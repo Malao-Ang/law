@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Writer\HTML;
+use PhpOffice\PhpWord\Settings;
 use Illuminate\Http\Request;
 
 class WordController extends Controller
 {
-   public function uploadForm()
+    public function uploadForm()
     {
         return view('upload');
     }
@@ -21,12 +21,21 @@ class WordController extends Controller
 
         $file = $request->file('file');
 
-        $phpWord = IOFactory::load($file->getPathName());
+        // โหลดไฟล์ Word
+        $phpWord = IOFactory::load($file->getPathname());
 
-        // ตั้งค่า HTML writer ให้ support UTF-8
-        $writer = new HTML($phpWord);
-        $html = $writer->getContent();
+        // สร้าง HTML Writer
+        $writer = IOFactory::createWriter($phpWord, 'HTML');
 
-        return view('result', compact('html'));
+        // ดึงเนื้อหา HTML
+        $content = $writer->getContent();
+
+        /* * เทคนิคพิเศษ:
+         * 1. แทนที่ Tab (\t) เป็นช่องว่าง HTML (&nbsp;) 4 ตัว
+         * 2. ครอบเนื้อหาด้วย Class 'word-content' เพื่อจัดการ CSS ต่อ
+         */
+        $content = str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $content);
+
+        return view('result', ['html' => $content]);
     }
 }
