@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use PhpOffice\PhpWord\IOFactory;
+use Spatie\PdfToText\Pdf;
 use App\Models\Document;
 use Illuminate\Support\Facades\Log;
+use Smalot\PdfParser\Parser;
 
 class WordController extends Controller
 {
@@ -38,27 +40,32 @@ class WordController extends Controller
             $html = $this->stripUnderline($html);
             // ส่วนใน public function convert
         } else if ($extension === 'pdf') {
-            $filePath = $file->getPathname();
+            $parser = new Parser();
+            $pdf = $parser->parseFile($file->getPathname());
+            $text = $pdf->getText();
 
-            // 1. ใช้ Smalot Parser (มักจะแม่นยำกว่า pdftotext ในเรื่องสระไทย)
-            try {
-                $parser = new \Smalot\PdfParser\Parser();
-                $pdf = $parser->parseFile($filePath);
-                $text = $pdf->getText();
-            } catch (\Exception $e) {
-                // แผนสำรองถ้า Parser พัง
-                $escapedPath = escapeshellarg($filePath);
-                $text = shell_exec("pdftotext -layout -enc UTF-8 $escapedPath -");
-            }
-
-            // 2. ทำความสะอาดข้อความและซ่อมสระไทย
+            // ต้องซ่อมข้อความ (รวม ส+า) ก่อนที่จะไปแตกเป็น Line
             $text = $this->repairThaiAdvanced($text);
 
-            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">'
-                . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
-                . '</div>';
+            $lines = explode("\n", $text);
+            $processedLines = [];
 
-            $html = $this->repairThai($html); // ใช้ฟังก์ชันเดิมที่คุณมีด้วย
+            foreach ($lines as $line) {
+                $line = trim($line, "\r");
+
+                // หลังจากซ่อมคำแล้ว ช่องว่างที่เหลือมักจะเป็นช่องว่างระหว่างประโยคจริงๆ
+                // เราค่อยเปลี่ยนช่องว่างที่เหลือ (ถ้ามี 2 ช่องขึ้นไป) ให้เป็น nbsp
+                $line = preg_replace_callback('/  +/', function ($match) {
+                    return str_repeat('&nbsp;', strlen($match[0]));
+                }, $line);
+
+                $processedLines[] = $line;
+            }
+
+            $html = implode('<br>', $processedLines);
+
+            // 4. แสดงผลโดยใช้ white-space: normal เพื่อให้ Editor ตัดคำไทยได้เอง
+            $html = '<div class="legal-document" style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
         }
 
         return response()->json([
@@ -146,18 +153,47 @@ class WordController extends Controller
 
     private function repairThaiAdvanced(string $text): string
     {
-        // 1. แก้ไขปัญหา "ำ" (เกิดจาก ํ + า แยกกัน)
-        $text = preg_replace('/\x{0E4D}\s*\x{0E32}/u', 'ำ', $text);
+        if (empty($text)) return $text;
 
-        // 2. แก้สระที่ชอบสลับที่ (เช่น สระบน/วรรณยุกต์ มาก่อนพยัญชนะ)
-        // หมายเหตุ: PDF บางตัวเก็บ [พยัญชนะ][วรรณยุกต์][สระ] สลับกัน
-        // เราจะใช้ Regex ช่วยดึงสระที่ลอยผิดตำแหน่ง
-        $text = preg_replace('/([ก-ฮ])\s+([\x{0E31}\x{0E34}-\x{0E37}\x{0E47}-\x{0E4E}])/u', '$1$2', $text);
+        // 1. จัดการ "พยัญชนะ + space + านัก/านวน/า" ให้กลายเป็น สระอำ
+        // โดยเน้นกลุ่มคำที่พบบ่อยในเอกสารราชการ
+        $common_am_words = ['สำ', 'จำ', 'นำ', 'อำ', 'ดำ', 'ตำ', 'ทำ'];
+        foreach ($common_am_words as $word) {
+            $char = mb_substr($word, 0, 1);
+            // แก้ไข: ส [space] า -> สำ, จ [space] า -> จำ
+            $text = preg_replace('/' . $char . '\s+า/u', $word, $text);
+        }
 
-        // 3. ลบช่องว่างที่เกินมาในคำไทย (PDF มักจะใส่ space ระหว่างตัวอักษร)
-        // ระวัง: อย่าลบ space ทั้งหมดเพราะจะเสีย Layout กฎหมาย
-        // แก้เฉพาะจุดที่สระลอยห่างจากพยัญชนะ
-        $text = preg_replace('/([ก-ฮ])\s+([ะาำิีึืุูเแโใไ็่้๊๋์])/u', '$1$2', $text);
+        // 2. แก้ไขกรณีทั่วไปของสระอำ: [พยัญชนะ] + [space] + [นิคหิต ํ] + [space] + [สระอา า]
+        // หรือ [พยัญชนะ] + [space] + า
+        $text = preg_replace('/([ก-ฮ])\s+[\x{0E4D}]?\s*า/u', '$1ำ', $text);
+
+        // 3. แก้ไขกรณีมีวงกลม (นิคหิต) แต่ไม่มีสระอาตามมา (ถ้ามี)
+        $text = preg_replace('/([ก-ฮ])\s+[\x{0E4D}]/u', '$1ำ', $text);
+
+        // 4. ลบช่องว่างที่แทรกกลางคำ (สระบน/วรรณยุกต์) เช่น "ที่" เป็น "ท ี่"
+        $upper_marks = 'ิีึืั็่้๊๋์';
+        $text = preg_replace('/([ก-ฮ])\s+([' . $upper_marks . '])/u', '$1$2', $text);
+
+        // 5. ลบช่องว่างที่แทรกระหว่างสระบนกับตัวสะกด เช่น "นั ก" -> "นัก"
+        $text = preg_replace('/([' . $upper_marks . '])\s+([ก-ฮ])/u', '$1$2', $text);
+
+        // 6. ลบช่องว่างหลังสระหน้า (เ แ โ ใ ไ) เช่น "เ พื่อ" -> "เพื่อ"
+        $text = preg_replace('/([เแโใไ])\s+([ก-ฮ])/u', '$1$2', $text);
+
+        // 7. แก้ไข "ำา" (สระอำซ้ำซ้อน)
+        $text = str_replace('ำา', 'ำ', $text);
+
+        // 8. Dictionary เฉพาะจุดสำหรับเคสที่คุณส่งมา
+        $dictionary = [
+            'ส านัก' => 'สำนัก',
+            'จ านวน' => 'จำนวน',
+            'น าไป' => 'นำไป',
+            'อ านวย' => 'อำนวย',
+            'จ าเป็น' => 'จำเป็น',
+            'ประจ า' => 'ประจำ'
+        ];
+        $text = str_replace(array_keys($dictionary), array_values($dictionary), $text);
 
         return $text;
     }
