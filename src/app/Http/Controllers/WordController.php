@@ -25,86 +25,338 @@ class WordController extends Controller
         $html = "";
 
         if ($extension === 'docx') {
-            // Load Word file
             $phpWord = IOFactory::load($file->getPathname());
-            
-            // Save to HTML in memory
-            $xmlWriter = IOFactory::createWriter($phpWord, 'HTML');
-            
-            // Capture output
-            ob_start();
-            $xmlWriter->save("php://output");
-            $content = ob_get_contents();
-            ob_end_clean();
-            
-            // Extract body content only
-            if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $content, $matches)) {
-                $html = $matches[1];
-            } else {
-                $html = $content;
+            if ($request->boolean('debug')) {
+                return response()->json([
+                    'graph' => $this->buildElementGraph($phpWord),
+                    'type' => $extension
+                ]);
             }
 
-            // Post-process HTML to improve formatting
-            // 1. Ensure tables have proper borders and styling
-            $html = preg_replace(
-                '/<table([^>]*)>/',
-                '<table$1 style="border-collapse: collapse; width: 100%; margin-bottom: 1em; font-family: \'Sarabun New\', sans-serif;">',
-                $html
-            );
-            
-            // 2. Add border to table cells if not present
-            $html = preg_replace(
-                '/<(td|th)([^>]*)>/',
-                '<$1$2 style="border: 1px solid #000; padding: 8px; font-family: \'Sarabun New\', sans-serif;">',
-                $html
-            );
-
-            // 3. Preserve tabs by converting them to proper spacing
-            $html = str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $html);
-            
-            // 4. Wrap all content to set default font
-            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
+            $html = $this->convertDocxToHtmlByElements($phpWord);
+            $html = $this->repairThai($html);
+            $html = $this->stripUnderline($html);
 
         } else if ($extension === 'pdf') {
-            // Parse PDF
-            $parser = new Parser();
-            $pdf = $parser->parseFile($file->getPathname());
-            $text = $pdf->getText();
-            
-            // Enhanced layout preservation for PDF
-            $lines = explode("\n", $text);
-            $processedLines = [];
-            
-            foreach ($lines as $line) {
-                // Detect if line starts with spaces/tabs (indentation)
-                if (preg_match('/^(\s+)(.*)$/', $line, $matches)) {
-                    $spaces = $matches[1];
-                    $content = $matches[2];
-                    
-                    // Convert leading spaces to non-breaking spaces
-                    $indentCount = strlen($spaces);
-                    $indent = str_repeat('&nbsp;', $indentCount);
-                    $processedLines[] = $indent . htmlspecialchars($content);
-                } else {
-                    // Regular line
-                    // Convert multiple spaces (potential tabs) to nbsp
-                    $line = preg_replace('/  +/', function($match) {
-                        return str_repeat('&nbsp;', strlen($match[0]));
-                    }, $line);
-                    $processedLines[] = htmlspecialchars($line);
-                }
-            }
-            
-            $html = implode('<br>', $processedLines);
-            
-            // Wrap in div with Thai-friendly font
-            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">' . $html . '</div>';
+            // Use pdftotext -layout to preserve layout
+            $tempFile = tempnam(sys_get_temp_dir(), 'pdf_');
+            $txtFile = $tempFile . '.txt';
+            rename($tempFile, $txtFile);
+            $escapedPath = escapeshellarg($file->getPathname());
+            $escapedTxt = escapeshellarg($txtFile);
+            shell_exec("pdftotext -layout -enc UTF-8 $escapedPath $escapedTxt");
+            $text = file_get_contents($txtFile);
+            unlink($txtFile);
+            $html = '<pre style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">' . htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</pre>';
+            $html = $this->repairThai($html);
         }
 
         return response()->json([
             'content' => $html,
             'type' => $extension
         ]);
+    }
+
+    private function convertDocxToHtmlByElements(\PhpOffice\PhpWord\PhpWord $phpWord): string
+    {
+        $chunks = [];
+        foreach ($phpWord->getSections() as $section) {
+            foreach ($section->getElements() as $element) {
+                $chunks[] = $this->processElement($element);
+            }
+        }
+
+        $html = implode('', $chunks);
+        $html = str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $html);
+
+        $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
+        return $html;
+    }
+
+    private function detectElementType($element): string
+    {
+        if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+            return 'TextRun';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Text) {
+            return 'Text';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\TextBreak) {
+            return 'TextBreak';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Table) {
+            return 'Table';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\ListItem) {
+            return 'ListItem';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Title) {
+            return 'Title';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Image) {
+            return 'Image';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Link) {
+            return 'Link';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\PageBreak) {
+            return 'PageBreak';
+        }
+
+        $class = is_object($element) ? get_class($element) : '';
+        if ($class !== '' && (stripos($class, 'Math') !== false || stripos($class, 'OMath') !== false)) {
+            return 'Math';
+        }
+
+        return $class !== '' ? $class : 'Unknown';
+    }
+
+    private function buildElementGraph(\PhpOffice\PhpWord\PhpWord $phpWord): array
+    {
+        $graph = [];
+        $sectionIndex = 0;
+
+        foreach ($phpWord->getSections() as $section) {
+            $sectionIndex++;
+            $elements = [];
+
+            foreach ($section->getElements() as $element) {
+                $elements[] = $this->buildElementGraphNode($element);
+            }
+
+            $graph[] = [
+                'type' => 'Section',
+                'index' => $sectionIndex,
+                'elements' => $elements
+            ];
+        }
+
+        return $graph;
+    }
+
+    private function buildElementGraphNode($element): array
+    {
+        $type = $this->detectElementType($element);
+        $node = [
+            'type' => $type,
+            'class' => is_object($element) ? get_class($element) : null,
+        ];
+
+        if ($element instanceof \PhpOffice\PhpWord\Element\Text) {
+            $node['text'] = $element->getText();
+        }
+
+        if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+            $children = [];
+            foreach ($element->getElements() as $child) {
+                $children[] = $this->buildElementGraphNode($child);
+            }
+            $node['children'] = $children;
+        }
+
+        if ($element instanceof \PhpOffice\PhpWord\Element\Table) {
+            $node['rows'] = count($element->getRows());
+        }
+
+        return $node;
+    }
+
+    private function processElement($element): string
+    {
+        if ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+            return $this->processTextRun($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Text) {
+            return $this->processText($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\TextBreak) {
+            return '<br>';
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Table) {
+            return $this->processTable($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\ListItem) {
+            return $this->processListItem($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Title) {
+            return $this->processTitle($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\Link) {
+            return $this->processLink($element);
+        }
+        if ($element instanceof \PhpOffice\PhpWord\Element\PageBreak) {
+            return '<div style="page-break-after: always;"></div>';
+        }
+
+        $type = $this->detectElementType($element);
+        if ($type === 'Math') {
+            return $this->processUnknownMathElement($element);
+        }
+
+        return '';
+    }
+
+    private function processTextRun(\PhpOffice\PhpWord\Element\TextRun $textRun): string
+    {
+        $parts = [];
+        foreach ($textRun->getElements() as $child) {
+            $parts[] = $this->processElement($child);
+        }
+
+        $content = implode('', $parts);
+        if ($content === '') {
+            return '';
+        }
+
+        // Extract paragraph alignment if available
+        $align = $this->getParagraphAlignment($textRun);
+        $alignStyle = $align ? "text-align: $align;" : '';
+        return '<p style="' . $alignStyle . '">' . $content . '</p>';
+    }
+
+    private function processText(\PhpOffice\PhpWord\Element\Text $text): string
+    {
+        $content = htmlspecialchars($text->getText(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $fontStyle = $text->getFontStyle();
+
+        $styles = [];
+        $fontName = null;
+
+        if ($fontStyle) {
+            if (method_exists($fontStyle, 'isBold') && $fontStyle->isBold()) {
+                $content = '<strong>' . $content . '</strong>';
+            }
+            if (method_exists($fontStyle, 'isItalic') && $fontStyle->isItalic()) {
+                $content = '<em>' . $content . '</em>';
+            }
+            // Ignore underline on import (per plan)
+            if (method_exists($fontStyle, 'isStrikethrough') && $fontStyle->isStrikethrough()) {
+                $content = '<s>' . $content . '</s>';
+            }
+
+            if (method_exists($fontStyle, 'getColor') && $fontStyle->getColor()) {
+                $styles[] = 'color: #' . $fontStyle->getColor();
+            }
+            if (method_exists($fontStyle, 'getSize') && $fontStyle->getSize()) {
+                $styles[] = 'font-size: ' . $fontStyle->getSize() . 'pt';
+            }
+            if (method_exists($fontStyle, 'getName') && $fontStyle->getName()) {
+                $fontName = $fontStyle->getName();
+                $styles[] = 'font-family: \'{$fontName}\', sans-serif';
+            }
+        }
+
+        if ($fontName && stripos($fontName, 'Math') !== false) {
+            $styles[] = 'font-family: \'Cambria Math\', \'Times New Roman\', serif';
+        }
+
+        if (!empty($styles)) {
+            return '<span style="' . implode('; ', $styles) . '">' . $content . '</span>';
+        }
+
+        return $content;
+    }
+
+    private function getParagraphAlignment(\PhpOffice\PhpWord\Element\TextRun $textRun): ?string
+    {
+        // Try to get paragraph style from the TextRun
+        $paragraphStyle = null;
+        if (method_exists($textRun, 'getParagraphStyle')) {
+            $paragraphStyle = $textRun->getParagraphStyle();
+        }
+        // Fallback: some PhpWord versions store it in getStyle()
+        if (!$paragraphStyle && method_exists($textRun, 'getStyle')) {
+            $paragraphStyle = $textRun->getStyle();
+        }
+        if (!$paragraphStyle) {
+            return null;
+        }
+        if (is_string($paragraphStyle)) {
+            // Style name; we cannot resolve without full style registry, skip
+            return null;
+        }
+        if (method_exists($paragraphStyle, 'getAlignment')) {
+            $align = $paragraphStyle->getAlignment();
+            return match ($align) {
+                'left' => 'left',
+                'center' => 'center',
+                'right' => 'right',
+                'both' => 'justify',
+                'justify' => 'justify',
+                default => null,
+            };
+        }
+        return null;
+    }
+
+    private function repairThai(string $html): string
+    {
+        // Fix common Thai spacing issues, especially ำ
+        // ส า -> สำ, [พยัญชนะ] ำ -> [พยัญชนะ]ำ
+        $html = preg_replace('/([ก-ฮ])\s+ำ/u', '$1ำ', $html);
+        // Also handle standalone ำ with space before
+        $html = preg_replace('/\s+ำ/u', 'ำ', $html);
+        return $html;
+    }
+
+    private function stripUnderline(string $html): string
+    {
+        // Remove <u> tags and any text-decoration: underline from styles
+        $html = preg_replace('/<u>(.*?)<\/u>/us', '$1', $html);
+        $html = preg_replace('/text-decoration\s*:\s*underline[^;]*;?/i', '', $html);
+        return $html;
+    }
+
+    private function processLink(\PhpOffice\PhpWord\Element\Link $link): string
+    {
+        $text = htmlspecialchars($link->getText(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $url = htmlspecialchars($link->getSource(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return '<a href="' . $url . '">' . $text . '</a>';
+    }
+
+    private function processTable(\PhpOffice\PhpWord\Element\Table $table): string
+    {
+        $rowsHtml = [];
+        foreach ($table->getRows() as $row) {
+            $cellsHtml = [];
+            foreach ($row->getCells() as $cell) {
+                $cellParts = [];
+                foreach ($cell->getElements() as $child) {
+                    $cellParts[] = $this->processElement($child);
+                }
+                $cellContent = implode('', $cellParts);
+                $cellsHtml[] = '<td class="doc-td" style="border: 1px solid #000; padding: 8px; vertical-align: top;">' . $cellContent . '</td>';
+            }
+            $rowsHtml[] = '<tr>' . implode('', $cellsHtml) . '</tr>';
+        }
+
+        return '<table class="doc-table" style="border-collapse: collapse; width: 100%; margin-bottom: 1em; font-family: \'Sarabun New\', sans-serif;"><tbody>' . implode('', $rowsHtml) . '</tbody></table>';
+    }
+
+    private function processListItem(\PhpOffice\PhpWord\Element\ListItem $listItem): string
+    {
+        $text = htmlspecialchars($listItem->getText(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $depth = $listItem->getDepth();
+        $style = 'margin-left: ' . ($depth * 2) . 'em;';
+        return '<li style="' . $style . '">' . $text . '</li>';
+    }
+
+    private function processTitle(\PhpOffice\PhpWord\Element\Title $title): string
+    {
+        $text = htmlspecialchars($title->getText(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $depth = $title->getDepth();
+        $level = min(max($depth + 1, 1), 6);
+        return '<h' . $level . ' style="font-weight: bold; margin: 1em 0 0.5em 0;">' . $text . '</h' . $level . '>';
+    }
+
+    private function processUnknownMathElement($element): string
+    {
+        if (is_object($element) && method_exists($element, 'getText')) {
+            $text = htmlspecialchars((string) $element->getText(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return '<span style="font-family: \'Cambria Math\', \'Times New Roman\', serif;">' . $text . '</span>';
+        }
+
+        return '';
     }
 
     public function store(Request $request)
