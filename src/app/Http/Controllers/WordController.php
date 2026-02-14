@@ -2,61 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\Settings;
 use Illuminate\Http\Request;
-use Spatie\Browsershot\Browsershot;
+use PhpOffice\PhpWord\IOFactory;
+use Smalot\PdfParser\Parser;
+use App\Models\Document;
 
 class WordController extends Controller
 {
-    public function uploadForm()
+    public function index()
     {
-        return view('upload');
+        return view('app');
     }
 
-   public function convert(Request $request)
-{
-    $request->validate([
-        'file' => 'required|mimes:docx,pdf|max:10240' // รองรับทั้ง docx และ pdf
-    ]);
+    public function convert(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:docx,pdf|max:10240'
+        ]);
 
-    $file = $request->file('file');
-    $extension = $file->getClientOriginalExtension();
-    $html = "";
-    $pdfUrl = "";
+        $file = $request->file('file');
+        $extension = $file->getClientOriginalExtension();
+        $html = "";
 
-    if ($extension === 'docx') {
-        // ถ้าเป็น Word: แปลงเป็น HTML
-        $phpWord = \PhpOffice\PhpWord\IOFactory::load($file->getPathname());
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML');
-        $html = $writer->getContent();
-        
-        // (Optional) หากมี PDF ต้นฉบับในระบบอยู่แล้ว ให้กำหนด path ที่นี่
-        $pdfUrl = null; 
-    } else {
-        // ถ้าเป็น PDF: เก็บไฟล์ไว้ใน public เพื่อนำไป Preview
-        $fileName = time() . '.pdf';
-        $file->move(public_path('uploads'), $fileName);
-        $pdfUrl = asset('uploads/' . $fileName);
-        $html = "<p>เอกสาร PDF ต้นฉบับ (แก้ไขไม่ได้โดยตรง กรุณาพิมพ์เนื้อหาใหม่ที่นี่)</p>";
+        if ($extension === 'docx') {
+            // Load Word file
+            $phpWord = IOFactory::load($file->getPathname());
+            
+            // Save to HTML in memory
+            $xmlWriter = IOFactory::createWriter($phpWord, 'HTML');
+            
+            // Capture output
+            ob_start();
+            $xmlWriter->save("php://output");
+            $content = ob_get_contents();
+            ob_end_clean();
+            
+            // Extract body content only
+            if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $content, $matches)) {
+                $html = $matches[1];
+            } else {
+                $html = $content;
+            }
+
+            // Post-process HTML to improve formatting
+            // 1. Ensure tables have proper borders and styling
+            $html = preg_replace(
+                '/<table([^>]*)>/',
+                '<table$1 style="border-collapse: collapse; width: 100%; margin-bottom: 1em; font-family: \'Sarabun New\', sans-serif;">',
+                $html
+            );
+            
+            // 2. Add border to table cells if not present
+            $html = preg_replace(
+                '/<(td|th)([^>]*)>/',
+                '<$1$2 style="border: 1px solid #000; padding: 8px; font-family: \'Sarabun New\', sans-serif;">',
+                $html
+            );
+
+            // 3. Preserve tabs by converting them to proper spacing
+            $html = str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $html);
+            
+            // 4. Wrap all content to set default font
+            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
+
+        } else if ($extension === 'pdf') {
+            // Parse PDF
+            $parser = new Parser();
+            $pdf = $parser->parseFile($file->getPathname());
+            $text = $pdf->getText();
+            
+            // Enhanced layout preservation for PDF
+            $lines = explode("\n", $text);
+            $processedLines = [];
+            
+            foreach ($lines as $line) {
+                // Detect if line starts with spaces/tabs (indentation)
+                if (preg_match('/^(\s+)(.*)$/', $line, $matches)) {
+                    $spaces = $matches[1];
+                    $content = $matches[2];
+                    
+                    // Convert leading spaces to non-breaking spaces
+                    $indentCount = strlen($spaces);
+                    $indent = str_repeat('&nbsp;', $indentCount);
+                    $processedLines[] = $indent . htmlspecialchars($content);
+                } else {
+                    // Regular line
+                    // Convert multiple spaces (potential tabs) to nbsp
+                    $line = preg_replace('/  +/', function($match) {
+                        return str_repeat('&nbsp;', strlen($match[0]));
+                    }, $line);
+                    $processedLines[] = htmlspecialchars($line);
+                }
+            }
+            
+            $html = implode('<br>', $processedLines);
+            
+            // Wrap in div with Thai-friendly font
+            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">' . $html . '</div>';
+        }
+
+        return response()->json([
+            'content' => $html,
+            'type' => $extension
+        ]);
     }
 
-    return view('result', compact('html', 'pdfUrl'));
-}
-    public function exportPdf(Request $request)
-{
-    $html = $request->input('content'); // รับค่าจาก TinyMCE
+    public function store(Request $request)
+    {
+        $request->validate([
+            'content' => 'required',
+            'title' => 'nullable|string|max:255'
+        ]);
 
-    // สร้างไฟล์ HTML ชั่วคราวที่มีสไตล์กระดาษ
-    $fullHtml = view('pdf_template', ['content' => $html])->render();
+        $document = Document::create([
+            'title' => $request->input('title', 'Untitled Document'),
+            'content' => $request->input('content')
+        ]);
 
-    $pdfPath = storage_path('app/public/document.pdf');
-
-    Browsershot::html($fullHtml)
-        ->paperSize(210, 297) // ขนาด A4 (mm)
-        ->margins(10, 10, 10, 10) // ขอบกระดาษ
-        ->save($pdfPath);
-
-    return response()->download($pdfPath);
-}
+        return response()->json([
+            'message' => 'Document saved successfully',
+            'id' => $document->id
+        ]);
+    }
 }

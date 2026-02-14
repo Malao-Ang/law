@@ -1,0 +1,43 @@
+# --- Version Control ---
+.git
+.gitignore
+.gitattributes
+
+# --- Laravel / PHP ---
+vendor/
+node_modules/
+.env
+.env.*
+! .env.example
+storage/*.key
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*
+
+# --- Vue / Frontend ---
+dist/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# --- Temporary/Uploaded Files (สำคัญมากสำหรับระบบจัดการเอกสาร) ---
+# ไม่ควร Copy ไฟล์เอกสารที่ใช้ทดสอบเข้าไปใน Image
+storage/app/public/*
+public/storage
+tests/
+
+# --- Docker / OS ---
+docker-compose.yml
+Dockerfile
+.dockerignore
+.DS_Store
+Thumbs.db
+
+# --- Ide / Editors ---
+.idea/
+.vscode/
+*.swp
+*.swo
