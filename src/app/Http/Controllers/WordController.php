@@ -36,22 +36,29 @@ class WordController extends Controller
             $html = $this->convertDocxToHtmlByElements($phpWord);
             $html = $this->repairThai($html);
             $html = $this->stripUnderline($html);
+            // ส่วนใน public function convert
         } else if ($extension === 'pdf') {
             $filePath = $file->getPathname();
-            $escapedPath = escapeshellarg($filePath);
 
-            $text = shell_exec("pdftotext -layout -enc UTF-8 $escapedPath -");
-
-            if (!$text) {
+            // 1. ใช้ Smalot Parser (มักจะแม่นยำกว่า pdftotext ในเรื่องสระไทย)
+            try {
                 $parser = new \Smalot\PdfParser\Parser();
                 $pdf = $parser->parseFile($filePath);
                 $text = $pdf->getText();
+            } catch (\Exception $e) {
+                // แผนสำรองถ้า Parser พัง
+                $escapedPath = escapeshellarg($filePath);
+                $text = shell_exec("pdftotext -layout -enc UTF-8 $escapedPath -");
             }
 
-            $html = '<pre style="font-family: \'Sarabun\', sans-serif; font-size: 16pt; white-space: pre-wrap;">'
-                . htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-                . '</pre>';
-            $html = $this->repairThai($html);
+            // 2. ทำความสะอาดข้อความและซ่อมสระไทย
+            $text = $this->repairThaiAdvanced($text);
+
+            $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">'
+                . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
+                . '</div>';
+
+            $html = $this->repairThai($html); // ใช้ฟังก์ชันเดิมที่คุณมีด้วย
         }
 
         return response()->json([
@@ -135,6 +142,24 @@ class WordController extends Controller
         }
 
         return $graph;
+    }
+
+    private function repairThaiAdvanced(string $text): string
+    {
+        // 1. แก้ไขปัญหา "ำ" (เกิดจาก ํ + า แยกกัน)
+        $text = preg_replace('/\x{0E4D}\s*\x{0E32}/u', 'ำ', $text);
+
+        // 2. แก้สระที่ชอบสลับที่ (เช่น สระบน/วรรณยุกต์ มาก่อนพยัญชนะ)
+        // หมายเหตุ: PDF บางตัวเก็บ [พยัญชนะ][วรรณยุกต์][สระ] สลับกัน
+        // เราจะใช้ Regex ช่วยดึงสระที่ลอยผิดตำแหน่ง
+        $text = preg_replace('/([ก-ฮ])\s+([\x{0E31}\x{0E34}-\x{0E37}\x{0E47}-\x{0E4E}])/u', '$1$2', $text);
+
+        // 3. ลบช่องว่างที่เกินมาในคำไทย (PDF มักจะใส่ space ระหว่างตัวอักษร)
+        // ระวัง: อย่าลบ space ทั้งหมดเพราะจะเสีย Layout กฎหมาย
+        // แก้เฉพาะจุดที่สระลอยห่างจากพยัญชนะ
+        $text = preg_replace('/([ก-ฮ])\s+([ะาำิีึืุูเแโใไ็่้๊๋์])/u', '$1$2', $text);
+
+        return $text;
     }
 
     private function buildElementGraphNode($element): array
