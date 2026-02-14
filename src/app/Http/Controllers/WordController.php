@@ -44,28 +44,80 @@ class WordController extends Controller
             $pdf = $parser->parseFile($file->getPathname());
             $text = $pdf->getText();
 
-            // ต้องซ่อมข้อความ (รวม ส+า) ก่อนที่จะไปแตกเป็น Line
             $text = $this->repairThaiAdvanced($text);
 
             $lines = explode("\n", $text);
-            $processedLines = [];
+            $processedHtml = "";
 
             foreach ($lines as $line) {
-                $line = trim($line, "\r");
+                $rawLine = $line;
+                $line = trim($line, "\r\n");
+                $trimmedLine = trim($line);
 
-                // หลังจากซ่อมคำแล้ว ช่องว่างที่เหลือมักจะเป็นช่องว่างระหว่างประโยคจริงๆ
-                // เราค่อยเปลี่ยนช่องว่างที่เหลือ (ถ้ามี 2 ช่องขึ้นไป) ให้เป็น nbsp
-                $line = preg_replace_callback('/  +/', function ($match) {
+                if (empty($trimmedLine)) {
+                    $processedHtml .= "<p style='margin: 0; min-height: 1em;'>&nbsp;</p>";
+                    continue;
+                }
+
+                $style = "margin-bottom: 0.1em; line-height: 1.6; clear: both;";
+                $isTitle = false;
+
+                // --- 1. ตรวจจับหัวข้อกึ่งกลาง (Center Alignment) ---
+                // เช็คจาก Keyword หรือ บรรทัดที่มี Space นำหน้าเยอะๆ (เช่น ส่วนหัว TOR)
+                if (
+                    preg_match('/^(- ร่าง -|ขอบเขตของงาน|โครงการ|ประจำปีงบประมาณ|TOR|Terms of Reference)/u', $trimmedLine) ||
+                    preg_match('/^\(.*\)$/u', $trimmedLine) || // ข้อความในวงเล็บกึ่งกลาง เช่น (Terms of Reference : TOR)
+                    (preg_match('/^\s{12,}/u', $rawLine) && mb_strlen($trimmedLine) < 100)
+                ) {
+                    $style .= " text-align: center; font-weight: bold; font-size: 18pt; display: block; width: 100%; margin-top: 0.5em;";
+                    $isTitle = true;
+                }
+
+                // --- 2. ตรวจจับลำดับหัวข้อและการเยื้อง (Tab/Indent Alignment) ---
+
+                // หัวข้อหลัก: เลขตัวเดียว หรือ เลขไทยตัวเดียว (เช่น 1. , ๒.)
+                else if (preg_match('/^(\d+|[๑-๙]+)\.(?!\d)/u', $trimmedLine)) {
+                    $style .= " font-weight: bold; text-align: left; margin-top: 1.2em; font-size: 16pt;";
+                    $isTitle = true;
+                }
+
+                // หัวข้อย่อยชั้นที่ 1: (เช่น 1.1 , ๑.๑) -> Tab 1
+                else if (preg_match('/^(\d+|[๑-๙]+)\.(\d+|[๑-๙]+)\s+/u', $trimmedLine)) {
+                    $style .= " padding-left: 3em; text-align: justify;";
+                }
+
+                // หัวข้อย่อยชั้นที่ 2: (เช่น 1.1.1 หรือ (1)) -> Tab 2
+                else if (preg_match('/^(\d+\.\d+\.\d+|(\(\d+\))|([๑-๙]+\.[๑-๙]+\.[๑-๙]+))/u', $trimmedLine)) {
+                    $style .= " padding-left: 5em; text-align: justify;";
+                }
+
+                // ย่อหน้าเนื้อหาปกติ (ตรวจจับจากการเคาะ Space นำหน้าบรรทัด)
+                else if (preg_match('/^\s{2,10}/u', $rawLine)) {
+                    $style .= " padding-left: 3em; text-indent: 2em; text-align: justify;";
+                }
+
+                // กรณีบรรทัดต่อจากหัวข้อ (Hanging Indent)
+                else {
+                    $style .= " text-align: justify;";
+                }
+
+                // ทำความสะอาดช่องว่างภายในบรรทัด
+                $content = htmlspecialchars($trimmedLine);
+                $content = preg_replace_callback('/  +/', function ($match) {
                     return str_repeat('&nbsp;', strlen($match[0]));
-                }, $line);
+                }, $content);
 
-                $processedLines[] = $line;
+                // สร้าง Output HTML
+                if ($isTitle) {
+                    $processedHtml .= "<div style='{$style}'>" . $content . "</div>";
+                } else {
+                    $processedHtml .= "<p style='{$style}'>" . $content . "</p>";
+                }
             }
 
-            $html = implode('<br>', $processedLines);
-
-            // 4. แสดงผลโดยใช้ white-space: normal เพื่อให้ Editor ตัดคำไทยได้เอง
-            $html = '<div class="legal-document" style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
+            $html = '<div class="legal-document" style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; padding: 1in; background: white;">'
+                . $processedHtml .
+                '</div>';
         }
 
         return response()->json([
