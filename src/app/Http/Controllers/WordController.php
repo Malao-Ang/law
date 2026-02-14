@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use PhpOffice\PhpWord\IOFactory;
-use Smalot\PdfParser\Parser;
 use App\Models\Document;
+use Illuminate\Support\Facades\Log;
 
 class WordController extends Controller
 {
@@ -36,18 +36,21 @@ class WordController extends Controller
             $html = $this->convertDocxToHtmlByElements($phpWord);
             $html = $this->repairThai($html);
             $html = $this->stripUnderline($html);
-
         } else if ($extension === 'pdf') {
-            // Use pdftotext -layout to preserve layout
-            $tempFile = tempnam(sys_get_temp_dir(), 'pdf_');
-            $txtFile = $tempFile . '.txt';
-            rename($tempFile, $txtFile);
-            $escapedPath = escapeshellarg($file->getPathname());
-            $escapedTxt = escapeshellarg($txtFile);
-            shell_exec("pdftotext -layout -enc UTF-8 $escapedPath $escapedTxt");
-            $text = file_get_contents($txtFile);
-            unlink($txtFile);
-            $html = '<pre style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5; white-space: pre-wrap;">' . htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</pre>';
+            $filePath = $file->getPathname();
+            $escapedPath = escapeshellarg($filePath);
+
+            $text = shell_exec("pdftotext -layout -enc UTF-8 $escapedPath -");
+
+            if (!$text) {
+                $parser = new \Smalot\PdfParser\Parser();
+                $pdf = $parser->parseFile($filePath);
+                $text = $pdf->getText();
+            }
+
+            $html = '<pre style="font-family: \'Sarabun\', sans-serif; font-size: 16pt; white-space: pre-wrap;">'
+                . htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                . '</pre>';
             $html = $this->repairThai($html);
         }
 
