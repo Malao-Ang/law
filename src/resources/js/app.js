@@ -6,6 +6,7 @@ import '@mdi/font/css/materialdesignicons.css';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import App from './App.vue';
+import router from './router';
 
 const vuetify = createVuetify({
     components,
@@ -15,4 +16,7 @@ const vuetify = createVuetify({
     }
 });
 
-createApp(App).use(vuetify).mount('#app');
+const app = createApp(App);
+app.use(vuetify);
+app.use(router);
+app.mount('#app');

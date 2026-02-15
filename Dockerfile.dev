@@ -1,0 +1,31 @@
+FROM php:8.4-fpm
+
+# ติดตั้ง System Dependencies (รวม poppler-utils สำหรับอ่าน PDF)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libzip-dev \
+    unzip \
+    libxml2-dev \
+    libonig-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    pkg-config autoconf g++ make \
+    libssl-dev \
+    poppler-utils \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install zip xml pdo pdo_mysql mbstring gd \
+    && pecl install mongodb \
+    && docker-php-ext-enable mongodb \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ติดตั้ง Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+# ตั้งค่า Permission เบื้องต้น
+RUN chown -R www-data:www-data /var/www/html
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
