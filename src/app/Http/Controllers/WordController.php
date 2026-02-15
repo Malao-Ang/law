@@ -28,17 +28,29 @@ class WordController extends Controller
 
         if ($extension === 'docx') {
             $phpWord = IOFactory::load($file->getPathname());
-            if ($request->boolean('debug')) {
-                return response()->json([
-                    'graph' => $this->buildElementGraph($phpWord),
-                    'type' => $extension
-                ]);
+
+            $writer = IOFactory::createWriter($phpWord, 'HTML');
+            ob_start();
+            $writer->save('php://output');
+            $content = ob_get_clean();
+
+            // เอาเฉพาะ body
+            if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $content, $m)) {
+                $html = $m[1];
+            } else {
+                $html = $content;
             }
 
-            $html = $this->convertDocxToHtmlByElements($phpWord);
+            // normalize ตารางให้ Tiptap
+            $html = $this->normalizeDocxHtmlForTiptap($html);
+
             $html = $this->repairThai($html);
             $html = $this->stripUnderline($html);
-            // ส่วนใน public function convert
+
+            // wrap font
+            $html = '<div class="legal-document" style="font-family:\'Sarabun New\',sans-serif;font-size:16pt;line-height:1.5;">'
+                . $html
+                . '</div>';
         } else if ($extension === 'pdf') {
             $parser = new Parser();
             $pdf = $parser->parseFile($file->getPathname());
@@ -126,21 +138,97 @@ class WordController extends Controller
         ]);
     }
 
-    private function convertDocxToHtmlByElements(\PhpOffice\PhpWord\PhpWord $phpWord): string
+    private function normalizeDocxHtmlForTiptap(string $html): string
     {
-        $chunks = [];
-        foreach ($phpWord->getSections() as $section) {
-            foreach ($section->getElements() as $element) {
-                $chunks[] = $this->processElement($element);
+        if ($html === '') return $html;
+
+        // 1) normalize <table> : merge class + ensure style + ensure tbody
+        $html = preg_replace_callback('/<table\b([^>]*)>/i', function ($m) {
+            $attrs = $m[1];
+
+            // --- merge class ---
+            if (preg_match('/\bclass\s*=\s*"([^"]*)"/i', $attrs, $cm)) {
+                $classes = trim($cm[1]);
+                // เติม doc-table ถ้ายังไม่มี
+                if (!preg_match('/\bdoc-table\b/i', $classes)) {
+                    $classes .= ' doc-table';
+                }
+                $attrs = preg_replace('/\bclass\s*=\s*"[^"]*"/i', 'class="' . $classes . '"', $attrs, 1);
+            } else {
+                $attrs .= ' class="doc-table"';
             }
-        }
 
-        $html = implode('', $chunks);
-        $html = str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $html);
+            // --- ensure style (merge style ไม่ยัดซ้ำแบบพัง) ---
+            $needStyle = "border-collapse:collapse;width:100%;table-layout:fixed;";
+            if (preg_match('/\bstyle\s*=\s*"([^"]*)"/i', $attrs, $sm)) {
+                $style = $sm[1];
+                // เติมเฉพาะที่ยังไม่มี
+                foreach (explode(';', $needStyle) as $rule) {
+                    $rule = trim($rule);
+                    if ($rule === '') continue;
+                    $prop = trim(explode(':', $rule)[0]);
+                    if ($prop && stripos($style, $prop . ':') === false) {
+                        $style .= ';' . $rule;
+                    }
+                }
+                $attrs = preg_replace('/\bstyle\s*=\s*"[^"]*"/i', 'style="' . $style . '"', $attrs, 1);
+            } else {
+                $attrs .= ' style="' . $needStyle . '"';
+            }
 
-        $html = '<div style="font-family: \'Sarabun New\', sans-serif; font-size: 16pt; line-height: 1.5;">' . $html . '</div>';
+            return '<table' . $attrs . '>';
+        }, $html);
+
+        // 2) ใส่ <tbody> ถ้าไม่มี (Tiptap ชอบมาก)
+        $html = preg_replace_callback('/<table\b[^>]*>.*?<\/table>/is', function ($m) {
+            $table = $m[0];
+            if (stripos($table, '<tbody') !== false) return $table;
+
+            // ใส่ tbody ครอบเฉพาะ tr (อย่าทับ thead ถ้ามี)
+            if (stripos($table, '<thead') !== false) {
+                // ถ้ามี thead ให้ห่อเฉพาะส่วนหลัง thead
+                $table = preg_replace('/(<\/thead>)/i', '$1<tbody>', $table, 1);
+                $table = preg_replace('/<\/table>/i', '</tbody></table>', $table, 1);
+                return $table;
+            }
+
+            $table = preg_replace('/<table\b([^>]*)>/i', '<table$1><tbody>', $table, 1);
+            $table = preg_replace('/<\/table>/i', '</tbody></table>', $table, 1);
+            return $table;
+        }, $html);
+
+        // 3) ใส่ class td/th แบบ merge (ห้ามทำให้ class ซ้ำ)
+        $html = preg_replace_callback('/<(td|th)\b([^>]*)>/i', function ($m) {
+            $tag = strtolower($m[1]);
+            $attrs = $m[2];
+            $need = ($tag === 'th') ? 'doc-th' : 'doc-td';
+
+            if (preg_match('/\bclass\s*=\s*"([^"]*)"/i', $attrs, $cm)) {
+                $classes = trim($cm[1]);
+                if (!preg_match('/\b' . preg_quote($need, '/') . '\b/i', $classes)) {
+                    $classes .= ' ' . $need;
+                }
+                $attrs = preg_replace('/\bclass\s*=\s*"[^"]*"/i', 'class="' . $classes . '"', $attrs, 1);
+            } else {
+                $attrs .= ' class="' . $need . '"';
+            }
+
+            return '<' . $tag . $attrs . '>';
+        }, $html);
+
+        // 4) ลดปัญหา <p> ใน cell: บังคับ margin 0
+        $html = preg_replace(
+            '/(<(td|th)[^>]*>)\s*<p[^>]*>/i',
+            '$1<p style="margin:0; line-height:1.2;">',
+            $html
+        );
+
+        // 5) ลบ <p> ว่าง
+        $html = preg_replace('/<p[^>]*>\s*<\/p>/i', '', $html);
+
         return $html;
     }
+
 
     private function detectElementType($element): string
     {
