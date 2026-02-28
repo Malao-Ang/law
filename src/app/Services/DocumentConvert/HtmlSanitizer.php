@@ -26,7 +26,7 @@ class HtmlSanitizer
     {
         if ($text === '') return $text;
 
-        $common_am_words = ['สำ', 'จำ', 'นำ', 'อำ', 'ดำ', 'ตำ', 'ทำ'];
+        $common_am_words = ['สำ', 'จำ', 'นำ', 'อำ', 'ดำ', 'ตำ', 'ทำ', 'กำ', 'ลำ', 'คำ', 'บำ'];
         foreach ($common_am_words as $word) {
             $char = mb_substr($word, 0, 1);
             $text = preg_replace('/' . $char . '\s+า/u', $word, $text);
@@ -34,13 +34,20 @@ class HtmlSanitizer
 
         $text = preg_replace('/([ก-ฮ])\s+[\x{0E4D}]?\s*า/u', '$1ำ', $text);
         $text = preg_replace('/([ก-ฮ])\s+[\x{0E4D}]/u', '$1ำ', $text);
+        $text = preg_replace('/([ก-ฮ])\s+ำ/u', '$1ำ', $text);
+        $text = preg_replace('/([ก-ฮ])\s+็/u', '$1็', $text);
 
-        $upper_marks = 'ิีึืั็่้๊๋์';
+        $upper_marks = 'ิีึืัุู็่้๊๋์ํ';
         $text = preg_replace('/([ก-ฮ])\s+([' . $upper_marks . '])/u', '$1$2', $text);
         $text = preg_replace('/([' . $upper_marks . '])\s+([ก-ฮ])/u', '$1$2', $text);
+        $text = preg_replace('/([' . $upper_marks . '])\s+([' . $upper_marks . '])/u', '$1$2', $text);
+        
         $text = preg_replace('/([เแโใไ])\s+([ก-ฮ])/u', '$1$2', $text);
+        $text = preg_replace('/([ก-ฮ])\s+([เแโใไ])/u', '$2$1', $text);
 
-        $text = str_replace('ำา', 'ำ', $text);
+        $text = str_replace(['ำา', 'าำ'], 'ำ', $text);
+        $text = preg_replace('/([ก-ฮ])\s+ะ/u', '$1ะ', $text);
+        $text = preg_replace('/([ก-ฮ])\s+ๅ/u', '$1ๅ', $text);
 
         $dictionary = [
             'ส านัก' => 'สำนัก',
@@ -48,7 +55,22 @@ class HtmlSanitizer
             'น าไป' => 'นำไป',
             'อ านวย' => 'อำนวย',
             'จ าเป็น' => 'จำเป็น',
-            'ประจ า' => 'ประจำ'
+            'ประจ า' => 'ประจำ',
+            'ก าหนด' => 'กำหนด',
+            'ล าดับ' => 'ลำดับ',
+            'ค าสั่ง' => 'คำสั่ง',
+            'ท าการ' => 'ทำการ',
+            'ด าเนิน' => 'ดำเนิน',
+            'บ าบัด' => 'บำบัด',
+            'ต าแหน่ง' => 'ตำแหน่ง',
+            'ห าม' => 'ห้าม',
+            'ค ่า' => 'ค่า',
+            'ท ี่' => 'ที่',
+            'ก ็' => 'ก็',
+            'เพ ื่อ' => 'เพื่อ',
+            'ต ้อง' => 'ต้อง',
+            'ม ี' => 'มี',
+            'ให ้' => 'ให้',
         ];
         return str_replace(array_keys($dictionary), array_values($dictionary), $text);
     }

@@ -4,40 +4,55 @@
 .gitattributes
 
 # --- Laravel / PHP ---
-vendor/
-node_modules/
-.env
-.env.*
-! .env.example
-storage/*.key
-storage/framework/cache/data/*
-storage/framework/sessions/*
-storage/framework/views/*
-storage/logs/*
-bootstrap/cache/*
+src/vendor/
+src/node_modules/
+src/.env
+src/.env.*
+!src/.env.example
+src/storage/*.key
+src/storage/framework/cache/data/*
+src/storage/framework/sessions/*
+src/storage/framework/views/*
+src/storage/logs/*
+src/bootstrap/cache/*
 
-# --- Vue / Frontend ---
-dist/
-npm-debug.log
-yarn-error.log
-package-lock.json
-yarn.lock
+# --- Database (dev only, never ship sqlite into image) ---
+src/database/database.sqlite
+src/database/database.sqlite-shm
+src/database/database.sqlite-wal
 
-# --- Temporary/Uploaded Files (สำคัญมากสำหรับระบบจัดการเอกสาร) ---
-# ไม่ควร Copy ไฟล์เอกสารที่ใช้ทดสอบเข้าไปใน Image
-storage/app/public/*
-public/storage
-tests/
+# --- Vue / Frontend build output ---
+src/public/build/
+src/public/hot
+src/public/storage
 
-# --- Docker / OS ---
-docker-compose.yml
-Dockerfile
+# --- Uploaded/Temp files ---
+src/storage/app/public/*
+src/storage/app/uploads/*
+
+# --- Tests ---
+src/tests/
+
+# --- Docker configs (not needed inside image) ---
+docker-compose*.yml
+Dockerfile*
 .dockerignore
+nginx*.conf
+supervisord.conf
+
+# --- Documentation ---
+*.md
+tip.md
+PHPWORD-ELEMENTS.md
+
+# --- OS / Editor ---
 .DS_Store
 Thumbs.db
-
-# --- Ide / Editors ---
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# --- NPM logs ---
+npm-debug.log*
+yarn-error.log*

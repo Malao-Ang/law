@@ -2,134 +2,147 @@
 
 namespace App\Services\DocumentConvert;
 
-use Smalot\PdfParser\Parser;
+use RuntimeException;
+use Symfony\Component\Process\Process;
 
 class PdfToHtmlConverter
 {
-    public function __construct(
-        private readonly HtmlSanitizer $sanitizer
-    ) {}
-
     public function convert(string $path): string
     {
-        $parser = new Parser();
-        $pdf = $parser->parseFile($path);
-        $text = $pdf->getText();
+        $outputDir = sys_get_temp_dir();
+        $outputName = uniqid('pdf_', true);
+        $outputPath = $outputDir.DIRECTORY_SEPARATOR.$outputName;
 
-        $text = $this->sanitizer->repairThaiTextAdvanced($text);
+        // Command: pdftohtml -c (complex) -s (single file) -i (ignore images) -noframes [input] [output_prefix]
+        // Note: -i ignores extracting images, but -c relies on background images for lines sometimes.
+        // We will try -c -s -noframes first (allowing images might be needed for table lines).
+        // Actually, let's try -s -i -noframes (Simple mode) first?
+        // The plan said "-c (Complex)". Complex is definitely better for "looking like PDF".
 
-        $lines = preg_split("/\R/u", $text) ?: [];
-        $html  = $this->buildHtmlFromLines($lines);
+        $cmd = [
+            'pdftohtml',
+            '-c',           // Complex output
+            '-s',           // Single file
+            '-i',           // Ignore images (prevent extracting hundreds of image files)
+            '-noframes',    // No frameset
+            $path,
+            $outputPath,
+        ];
 
-        return $this->sanitizer->wrapLegalDocument($html, [
-            'padding' => '1in',
-            'background' => 'white',
-        ]);
-    }
+        $process = new Process($cmd);
+        $process->run();
 
-    private function buildHtmlFromLines(array $lines): string
-    {
-        $out = '';
-
-        foreach ($lines as $rawLine) {
-            $trimmed = trim((string)$rawLine);
-
-            if ($trimmed === '') {
-                $out .= "<p class='p-empty'>&nbsp;</p>";
-                continue;
-            }
-
-            $block = $this->detectPdfBlock($rawLine, $trimmed);
-            $content = $this->escapeAndPreserveSpaces($trimmed);
-
-            if ($block['tag'] === 'div') {
-                $out .= "<div class='{$block['class']}' style='{$block['style']}'>{$content}</div>";
-            } else {
-                $out .= "<p class='{$block['class']}' style='{$block['style']}'>{$content}</p>";
-            }
+        if (! $process->isSuccessful()) {
+            throw new RuntimeException('pdftohtml failed: '.$process->getErrorOutput());
         }
 
-        return $out;
+        // pdftohtml with -s creates [output_name].html
+        $generatedFile = $outputPath.'.html';
+
+        if (! file_exists($generatedFile)) {
+            // Fallback check
+            throw new RuntimeException("pdftohtml did not generate expected file: {$generatedFile}");
+        }
+
+        $html = file_get_contents($generatedFile);
+
+        // Cleanup
+        @unlink($generatedFile);
+
+        $body = $this->extractBody($html);
+        return $this->repairThaiHtml($body);
+    }
+
+    private function extractBody(string $html): string
+    {
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $html, $matches)) {
+            return $matches[1];
+        }
+
+        return $html;
     }
 
     /**
-     * โฟักสเอกสารราชการไทย: หัวข้อหลัก / ข้อ / (๑) / ย่อหน้าเยื้อง
-     * ตัวอย่างที่เจอในไฟล์ของคุณ เช่น "- ร่าง -", "ประกาศสำนักหอสมุด ...", "เรื่อง ...", เส้นคั่น, หัวข้อ "ข้อ ๑ …", และ bullet "(๑) …"
+     * Repair Thai text in HTML output from pdftohtml.
+     *
+     * pdftohtml often decomposes Thai sara am (ำ U+0E33) into:
+     *   - nikhahit (ํ U+0E4D) + sara aa (า U+0E32)
+     *   - or consonant + space + sara aa
+     * This method reassembles them correctly.
      */
-    private function detectPdfBlock(string $rawLine, string $trimmed): array
+    private function repairThaiHtml(string $html): string
     {
-        $style = "margin-bottom:0.1em; line-height:1.6; clear:both;";
-        $class = "p-normal";
-        $tag   = "p";
+        // --- Pass 1: Fix dictionary of known common words FIRST (highest precision) ---
+        $dictionary = [
+            'ส านัก'  => 'สำนัก',
+            'จ านวน'  => 'จำนวน',
+            'น าไป'   => 'นำไป',
+            'น ามา'   => 'นำมา',
+            'อ านวย'  => 'อำนวย',
+            'จ าเป็น' => 'จำเป็น',
+            'ประจ า'  => 'ประจำ',
+            'ก าหนด'  => 'กำหนด',
+            'ก ากับ'  => 'กำกับ',
+            'ล าดับ'  => 'ลำดับ',
+            'ค าสั่ง' => 'คำสั่ง',
+            'ท าการ'  => 'ทำการ',
+            'ท าให้'  => 'ทำให้',
+            'ด าเนิน' => 'ดำเนิน',
+            'ด าริ'   => 'ดำริ',
+            'บ าบัด'  => 'บำบัด',
+            'บ ารุง'  => 'บำรุง',
+            'ต าแหน่ง'=> 'ตำแหน่ง',
+            'ต าบล'   => 'ตำบล',
+            'ต ารา'   => 'ตำรา',
+            'ต ารวจ'  => 'ตำรวจ',
+            'ค าถาม'  => 'คำถาม',
+            'ค าตอบ'  => 'คำตอบ',
+            'ค าอธิบาย'=> 'คำอธิบาย',
+            'ค าชี้แจง'=> 'คำชี้แจง',
+            'ค าขอ'   => 'คำขอ',
+            'ค าร้อง'  => 'คำร้อง',
+            'ค ารับรอง'=> 'คำรับรอง',
+            'ค าแนะน า'=> 'คำแนะนำ',
+            'ก ารผลิต' => 'การผลิต',
+            'ก ารด าเนิน'=> 'การดำเนิน',
+            'ก ารก าหนด'=> 'การกำหนด',
+            'ก ารจ า'  => 'การจำ',
+            'บริก าร'  => 'บริการ',
+            'ก ารบริก าร'=> 'การบริการ',
+        ];
+        $html = str_replace(array_keys($dictionary), array_values($dictionary), $html);
 
-        // 1) หัวเรื่องกึ่งกลาง (center + bold)
-        $isCenterKeyword =
-            preg_match('/^-\s*ร่าง\s*-\s*$/u', $trimmed) ||
-            preg_match('/^ประกาศ(สำนัก|มหาวิทยาลัย)/u', $trimmed) ||
-            preg_match('/^เรื่อง\s+/u', $trimmed) ||
-            preg_match('/^-{3,}$/u', $trimmed) ||
-            preg_match('/^\(.*\)$/u', $trimmed); // ข้อความในวงเล็บกึ่งกลาง เช่น (Terms of Reference : TOR)
+        // --- Pass 2: Fix decomposed sara am: nikhahit(U+0E4D) + sara aa(U+0E32) → sara am(U+0E33) ---
+        // This is the canonical Unicode decomposition that some PDF extractors produce.
+        $html = str_replace("\u{0E4D}\u{0E32}", 'ำ', $html);
 
-        $hasLeadingSpaces = preg_match('/^\s{10,}/u', $rawLine) === 1;
+        // --- Pass 3: Fix consonant + space(s) + nikhahit + space(s) + sara aa ---
+        $html = preg_replace('/([ก-ฮ])[ \t]*\x{0E4D}[ \t]*า/u', '$1ำ', $html);
 
-        if (($isCenterKeyword && mb_strlen($trimmed) < 140) || ($hasLeadingSpaces && mb_strlen($trimmed) < 100)) {
-            $tag = "div";
-            $class = "h-center";
-            $style .= "text-align:center;font-weight:700;font-size:18pt;width:100%;margin-top:0.5em;";
-            return compact('tag','class','style');
-        }
+        // --- Pass 4: Fix consonant + space + sara aa → sara am ---
+        // Use space/tab only (not \s which would cross HTML tag boundaries via newlines)
+        $html = preg_replace('/([ก-ฮ])[ \t]+า(?=[^"a-zA-Z]|$)/u', '$1ำ', $html);
 
-        // 2) หัวข้อหลัก: "ข้อ ๑ …" หรือ "1."
-        if (preg_match('/^ข้อ\s*[๐-๙0-9]+\b/u', $trimmed) || preg_match('/^(\d+|[๑-๙]+)\.(?!\d)/u', $trimmed)) {
-            $tag = "div";
-            $class = "h-main";
-            $style .= "font-weight:700;text-align:left;margin-top:1.0em;font-size:16pt;";
-            return compact('tag','class','style');
-        }
+        // --- Pass 5: Fix consonant + space + sara am (already correct char but spaced) ---
+        $html = preg_replace('/([ก-ฮ])[ \t]+ำ/u', '$1ำ', $html);
 
-        // 3) ลำดับย่อยแบบ (๑) หรือ (1)
-        if (preg_match('/^\((\d+|[๐-๙]+)\)/u', $trimmed) || preg_match('/^\(([๑-๙]+)\)/u', $trimmed)) {
-            $class = "p-bullet";
-            $style .= "padding-left:3em;text-indent:-1.2em;text-align:justify;";
-            return compact('tag','class','style');
-        }
+        // --- Pass 6: Fix other combining marks / tone marks separated by spaces ---
+        // upper diacritics: sara i,ii,ue,uee,a,u,uu,mai tai khu,mai ek,mai tho,mai tri,mai jattawa,thanthakat,nikhahit
+        $up = 'ิีึืัุู็่้๊๋์ํ';
+        $html = preg_replace('/([ก-ฮ])[ \t]+([' . $up . '])/u', '$1$2', $html);
+        $html = preg_replace('/([' . $up . '])[ \t]+([ก-ฮ])/u', '$1$2', $html);
+        $html = preg_replace('/([' . $up . '])[ \t]+([' . $up . '])/u', '$1$2', $html);
 
-        // 4) หัวข้อย่อยชั้นที่ 1.1 / 1.1.1
-        if (preg_match('/^\d+\.\d+(\.\d+)?\s+/u', $trimmed) || preg_match('/^[๑-๙]+\.[๑-๙]+(\.[๑-๙]+)?\s+/u', $trimmed)) {
-            $class = "p-sub";
-            $style .= "padding-left:3em;text-align:justify;";
-            return compact('tag','class','style');
-        }
+        // --- Pass 7: Fix leading vowels (เ แ โ ใ ไ) separated from consonant ---
+        $html = preg_replace('/([เแโใไ])[ \t]+([ก-ฮ])/u', '$1$2', $html);
 
-        // 5) ย่อหน้าเยื้อง (ดูจากช่องว่างหน้า line)
-        if (preg_match('/^\s{2,10}/u', $rawLine)) {
-            $class = "p-indent";
-            $style .= "padding-left:3em;text-indent:2em;text-align:justify;";
-            return compact('tag','class','style');
-        }
+        // --- Pass 8: Fix sara ะ and ๅ separated ---
+        $html = preg_replace('/([ก-ฮ])[ \t]+ะ/u', '$1ะ', $html);
+        $html = preg_replace('/([ก-ฮ])[ \t]+ๅ/u', '$1ๅ', $html);
 
-        // กรณีบรรทัดต่อจากหัวข้อ (Hanging Indent)
-        else {
-            $style .= "text-align:justify;";
-        }
+        // --- Pass 9: Deduplicate accidental double ำ ---
+        $html = str_replace(['ำา', 'าำ', 'ำำ'], 'ำ', $html);
 
-        // ทำความสะอาดช่องว่างภายในบรรทัด
-        $content = htmlspecialchars($trimmed);
-        $content = preg_replace_callback('/  +/', function ($match) {
-            return str_repeat('&nbsp;', strlen($match[0]));
-        }, $content);
-
-        // สร้าง Output HTML
-        if ($tag === 'div') {
-            return compact('tag','class','style');
-        } else {
-            return compact('tag','class','style');
-        }
-    }
-
-    private function escapeAndPreserveSpaces(string $text): string
-    {
-        $content = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        return preg_replace_callback('/  +/', fn($m) => str_repeat('&nbsp;', strlen($m[0])), $content);
+        return $html;
     }
 }

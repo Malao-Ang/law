@@ -108,7 +108,7 @@ const initializeCKEditor = async () => {
     if (editorElement.value) {
         try {
             const newEditor = await ClassicEditor.create(editorElement.value, {
-                licenseKey: 'GPL', // Or 'your-license-key'
+                licenseKey: 'GPL',
                 plugins: [
                     Essentials, Paragraph, Heading, Bold, Italic, Underline, List, Link, Table, TableToolbar,
                     BlockQuote, Indent, IndentBlock, PasteFromOffice, GeneralHtmlSupport, Alignment, Autoformat
@@ -303,27 +303,37 @@ watch(activeTab, async (newTab) => {
     /* Outer bg */
 }
 
-/* Override editor container to look like a document page */
+/* Override editor container - responsive, no A4 constraint */
 .editor-container {
-    background: #e0e0e0;
+    background: #f5f5f5;
     padding: 20px;
-    display: flex;
-    justify-content: center;
+    width: 100%;
+    max-width: 100%;
 }
 
 .ck-content {
-    width: 21cm;
-    /* A4 width */
-    min-height: 29.7cm;
-    /* A4 height */
-    margin: auto;
+    width: 100%;
+    max-width: 1200px;
+    min-height: 500px;
+    margin: 0 auto;
     background: white;
+    box-sizing: border-box;
 }
 
 .ck-content table {
     width: 100% !important;
+    max-width: 100%;
     border-collapse: collapse;
     margin: 1em 0;
+    table-layout: auto;
+    overflow-x: auto;
+    display: block;
+}
+
+.ck-content table tbody,
+.ck-content table thead {
+    display: table;
+    width: 100%;
 }
 
 .ck-content td,
@@ -355,34 +365,37 @@ watch(activeTab, async (newTab) => {
     print-color-adjust: exact;
 }
 
-/* Preview Styles matching hello.html */
+/* Preview Styles - responsive without A4 constraint */
 .preview-container {
-    background: #e0e0e0;
+    background: #f5f5f5;
     min-height: 600px;
-    display: flex;
-    justify-content: center;
+    padding: 20px;
     overflow-y: auto;
-    max-height: 800px;
+    overflow-x: hidden;
+    max-height: calc(100vh - 200px);
 }
 
 .paper-sheet {
-    width: 21cm;
-    min-height: 29.7cm;
+    width: 100%;
+    max-width: 1200px;
+    min-height: 500px;
     background: white;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    margin: 20px auto;
+    margin: 0 auto;
+    padding: 40px;
     color: #000;
-    /* Ensure text is black */
+    box-sizing: border-box;
 }
 
-/* Ensure styles from hello.html work here */
+/* Ensure styles from hello.html work here - responsive */
 .legal-document {
     font-family: "Sarabun", "Sarabun New", "TH Sarabun New", sans-serif;
     font-size: 16pt;
     line-height: 1.75;
-    padding: 1in;
     word-break: break-word;
     overflow-wrap: anywhere;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 .legal-document p {
@@ -407,9 +420,18 @@ watch(activeTab, async (newTab) => {
 
 .legal-document .doc-table {
     width: 100%;
+    max-width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
     margin: 0.75em 0;
+    overflow-x: auto;
+    display: block;
+}
+
+.legal-document .doc-table tbody,
+.legal-document .doc-table thead {
+    display: table;
+    width: 100%;
 }
 
 .legal-document .doc-td {

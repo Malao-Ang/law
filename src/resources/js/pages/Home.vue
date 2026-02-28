@@ -21,9 +21,15 @@
                     </v-list>
 
                     <v-btn color="primary" size="x-large" block elevation="2"
-                        class="text-none font-weight-bold text-h6 py-6" to="/editor">
+                        class="text-none font-weight-bold text-h6 py-6 mb-3" to="/editor">
                         <v-icon left size="32" class="mr-2">mdi-plus-circle</v-icon>
                         Create New Document
+                    </v-btn>
+
+                    <v-btn color="secondary" size="large" block elevation="2"
+                        class="text-none font-weight-bold py-4" to="/regulations">
+                        <v-icon left size="24" class="mr-2">mdi-file-document-multiple</v-icon>
+                        View All Regulations
                     </v-btn>
 
                     <div class="mt-4 text-caption text-grey">

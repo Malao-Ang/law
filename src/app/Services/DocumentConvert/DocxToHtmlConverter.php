@@ -14,6 +14,8 @@ class DocxToHtmlConverter
 
     private array $rels = [];         // [rId] => target (e.g. "media/image1.png")
 
+    private array $stylesMap = [];    // [styleId] => ['align'=>?string, 'ind'=>array, 'basedOn'=>?string]
+
     private ?ZipArchive $zip = null;
 
     public function convert(string $path): string
@@ -27,7 +29,8 @@ class DocxToHtmlConverter
         try {
             $documentXml = $this->zip->getFromName('word/document.xml');
             $numberingXml = $this->zip->getFromName('word/numbering.xml') ?: null;
-            $relsXml = $this->zip->getFromName('word/_rels/document.xml.rels') ?: null;
+            $stylesXml    = $this->zip->getFromName('word/styles.xml') ?: null;
+            $relsXml      = $this->zip->getFromName('word/_rels/document.xml.rels') ?: null;
 
             if (! $documentXml) {
                 throw new \Exception('Invalid DOCX structure: missing word/document.xml');
@@ -35,6 +38,10 @@ class DocxToHtmlConverter
 
             if ($numberingXml) {
                 $this->loadNumbering($numberingXml);
+            }
+
+            if ($stylesXml) {
+                $this->loadStyles($stylesXml);
             }
 
             if ($relsXml) {
@@ -161,6 +168,105 @@ HTML;
         $v = $el->getAttributeNS(self::W_NS, $localName);
 
         return $v !== '' ? $v : null;
+    }
+
+    private function attrVal(\DOMXPath $xp, \DOMElement $parent, string $childTag, string $attrName): ?string
+    {
+        $nodes = $xp->query($childTag, $parent);
+        if ($nodes->length === 0) {
+            return null;
+        }
+        
+        $child = $nodes->item(0);
+        if (!$child instanceof \DOMElement) {
+            return null;
+        }
+        
+        return $this->attr($child, $attrName);
+    }
+
+    private function loadStyles(string $xml): void
+    {
+        $dom = new \DOMDocument;
+        $dom->preserveWhiteSpace = false;
+        $dom->loadXML($xml);
+
+        $xp = new \DOMXPath($dom);
+        $xp->registerNamespace('w', self::W_NS);
+
+        foreach ($this->els($xp->query('//w:style[@w:type="paragraph"]')) as $styleEl) {
+            $styleId = $this->attr($styleEl, 'styleId');
+            if (! $styleId) {
+                continue;
+            }
+
+            $basedOnEl = $this->firstEl($xp->query('w:basedOn', $styleEl));
+            $basedOn   = $basedOnEl ? $this->attr($basedOnEl, 'val') : null;
+
+            // alignment from pPr/jc
+            $jcEl = $this->firstEl($xp->query('w:pPr/w:jc', $styleEl));
+            $jcVal = $jcEl ? $this->attr($jcEl, 'val') : null;
+            $align = match ($jcVal) {
+                'center'                        => 'center',
+                'right'                         => 'right',
+                'left'                          => 'left',
+                'both', 'justify', 'distribute' => 'justify',
+                default                         => null,
+            };
+
+            // indentation from pPr/ind
+            $indEl = $this->firstEl($xp->query('w:pPr/w:ind', $styleEl));
+            $ind   = ['left' => 0, 'hanging' => 0, 'firstLine' => 0];
+            if ($indEl) {
+                $ind['left']      = (int) ((int) $this->attr($indEl, 'left')      / 20);
+                $ind['hanging']   = (int) ((int) $this->attr($indEl, 'hanging')   / 20);
+                $ind['firstLine'] = (int) ((int) $this->attr($indEl, 'firstLine') / 20);
+            }
+
+            $this->stylesMap[$styleId] = [
+                'align'   => $align,
+                'ind'     => $ind,
+                'basedOn' => $basedOn,
+            ];
+        }
+    }
+
+    private function resolveStyleAlign(string $styleId, int $depth = 0): ?string
+    {
+        if ($depth > 8 || ! isset($this->stylesMap[$styleId])) {
+            return null;
+        }
+        $style = $this->stylesMap[$styleId];
+        if ($style['align'] !== null) {
+            return $style['align'];
+        }
+        if ($style['basedOn']) {
+            return $this->resolveStyleAlign($style['basedOn'], $depth + 1);
+        }
+        return null;
+    }
+
+    private function resolveStyleInd(string $styleId, int $depth = 0): array
+    {
+        $empty = ['left' => 0, 'hanging' => 0, 'firstLine' => 0];
+        if ($depth > 8 || ! isset($this->stylesMap[$styleId])) {
+            return $empty;
+        }
+        $style = $this->stylesMap[$styleId];
+        $ind   = $style['ind'];
+        if ($ind['left'] !== 0 || $ind['hanging'] !== 0 || $ind['firstLine'] !== 0) {
+            return $ind;
+        }
+        if ($style['basedOn']) {
+            return $this->resolveStyleInd($style['basedOn'], $depth + 1);
+        }
+        return $empty;
+    }
+
+    private function getPStyleId(DOMXPath $xp, $pNode): ?string
+    {
+        $pStyleEl = $this->firstEl($xp->query('.//w:pPr/w:pStyle', $pNode));
+        return $pStyleEl ? $this->attr($pStyleEl, 'val') : null;
     }
 
     private function loadNumbering(string $xml): void
@@ -314,18 +420,15 @@ HTML;
         $html = $this->parseParagraphRuns($xp, $pNode);
         $plain = $this->stripTags($html);
 
-        // heuristic: center heading
-        $isShort = (mb_strlen(trim($plain)) <= 120);
-        $hasBoldBig = $this->hasBoldOrBigText($xp, $pNode);
-
-        $isCenterHeading = ($align === 'center' && $isShort && $hasBoldBig);
+        $isCenterHeading = ($align === 'center');
 
         $num = $this->getNumbering($xp, $pNode);
 
         $style = [
-            'text-align' => $align ?: 'justify',
+            'text-align' => $align ?: 'justify', // Default to justify for formal look, or left if preferred
             'margin' => '0 0 0.35em 0',
             'line-height' => '1.75',
+            'position' => 'relative', // Para positioning
         ];
 
         // ย่อหน้าไทย & Indentation logic
@@ -412,9 +515,7 @@ HTML;
                 $t = $this->repairThaiText($t);
                 $texts[] = htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             } elseif ($child->nodeName === 'w:tab') {
-                // Approximate tab as 4 spaces or specific width if known
-                // Word default tab is 0.5 inch = 36pt
-                $texts[] = '<span class="doc-tab" style="display:inline-block; min-width: 2rem;">&nbsp;&nbsp;&nbsp;&nbsp;</span>';
+                $texts[] = '<span class="doc-tab" style="display:inline-block; min-width: 48px;">&nbsp;</span>';
             } elseif ($child->nodeName === 'w:br') {
                 $texts[] = '<br>';
             } elseif ($child->nodeName === 'w:drawing') {
@@ -487,36 +588,48 @@ HTML;
 
     private function getAlignment(DOMXPath $xp, $pNode): ?string
     {
+        // 1) Direct override on the paragraph
         $jcEl = $this->el($xp->query('.//w:pPr/w:jc', $pNode));
-        $val = $this->attr($jcEl, 'w:val');
-
-        return match ($val) {
-            'center' => 'center',
-            'right' => 'right',
-            'left' => 'left',
-            'both', 'justify' => 'justify',
-            default => null,
+        $val  = $this->attr($jcEl, 'val');
+        $direct = match ($val) {
+            'center'                        => 'center',
+            'right'                         => 'right',
+            'left'                          => 'left',
+            'both', 'justify', 'distribute' => 'justify',
+            default                         => null,
         };
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        // 2) Fall back to paragraph style (styles.xml)
+        $styleId = $this->getPStyleId($xp, $pNode);
+        if ($styleId) {
+            return $this->resolveStyleAlign($styleId);
+        }
+
+        return null;
     }
 
     private function getIndentation(\DOMXPath $xp, \DOMElement $pNode): array
     {
+        // 1) Direct override on the paragraph
         $indEl = $this->firstEl($xp->query('.//w:pPr/w:ind', $pNode));
-
-        if (! $indEl) {
-            return ['left' => 0, 'hanging' => 0, 'firstLine' => 0];
+        if ($indEl) {
+            return [
+                'left'      => (int) ((int) $this->attr($indEl, 'left')      / 20),
+                'hanging'   => (int) ((int) $this->attr($indEl, 'hanging')   / 20),
+                'firstLine' => (int) ((int) $this->attr($indEl, 'firstLine') / 20),
+            ];
         }
 
-        // Word stores these in twips (1/20 pt)
-        $left = (int) $this->attr($indEl, 'left');
-        $hanging = (int) $this->attr($indEl, 'hanging');
-        $firstLine = (int) $this->attr($indEl, 'firstLine');
+        // 2) Fall back to paragraph style (styles.xml)
+        $styleId = $this->getPStyleId($xp, $pNode);
+        if ($styleId) {
+            return $this->resolveStyleInd($styleId);
+        }
 
-        return [
-            'left' => (int) ($left / 20),
-            'hanging' => (int) ($hanging / 20),
-            'firstLine' => (int) ($firstLine / 20),
-        ];
+        return ['left' => 0, 'hanging' => 0, 'firstLine' => 0];
     }
 
     private function getNumbering(DOMXPath $xp, $pNode): ?array
@@ -529,8 +642,8 @@ HTML;
         $ilvlEl = $this->el($xp->query('.//w:pPr/w:numPr/w:ilvl', $pNode));
         $numIdEl = $this->el($xp->query('.//w:pPr/w:numPr/w:numId', $pNode));
 
-        $ilvlVal = $this->attr($ilvlEl, 'w:val');
-        $numIdVal = $this->attr($numIdEl, 'w:val');
+        $ilvlVal = $this->attr($ilvlEl, 'val');
+        $numIdVal = $this->attr($numIdEl, 'val');
 
         if ($ilvlVal === null || $numIdVal === null) {
             return null;
@@ -540,20 +653,6 @@ HTML;
             'ilvl' => (int) $ilvlVal,
             'numId' => (string) $numIdVal,
         ];
-    }
-
-    private function hasBoldOrBigText(DOMXPath $xp, $pNode): bool
-    {
-        // bold?
-        if ($xp->query('.//w:rPr/w:b', $pNode)->length > 0) {
-            return true;
-        }
-
-        // size >= 28 half-points? (Word uses half-point for sz)
-        $szEl = $this->el($xp->query('.//w:rPr/w:sz', $pNode));
-        $val = $this->attr($szEl, 'w:val');
-
-        return $val !== null && intval($val) >= 28; // ~14pt+
     }
 
     private function renderParagraph(string $innerHtml, array $style): string
@@ -570,9 +669,7 @@ HTML;
     private function renderCenterHeading(string $innerHtml, array $style): string
     {
         $style['text-align'] = 'center';
-        $style['font-weight'] = '700';
         $style['margin'] = '0.75em 0 0.5em 0';
-        $style['font-size'] = '18pt';
 
         $styleStr = $this->styleToString($style);
 
@@ -845,19 +942,36 @@ HTML;
     private function repairThaiInHtml(string $html): string
     {
         // ทำเฉพาะ text node แบบง่าย: ใช้ regex ช่วยกับเคสเอกสารราชการที่เจอบ่อย
-        // 1) ส า -> สำ (รวมถึง จ า, น า, อ า ฯลฯ)
+        
+        // 1) แก้ ำ ที่แยก: ส า -> สำ, จ า -> จำ (รวมทุกรูปแบบ)
         $html = preg_replace('/([ก-ฮ])\s+า/u', '$1ำ', $html);
-
-        // 2) ลบช่องว่างคั่นระหว่างพยัญชนะกับวรรณยุกต์/สระบน
-        $upper = 'ิีึืั็่้๊๋์';
+        $html = preg_replace('/([ก-ฮ])\s+ำ/u', '$1ำ', $html);
+        
+        // 2) แก้ไมม้วน (ไม้หันอากาศ) ที่แยก: ก ็ -> ก็
+        $html = preg_replace('/([ก-ฮ])\s+็/u', '$1็', $html);
+        
+        // 3) ลบช่องว่างคั่นระหว่างพยัญชนะกับวรรณยุกต์/สระบน (ครอบคลุมทุกตัว)
+        $upper = 'ิีึืัุู็่้๊๋์ํ';
         $html = preg_replace('/([ก-ฮ])\s+(['.$upper.'])/u', '$1$2', $html);
         $html = preg_replace('/(['.$upper.'])\s+([ก-ฮ])/u', '$1$2', $html);
+        
+        // 4) แก้สระบนที่ซ้อนกัน (เช่น ิ ้ -> ิ้)
+        $html = preg_replace('/(['.$upper.'])\s+(['.$upper.'])/u', '$1$2', $html);
 
-        // 3) ลบช่องว่างหลังสระหน้า เ แ โ ใ ไ
+        // 5) ลบช่องว่างหลังสระหน้า เ แ โ ใ ไ
         $html = preg_replace('/([เแโใไ])\s+([ก-ฮ])/u', '$1$2', $html);
+        
+        // 6) ลบช่องว่างก่อนสระหน้า (กรณีพยัญชนะ + space + สระหน้า)
+        $html = preg_replace('/([ก-ฮ])\s+([เแโใไ])/u', '$2$1', $html);
 
-        // 4) แก้ “ำา”
-        $html = str_replace('ำา', 'ำ', $html);
+        // 7) แก้ "ำา" และ "าำ"
+        $html = str_replace(['ำา', 'าำ'], 'ำ', $html);
+        
+        // 8) แก้สระ ะ ที่แยก
+        $html = preg_replace('/([ก-ฮ])\s+ะ/u', '$1ะ', $html);
+        
+        // 9) แก้สระ ๅ (ไม้ยมก) ที่แยก
+        $html = preg_replace('/([ก-ฮ])\s+ๅ/u', '$1ๅ', $html);
 
         return $html;
     }
@@ -868,7 +982,7 @@ HTML;
             return $t;
         }
 
-        // เคสคำราชการที่ชอบแตก
+        // เคสคำราชการที่ชอบแตก (เพิ่มเติม)
         $dict = [
             'ส านัก' => 'สำนัก',
             'จ านวน' => 'จำนวน',
@@ -876,16 +990,40 @@ HTML;
             'อ านวย' => 'อำนวย',
             'จ าเป็น' => 'จำเป็น',
             'ประจ า' => 'ประจำ',
+            'ก าหนด' => 'กำหนด',
+            'ล าดับ' => 'ลำดับ',
+            'ค าสั่ง' => 'คำสั่ง',
+            'ท าการ' => 'ทำการ',
+            'ด าเนิน' => 'ดำเนิน',
+            'บ าบัด' => 'บำบัด',
+            'ต าแหน่ง' => 'ตำแหน่ง',
+            'ห าม' => 'ห้าม',
+            'ค ่า' => 'ค่า',
+            'ท ี่' => 'ที่',
+            'ก ็' => 'ก็',
+            'เพ ื่อ' => 'เพื่อ',
+            'ต ้อง' => 'ต้อง',
+            'ม ี' => 'มี',
+            'ให ้' => 'ให้',
         ];
         $t = str_replace(array_keys($dict), array_values($dict), $t);
 
-        // fix spacing ทั่วไป
+        // fix spacing ทั่วไป (เหมือน repairThaiInHtml)
         $t = preg_replace('/([ก-ฮ])\s+า/u', '$1ำ', $t);
-        $upper = 'ิีึืั็่้๊๋์';
+        $t = preg_replace('/([ก-ฮ])\s+ำ/u', '$1ำ', $t);
+        $t = preg_replace('/([ก-ฮ])\s+็/u', '$1็', $t);
+        
+        $upper = 'ิีึืัุู็่้๊๋์ํ';
         $t = preg_replace('/([ก-ฮ])\s+(['.$upper.'])/u', '$1$2', $t);
         $t = preg_replace('/(['.$upper.'])\s+([ก-ฮ])/u', '$1$2', $t);
+        $t = preg_replace('/(['.$upper.'])\s+(['.$upper.'])/u', '$1$2', $t);
+        
         $t = preg_replace('/([เแโใไ])\s+([ก-ฮ])/u', '$1$2', $t);
-        $t = str_replace('ำา', 'ำ', $t);
+        $t = preg_replace('/([ก-ฮ])\s+([เแโใไ])/u', '$2$1', $t);
+        
+        $t = str_replace(['ำา', 'าำ'], 'ำ', $t);
+        $t = preg_replace('/([ก-ฮ])\s+ะ/u', '$1ะ', $t);
+        $t = preg_replace('/([ก-ฮ])\s+ๅ/u', '$1ๅ', $t);
 
         return $t;
     }

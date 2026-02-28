@@ -21,11 +21,19 @@ export default defineConfig({
     ],
     server: {
         host: '0.0.0.0',
+        port: 5173,
+        strictPort: true,
+        // HMR: ต้องชี้ไปที่ localhost เพราะ browser เชื่อมผ่าน nginx → node
         hmr: {
             host: 'localhost',
+            port: 5173,
         },
+        // Polling จำเป็นสำหรับ Docker volume mounts บน Windows/Mac
         watch: {
             usePolling: true,
+            interval: 1000,
         },
+        // Allow nginx origin (CORS for HMR)
+        cors: true,
     },
 });

@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('documents', function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->longText('content')->nullable(); // HTML จาก CKEditor
-            $table->string('original_filename')->nullable();
-            $table->string('file_type')->nullable(); // docx, pdf
-            $table->timestamps();
+        Schema::table('documents', function (Blueprint $table) {
+            if (!Schema::hasColumn('documents', 'original_filename')) {
+                $table->string('original_filename')->nullable()->after('content');
+            }
+            if (!Schema::hasColumn('documents', 'file_type')) {
+                $table->string('file_type')->nullable()->after('original_filename');
+            }
         });
     }
 
@@ -26,6 +26,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('documents');
+        Schema::table('documents', function (Blueprint $table) {
+            $table->dropColumn(['original_filename', 'file_type']);
+        });
     }
 };
