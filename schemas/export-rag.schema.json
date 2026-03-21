@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/export-rag.schema.json",
+  "title": "RagExport",
+  "type": "object",
+  "required": ["document_id", "chunks"],
+  "properties": {
+    "document_id": { "type": "string" },
+    "document_title": { "type": ["string", "null"] },
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chunk_id", "page_no", "block_ids", "text"],
+        "properties": {
+          "chunk_id": { "type": "string" },
+          "page_no": { "type": "integer", "minimum": 1 },
+          "block_ids": { "type": "array", "items": { "type": "string" } },
+          "section_path": { "type": ["string", "null"] },
+          "text": { "type": "string" },
+          "meta": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

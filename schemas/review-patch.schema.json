@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/review-patch.schema.json",
+  "title": "ReviewPatch",
+  "type": "object",
+  "required": ["document_id", "page_no", "block_id", "approved_text"],
+  "properties": {
+    "document_id": { "type": "string" },
+    "page_no": { "type": "integer", "minimum": 1 },
+    "block_id": { "type": "string" },
+    "approved_text": { "type": "string" },
+    "approved_by": { "type": ["string", "null"] },
+    "notes": { "type": ["string", "null"] },
+    "mark_uncertain": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

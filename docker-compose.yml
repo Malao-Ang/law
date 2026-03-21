@@ -1,0 +1,72 @@
+services:
+  laravel-app:
+    build:
+      context: ./apps/app-laravel
+      dockerfile: Dockerfile
+    container_name: thai-ocr-laravel-app
+    working_dir: /var/www/html
+    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - poc_storage:/var/www/html/storage/app/poc
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - ocr-service
+    ports:
+      - "8000:8000"
+
+  laravel-vite:
+    image: node:20-alpine
+    container_name: thai-ocr-laravel-vite
+    working_dir: /var/www/html
+    command: sh -c "npm install --include=optional --registry=https://registry.npmjs.org && npm run dev"
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - vite_node_modules:/var/www/html/node_modules
+    ports:
+      - "5173:5173"
+
+  queue-worker:
+    build:
+      context: ./apps/app-laravel
+      dockerfile: Dockerfile
+    container_name: thai-ocr-queue-worker
+    working_dir: /var/www/html
+    command: php artisan queue:listen --tries=1 --timeout=1800
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - poc_storage:/var/www/html/storage/app/poc
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - laravel-app
+      - ocr-service
+
+  ocr-service:
+    build:
+      context: ./apps/ocr-service
+      dockerfile: Dockerfile
+    container_name: thai-ocr-service
+    working_dir: /app
+    volumes:
+      - ./apps/ocr-service:/app
+      - poc_storage:/data/poc
+    env_file:
+      - .env
+    ports:
+      - "8010:8010"
+
+  redis:
+    image: redis:7-alpine
+    container_name: thai-ocr-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  poc_storage:
+  vite_node_modules:
+
+

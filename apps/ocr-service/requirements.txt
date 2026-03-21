@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+httpx
+orjson
+numpy
+Pillow
+PyMuPDF
+pythainlp
+easyocr
+opencv-python-headless
+docling
+pytest
