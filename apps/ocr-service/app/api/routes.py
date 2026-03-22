@@ -39,13 +39,13 @@ def extract_document(payload: ExtractRequest) -> dict:
     source_type = detect_file_type(file_path)
     logger.info("detected source type", extra={"source_type": source_type})
 
-    docling_service = DoclingService()
+    docling_service = DoclingService(data_root=settings.data_root)
     ocr_pipeline = OcrPipeline(data_root=settings.data_root)
 
     if source_type == "pdf_scan":
         pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=payload.document_id)
     else:
-        pages = docling_service.extract(file_path=file_path, source_type=source_type)
+        pages = docling_service.extract(file_path=file_path, source_type=source_type, document_id=payload.document_id)
 
     ai_corrector = MockAICorrector()
     output = build_document_output(

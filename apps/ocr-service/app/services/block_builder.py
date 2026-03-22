@@ -33,7 +33,7 @@ def build_document_output(
             source_layout = normalize_layout(source_meta.get("layout"), block.get("bbox"), block.get("reading_order", index))
             table = build_table_payload(block, raw_text, block_type)
 
-            if raw_text == "" and table is None:
+            if raw_text == "" and table is None and block_type != "image":
                 continue
 
             normalized = normalizer(raw_text) if raw_text != "" else {"text": "", "flags": []}
@@ -52,7 +52,7 @@ def build_document_output(
             approved_text = ai_text
             bbox = block.get("bbox")
             block_id = block.get("block_id", f"{page_no}-{index}")
-            reviewed_html = build_reviewed_html(block_type, approved_text, source_layout, block_id, table)
+            reviewed_html = build_reviewed_html(block_type, approved_text, source_layout, block_id, table, source_meta)
             if table is not None:
                 reviewed_html = table["html"]
 
@@ -69,6 +69,8 @@ def build_document_output(
                     "confidence": max(0.0, min(1.0, confidence)),
                     "needs_review": needs_review,
                     "flags": sorted(set(flags)),
+                    "image_path": source_meta.get("image_path") if block_type == "image" else None,
+                    "image_data_uri": source_meta.get("image_data_uri") if block_type == "image" else None,
                     "meta": {
                         **source_meta,
                         "section_path": source_meta.get("section_path"),
@@ -133,10 +135,23 @@ def normalize_layout(layout: object, bbox: object, reading_order: object) -> dic
     }
 
 
-def build_reviewed_html(block_type: str, text: str, layout: dict, block_id: str, table: dict | None = None) -> str:
+def build_reviewed_html(block_type: str, text: str, layout: dict, block_id: str, table: dict | None = None, source_meta: dict | None = None) -> str:
     if block_type == "table" and table is not None:
         html = str(table["html"])
         return html.replace("<table", f'<table data-block-id="{block_id}"', 1)
+
+    if block_type == "image":
+        source_meta = source_meta or {}
+        data_uri  = source_meta.get("image_data_uri")
+        img_path  = source_meta.get("image_path", "")
+        img_src   = data_uri or img_path or ""
+        if img_src:
+            return (
+                f'<figure data-block-id="{block_id}" class="doc-image" style="text-align: center; margin: 1rem 0;">'
+                f'<img src="{img_src}" alt="embedded image" style="max-width:100%; height:auto; display: block; margin: 0 auto;"/>'
+                f'</figure>'
+            )
+        return f'<figure data-block-id="{block_id}" class="doc-image doc-image--missing"></figure>'
 
     tag = "p"
 
