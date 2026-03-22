@@ -90,7 +90,6 @@ class DocumentHtmlService
         if ($type === 'list_item') {
             $classNames[] = 'doc-list-item';
         }
-        // Force all types to use doc-paragraph styling, but keep semantic classes for reference
         if ($type === 'title') {
             $classNames[] = 'doc-title';
         }
