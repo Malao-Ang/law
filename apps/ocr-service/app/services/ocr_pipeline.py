@@ -1,8 +1,12 @@
 from pathlib import Path
+import warnings
 
 import fitz
 import cv2
 import numpy as np
+
+# Suppress torch pin_memory warnings when no GPU is available
+warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
 
 class OcrPipeline:
@@ -297,7 +301,15 @@ class OcrPipeline:
 
         lines: list[dict] = []
         for item in result:
-            bbox, text, confidence = item
+            # EasyOCR may return (bbox, text, confidence) or (bbox, text)
+            if len(item) == 3:
+                bbox, text, confidence = item
+            elif len(item) == 2:
+                bbox, text = item
+                confidence = 0.95  # default confidence when not provided
+            else:
+                continue
+            
             x_values = [point[0] for point in bbox]
             y_values = [point[1] for point in bbox]
             lines.append(
@@ -314,6 +326,8 @@ class OcrPipeline:
         if self._reader is None:
             import easyocr
 
-            self._reader = easyocr.Reader(["th", "en"], gpu=False)
+            self._reader = easyocr.Reader(["th", "en"], gpu=False, 
+                                       detector=True, recognizer=True,
+                                       verbose=False)
 
         return self._reader
