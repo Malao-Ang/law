@@ -1,23 +1,53 @@
-<template>
-  <section>
-    <UploadForm @uploaded="onUploaded" />
+﻿<template>
+  <HeaderComponent 
+    title="อัปโหลดเอกสาร"
+    :breadcrumbs="[
+      { text: 'หน้าแรก', to: '/' },
+      { text: 'อัปโหลดเอกสาร' }
+    ]"
+  />
+  
+  <v-main>
+    <v-container class="py-8">
+      <v-row>
+        <v-col cols="12">
+          <UploadForm @uploaded="onUploaded" />
+        </v-col>
+      </v-row>
 
-    <section v-if="documentId" class="panel status-panel">
-      <h3>Processing Status</h3>
-      <p><strong>Document:</strong> {{ documentId }}</p>
-      <p><strong>Status:</strong> {{ status?.status ?? 'loading' }}</p>
-      <p><strong>Step:</strong> {{ status?.current_step ?? '-' }}</p>
-      <p><strong>Progress:</strong> {{ status?.progress ?? 0 }}%</p>
+      <v-row v-if="status">
+        <v-col cols="12">
+          <v-card>
+            <v-card-title>สถานะการประมวลผลเอกสาร</v-card-title>
+            <v-card-text>
+              <v-chip :color="getStatusColor(status.status)" class="mb-4">
+                {{ getStatusText(status.status) }}
+              </v-chip>
+              
+              <v-progress-linear
+                v-if="['queued', 'processing', 'ingesting'].includes(status.status)"
+                indeterminate
+                color="primary"
+                class="mb-4"
+              ></v-progress-linear>
 
-      <button class="btn btn-primary" :disabled="status?.status !== 'done'" @click="goToReview">
-        Open Review
-      </button>
-    </section>
-  </section>
+              <v-btn
+                v-if="canOpenReview"
+                color="success"
+                @click="goToReview"
+              >
+                ตรวจสอบเอกสาร
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </v-container>
+  </v-main>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import UploadForm from '../components/UploadForm.vue';
 import { fetchStatus } from '../api/client';
@@ -27,6 +57,47 @@ const router = useRouter();
 const documentId = ref<string | null>(null);
 const status = ref<DocumentStatus | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+const canOpenReview = computed(() => {
+  return ['done', 'exported', 'ingesting', 'ingested'].includes(status.value?.status ?? '');
+});
+
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'done':
+    case 'exported':
+    case 'ingested':
+      return 'success';
+    case 'processing':
+    case 'ingesting':
+      return 'warning';
+    case 'queued':
+      return 'info';
+    default:
+      return 'error';
+  }
+}
+
+function getStatusText(status: string): string {
+  switch (status) {
+    case 'queued':
+      return 'รอดำเนินการ';
+    case 'processing':
+      return 'กำลังประมวลผล';
+    case 'ingesting':
+      return 'กำลังนำเข้าระบบ';
+    case 'done':
+      return 'เสร็จสิ้น';
+    case 'exported':
+      return 'ส่งออกแล้ว';
+    case 'ingested':
+      return 'นำเข้าระบบแล้ว';
+    case 'failed':
+      return 'ล้มเหลว';
+    default:
+      return status;
+  }
+}
 
 function onUploaded(id: string): void {
   documentId.value = id;
@@ -40,7 +111,7 @@ async function pollStatus(): Promise<void> {
   try {
     status.value = await fetchStatus(documentId.value);
 
-    if (status.value.status === 'queued' || status.value.status === 'processing') {
+    if (['queued', 'processing', 'ingesting'].includes(status.value.status)) {
       pollTimer = setTimeout(pollStatus, 1500);
     }
   } catch {

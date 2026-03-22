@@ -18,10 +18,15 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
+# Install dependencies first for caching
 COPY composer.json composer.lock ./
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader || true
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev || true
 
+# Copy application code
 COPY . .
+
+# Install dev dependencies if needed (can be overridden)
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader || true
 
 EXPOSE 8000
 

@@ -10,7 +10,7 @@ class ReviewStore
 {
     private string $basePath;
 
-    public function __construct()
+    public function __construct(private readonly DocumentHtmlService $documentHtmlService)
     {
         $this->basePath = storage_path('app/poc');
         $this->ensureDirectories();
@@ -74,7 +74,8 @@ class ReviewStore
      */
     public function writeReviewDocument(string $documentId, array $document): void
     {
-        $this->writeJson($this->intermediatePath($documentId), $document);
+        $this->syncDocumentReview($document);
+        $this->persistReviewDocument($documentId, $document);
     }
 
     /**
@@ -88,7 +89,13 @@ class ReviewStore
             throw new RuntimeException('Review document not found.');
         }
 
-        return $this->readJson($path);
+        $document = $this->readJson($path);
+        if (! is_array($document['document_review'] ?? null)) {
+            $this->syncDocumentReview($document);
+            $this->persistReviewDocument($documentId, $document);
+        }
+
+        return $document;
     }
 
     /**
@@ -114,19 +121,24 @@ class ReviewStore
         }
         $block['flags'] = $flags->all();
 
-        $table = $this->normalizeTable($patch['table'] ?? $block['meta']['table'] ?? null);
+        $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+        $existingLayout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+        $table = $this->normalizeTable($patch['table'] ?? $existingMeta['table'] ?? null);
+        $layout = array_merge($existingLayout, [
+            'bbox' => $block['bbox'],
+            'reading_order' => $block['reading_order'],
+        ]);
+
         $reviewedHtml = trim((string) ($patch['reviewed_html'] ?? ''));
         if ($reviewedHtml === '') {
-            $reviewedHtml = $this->buildReviewedHtml($block, $table);
+            $reviewedHtml = $this->buildReviewedHtml($block, $table, $layout);
         }
 
-        $block['meta'] = array_merge($block['meta'] ?? [], [
+        $block['meta'] = array_merge($existingMeta, [
             'reviewed_html' => $reviewedHtml,
-            'layout' => [
-                'bbox' => $block['bbox'],
-                'reading_order' => $block['reading_order'],
-            ],
+            'layout' => $layout,
             'table' => $table,
+            'table_html' => $table['html'] ?? null,
             'review' => [
                 'approved_by' => $patch['approved_by'] ?? null,
                 'notes' => $patch['notes'] ?? null,
@@ -135,7 +147,8 @@ class ReviewStore
         ]);
 
         $this->recalculateSummary($document);
-        $this->writeReviewDocument($documentId, $document);
+        $this->syncDocumentReview($document);
+        $this->persistReviewDocument($documentId, $document);
 
         return $block;
     }
@@ -155,14 +168,60 @@ class ReviewStore
         $block['confidence'] = max(0.0, min(1.0, (float) ($result['confidence'] ?? $block['confidence'] ?? 0.0)));
         $block['flags'] = array_values(array_unique(array_map('strval', $result['flags'] ?? $block['flags'] ?? [])));
         $block['needs_review'] = true;
-        $block['meta'] = array_merge($block['meta'] ?? [], [
-            'reviewed_html' => $this->buildReviewedHtml($block, $this->normalizeTable($block['meta']['table'] ?? null)),
+
+        $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+        $layout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+        $table = $this->normalizeTable($existingMeta['table'] ?? null);
+        $block['meta'] = array_merge($existingMeta, [
+            'reviewed_html' => $this->buildReviewedHtml($block, $table, $layout),
+            'table' => $table,
+            'table_html' => $table['html'] ?? null,
         ]);
 
         $this->recalculateSummary($document);
-        $this->writeReviewDocument($documentId, $document);
+        $this->syncDocumentReview($document);
+        $this->persistReviewDocument($documentId, $document);
 
         return $block;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateDocumentReview(string $documentId, array $payload): array
+    {
+        $document = $this->getReviewDocument($documentId);
+        $this->syncDocumentReview($document);
+
+        $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
+        $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
+        $draftHtml = $resetToGenerated
+            ? $generatedHtml
+            : trim((string) ($payload['draft_html'] ?? ''));
+
+        if ($draftHtml === '') {
+            throw new RuntimeException('Document HTML draft cannot be empty.');
+        }
+
+        $document['document_review'] = array_merge(
+            is_array($document['document_review'] ?? null) ? $document['document_review'] : [],
+            [
+                'generated_html' => $generatedHtml,
+                'draft_html' => $draftHtml,
+                'html_mode' => $resetToGenerated ? 'generated' : 'manual',
+                'out_of_sync' => $resetToGenerated
+                    ? false
+                    : $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
+                'updated_at' => now()->toIso8601String(),
+                'approved_by' => $payload['approved_by'] ?? null,
+                'notes' => $payload['notes'] ?? null,
+            ],
+        );
+
+        $this->persistReviewDocument($documentId, $document);
+
+        return $document['document_review'];
     }
 
     /**
@@ -177,6 +236,18 @@ class ReviewStore
         return $relativePath;
     }
 
+    /**
+     * @param array<string, mixed> $ingestData
+     */
+    public function writeIngest(string $documentId, array $ingestData): string
+    {
+        $relativePath = sprintf('ingested/%s.ingested.json', $documentId);
+        $absolutePath = $this->absolutePath($relativePath);
+        $this->writeJson($absolutePath, $ingestData);
+
+        return $relativePath;
+    }
+
     public function reviewRelativePath(string $documentId): string
     {
         return sprintf('intermediate/%s.review.json', $documentId);
@@ -187,9 +258,14 @@ class ReviewStore
         return sprintf('exports/%s.rag.json', $documentId);
     }
 
+    public function ingestRelativePath(string $documentId): string
+    {
+        return sprintf('ingested/%s.ingested.json', $documentId);
+    }
+
     private function ensureDirectories(): void
     {
-        foreach (['uploads', 'pages', 'intermediate', 'exports', 'status'] as $dir) {
+        foreach (['uploads', 'pages', 'intermediate', 'exports', 'ingested', 'status'] as $dir) {
             File::ensureDirectoryExists($this->basePath.'/'.$dir);
         }
     }
@@ -279,6 +355,44 @@ class ReviewStore
     }
 
     /**
+     * @param array<string, mixed> $document
+     */
+    private function persistReviewDocument(string $documentId, array $document): void
+    {
+        $this->writeJson($this->intermediatePath($documentId), $document);
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     */
+    private function syncDocumentReview(array &$document): void
+    {
+        $generatedHtml = $this->documentHtmlService->buildGeneratedHtml($document);
+        $existing = is_array($document['document_review'] ?? null) ? $document['document_review'] : [];
+        $mode = ($existing['html_mode'] ?? 'generated') === 'manual' ? 'manual' : 'generated';
+        $draftHtml = trim((string) ($existing['draft_html'] ?? ''));
+
+        if ($draftHtml === '' || $mode !== 'manual') {
+            $draftHtml = $generatedHtml;
+            $mode = 'generated';
+        }
+
+        $document['document_review'] = array_merge($existing, [
+            'generated_html' => $generatedHtml,
+            'draft_html' => $draftHtml,
+            'html_mode' => $mode,
+            'out_of_sync' => $mode === 'manual'
+                && $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
+            'updated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    private function normalizeHtmlForCompare(string $html): string
+    {
+        return preg_replace('/\s+/u', ' ', trim($html)) ?? trim($html);
+    }
+
+    /**
      * @param mixed $bbox
      * @return array<int, float>|null
      */
@@ -292,78 +406,27 @@ class ReviewStore
     }
 
     /**
-     * @param mixed $table
      * @return array<string, mixed>|null
      */
     private function normalizeTable(mixed $table): ?array
     {
-        if (! is_array($table)) {
-            return null;
-        }
-
-        $headers = array_values(array_map('strval', is_array($table['headers'] ?? null) ? $table['headers'] : []));
-        $rows = [];
-        foreach ((is_array($table['rows'] ?? null) ? $table['rows'] : []) as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $rows[] = array_values(array_map('strval', $row));
-        }
-
-        return [
-            'headers' => $headers,
-            'rows' => $rows,
-            'html' => $this->buildTableHtml($headers, $rows),
-        ];
+        return $this->documentHtmlService->normalizeTablePayload($table);
     }
 
     /**
      * @param array<string, mixed> $block
      * @param array<string, mixed>|null $table
+     * @param array<string, mixed> $layout
      */
-    private function buildReviewedHtml(array $block, ?array $table): string
+    private function buildReviewedHtml(array $block, ?array $table, array $layout): string
     {
-        if (($block['type'] ?? 'paragraph') === 'table' && $table !== null) {
-            return (string) ($table['html'] ?? '');
-        }
+        $tempBlock = $block;
+        $tempBlock['meta'] = array_merge(is_array($block['meta'] ?? null) ? $block['meta'] : [], [
+            'reviewed_html' => '',
+            'layout' => $layout,
+            'table' => $table,
+        ]);
 
-        $text = trim((string) ($block['approved_text'] ?? ''));
-        $safeText = e($text === '' ? (string) ($block['ai_suggested_text'] ?? '') : $text);
-        $tag = match ((string) ($block['type'] ?? 'paragraph')) {
-            'title' => 'h1',
-            'section_header' => 'h2',
-            'list_item' => 'li',
-            'figure_caption' => 'figcaption',
-            'footnote' => 'aside',
-            default => 'p',
-        };
-
-        return sprintf('<%1$s>%2$s</%1$s>', $tag, nl2br($safeText, false));
-    }
-
-    /**
-     * @param array<int, string> $headers
-     * @param array<int, array<int, string>> $rows
-     */
-    private function buildTableHtml(array $headers, array $rows): string
-    {
-        $headerCells = '';
-        foreach ($headers as $header) {
-            $headerCells .= '<th>'.e($header).'</th>';
-        }
-
-        $bodyRows = '';
-        foreach ($rows as $row) {
-            $bodyRows .= '<tr>';
-            foreach ($row as $cell) {
-                $bodyRows .= '<td>'.e($cell).'</td>';
-            }
-            $bodyRows .= '</tr>';
-        }
-
-        $thead = $headerCells !== '' ? '<thead><tr>'.$headerCells.'</tr></thead>' : '';
-        $tbody = '<tbody>'.$bodyRows.'</tbody>';
-
-        return '<table>'.$thead.$tbody.'</table>';
+        return $this->documentHtmlService->buildBlockHtml($tempBlock);
     }
 }

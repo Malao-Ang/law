@@ -1,17 +1,40 @@
 <template>
-  <section class="panel">
-    <h2>Upload Document</h2>
-    <p class="hint">Supported: .docx, .pdf</p>
+  <v-card class="mx-auto" max-width="600">
+    <v-card-title class="text-h5">Upload Document</v-card-title>
+    <v-card-subtitle>Supported: .docx, .pdf</v-card-subtitle>
 
-    <input type="file" accept=".docx,.pdf" @change="onFileChange" />
+    <v-card-text>
+      <v-file-input
+        v-model="selectedFile"
+        label="Select file"
+        accept=".docx,.pdf"
+        prepend-icon="mdi-file-upload"
+        show-size
+        :error-messages="error"
+        @change="onFileChange"
+      ></v-file-input>
 
-    <button class="btn" :disabled="!selectedFile || loading" @click="submitUpload">
-      {{ loading ? 'Uploading...' : 'Upload' }}
-    </button>
+      <v-btn
+        color="primary"
+        size="large"
+        block
+        :disabled="!selectedFile || loading"
+        :loading="loading"
+        @click="submitUpload"
+      >
+        {{ loading ? 'Uploading...' : 'Upload' }}
+      </v-btn>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="selectedFile" class="hint">Selected: {{ selectedFile.name }}</p>
-  </section>
+      <v-chip
+        v-if="selectedFile"
+        color="info"
+        class="mt-4"
+        prepend-icon="mdi-file-check"
+      >
+        Selected: {{ selectedFile.name }}
+      </v-chip>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script setup lang="ts">

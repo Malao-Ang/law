@@ -21,7 +21,11 @@ services:
     image: node:20-alpine
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
-    command: sh -c "npm install --include=optional --registry=https://registry.npmjs.org && npm run dev"
+    command: sh -c "rm -f /root/.npmrc && rm -rf /root/.npm && npm config set registry https://registry.npmjs.org && npm config set strict-ssl false && npm install --include=optional && npm run dev"
+    environment:
+      - NPM_CONFIG_REGISTRY=https://registry.npmjs.org
+      - NPM_CONFIG_STRICT_SSL=false
+      - HMR_HOST=localhost
     volumes:
       - ./apps/app-laravel:/var/www/html
       - vite_node_modules:/var/www/html/node_modules

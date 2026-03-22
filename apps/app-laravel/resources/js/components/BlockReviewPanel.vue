@@ -3,16 +3,9 @@
     <h3>Block Review</h3>
     <p class="hint">{{ block.block_id }} · {{ block.type }}</p>
 
-    <label>Raw Text</label>
-    <textarea :value="block.raw_text" readonly></textarea>
+  
 
-    <label>Normalized Text</label>
-    <textarea :value="block.normalized_text" readonly></textarea>
-
-    <label>AI Suggested Text</label>
-    <textarea :value="block.ai_suggested_text" readonly></textarea>
-
-    <label>Approved Text</label>
+    <label>Block Review Approved Text</label>
     <textarea v-model="approvedText"></textarea>
 
     <div class="layout-grid">
@@ -44,19 +37,35 @@
       </div>
     </div>
 
+    <div v-if="block.meta.layout" class="layout-metadata">
+      <p class="hint">Alignment: {{ block.meta.layout.alignment ?? 'left' }}</p>
+      <p class="hint">
+        Indent L/F/H: {{ block.meta.layout.indent_left ?? 0 }} / {{ block.meta.layout.indent_first_line ?? 0 }} /
+        {{ block.meta.layout.indent_hanging ?? 0 }}
+      </p>
+      <p class="hint">Tabs: {{ layoutTabsText }}</p>
+    </div>
+
     <label>Reviewed HTML</label>
     <textarea v-model="reviewedHtml" class="html-editor"></textarea>
 
     <div v-if="selectedType === 'table'" class="table-editor">
-      <label>Table Headers</label>
-      <input v-model="tableHeadersText" type="text" placeholder="Header 1 | Header 2 | Header 3" />
-
-      <label>Table Rows</label>
-      <textarea
-        v-model="tableRowsText"
-        class="table-textarea"
-        placeholder="row1-col1 | row1-col2&#10;row2-col1 | row2-col2"
-      ></textarea>
+      <label>Structured Table</label>
+      <table class="structured-table-editor">
+        <tbody>
+          <tr v-for="(row, rowIndex) in tableCells" :key="`row-${rowIndex}`">
+            <td
+              v-for="(cell, cellIndex) in row"
+              :key="`cell-${rowIndex}-${cellIndex}`"
+              :colspan="cell.colspan"
+              :rowspan="cell.rowspan"
+            >
+              <textarea v-model="tableCells[rowIndex][cellIndex].text" class="table-cell-input"></textarea>
+              <p class="hint">merge {{ cell.rowspan }}x{{ cell.colspan }}</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="actions">
@@ -82,9 +91,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { patchBlock, reprocessBlock } from '../api/client';
-import type { DocumentBlock, BlockType, ReviewedTable } from '../types/document';
+import type { BlockLayout, BlockType, DocumentBlock, ReviewedTable, ReviewedTableCell } from '../types/document';
 
 const blockTypes: BlockType[] = [
   'title',
@@ -115,8 +124,16 @@ const selectedType = ref<BlockType>('paragraph');
 const readingOrder = ref(0);
 const bbox = ref<[number, number, number, number]>([24, 24, 760, 112]);
 const reviewedHtml = ref('');
-const tableHeadersText = ref('');
-const tableRowsText = ref('');
+const tableCells = ref<ReviewedTableCell[][]>([]);
+
+const layoutTabsText = computed(() => {
+  const tabs = props.block?.meta.layout?.tabs ?? [];
+  if (tabs.length === 0) {
+    return 'none';
+  }
+
+  return tabs.map((tab) => `${tab.align}@${tab.position}`).join(', ');
+});
 
 watch(
   () => props.block,
@@ -125,9 +142,11 @@ watch(
     selectedType.value = next?.type ?? 'paragraph';
     readingOrder.value = next?.meta.layout?.reading_order ?? next?.reading_order ?? 0;
     bbox.value = normalizeBbox(next?.meta.layout?.bbox ?? next?.bbox ?? null);
-    reviewedHtml.value = String(next?.meta.reviewed_html ?? buildDefaultHtml(next?.type ?? 'paragraph', next?.approved_text ?? ''));
-    tableHeadersText.value = (next?.meta.table?.headers ?? []).join(' | ');
-    tableRowsText.value = (next?.meta.table?.rows ?? []).map((row) => row.join(' | ')).join('\n');
+    tableCells.value = normalizeTableCells(next?.meta.table);
+    reviewedHtml.value = String(
+      next?.meta.reviewed_html
+        ?? buildDefaultHtml(next?.type ?? 'paragraph', next?.approved_text ?? '', next?.meta.layout, tableCells.value),
+    );
     message.value = '';
   },
   { immediate: true },
@@ -142,15 +161,79 @@ function normalizeBbox(input: [number, number, number, number] | null): [number,
   return [x1, y1, x2, y2];
 }
 
-function buildDefaultHtml(type: BlockType, text: string): string {
-  const safe = escapeHtml(text);
-
-  if (type === 'table') {
-    return `<table><tbody><tr><td>${safe}</td></tr></tbody></table>`;
+function normalizeTableCells(table: ReviewedTable | null | undefined): ReviewedTableCell[][] {
+  if (table?.cells && table.cells.length > 0) {
+    return table.cells.map((row) =>
+      row.map((cell) => ({
+        text: cell.text,
+        colspan: cell.colspan ?? 1,
+        rowspan: cell.rowspan ?? 1,
+        alignment: cell.alignment ?? null,
+      })),
+    );
   }
 
-  const tag = type === 'title' ? 'h1' : type === 'section_header' ? 'h2' : type === 'list_item' ? 'li' : 'p';
-  return `<${tag}>${safe.replaceAll('\n', '<br>')}</${tag}>`;
+  const fallbackRows = [table?.headers ?? [], ...(table?.rows ?? [])].filter((row) => row.length > 0);
+  return fallbackRows.map((row) => row.map((text) => ({ text, colspan: 1, rowspan: 1, alignment: null })));
+}
+
+function buildLayoutStyle(layout?: BlockLayout): string {
+  if (!layout) {
+    return '';
+  }
+
+  const styles: string[] = [];
+  if (layout.alignment) {
+    styles.push(`text-align:${layout.alignment}`);
+  }
+  if (layout.indent_left) {
+    styles.push(`margin-left:${layout.indent_left / 20}pt`);
+  }
+  if (layout.indent_first_line) {
+    styles.push(`text-indent:${layout.indent_first_line / 20}pt`);
+  } else if (layout.indent_hanging) {
+    styles.push(`text-indent:-${layout.indent_hanging / 20}pt`);
+  }
+
+  return styles.join('; ');
+}
+
+function renderTextWithTabs(text: string, layout?: BlockLayout): string {
+  const escapedSegments = text
+    .split('\t')
+    .map((segment) => escapeHtml(segment).replaceAll('\n', '<br>'));
+
+  if (!text.includes('\t')) {
+    return escapedSegments[0] ?? '';
+  }
+
+  return escapedSegments
+    .map((segment, index) => {
+      if (index >= escapedSegments.length - 1) {
+        return segment;
+      }
+      const tabWidth = Math.max(((layout?.tabs?.[index]?.position ?? 960) / 20), 48);
+      return `${segment}<span class="doc-tab" style="display:inline-block; width:${tabWidth}pt;"></span>`;
+    })
+    .join('');
+}
+
+function buildDefaultHtml(
+  type: BlockType,
+  text: string,
+  layout?: BlockLayout,
+  cells: ReviewedTableCell[][] = tableCells.value,
+): string {
+  if (type === 'table') {
+    return buildTableHtml(cells);
+  }
+
+  const style = buildLayoutStyle(layout);
+  const styleAttr = style ? ` style="${style}"` : '';
+  const content = renderTextWithTabs(text, layout);
+  const tag = 'p';
+  const className = type === 'list_item' ? ' class="doc-paragraph doc-list-item"' : ' class="doc-paragraph"';
+  return `<${tag}${className}${styleAttr}>${content}</${tag}>`;
 }
 
 function escapeHtml(value: string): string {
@@ -167,39 +250,55 @@ function parseTable(): ReviewedTable | null {
     return null;
   }
 
-  const headers = tableHeadersText.value
-    .split('|')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const rows = tableRowsText.value
-    .split('\n')
-    .map((line) => line.split('|').map((value) => value.trim()))
-    .filter((row) => row.some(Boolean));
+  const cells = tableCells.value.map((row) =>
+    row.map((cell) => ({
+      text: cell.text,
+      colspan: Math.max(1, cell.colspan ?? 1),
+      rowspan: Math.max(1, cell.rowspan ?? 1),
+      alignment: cell.alignment ?? null,
+    })),
+  );
 
   return {
-    headers,
-    rows,
+    headers: cells[0]?.map((cell) => cell.text) ?? [],
+    rows: cells.slice(1).map((row) => row.map((cell) => cell.text)),
+    cells,
+    html: buildTableHtml(cells),
   };
 }
 
-function buildTableHtml(table: ReviewedTable | null): string {
-  if (!table) {
-    return buildDefaultHtml(selectedType.value, approvedText.value);
+function buildTableHtml(cells: ReviewedTableCell[][]): string {
+  if (cells.length === 0) {
+    return '<table><tbody></tbody></table>';
   }
 
-  const headers = table.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('');
-  const rows = table.rows
-    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+  const rows = cells
+    .map((row, rowIndex) => {
+      const cellTag = rowIndex === 0 ? 'th' : 'td';
+      const html = row
+        .map((cell) => {
+          const colspan = Math.max(1, cell.colspan ?? 1);
+          const rowspan = Math.max(1, cell.rowspan ?? 1);
+          const attrs = [
+            colspan > 1 ? ` colspan="${colspan}"` : '',
+            rowspan > 1 ? ` rowspan="${rowspan}"` : '',
+            cell.alignment ? ` style="text-align:${cell.alignment};"` : '',
+          ].join('');
+          return `<${cellTag}${attrs}>${escapeHtml(cell.text).replaceAll('\n', '<br>')}</${cellTag}>`;
+        })
+        .join('');
+      return `<tr>${html}</tr>`;
+    })
     .join('');
 
-  return `<table>${headers ? `<thead><tr>${headers}</tr></thead>` : ''}<tbody>${rows}</tbody></table>`;
+  return `<table><tbody>${rows}</tbody></table>`;
 }
 
 function syncReviewedHtml(): void {
   const table = parseTable();
   reviewedHtml.value = selectedType.value === 'table'
-    ? buildTableHtml(table)
-    : buildDefaultHtml(selectedType.value, approvedText.value);
+    ? table?.html ?? buildTableHtml(tableCells.value)
+    : buildDefaultHtml(selectedType.value, approvedText.value, props.block?.meta.layout, tableCells.value);
 }
 
 async function saveBlock(): Promise<void> {

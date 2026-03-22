@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\IngestRagJob;
 use App\Services\ExportService;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
@@ -24,12 +25,16 @@ class ExportController extends Controller
         }
 
         $this->reviewStore->setStatus($documentId, [
-            'status' => 'exported',
-            'current_step' => 'exported',
+            'status' => 'ingesting',
+            'current_step' => 'rag_ingest_queued',
             'progress' => 100,
             'export_path' => $result['export_path'],
         ]);
 
-        return response()->json($result);
+        IngestRagJob::dispatch($documentId);
+
+        return response()->json(array_merge($result, [
+            'rag_status' => 'queued',
+        ]));
     }
 }

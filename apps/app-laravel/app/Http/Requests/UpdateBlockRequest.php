@@ -40,6 +40,12 @@ class UpdateBlockRequest extends FormRequest
             'table.rows' => ['nullable', 'array'],
             'table.rows.*' => ['array'],
             'table.rows.*.*' => ['string'],
+            'table.cells' => ['nullable', 'array'],
+            'table.cells.*' => ['array'],
+            'table.cells.*.*.text' => ['required_with:table.cells', 'string'],
+            'table.cells.*.*.colspan' => ['nullable', 'integer', 'min:1'],
+            'table.cells.*.*.rowspan' => ['nullable', 'integer', 'min:1'],
+            'table.cells.*.*.alignment' => ['nullable', 'string'],
         ];
     }
 }

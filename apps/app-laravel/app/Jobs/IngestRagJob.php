@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Services\RagIngestService;
+use App\Services\ReviewStore;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Throwable;
+
+class IngestRagJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(public readonly string $documentId) {}
+
+    public function handle(RagIngestService $ragIngestService, ReviewStore $reviewStore): void
+    {
+        $result = $ragIngestService->ingest($this->documentId);
+
+        $reviewStore->setStatus($this->documentId, [
+            'status' => 'ingested',
+            'current_step' => 'rag_ingested',
+            'progress' => 100,
+            'ingest_path' => $result['ingest_path'],
+            'ingested_chunk_count' => $result['chunk_count'],
+        ]);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        app(ReviewStore::class)->setStatus($this->documentId, [
+            'status' => 'failed',
+            'current_step' => 'rag_ingest',
+            'error' => $exception->getMessage(),
+        ]);
+    }
+}

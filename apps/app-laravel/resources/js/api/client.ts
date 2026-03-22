@@ -1,10 +1,11 @@
-import type {
+﻿import type {
   DocumentStatus,
   ExportResponse,
   ReprocessResponse,
   ReviewDocument,
-  UploadResponse,
   ReviewedTable,
+  UpdateDocumentReviewResponse,
+  UploadResponse,
 } from '../types/document';
 
 async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -56,6 +57,21 @@ export function fetchStatus(documentId: string): Promise<DocumentStatus> {
 
 export function fetchReview(documentId: string): Promise<ReviewDocument> {
   return jsonRequest<ReviewDocument>(`/api/documents/${documentId}/review`);
+}
+
+export function saveDocumentReview(
+  documentId: string,
+  payload: {
+    draft_html?: string;
+    approved_by?: string;
+    notes?: string;
+    reset_to_generated?: boolean;
+  },
+): Promise<UpdateDocumentReviewResponse> {
+  return jsonRequest<UpdateDocumentReviewResponse>(`/api/documents/${documentId}/document-review`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
 }
 
 export function patchBlock(

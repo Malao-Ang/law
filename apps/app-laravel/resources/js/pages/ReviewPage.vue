@@ -1,13 +1,18 @@
-<template>
+﻿<template>
   <section>
     <div class="panel review-header">
       <div>
         <h2>Review Document</h2>
-        <p class="hint" v-if="review">{{ review.source_file }} · {{ review.source_type }}</p>
-        <p class="hint" v-else>Loading review data...</p>
+        <p v-if="review" class="hint">
+          {{ review.source_file }} · {{ review.source_type }} · {{ review.summary.block_count }} blocks
+        </p>
+        <p v-if="documentStatus" class="hint">
+          Pipeline: {{ documentStatus.status }} · {{ documentStatus.current_step }}
+          <span v-if="documentStatus.ingested_chunk_count">· {{ documentStatus.ingested_chunk_count }} chunks</span>
+        </p>
+        <p v-else class="hint">Loading review data...</p>
       </div>
-      <div>
-        <button class="btn" :disabled="!review" @click="onExport">Export RAG JSON</button>
+      <div class="review-actions">
         <p v-if="exportMessage" class="hint">{{ exportMessage }}</p>
       </div>
     </div>
@@ -15,6 +20,7 @@
     <div class="grid review-grid" v-if="review">
       <section class="panel list-panel">
         <h3>Blocks</h3>
+        <p class="hint">เลือก block เพื่อดูข้อความ OCR เดิมและปรับแก้แบบละเอียด</p>
         <ul class="block-list">
           <li
             v-for="item in flatBlocks"
@@ -30,90 +36,116 @@
         </ul>
       </section>
 
-      <DocumentViewer
-        :page="selectedPage"
-        :block="selected?.block ?? null"
-        @select-block="selectBlockById"
-        @sync-selected="syncSelectedHtml"
-      />
-
-      <BlockReviewPanel
-        :document-id="documentId"
-        :page-no="selected?.page_no ?? 1"
-        :block="selected?.block ?? null"
-        @saved="reloadReview"
-        @reprocessed="reloadReview"
-      />
-
-      <section class="panel rag-panel">
-        <h3>RAG Preview</h3>
-        <p class="hint">What will be exported for the selected block.</p>
-        <div v-if="selected" class="rag-preview-card">
-          <pre class="code">{{ ragPreview }}</pre>
-          <div class="html-preview-card" v-html="selected.block.meta.reviewed_html ?? ''"></div>
-        </div>
-        <p v-else class="hint">Select a block to inspect its RAG preview.</p>
+      <section class="panel editor-panel">
+        <DocumentHtmlEditor
+          v-model="documentHtml"
+          :selected-block-id="selected?.block.block_id ?? null"
+          :html-mode="review.document_review.html_mode"
+          :out-of-sync="review.document_review.out_of_sync"
+          @update:modelValue="onEditorInput"
+          @select-block="selectBlockById"
+        />
       </section>
+
+      <div class="review-side-column">
+        <section class="panel document-review-meta">
+          <h3>Document Draft</h3>
+          <p class="hint">Current mode: {{ review.document_review.html_mode }}</p>
+          <p class="hint">Unsaved changes: {{ documentHtmlDirty ? 'yes' : 'no' }}</p>
+          <p class="hint">Out of sync with block edits: {{ review.document_review.out_of_sync ? 'yes' : 'no' }}</p>
+          <p v-if="documentStatus?.ingest_path" class="hint">RAG artifact: {{ documentStatus.ingest_path }}</p>
+        </section>
+
+        <BlockReviewPanel
+          :document-id="documentId"
+          :page-no="selected?.page_no ?? 1"
+          :block="selected?.block ?? null"
+          @saved="handleBlockSaved"
+          @reprocessed="handleBlockReprocessed"
+        />
+      </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { exportDocument, fetchReview } from '../api/client';
-import type { DocumentBlock, DocumentPage, ReviewDocument } from '../types/document';
-import DocumentViewer from '../components/DocumentViewer.vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { exportDocument, fetchReview, fetchStatus, saveDocumentReview } from '../api/client';
+import type { DocumentBlock, DocumentStatus, ReviewDocument } from '../types/document';
 import BlockReviewPanel from '../components/BlockReviewPanel.vue';
+import DocumentHtmlEditor from '../components/DocumentHtmlEditor.vue';
+import HeaderComponent from '../components/HeaderComponent.vue';
 
 const props = defineProps<{ documentId: string }>();
 
 const review = ref<ReviewDocument | null>(null);
+const documentStatus = ref<DocumentStatus | null>(null);
 const exportMessage = ref('');
 const selected = ref<{ page_no: number; block: DocumentBlock } | null>(null);
+const documentHtml = ref('');
+const documentHtmlDirty = ref(false);
+const busy = ref(false);
+let statusPollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const flatBlocks = computed(() => {
   if (!review.value) return [];
   return review.value.pages.flatMap((page) => page.blocks.map((block) => ({ page_no: page.page_no, block })));
 });
 
-const selectedPage = computed<DocumentPage | null>(() => {
-  if (!review.value || !selected.value) return null;
-  return review.value.pages.find((page) => page.page_no === selected.value?.page_no) ?? null;
-});
+const serverDraftHtml = computed(() => review.value?.document_review.draft_html ?? '');
 
-const ragPreview = computed(() => {
-  if (!selected.value) {
-    return '';
+async function reloadReview(options: { preserveLocalHtml?: boolean } = {}): Promise<void> {
+  const preserveLocalHtml = options.preserveLocalHtml ?? false;
+  const localHtml = documentHtml.value;
+  const currentSelectedBlockId = selected.value?.block.block_id ?? null;
+
+  review.value = await fetchReview(props.documentId);
+  await refreshStatus();
+
+  if (!preserveLocalHtml || !documentHtmlDirty.value) {
+    documentHtml.value = review.value.document_review.draft_html;
+    documentHtmlDirty.value = false;
+  } else {
+    documentHtml.value = localHtml;
   }
 
-  const block = selected.value.block;
-  return JSON.stringify(
-    {
-      text: block.approved_text,
-      html: block.meta.reviewed_html ?? null,
-      layout: block.meta.layout ?? {
-        bbox: block.bbox,
-        reading_order: block.reading_order,
-      },
-      table: block.meta.table ?? null,
-    },
-    null,
-    2,
-  );
-});
-
-async function reloadReview(): Promise<void> {
-  review.value = await fetchReview(props.documentId);
-
-  if (!selected.value && flatBlocks.value.length > 0) {
+  if (!currentSelectedBlockId && flatBlocks.value.length > 0) {
     selected.value = flatBlocks.value[0];
     return;
   }
 
-  if (selected.value) {
-    const match = flatBlocks.value.find((item) => item.block.block_id === selected.value?.block.block_id);
+  if (currentSelectedBlockId) {
+    const match = flatBlocks.value.find((item) => item.block.block_id === currentSelectedBlockId);
     selected.value = match ?? flatBlocks.value[0] ?? null;
   }
+}
+
+async function refreshStatus(): Promise<void> {
+  documentStatus.value = await fetchStatus(props.documentId);
+}
+
+function scheduleStatusPoll(): void {
+  if (statusPollTimer) {
+    clearTimeout(statusPollTimer);
+  }
+
+  if (!['ingesting', 'processing', 'queued'].includes(documentStatus.value?.status ?? '')) {
+    return;
+  }
+
+  statusPollTimer = setTimeout(async () => {
+    await refreshStatus();
+    scheduleStatusPoll();
+  }, 1500);
+}
+
+function normalizeHtml(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function onEditorInput(value: string): void {
+  documentHtml.value = value;
+  documentHtmlDirty.value = normalizeHtml(value) !== normalizeHtml(serverDraftHtml.value);
 }
 
 function selectBlockById(blockId: string): void {
@@ -123,33 +155,72 @@ function selectBlockById(blockId: string): void {
   }
 }
 
-function syncSelectedHtml(): void {
-  if (!selected.value) {
-    return;
-  }
+async function persistDocumentReview(resetToGenerated = false): Promise<void> {
+  busy.value = true;
 
-  selected.value = {
-    ...selected.value,
-    block: {
-      ...selected.value.block,
-      meta: {
-        ...selected.value.block.meta,
-        reviewed_html: selected.value.block.meta.reviewed_html ?? `<p>${selected.value.block.approved_text}</p>`,
-      },
-    },
-  };
+  try {
+    await saveDocumentReview(props.documentId, {
+      draft_html: resetToGenerated ? undefined : documentHtml.value,
+      reset_to_generated: resetToGenerated,
+    });
+    await reloadReview({ preserveLocalHtml: false });
+  } finally {
+    busy.value = false;
+  }
 }
 
-async function onExport(): Promise<void> {
+async function onSaveDraft(): Promise<void> {
   try {
+    await persistDocumentReview(false);
+    exportMessage.value = 'Draft HTML saved';
+  } catch (err) {
+    exportMessage.value = err instanceof Error ? err.message : 'Save failed';
+  }
+}
+
+async function onResetToGenerated(): Promise<void> {
+  try {
+    await persistDocumentReview(true);
+    exportMessage.value = 'Document HTML reset from latest blocks';
+  } catch (err) {
+    exportMessage.value = err instanceof Error ? err.message : 'Reset failed';
+  }
+}
+
+async function onSaveAndExport(): Promise<void> {
+  try {
+    if (documentHtmlDirty.value) {
+      await persistDocumentReview(false);
+    }
+
+    busy.value = true;
     const result = await exportDocument(props.documentId);
-    exportMessage.value = `Exported: ${result.export_path}`;
+    exportMessage.value = `Exported and queued RAG: ${result.export_path}`;
+    await reloadReview({ preserveLocalHtml: false });
+    scheduleStatusPoll();
   } catch (err) {
     exportMessage.value = err instanceof Error ? err.message : 'Export failed';
+  } finally {
+    busy.value = false;
   }
+}
+
+async function handleBlockSaved(): Promise<void> {
+  await reloadReview({ preserveLocalHtml: documentHtmlDirty.value });
+}
+
+async function handleBlockReprocessed(): Promise<void> {
+  await reloadReview({ preserveLocalHtml: documentHtmlDirty.value });
 }
 
 onMounted(async () => {
   await reloadReview();
+  scheduleStatusPoll();
+});
+
+onBeforeUnmount(() => {
+  if (statusPollTimer) {
+    clearTimeout(statusPollTimer);
+  }
 });
 </script>

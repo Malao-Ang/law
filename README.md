@@ -398,7 +398,63 @@ THAI_REVIEW_THRESHOLD=0.90
 
 ---
 
-## 9) Dockerfile ที่แนะนำ
+## 9) Development Optimizations
+
+### 9.1 Fast Build & Hot Reload
+
+The project is optimized for fast development with:
+
+- **Multi-stage builds**: Docker dependencies cached separately
+- **Vite polling**: File change detection for Docker volumes
+- **Build caching**: Reuse previous builds when possible
+
+#### Quick Start (Development)
+
+```bash
+# Start all services with hot reload
+docker-compose up -d
+
+# Frontend: http://localhost:5173 (auto-reloads on file changes)
+# Backend: http://localhost:8000
+# OCR Service: http://localhost:8010
+```
+
+#### Fast Rebuild Commands
+
+```bash
+# Rebuild specific service with cache
+./scripts/fast-rebuild.sh ocr      # OCR service only
+./scripts/fast-rebuild.sh laravel  # Laravel app only
+./scripts/fast-rebuild.sh vite     # Restart Vite only
+
+# Or on Windows
+scripts\fast-rebuild.bat ocr
+```
+
+#### Hot Reload Features
+
+- **Vue Components**: Auto-reload when saving `.vue` files
+- **CSS Changes**: Instant style updates
+- **PHP/Laravel**: Auto-restart on file changes
+- **Python/OCR**: Auto-reload with `--reload` flag
+
+### 9.2 Performance Tips
+
+1. **First Build**: May take 2-3 minutes (installs all dependencies)
+2. **Subsequent Builds**: 30-60 seconds (uses cached layers)
+3. **File Changes**: Instant reload (1-2 seconds with polling)
+4. **Windows Users**: Vite polling enabled for Docker volume compatibility
+
+### 9.3 Build Optimization Details
+
+- **OCR Service**: Multi-stage build with cached Python packages
+- **Laravel App**: Composer dependencies cached separately
+- **Vite**: File polling enabled for Docker volumes
+- **Docker Compose**: Build cache and parallel builds enabled
+
+---
+
+## 10) Dockerfile ที่แนะนำ
 
 ### 9.1 Laravel Dockerfile
 

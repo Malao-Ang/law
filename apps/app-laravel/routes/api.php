@@ -11,6 +11,7 @@ Route::get('/health', HealthController::class);
 Route::post('/documents', [UploadController::class, 'store']);
 Route::get('/documents/{documentId}', [UploadController::class, 'show']);
 Route::get('/documents/{documentId}/review', [ReviewController::class, 'show']);
+Route::put('/documents/{documentId}/document-review', [ReviewController::class, 'updateDocumentReview']);
 Route::patch('/documents/{documentId}/blocks/{blockId}', [ReviewController::class, 'update']);
 Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewController::class, 'reprocess']);
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store']);

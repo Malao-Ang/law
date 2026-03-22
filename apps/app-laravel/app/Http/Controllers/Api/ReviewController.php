@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReprocessBlockRequest;
 use App\Http\Requests\UpdateBlockRequest;
+use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
@@ -43,6 +44,21 @@ class ReviewController extends Controller
             'block_id' => $blockId,
             'status' => 'updated',
             'block' => $updatedBlock,
+        ]);
+    }
+
+    public function updateDocumentReview(UpdateDocumentReviewRequest $request, string $documentId): JsonResponse
+    {
+        try {
+            $documentReview = $this->reviewStore->updateDocumentReview($documentId, $request->validated());
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status' => 'updated',
+            'document_review' => $documentReview,
         ]);
     }
 
