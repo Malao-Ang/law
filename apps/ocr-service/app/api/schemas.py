@@ -20,6 +20,13 @@ class ReprocessBlockRequest(BaseModel):
     mode: Literal["ai_correction"] = "ai_correction"
 
 
+class PreviewRequest(BaseModel):
+    document_id: str = Field(min_length=1)
+    format: Literal["html", "raw_html"] = "html"
+    include_styles: bool = True
+    include_metadata: bool = False
+
+
 class BlockPatchResponse(BaseModel):
     document_id: str
     page_no: int
@@ -32,6 +39,14 @@ class BlockPatchResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: Literal["ocr-service"] = "ocr-service"
+
+
+class PreviewResponse(BaseModel):
+    document_id: str
+    format: str
+    html: str
+    css: str | None = None
+    metadata: dict | None = None
 
 
 class BlockDraft(BaseModel):

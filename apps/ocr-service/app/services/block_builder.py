@@ -109,6 +109,248 @@ def build_document_output(
     }
 
 
+def build_html_preview(document_data: dict, format: str = "html", include_styles: bool = True) -> dict:
+    """Generate HTML preview from document data."""
+    html_parts = []
+    css_parts = []
+    
+    # Add CSS styles
+    if include_styles:
+        css_lines = _generate_preview_css()
+        css_parts.extend(css_lines)
+    
+    # Build HTML content
+    html_parts.append('<!DOCTYPE html>')
+    html_parts.append('<html lang="th">')
+    html_parts.append('<head>')
+    html_parts.append('<meta charset="UTF-8">')
+    html_parts.append('<meta name="viewport" content="width=device-width, initial-scale=1.0">')
+    html_parts.append(f'<title>{document_data.get("source_file", "Document")} - Preview</title>')
+    
+    if include_styles and css_parts:
+        html_parts.append('<style>')
+        html_parts.extend(css_parts)
+        html_parts.append('</style>')
+    
+    html_parts.append('</head>')
+    html_parts.append('<body>')
+    html_parts.append('<div class="document-preview">')
+    html_parts.append(f'<h1 class="document-title">{document_data.get("source_file", "Document")}</h1>')
+    
+    # Add document metadata
+    if document_data.get("summary"):
+        summary = document_data["summary"]
+        html_parts.append('<div class="document-summary">')
+        html_parts.append(f'<p>Pages: {summary.get("page_count", 0)} | Blocks: {summary.get("block_count", 0)} | Review Required: {summary.get("review_required_count", 0)}</p>')
+        html_parts.append('</div>')
+    
+    # Add page content
+    for page in document_data.get("pages", []):
+        page_no = page.get("page_no", 1)
+        html_parts.append(f'<div class="page" data-page="{page_no}">')
+        html_parts.append(f'<h2 class="page-header">Page {page_no}</h2>')
+        
+        for block in page.get("blocks", []):
+            block_html = block.get("meta", {}).get("reviewed_html", "")
+            if block_html:
+                html_parts.append(block_html)
+        
+        html_parts.append('</div>')
+    
+    html_parts.append('</div>')
+    html_parts.append('</body>')
+    html_parts.append('</html>')
+    
+    html_content = "\n".join(html_parts)
+    css_content = "\n".join(css_parts) if css_parts else None
+    
+    return {
+        "document_id": document_data.get("document_id", ""),
+        "format": format,
+        "html": html_content,
+        "css": css_content,
+        "metadata": {
+            "source_file": document_data.get("source_file"),
+            "source_type": document_data.get("source_type"),
+            "summary": document_data.get("summary")
+        }
+    }
+
+
+def _generate_preview_css() -> list[str]:
+    """Generate CSS styles for HTML preview."""
+    return [
+        "/* Document Preview Styles */",
+        "body {",
+        "  font-family: 'Sarabun', 'Tahoma', sans-serif;",
+        "  line-height: 1.6;",
+        "  color: #333;",
+        "  margin: 0;",
+        "  padding: 20px;",
+        "  background-color: #f5f5f5;",
+        "}",
+        "",
+        ".document-preview {",
+        "  max-width: 800px;",
+        "  margin: 0 auto;",
+        "  background: white;",
+        "  padding: 40px;",
+        "  border-radius: 8px;",
+        "  box-shadow: 0 2px 10px rgba(0,0,0,0.1);",
+        "}",
+        "",
+        ".document-title {",
+        "  text-align: center;",
+        "  color: #2c3e50;",
+        "  margin-bottom: 30px;",
+        "  font-size: 28px;",
+        "}",
+        "",
+        ".document-summary {",
+        "  background: #ecf0f1;",
+        "  padding: 15px;",
+        "  border-radius: 4px;",
+        "  margin-bottom: 30px;",
+        "  text-align: center;",
+        "}",
+        "",
+        ".page {",
+        "  margin-bottom: 40px;",
+        "  border-bottom: 2px solid #3498db;",
+        "  padding-bottom: 30px;",
+        "}",
+        "",
+        ".page-header {",
+        "  color: #3498db;",
+        "  border-bottom: 1px solid #bdc3c7;",
+        "  padding-bottom: 10px;",
+        "  margin-bottom: 20px;",
+        "}",
+        "",
+        "/* Block Styles */",
+        ".doc-paragraph {",
+        "  margin-bottom: 12px;",
+        "  text-align: justify;",
+        "}",
+        "",
+        ".doc-title {",
+        "  font-size: 24px;",
+        "  font-weight: bold;",
+        "  text-align: center;",
+        "  margin: 20px 0;",
+        "  color: #2c3e50;",
+        "}",
+        "",
+        ".doc-section-header {",
+        "  font-size: 18px;",
+        "  font-weight: bold;",
+        "  margin: 15px 0 10px 0;",
+        "  color: #34495e;",
+        "}",
+        "",
+        ".doc-list-item {",
+        "  margin-left: 20px;",
+        "  margin-bottom: 8px;",
+        "  position: relative;",
+        "}",
+        "",
+        ".doc-list-item::before {",
+        "  content: '•';",
+        "  position: absolute;",
+        "  left: -15px;",
+        "  color: #3498db;",
+        "}",
+        "",
+        ".doc-figure-caption {",
+        "  font-style: italic;",
+        "  text-align: center;",
+        "  margin: 10px 0;",
+        "  font-size: 14px;",
+        "  color: #7f8c8d;",
+        "}",
+        "",
+        ".doc-footnote {",
+        "  font-size: 12px;",
+        "  vertical-align: super;",
+        "  color: #95a5a6;",
+        "}",
+        "",
+        "/* Table Styles */",
+        "table {",
+        "  width: 100%;",
+        "  border-collapse: collapse;",
+        "  margin: 20px 0;",
+        "  font-size: 14px;",
+        "}",
+        "",
+        "th, td {",
+        "  border: 1px solid #bdc3c7;",
+        "  padding: 8px 12px;",
+        "  text-align: left;",
+        "}",
+        "",
+        "th {",
+        "  background-color: #3498db;",
+        "  color: white;",
+        "  font-weight: bold;",
+        "}",
+        "",
+        "tr:nth-child(even) {",
+        "  background-color: #f8f9fa;",
+        "}",
+        "",
+        "/* Image Styles */",
+        ".doc-image {",
+        "  text-align: center;",
+        "  margin: 20px 0;",
+        "}",
+        "",
+        ".doc-image img {",
+        "  max-width: 100%;",
+        "  height: auto;",
+        "  border-radius: 4px;",
+        "  box-shadow: 0 2px 5px rgba(0,0,0,0.1);",
+        "}",
+        "",
+        ".doc-image--missing {",
+        "  border: 2px dashed #e74c3c;",
+        "  padding: 20px;",
+        "  text-align: center;",
+        "  color: #e74c3c;",
+        "  background-color: #fadbd8;",
+        "}",
+        "",
+        "/* Tab styles */",
+        ".doc-tab {",
+        "  display: inline-block;",
+        "}",
+        "",
+        "/* Responsive */",
+        "@media (max-width: 768px) {",
+        "  .document-preview {",
+        "    padding: 20px;",
+        "    margin: 10px;",
+        "  }",
+        "  ",
+        "  .document-title {",
+        "    font-size: 24px;",
+        "  }",
+        "  ",
+        "  .doc-title {",
+        "    font-size: 20px;",
+        "  }",
+        "  ",
+        "  table {",
+        "    font-size: 12px;",
+        "  }",
+        "  ",
+        "  th, td {",
+        "    padding: 6px 8px;",
+        "  }",
+        "}",
+    ]
+
+
 def normalize_layout(layout: object, bbox: object, reading_order: object) -> dict:
     source = layout if isinstance(layout, dict) else {}
     tabs: list[dict[str, int | str]] = []
@@ -338,12 +580,28 @@ def build_layout_style(layout: dict) -> str:
         css_indent = normalize_indent_for_css(indent_level)
         styles.append(f"margin-left:{css_indent}")
     elif indent_left is not None:
-        # Legacy DOCX-style indent in points
-        styles.append(f"margin-left:{indent_left / 20:.1f}pt")
+        # Convert DOCX twips (1/20 point) to points
+        left_margin_pt = indent_left / 20.0
+        styles.append(f"margin-left:{left_margin_pt:.1f}pt")
+        
+        # Handle hanging indent properly
+        if indent_hanging is not None and indent_hanging > 0:
+            # Hanging indent: first line is indented less than subsequent lines
+            # text-indent: negative value pulls first line back
+            hanging_pt = indent_hanging / 20.0
+            styles.append(f"text-indent:-{hanging_pt:.1f}pt")
+        elif indent_first_line is not None and indent_first_line > 0:
+            # First line indent: first line indented more than subsequent lines
+            first_line_pt = indent_first_line / 20.0
+            styles.append(f"text-indent:{first_line_pt:.1f}pt")
     elif indent_first_line is not None:
-        styles.append(f"text-indent:{indent_first_line / 20:.1f}pt")
+        # First line indent without left margin
+        first_line_pt = indent_first_line / 20.0
+        styles.append(f"text-indent:{first_line_pt:.1f}pt")
     elif indent_hanging is not None:
-        styles.append(f"text-indent:-{indent_hanging / 20:.1f}pt")
+        # Hanging indent without left margin
+        hanging_pt = indent_hanging / 20.0
+        styles.append(f"text-indent:-{hanging_pt:.1f}pt")
 
     return "; ".join(styles)
 

@@ -98,6 +98,10 @@ class DoclingService:
         # Initialize new extractors
         self._text_extractor = DoclingParseExtractor(fallback_to_fitz=True)
         self._table_extractor = DoclingTableExtractor(fallback_to_fitz=True)
+        
+        # Numbering and style caches for DOCX processing
+        self._numbering_cache: dict[str, dict] = {}
+        self._styles_cache: dict[str, dict] = {}
 
     # ── image storage ────────────────────────────────────────────────────────
 
@@ -137,6 +141,12 @@ class DoclingService:
 
     def _extract_docx_blocks(self, file_path: Path, document_id: str) -> list[dict]:
         with zipfile.ZipFile(file_path) as archive:
+            # Parse numbering.xml for list definitions
+            self._parse_docx_numbering(archive)
+            
+            # Parse styles.xml for style-based formatting
+            self._parse_docx_styles(archive)
+            
             # Build rId → zip-path map for embedded images
             rel_map: dict[str, str] = {}
             rel_path = "word/_rels/document.xml.rels"
@@ -444,23 +454,278 @@ class DoclingService:
             return False
         return (ix1 - ix0) * (iy1 - iy0) > (x1_1 - x0_1) * (y1_1 - y0_1) * threshold
 
+    # ── DOCX Numbering and Style Parsing ─────────────────────────────────────────────
+
+    def _parse_docx_numbering(self, archive: zipfile.ZipFile) -> None:
+        """Parse numbering.xml to extract list definitions."""
+        self._numbering_cache.clear()
+        
+        numbering_path = "word/numbering.xml"
+        if numbering_path not in archive.namelist():
+            return
+            
+        try:
+            with archive.open(numbering_path) as fh:
+                root = ET.parse(fh).getroot()
+                
+                # Parse abstract numbering definitions (w:abstractNum)
+                for abstract_num in root.findall("w:abstractNum", self.NAMESPACES):
+                    abstract_num_id = self._word_attr(abstract_num, "abstractNumId")
+                    if abstract_num_id is None:
+                        continue
+                        
+                    levels = {}
+                    for level in abstract_num.findall("w:lvl", self.NAMESPACES):
+                        level_id = self._word_attr(level, "ilvl")
+                        if level_id is None:
+                            continue
+                            
+                        level_info = self._parse_numbering_level(level)
+                        levels[level_id] = level_info
+                        
+                    self._numbering_cache[f"abstractNum_{abstract_num_id}"] = {
+                        "type": "abstract",
+                        "levels": levels
+                    }
+                
+                # Parse concrete numbering instances (w:num)
+                for num in root.findall("w:num", self.NAMESPACES):
+                    num_id = self._word_attr(num, "numId")
+                    if num_id is None:
+                        continue
+                        
+                    abstract_num_ref = num.find("w:abstractNumId", self.NAMESPACES)
+                    if abstract_num_ref is None:
+                        continue
+                        
+                    abstract_num_id = self._word_attr(abstract_num_ref, "val")
+                    if abstract_num_id is None:
+                        continue
+                        
+                    # Get abstract numbering definition
+                    abstract_key = f"abstractNum_{abstract_num_id}"
+                    abstract_def = self._numbering_cache.get(abstract_key, {})
+                    
+                    # Override with any level-specific overrides
+                    levels = abstract_def.get("levels", {}).copy()
+                    for override in num.findall("w:lvlOverride", self.NAMESPACES):
+                        level_id = self._word_attr(override, "ilvl")
+                        if level_id is None:
+                            continue
+                            
+                        level_info = self._parse_numbering_level(override)
+                        levels[level_id] = level_info
+                        
+                    self._numbering_cache[f"num_{num_id}"] = {
+                        "type": "concrete",
+                        "abstract_num_id": abstract_num_id,
+                        "levels": levels
+                    }
+                    
+        except Exception as e:
+            # If parsing fails, continue without numbering support
+            import warnings
+            warnings.warn(f"Failed to parse numbering.xml: {e}")
+
+    def _parse_numbering_level(self, level_element: ET.Element) -> dict:
+        """Parse a single numbering level definition."""
+        level_info = {}
+        
+        # Get start number
+        start = level_element.find("w:start", self.NAMESPACES)
+        if start is not None:
+            level_info["start"] = int(self._word_attr(start, "val") or "1")
+        
+        # Get numbering format
+        num_fmt = level_element.find("w:numFmt", self.NAMESPACES)
+        if num_fmt is not None:
+            level_info["format"] = self._word_attr(num_fmt, "val") or "decimal"
+        
+        # Get level text (e.g., "%1.", "(%a)", "•")
+        lvl_text = level_element.find("w:lvlText", self.NAMESPACES)
+        if lvl_text is not None:
+            level_info["text"] = self._word_attr(lvl_text, "val") or "%1."
+        
+        # Get justification
+        jc = level_element.find("w:jc", self.NAMESPACES)
+        if jc is not None:
+            level_info["alignment"] = self._word_attr(jc, "val")
+        
+        # Get paragraph properties (including indent)
+        paragraph_props = level_element.find("w:pPr", self.NAMESPACES)
+        if paragraph_props is not None:
+            level_info["paragraph_properties"] = self._extract_paragraph_layout(paragraph_props)
+        
+        return level_info
+
+    def _parse_docx_styles(self, archive: zipfile.ZipFile) -> None:
+        """Parse styles.xml to extract style definitions."""
+        self._styles_cache.clear()
+        
+        styles_path = "word/styles.xml"
+        if styles_path not in archive.namelist():
+            return
+            
+        try:
+            with archive.open(styles_path) as fh:
+                root = ET.parse(fh).getroot()
+                
+                for style in root.findall("w:style", self.NAMESPACES):
+                    style_id = self._word_attr(style, "styleId")
+                    if style_id is None:
+                        continue
+                        
+                    style_type = self._word_attr(style, "type") or "paragraph"
+                    
+                    # Extract paragraph properties if this is a paragraph style
+                    paragraph_props = None
+                    if style_type == "paragraph":
+                        paragraph_props = style.find("w:pPr", self.NAMESPACES)
+                        if paragraph_props is not None:
+                            layout = self._extract_paragraph_layout(paragraph_props)
+                            self._styles_cache[style_id] = {
+                                "type": style_type,
+                                "layout": layout
+                            }
+                    
+        except Exception as e:
+            # If parsing fails, continue without style support
+            import warnings
+            warnings.warn(f"Failed to parse styles.xml: {e}")
+
+    def _get_numbering_for_paragraph(self, paragraph: ET.Element) -> dict | None:
+        """Get numbering information for a paragraph."""
+        paragraph_props = paragraph.find("w:pPr", self.NAMESPACES)
+        if paragraph_props is None:
+            return None
+            
+        numbering_props = paragraph_props.find("w:numPr", self.NAMESPACES)
+        if numbering_props is None:
+            return None
+            
+        # Get numbering ID and level
+        num_id_elem = numbering_props.find("w:numId", self.NAMESPACES)
+        ilvl_elem = numbering_props.find("w:ilvl", self.NAMESPACES)
+        
+        if num_id_elem is None or ilvl_elem is None:
+            return None
+            
+        num_id = self._word_attr(num_id_elem, "val")
+        ilvl = self._word_attr(ilvl_elem, "val")
+        
+        if num_id is None or ilvl is None:
+            return None
+            
+        # Look up numbering definition
+        numbering_key = f"num_{num_id}"
+        numbering_def = self._numbering_cache.get(numbering_key)
+        
+        if not numbering_def:
+            return None
+            
+        # Get level-specific information
+        levels = numbering_def.get("levels", {})
+        level_info = levels.get(ilvl, {})
+        
+        # Determine list type based on format
+        num_format = level_info.get("format", "decimal")
+        list_type = "numbered"
+        if num_format in {"bullet", "none"}:
+            list_type = "bullet"
+        elif num_format in {"decimal", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"}:
+            list_type = "numbered"
+        
+        return {
+            "num_id": num_id,
+            "level": int(ilvl),
+            "type": list_type,
+            "format": num_format,
+            "text": level_info.get("text", "%1."),
+            "paragraph_properties": level_info.get("paragraph_properties", {})
+        }
+
     # ── DOCX paragraph / table helpers ───────────────────────────────────────
 
     def _parse_docx_paragraph(self, paragraph: ET.Element, reading_order: int) -> dict | None:
         text   = self._extract_paragraph_text(paragraph)
         layout = self._extract_paragraph_layout(paragraph)
+        
+        # Get numbering information
+        numbering_info = self._get_numbering_for_paragraph(paragraph)
+        
+        # Get style information
+        style_info = self._get_style_for_paragraph(paragraph)
+        
+        # Merge layout information: direct > numbering > style
+        merged_layout = self._merge_layout_properties(layout, numbering_info, style_info)
+        
         if text.strip() == "":
             return None
+            
+        # Determine block type (consider numbering)
+        block_type = self._classify_paragraph(
+            text=text, 
+            layout=merged_layout, 
+            reading_order=reading_order,
+            numbering_info=numbering_info
+        )
+        
         return {
             "block_id": f"1-{reading_order}",
-            "type": self._classify_paragraph(text=text, layout=layout, reading_order=reading_order),
+            "type": block_type,
             "reading_order": reading_order,
             "raw_text": text,
             "bbox": None,
             "confidence": 0.98,
             "flags": [],
-            "meta": {"layout": layout},
+            "meta": {
+                "layout": merged_layout,
+                "numbering": numbering_info,
+                "style": style_info
+            },
         }
+
+    def _get_style_for_paragraph(self, paragraph: ET.Element) -> dict | None:
+        """Get style information for a paragraph."""
+        paragraph_props = paragraph.find("w:pPr", self.NAMESPACES)
+        if paragraph_props is None:
+            return None
+            
+        style_ref = paragraph_props.find("w:pStyle", self.NAMESPACES)
+        if style_ref is None:
+            return None
+            
+        style_id = self._word_attr(style_ref, "val")
+        if style_id is None:
+            return None
+            
+        return self._styles_cache.get(style_id)
+
+    def _merge_layout_properties(self, direct_layout: dict, numbering_info: dict | None, style_info: dict | None) -> dict:
+        """Merge layout properties with precedence: direct > numbering > style."""
+        merged = direct_layout.copy()
+        
+        # Apply style-based layout first (lowest priority)
+        if style_info and "layout" in style_info:
+            style_layout = style_info["layout"]
+            for key, value in style_layout.items():
+                if value is not None and merged.get(key) is None:
+                    merged[key] = value
+        
+        # Apply numbering-based layout (medium priority)
+        if numbering_info and "paragraph_properties" in numbering_info:
+            numbering_layout = numbering_info["paragraph_properties"]
+            for key, value in numbering_layout.items():
+                if value is not None and merged.get(key) is None:
+                    merged[key] = value
+        
+        # Add list-specific information
+        if numbering_info:
+            merged["list_level"] = numbering_info.get("level", 0)
+            merged["list_type"] = numbering_info.get("type", "numbered")
+            merged["list_marker"] = numbering_info.get("text", "%1.")
+        
+        return merged
 
     def _parse_docx_table(self, table: ET.Element, reading_order: int) -> dict | None:
         rows: list[list[dict]] = []
@@ -611,15 +876,28 @@ class DoclingService:
             html_rows.append("<tr>" + "".join(cells) + "</tr>")
         return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
 
-    def _classify_paragraph(self, text: str, layout: dict, reading_order: int) -> str:
+    def _classify_paragraph(self, text: str, layout: dict, reading_order: int, numbering_info: dict | None = None) -> str:
         stripped  = text.strip()
         alignment = layout.get("alignment")
+        
+        # Check for numbered/bulleted lists first (highest priority)
+        if numbering_info:
+            list_type = numbering_info.get("type", "numbered")
+            if list_type == "bullet":
+                return "list_item"
+            elif list_type == "numbered":
+                return "list_item"
+        
+        # Check for alignment-based classification
         if alignment == "center":
             return "title" if reading_order <= 4 else "section_header"
+        
+        # Check for Thai legal document patterns
         if re.match(r"^(ข้อ\s*[๐-๙0-9]+|ข้อ[๐-๙0-9]+)", stripped):
             return "section_header"
         if re.match(r"^(\([๐-๙0-9]+\)|-|•)", stripped):
             return "list_item"
+            
         return "paragraph"
 
     @staticmethod

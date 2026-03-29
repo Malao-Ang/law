@@ -7,13 +7,15 @@ from app.api.schemas import (
     BlockPatchResponse,
     ExtractRequest,
     HealthResponse,
+    PreviewRequest,
+    PreviewResponse,
     ReprocessBlockRequest,
     intermediate_output_path,
 )
 from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
-from app.services.block_builder import build_document_output
+from app.services.block_builder import build_document_output, build_html_preview
 from app.services.docling_service import DoclingService
 from app.services.ocr_pipeline import OcrPipeline
 from app.services.thai_normalizer import normalize_text
@@ -113,3 +115,54 @@ def reprocess_block(payload: ReprocessBlockRequest) -> BlockPatchResponse:
         confidence=ai["confidence"],
         flags=target_block["flags"],
     )
+
+
+@router.post("/preview", response_model=PreviewResponse)
+def generate_preview(payload: PreviewRequest) -> PreviewResponse:
+    """Generate HTML preview for a processed document."""
+    settings = get_settings()
+    logger = get_logger(payload.document_id)
+
+    output_path = intermediate_output_path(settings.data_root, payload.document_id)
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        # Load document data
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        
+        # Generate HTML preview
+        preview_data = build_html_preview(
+            document_data=data,
+            format=payload.format,
+            include_styles=payload.include_styles
+        )
+        
+        # Add metadata if requested
+        if payload.include_metadata:
+            preview_data["metadata"] = {
+                "source_file": data.get("source_file"),
+                "source_type": data.get("source_type"),
+                "language": data.get("language"),
+                "summary": data.get("summary"),
+                "processing_info": {
+                    "format": payload.format,
+                    "include_styles": payload.include_styles,
+                    "generated_at": logger.handlers[0].formatter.formatTime(logger.handlers[0].record) if logger.handlers else None
+                }
+            }
+        
+        logger.info("preview generated", extra={
+            "document_id": payload.document_id,
+            "format": payload.format,
+            "include_styles": payload.include_styles
+        })
+        
+        return PreviewResponse(**preview_data)
+        
+    except Exception as e:
+        logger.error("preview generation failed", extra={
+            "document_id": payload.document_id,
+            "error": str(e)
+        })
+        raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")
