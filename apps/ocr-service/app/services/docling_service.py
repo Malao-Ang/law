@@ -124,6 +124,109 @@ class DoclingService:
 
     # ── DOCX ─────────────────────────────────────────────────────────────────
 
+    def _parse_numbering_xml(self, archive: zipfile.ZipFile) -> dict:
+        """Parse word/numbering.xml and return numbering context."""
+        numbering_path = "word/numbering.xml"
+        if numbering_path not in archive.namelist():
+            return {"abstract_nums": {}, "num_map": {}, "counters": {}}
+
+        with archive.open(numbering_path) as fh:
+            root = ET.parse(fh).getroot()
+
+        abstract_nums = {}
+        num_map = {}
+
+        # Parse abstractNum definitions
+        for abstract_num in root.findall("w:abstractNum", self.NAMESPACES):
+            abstract_num_id = self._word_attr(abstract_num, "abstractNumId")
+            if abstract_num_id is None:
+                continue
+
+            levels = {}
+            for lvl in abstract_num.findall("w:lvl", self.NAMESPACES):
+                ilvl = self._word_attr(lvl, "ilvl")
+                if ilvl is None:
+                    continue
+
+                start_elem = lvl.find("w:start", self.NAMESPACES)
+                start = int(self._word_attr(start_elem, "val") or "1")
+
+                num_fmt_elem = lvl.find("w:numFmt", self.NAMESPACES)
+                num_fmt = self._word_attr(num_fmt_elem, "val") or "decimal"
+
+                lvl_text_elem = lvl.find("w:lvlText", self.NAMESPACES)
+                lvl_text = self._word_attr(lvl_text_elem, "val") or "%1."
+
+                # Parse indentation for this level
+                indent_left = None
+                indent_hanging = None
+                indent_first_line = None
+
+                ind = lvl.find("w:pPr/w:ind", self.NAMESPACES)
+                if ind is not None:
+                    indent_left = self._parse_int_attr(ind, "left")
+                    indent_hanging = self._parse_int_attr(ind, "hanging")
+                    indent_first_line = self._parse_int_attr(ind, "firstLine")
+
+                levels[int(ilvl)] = {
+                    "numFmt": num_fmt,
+                    "lvlText": lvl_text,
+                    "start": start,
+                    "indent_left": indent_left,
+                    "indent_hanging": indent_hanging,
+                    "indent_first_line": indent_first_line,
+                }
+
+            abstract_nums[int(abstract_num_id)] = {"levels": levels}
+
+        # Parse num instances that reference abstractNum
+        for num in root.findall("w:num", self.NAMESPACES):
+            num_id = self._word_attr(num, "numId")
+            abstract_num_id_ref = None
+
+            abstract_num_ref = num.find("w:abstractNumId", self.NAMESPACES)
+            if abstract_num_ref is not None:
+                abstract_num_id_ref = self._word_attr(abstract_num_ref, "val")
+
+            if num_id is not None and abstract_num_id_ref is not None:
+                # Check for level overrides
+                overrides = {}
+                for lvl_override in num.findall("w:lvlOverride", self.NAMESPACES):
+                    ilvl = self._word_attr(lvl_override, "ilvl")
+                    if ilvl is None:
+                        continue
+
+                    start_elem = lvl_override.find("w:startOverride", self.NAMESPACES)
+                    start = int(self._word_attr(start_elem, "val") or "1")
+
+                    num_fmt_elem = lvl_override.find("w:numFmt", self.NAMESPACES)
+                    num_fmt = self._word_attr(num_fmt_elem, "val")
+
+                    lvl_text_elem = lvl_override.find("w:lvlText", self.NAMESPACES)
+                    lvl_text = self._word_attr(lvl_text_elem, "val")
+
+                    override_data = {}
+                    if start_elem is not None:
+                        override_data["start"] = start
+                    if num_fmt is not None:
+                        override_data["numFmt"] = num_fmt
+                    if lvl_text is not None:
+                        override_data["lvlText"] = lvl_text
+
+                    if override_data:
+                        overrides[int(ilvl)] = override_data
+
+                num_map[int(num_id)] = {
+                    "abstractNumId": int(abstract_num_id_ref),
+                    "overrides": overrides,
+                }
+
+        return {
+            "abstract_nums": abstract_nums,
+            "num_map": num_map,
+            "counters": {},  # Will track running counters per (numId, ilvl)
+        }
+
     def _extract_docx_blocks(self, file_path: Path, document_id: str) -> list[dict]:
         with zipfile.ZipFile(file_path) as archive:
             # Build rId → zip-path map for embedded images
@@ -138,6 +241,9 @@ class DoclingService:
                             if not target.startswith("word/"):
                                 target = "word/" + target
                             rel_map[rid] = target
+
+            # Parse numbering definitions
+            numbering_context = self._parse_numbering_xml(archive)
 
             with archive.open("word/document.xml") as fh:
                 root = ET.parse(fh).getroot()
@@ -161,7 +267,7 @@ class DoclingService:
                     if img is not None:
                         block = img
                     else:
-                        block = self._parse_docx_paragraph(child, reading_order)
+                        block = self._parse_docx_paragraph(child, reading_order, numbering_context)
                 elif tag == "tbl":
                     block = self._parse_docx_table(child, reading_order)
 
@@ -418,20 +524,38 @@ class DoclingService:
 
     # ── DOCX paragraph / table helpers ───────────────────────────────────────
 
-    def _parse_docx_paragraph(self, paragraph: ET.Element, reading_order: int) -> dict | None:
-        text   = self._extract_paragraph_text(paragraph)
+    def _parse_docx_paragraph(self, paragraph: ET.Element, reading_order: int, numbering_context: dict) -> dict | None:
+        text = self._extract_paragraph_text(paragraph)
         layout = self._extract_paragraph_layout(paragraph)
+        
+        # Resolve numbering if present
+        numbering_info = self._resolve_numbering(paragraph, numbering_context, layout)
+        if numbering_info:
+            text = numbering_info["prefix"] + "\t" + text
+            layout = numbering_info["layout"]
+        
         if text.strip() == "":
             return None
+            
+        meta = {"layout": layout}
+        if numbering_info:
+            meta["numbering"] = numbering_info["meta"]
+            
         return {
             "block_id": f"1-{reading_order}",
-            "type": self._classify_paragraph(text=text, layout=layout, reading_order=reading_order),
+            "type": self._classify_paragraph(
+                text=text, 
+                layout=layout, 
+                reading_order=reading_order,
+                has_numbering=numbering_info is not None,
+                numbering_ilvl=numbering_info["meta"]["ilvl"] if numbering_info else None
+            ),
             "reading_order": reading_order,
             "raw_text": text,
             "bbox": None,
             "confidence": 0.98,
             "flags": [],
-            "meta": {"layout": layout},
+            "meta": meta,
         }
 
     def _parse_docx_table(self, table: ET.Element, reading_order: int) -> dict | None:
@@ -583,9 +707,174 @@ class DoclingService:
             html_rows.append("<tr>" + "".join(cells) + "</tr>")
         return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
 
-    def _classify_paragraph(self, text: str, layout: dict, reading_order: int) -> str:
-        stripped  = text.strip()
+    def _resolve_numbering(self, paragraph: ET.Element, numbering_context: dict, layout: dict) -> dict | None:
+        """Resolve numbering for a paragraph and return prefix and updated layout."""
+        # Check if paragraph has numbering properties
+        pPr = paragraph.find("w:pPr", self.NAMESPACES)
+        if pPr is None:
+            return None
+            
+        numPr = pPr.find("w:numPr", self.NAMESPACES)
+        if numPr is None:
+            return None
+            
+        # Get numId and ilvl (indentation level)
+        numId_elem = numPr.find("w:numId", self.NAMESPACES)
+        ilvl_elem = numPr.find("w:ilvl", self.NAMESPACES)
+        
+        if numId_elem is None or ilvl_elem is None:
+            return None
+            
+        numId = int(self._word_attr(numId_elem, "val") or "0")
+        ilvl = int(self._word_attr(ilvl_elem, "val") or "0")
+        
+        # Look up numbering definition
+        num_map = numbering_context.get("num_map", {})
+        abstract_nums = numbering_context.get("abstract_nums", {})
+        
+        if numId not in num_map:
+            return None
+            
+        num_def = num_map[numId]
+        abstract_num_id = num_def["abstractNumId"]
+        
+        if abstract_num_id not in abstract_nums:
+            return None
+            
+        abstract_num = abstract_nums[abstract_num_id]
+        levels = abstract_num["levels"]
+        
+        if ilvl not in levels:
+            return None
+            
+        level_info = levels[ilvl]
+        
+        # Apply overrides if present
+        overrides = num_def.get("overrides", {})
+        if ilvl in overrides:
+            override = overrides[ilvl]
+            level_info = {**level_info, **override}
+        
+        # Get or increment counter for this (numId, ilvl) combination
+        counters = numbering_context.get("counters", {})
+        counter_key = (numId, ilvl)
+        
+        # Reset counters for lower levels when this level increments
+        if ilvl > 0:
+            for key in list(counters.keys()):
+                if key[0] == numId and key[1] < ilvl:
+                    del counters[key]
+        
+        current_num = counters.get(counter_key, level_info["start"] - 1) + 1
+        counters[counter_key] = current_num
+        numbering_context["counters"] = counters
+        
+        # Generate the prefix text based on numFmt and lvlText
+        prefix = self._format_numbering_prefix(
+            current_num, 
+            level_info["numFmt"], 
+            level_info["lvlText"],
+            numId,
+            ilvl,
+            numbering_context
+        )
+        
+        # Update layout with numbering indentation if not already set
+        updated_layout = layout.copy()
+        if updated_layout.get("indent_left") is None and level_info.get("indent_left") is not None:
+            updated_layout["indent_left"] = level_info["indent_left"]
+        if updated_layout.get("indent_hanging") is None and level_info.get("indent_hanging") is not None:
+            updated_layout["indent_hanging"] = level_info["indent_hanging"]
+        if updated_layout.get("indent_first_line") is None and level_info.get("indent_first_line") is not None:
+            updated_layout["indent_first_line"] = level_info["indent_first_line"]
+        
+        return {
+            "prefix": prefix,
+            "layout": updated_layout,
+            "meta": {
+                "numId": numId,
+                "ilvl": ilvl,
+                "numFmt": level_info["numFmt"],
+                "generated_prefix": prefix,
+                "current_num": current_num,
+            }
+        }
+
+    def _format_numbering_prefix(self, num: int, num_fmt: str, lvl_text: str, numId: int, ilvl: int, numbering_context: dict) -> str:
+        """Format the numbering prefix based on numFmt and lvlText pattern."""
+        # Handle different numbering formats
+        if num_fmt == "decimal":
+            num_str = str(num)
+        elif num_fmt == "thaiNumbers":
+            thai_digits = "๐๑๒๓๔๕๖๗๘๙"
+            num_str = "".join(thai_digits[int(d)] for d in str(num))
+        elif num_fmt == "thaiLetters":
+            thai_letters = "กขคงจฉชซฌญฎฏฐฑฒณดตถทธนบปผพภมยรลวศษสหฬอฮ"
+            if 1 <= num <= len(thai_letters):
+                num_str = thai_letters[num - 1]
+            else:
+                num_str = str(num)  # Fallback
+        elif num_fmt == "bullet":
+            # Use bullet characters
+            bullets = ["•", "◦", "▪", "▫", "■", "□", "▪", "▫"]
+            num_str = bullets[min(ilvl, len(bullets) - 1)]
+        elif num_fmt == "lowerLetter":
+            if 1 <= num <= 26:
+                num_str = chr(ord('a') + num - 1)
+            else:
+                num_str = str(num)
+        elif num_fmt == "upperLetter":
+            if 1 <= num <= 26:
+                num_str = chr(ord('A') + num - 1)
+            else:
+                num_str = str(num)
+        elif num_fmt == "lowerRoman":
+            roman_numerals = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
+                            "xi", "xii", "xiii", "xiv", "xv", "xvi", "xvii", "xviii", "xix", "xx"]
+            if 1 <= num <= len(roman_numerals):
+                num_str = roman_numerals[num - 1]
+            else:
+                num_str = str(num)
+        elif num_fmt == "upperRoman":
+            roman_numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+                            "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"]
+            if 1 <= num <= len(roman_numerals):
+                num_str = roman_numerals[num - 1]
+            else:
+                num_str = str(num)
+        else:
+            num_str = str(num)  # Default fallback
+        
+        # Replace placeholders in lvlText
+        result = lvl_text
+        result = result.replace("%1", num_str)
+        
+        # Handle multi-level numbering (e.g., %1.%2.%3)
+        for level in range(2, 10):
+            placeholder = f"%{level}"
+            if placeholder in result:
+                # Get parent level number
+                parent_ilvl = ilvl - (level - 1)
+                if parent_ilvl >= 0:
+                    parent_key = (numId, parent_ilvl)
+                    parent_num = numbering_context.get("counters", {}).get(parent_key, 1)
+                    parent_fmt = numbering_context.get("abstract_nums", {}).get(
+                        numbering_context.get("num_map", {}).get(numId, {}).get("abstractNumId", 0), {}
+                    ).get("levels", {}).get(parent_ilvl, {}).get("numFmt", "decimal")
+                    
+                    parent_str = self._format_numbering_prefix(parent_num, parent_fmt, "%1", numId, parent_ilvl, numbering_context)
+                    result = result.replace(placeholder, parent_str)
+        
+        return result
+
+    def _classify_paragraph(self, text: str, layout: dict, reading_order: int, has_numbering: bool = False, numbering_ilvl: int | None = None) -> str:
+        stripped = text.strip()
         alignment = layout.get("alignment")
+        
+        # If paragraph has numbering, classify as list_item by default
+        if has_numbering:
+            return "list_item"
+            
         if alignment == "center":
             return "title" if reading_order <= 4 else "section_header"
         if re.match(r"^(ข้อ\s*[๐-๙0-9]+|ข้อ[๐-๙0-9]+)", stripped):
