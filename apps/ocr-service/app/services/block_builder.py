@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.services.ai_corrector import MockAICorrector
+from app.utils.indent_detector import normalize_indent_for_css
 
 
 TAB_FALLBACK_PT = 48.0
@@ -319,19 +320,27 @@ def render_text_with_layout(text: str, layout: dict) -> str:
 
 
 def build_layout_style(layout: dict) -> str:
+    """Build CSS style string from layout information, supporting indent levels."""
     styles: list[str] = []
     alignment = layout.get("alignment")
     if alignment:
         styles.append(f"text-align:{alignment}")
 
+    # Support both DOCX-style indent points and new indent_level
+    indent_level = layout.get("indent_level", 0)
     indent_left = to_int_or_none(layout.get("indent_left"))
     indent_first_line = to_int_or_none(layout.get("indent_first_line"))
     indent_hanging = to_int_or_none(layout.get("indent_hanging"))
 
-    if indent_left is not None:
+    # Priority: indent_level > indent_left > other indent settings
+    if indent_level > 0:
+        # Use CSS-friendly indent based on level
+        css_indent = normalize_indent_for_css(indent_level)
+        styles.append(f"margin-left:{css_indent}")
+    elif indent_left is not None:
+        # Legacy DOCX-style indent in points
         styles.append(f"margin-left:{indent_left / 20:.1f}pt")
-
-    if indent_first_line is not None:
+    elif indent_first_line is not None:
         styles.append(f"text-indent:{indent_first_line / 20:.1f}pt")
     elif indent_hanging is not None:
         styles.append(f"text-indent:-{indent_hanging / 20:.1f}pt")

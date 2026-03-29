@@ -8,6 +8,13 @@ from xml.etree import ElementTree as ET
 
 import fitz
 
+# Import new docling-parse based services
+from app.services.docling_parse_extractor import DoclingParseExtractor
+from app.services.table_extractor import DoclingTableExtractor
+from app.utils.bbox import merge_text_into_table_cells, filter_text_outside_tables
+from app.utils.indent_detector import cluster_x_positions, detect_indent_level
+from app.utils.gap_detector import detect_gaps, join_cells_with_gaps
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Span-joining helper
@@ -87,6 +94,10 @@ class DoclingService:
             self._converter = DocumentConverter()
         except Exception:
             self._converter = None
+            
+        # Initialize new extractors
+        self._text_extractor = DoclingParseExtractor(fallback_to_fitz=True)
+        self._table_extractor = DoclingTableExtractor(fallback_to_fitz=True)
 
     # ── image storage ────────────────────────────────────────────────────────
 
@@ -221,20 +232,37 @@ class DoclingService:
     def _extract_pdf_blocks(
         self, file_path: Path, document_id: str
     ) -> list[tuple[int, list[dict]]]:
-        if self._converter is not None:
-            try:
-                self._converter.convert(str(file_path))
-            except Exception:
-                pass
-
-        doc = fitz.open(file_path)
+        """Extract PDF blocks using new docling-parse architecture.
+        
+        New flow:
+        1. docling-parse → text cells (word-level with coordinates)
+        2. DoclingTableExtractor → table structures (TableFormer only)
+        3. BBox merge → map text into table cells
+        4. Filter text outside tables → paragraph blocks
+        5. Indent detection + gap detection → layout analysis
+        """
         pages: list[tuple[int, list[dict]]] = []
-
-        for page_index, page in enumerate(doc, start=1):
-            blocks = self._extract_pdf_page_blocks(page, page_index, document_id)
-            pages.append((page_index, blocks))
-
-        doc.close()
+        
+        try:
+            # Step 1: Extract text cells using docling-parse
+            text_pages = self._text_extractor.extract_pages(file_path)
+            
+            # Step 2: Extract table structures using docling TableFormer
+            tables = self._table_extractor.extract_tables(file_path)
+            
+            # Step 3: Process each page
+            for page_idx in range(1, len(text_pages) + 1):
+                page_blocks = self._process_page_with_new_architecture(
+                    page_idx, text_pages, tables, document_id, file_path
+                )
+                pages.append((page_idx, page_blocks))
+                
+        except Exception as e:
+            # Fallback to original fitz-based extraction
+            import warnings
+            warnings.warn(f"New architecture failed: {e}. Using fallback.")
+            pages = self._extract_pdf_blocks_fallback(file_path, document_id)
+            
         return pages
 
     def _extract_pdf_page_blocks(
@@ -604,6 +632,364 @@ class DoclingService:
     def _parse_int_attr(self, node: ET.Element, name: str) -> int | None:
         v = self._word_attr(node, name)
         return None if not v else int(v)
+
+    # ── New Architecture Methods ─────────────────────────────────────────────────────
+
+    def _process_page_with_new_architecture(
+        self, page_no: int, text_pages: list, tables: list, 
+        document_id: str, file_path: Path
+    ) -> list[dict]:
+        """Process a single page using the new docling-parse architecture."""
+        blocks = []
+        reading_order = 1
+        
+        # Get page data
+        page_idx = page_no - 1
+        if page_idx >= len(text_pages):
+            return blocks
+            
+        page_cells = text_pages[page_idx]
+        page_tables = [t for t in tables if t.page_no == page_no]
+        
+        # Extract images using fitz (keep this functionality)
+        image_blocks = self._extract_page_images_fallback(file_path, page_no, document_id)
+        blocks.extend(image_blocks)
+        reading_order += len(image_blocks)
+        
+        # Step 1: Merge text into table cells
+        table_blocks = []
+        if page_tables:
+            table_blocks = self._create_table_blocks_with_text_merge(
+                page_tables, page_cells.word_cells, page_no, reading_order
+            )
+            reading_order += len(table_blocks)
+            
+        # Step 2: Filter text outside tables
+        table_bboxes = [table.bbox for table in page_tables]
+        outside_text_cells = filter_text_outside_tables(
+            page_cells.word_cells, table_bboxes, threshold=0.30
+        )
+        
+        # Step 3: Create paragraph blocks from remaining text
+        paragraph_blocks = self._create_paragraph_blocks_from_text(
+            outside_text_cells, page_no, reading_order
+        )
+        
+        # Combine all blocks
+        all_blocks = table_blocks + paragraph_blocks
+        
+        # Sort by reading order (y-coordinate, then x-coordinate)
+        all_blocks.sort(key=lambda b: (b.get("y0", 0), b.get("x0", 0), b.get("reading_order", 0)))
+        
+        # Reassign reading order
+        for i, block in enumerate(all_blocks, start=1):
+            block["reading_order"] = i
+            
+        return all_blocks
+        
+    def _create_table_blocks_with_text_merge(
+        self, tables: list, text_cells: list, page_no: int, start_reading_order: int
+    ) -> list[dict]:
+        """Create table blocks by merging text cells into table structures."""
+        table_blocks = []
+        
+        for i, table in enumerate(tables):
+            # Merge text into table cells
+            merged_cells = merge_text_into_table_cells(
+                text_cells, table.rows, threshold=0.30
+            )
+            
+            # Build table data
+            headers = []
+            body = []
+            if merged_cells:
+                # Group merged cells by row
+                row_groups: dict[int, list] = {}
+                for cell in merged_cells:
+                    row = cell["row"]
+                    if row not in row_groups:
+                        row_groups[row] = []
+                    row_groups[row].append(cell)
+                    
+                # Sort rows and extract data
+                sorted_rows = sorted(row_groups.items())
+                for row_idx, row_cells in sorted_rows:
+                    sorted_row_cells = sorted(row_cells, key=lambda c: c["col"])
+                    row_text = [cell["text"] for cell in sorted_row_cells]
+                    
+                    if row_idx == 0:  # First row as headers
+                        headers = row_text
+                    else:
+                        body.append(row_text)
+                        
+            # Build HTML table
+            html = self._build_table_html_from_merged(merged_cells)
+            raw_text = "\\n".join("\\t".join(cell["text"] for cell in row) 
+                                for row in [merged_cells[i:i+len(headers)] 
+                                          for i in range(0, len(merged_cells), len(headers))] 
+                                if merged_cells)
+            
+            table_block = {
+                "block_id": f"{page_no}-{start_reading_order + i}",
+                "type": "table",
+                "reading_order": start_reading_order + i,
+                "raw_text": raw_text,
+                "bbox": list(table.bbox),
+                "confidence": 0.98,
+                "flags": ["tableformer_detected"],
+                "meta": {
+                    "table": {
+                        "headers": headers,
+                        "rows": body,
+                        "cells": merged_cells,
+                        "html": html,
+                        "text": raw_text,
+                    },
+                    "layout": {
+                        "bbox": list(table.bbox),
+                        "reading_order": start_reading_order + i,
+                        "alignment": None,
+                        "indent_left": None,
+                        "indent_first_line": None,
+                        "indent_hanging": None,
+                        "tabs": [],
+                    },
+                },
+            }
+            
+            table_blocks.append(table_block)
+            
+        return table_blocks
+        
+    def _create_paragraph_blocks_from_text(
+        self, text_cells: list, page_no: int, start_reading_order: int
+    ) -> list[dict]:
+        """Create paragraph blocks from text cells with layout analysis."""
+        if not text_cells:
+            return []
+            
+        # Group text cells into lines (already done by docling-parse)
+        # For now, we'll create blocks from individual cells
+        # In a more sophisticated version, we'd group by y-coordinate proximity
+        
+        # Analyze indent patterns
+        x_positions = [cell.x0 for cell in text_cells]
+        indent_clusters = cluster_x_positions(x_positions)
+        
+        blocks = []
+        for i, cell in enumerate(text_cells):
+            # Detect indent level
+            indent_level = detect_indent_level(cell.x0, indent_clusters)
+            
+            # Detect gaps (if we had multiple cells in a line)
+            # For single cells, no gaps to detect
+            
+            # Classify block type
+            block_type = self._classify_text_block(cell.text, indent_level, i)
+            
+            block = {
+                "block_id": f"{page_no}-{start_reading_order + i}",
+                "type": block_type,
+                "reading_order": start_reading_order + i,
+                "raw_text": cell.text,
+                "bbox": list(cell.bbox),
+                "confidence": 0.99,
+                "flags": [],
+                "meta": {
+                    "indent_level": indent_level,
+                    "x_position": cell.x0,
+                    "layout": {
+                        "bbox": list(cell.bbox),
+                        "reading_order": start_reading_order + i,
+                        "alignment": None,
+                        "indent_left": cell.x0,
+                        "indent_first_line": None,
+                        "indent_hanging": None,
+                        "tabs": [],
+                    },
+                },
+            }
+            
+            blocks.append(block)
+            
+        return blocks
+        
+    def _classify_text_block(self, text: str, indent_level: int, position: int) -> str:
+        """Classify text block type based on content and layout."""
+        stripped = text.strip()
+        
+        if not stripped:
+            return "paragraph"
+            
+        # Title detection (center alignment or early position)
+        if position <= 2 or indent_level == 0:
+            if re.match(r"^[ก-๙a-zA-Z0-9\\s]{1,50}$", stripped) and len(stripped) < 50:
+                return "title"
+                
+        # Section headers
+        if re.match(r"^(ข้อ\\s*[๐-๙0-9]+|ข้อ[๐-๙0-9]+|มาตรา\\s*[๐-๙0-9]+|มาตรา[๐-๙0-9]+)", stripped):
+            return "section_header"
+            
+        # List items
+        if re.match(r"^(\\([๐-๙0-9]+\\)|-|•|\\d+\\.|[ก-ฮ]\\.\\s)", stripped):
+            return "list_item"
+            
+        return "paragraph"
+        
+    def _build_table_html_from_merged(self, merged_cells: list[dict]) -> str:
+        """Build HTML table from merged cell data."""
+        if not merged_cells:
+            return "<table><tbody></tbody></table>"
+            
+        # Group cells by row
+        row_groups: dict[int, list] = {}
+        for cell in merged_cells:
+            row = cell["row"]
+            if row not in row_groups:
+                row_groups[row] = []
+            row_groups[row].append(cell)
+            
+        # Build HTML
+        html_rows = []
+        sorted_rows = sorted(row_groups.items())
+        
+        for row_idx, row_cells in sorted_rows:
+            sorted_row_cells = sorted(row_cells, key=lambda c: c["col"])
+            rendered_cells = []
+            
+            cell_tag = "th" if row_idx == 0 else "td"
+            
+            for cell in sorted_row_cells:
+                attrs = []
+                if cell.get("colspan", 1) > 1:
+                    attrs.append(f' colspan="{cell["colspan"]}"')
+                if cell.get("rowspan", 1) > 1:
+                    attrs.append(f' rowspan="{cell["rowspan"]}"')
+                    
+                text = escape_html(str(cell.get("text", ""))).replace("\\n", "<br>")
+                rendered_cells.append(f'<{cell_tag}{"".join(attrs)}>{text}</{cell_tag}>')
+                
+            html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
+            
+        return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
+        
+    def _extract_page_images_fallback(
+        self, file_path: Path, page_no: int, document_id: str
+    ) -> list[dict]:
+        """Extract image blocks using fitz fallback."""
+        image_blocks = []
+        
+        try:
+            doc = fitz.open(file_path)
+            if page_no <= doc.page_count:
+                page = doc[page_no - 1]
+                text_dict = page.get_text("dict")
+                
+                reading_order = 1
+                for block in text_dict.get("blocks", []):
+                    if block["type"] == 1:  # Image block
+                        img_block = self._extract_pdf_image_block(
+                            block, page_no, reading_order, document_id
+                        )
+                        if img_block is not None:
+                            image_blocks.append(img_block)
+                            reading_order += 1
+                            
+            doc.close()
+        except Exception as e:
+            import warnings
+            warnings.warn(f"Failed to extract images: {e}")
+            
+        return image_blocks
+        
+    def _extract_pdf_blocks_fallback(
+        self, file_path: Path, document_id: str
+    ) -> list[tuple[int, list[dict]]]:
+        """Fallback method using original fitz-based extraction."""
+        pages: list[tuple[int, list[dict]]] = []
+        
+        doc = fitz.open(file_path)
+        for page_index, page in enumerate(doc, start=1):
+            blocks = self._extract_pdf_page_blocks_fallback(page, page_index, document_id)
+            pages.append((page_index, blocks))
+            
+        doc.close()
+        return pages
+        
+    def _extract_pdf_page_blocks_fallback(
+        self, page: object, page_index: int, document_id: str
+    ) -> list[dict]:
+        """Fallback page extraction using original fitz method."""
+        blocks: list[dict] = []
+        reading_order = 1
+        
+        # Keep the original implementation for fallback
+        try:
+            tables = page.find_tables()
+            table_rects = [t.bbox for t in tables] if tables else []
+        except Exception:
+            table_rects = []
+            
+        text_dict = page.get_text("dict")
+        
+        for block in text_dict.get("blocks", []):
+            if block["type"] == 1:  # Image block
+                img_block = self._extract_pdf_image_block(
+                    block, page_index, reading_order, document_id
+                )
+                if img_block is not None:
+                    blocks.append(img_block)
+                    reading_order += 1
+                continue
+                
+            if block["type"] == 0:  # Text block
+                block_rect = block["bbox"]
+                if any(self._rects_overlap(block_rect, tr) for tr in table_rects):
+                    continue
+                    
+                spans = []
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        t = span.get("text", "").strip()
+                        if t:
+                            spans.append(t)
+                            
+                if spans:
+                    blocks.append({
+                        "block_id": f"{page_index}-{reading_order}",
+                        "type": "paragraph",
+                        "reading_order": reading_order,
+                        "raw_text": _join_thai_spans(spans),
+                        "bbox": list(block_rect),
+                        "confidence": 0.99,
+                        "flags": ["fitz_fallback"],
+                    })
+                    reading_order += 1
+                    
+        # Add table blocks
+        for i, table in enumerate(page.find_tables() or []):
+            tb = self._extract_pdf_table(table, page_index, reading_order + i)
+            if tb:
+                blocks.append(tb)
+                
+        # Fallback for pages with no content
+        if not blocks:
+            raw = page.get_text("text")
+            lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+            blocks = [
+                {
+                    "block_id": f"{page_index}-{idx}",
+                    "type": "paragraph",
+                    "reading_order": idx,
+                    "raw_text": line,
+                    "bbox": None,
+                    "confidence": 0.99,
+                    "flags": ["fitz_fallback"],
+                }
+                for idx, line in enumerate(lines, start=1)
+            ]
+            
+        return blocks
 
 
 # ─────────────────────────────────────────────────────────────────────────────

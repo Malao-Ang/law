@@ -1,6 +1,8 @@
 FROM php:8.4-cli
 
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     git \
     unzip \
     zip \
@@ -18,17 +20,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Install dependencies first for caching
-COPY composer.json composer.lock ./
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev || true
-
-# Copy application code
+# Copy application code first
 COPY . .
 
-# Install dev dependencies if needed (can be overridden)
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader || true
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/tmp/composer-cache \
+    composer install --no-interaction --prefer-dist --optimize-autoloader
 
 EXPOSE 8000
 
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
-
+CMD ["php", "artisan", "serve", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,9 @@
+# Heavy dependencies that rarely change
+# These are cached separately for faster rebuilds
+docling>=2.80.0
+docling-parse>=5.0.0
+easyocr>=1.7.0
+opencv-python-headless>=4.8.0
+PyMuPDF>=1.23.0
+numpy>=1.24.0
+pythainlp>=3.0.0

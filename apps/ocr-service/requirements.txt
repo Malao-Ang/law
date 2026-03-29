@@ -1,15 +1,13 @@
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
-python-multipart
-httpx
-orjson
-numpy
-Pillow
-PyMuPDF
-pythainlp
-easyocr
-opencv-python-headless
-docling
-pytest
+# Light dependencies - change frequently
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.6
+httpx>=0.25.0
+orjson>=3.9.0
+Pillow>=10.0.0
+pytest>=7.4.0
+
+# Include heavy dependencies
+-r requirements-heavy.txt

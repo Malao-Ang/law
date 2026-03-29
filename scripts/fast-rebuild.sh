@@ -8,19 +8,28 @@ SERVICE=${1:-all}
 echo "🚀 Fast rebuild script for Thai OCR POC"
 echo "======================================"
 
-if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "ocr" ]; then
-    echo "📦 Building OCR service with multi-stage cache..."
-    docker-compose build ocr-service --parallel
-fi
-
-if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "laravel" ]; then
-    echo "📦 Building Laravel app with dependency cache..."
-    docker-compose build laravel-app --parallel
-fi
-
-if [ "$SERVICE" = "all" ] || [ "$SERVICE" = "vite" ]; then
+if [ "$SERVICE" = "all" ]; then
+    echo "📦 Building all services with BuildKit cache..."
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    docker-compose build --parallel
+elif [ "$SERVICE" = "ocr" ]; then
+    echo "📦 Building OCR service with BuildKit cache..."
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    docker-compose build ocr-service
+elif [ "$SERVICE" = "laravel" ]; then
+    echo "📦 Building Laravel app with BuildKit cache..."
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    docker-compose build laravel-app
+elif [ "$SERVICE" = "vite" ]; then
     echo "📦 Restarting Vite (no rebuild needed for Node image)..."
     docker-compose restart laravel-vite
+else
+    echo "❌ Unknown service: $SERVICE"
+    echo "   Usage: $0 [all|ocr|laravel|vite]"
+    exit 1
 fi
 
 echo "✅ Build complete! Starting services..."
@@ -34,4 +43,4 @@ echo ""
 echo "💡 Tips:"
 echo "   - File changes will trigger automatic reloads"
 echo "   - First build after changes may take 2-3 minutes"
-echo "   - Subsequent builds will be much faster with multi-stage cache"
+echo "   - Subsequent builds will be much faster with BuildKit cache"

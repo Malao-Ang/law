@@ -1,0 +1,48 @@
+# Simple Dockerfile for faster builds
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-tha \
+    libgl1 \
+    libglib2.0-0 \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies with specific versions for faster downloads
+RUN pip install --no-cache-dir \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    pydantic==2.5.0 \
+    pydantic-settings==2.1.0 \
+    python-multipart==0.0.6 \
+    httpx==0.25.2 \
+    orjson==3.9.10 \
+    Pillow==10.1.0 \
+    numpy==1.25.2 \
+    PyMuPDF==1.23.14 \
+    opencv-python-headless==4.8.1.78 \
+    pythainlp==3.1.0 \
+    easyocr==1.7.1
+
+# Install docling packages (these may take time)
+RUN pip install --no-cache-dir \
+    docling==2.82.0 \
+    docling-parse==5.6.2
+
+# Copy application
+COPY . /app
+
+# Create non-root user and handle volume permissions
+RUN useradd --create-home --shell /bin/bash app && \
+    mkdir -p /data/poc && \
+    chown -R app:app /app /data
+
+# Switch to non-root user
+USER app
+
+# Ensure data directories are writable on startup
+CMD ["sh", "-c", "mkdir -p /data/poc/pages /data/poc/intermediate && uvicorn app.main:app --host 0.0.0.0 --port 8010"]

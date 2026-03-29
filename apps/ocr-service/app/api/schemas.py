@@ -42,6 +42,10 @@ class BlockDraft(BaseModel):
     bbox: list[float] | None = None
     confidence: float = 1.0
     flags: list[str] = Field(default_factory=list)
+    # New fields for docling-parse architecture
+    indent_level: int = 0
+    x_position: float | None = None
+    font_size: float | None = None
 
 
 class PageDraft(BaseModel):
