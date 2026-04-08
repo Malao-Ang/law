@@ -132,6 +132,9 @@ def normalize_layout(layout: object, bbox: object, reading_order: object) -> dic
         "indent_first_line": to_int_or_none(source.get("indent_first_line")),
         "indent_hanging": to_int_or_none(source.get("indent_hanging")),
         "tabs": tabs,
+        "spacing_before": to_int_or_none(source.get("spacing_before")),
+        "spacing_after": to_int_or_none(source.get("spacing_after")),
+        "line_spacing": to_int_or_none(source.get("line_spacing")),
     }
 
 
@@ -327,14 +330,31 @@ def build_layout_style(layout: dict) -> str:
     indent_left = to_int_or_none(layout.get("indent_left"))
     indent_first_line = to_int_or_none(layout.get("indent_first_line"))
     indent_hanging = to_int_or_none(layout.get("indent_hanging"))
+    spacing_before = to_int_or_none(layout.get("spacing_before"))
+    spacing_after = to_int_or_none(layout.get("spacing_after"))
+    line_spacing = to_int_or_none(layout.get("line_spacing"))
 
     if indent_left is not None:
+        # Word stores indent in twips (1/20 point), convert to points
         styles.append(f"margin-left:{indent_left / 20:.1f}pt")
 
     if indent_first_line is not None:
+        # First line indent (positive = indent, negative = hanging)
         styles.append(f"text-indent:{indent_first_line / 20:.1f}pt")
     elif indent_hanging is not None:
+        # Hanging indent (always negative)
         styles.append(f"text-indent:-{indent_hanging / 20:.1f}pt")
+
+    # Paragraph spacing (before/after)
+    if spacing_before is not None:
+        styles.append(f"margin-top:{spacing_before / 20:.1f}pt")
+    if spacing_after is not None:
+        styles.append(f"margin-bottom:{spacing_after / 20:.1f}pt")
+
+    # Line spacing (Word uses 240 = single line, 480 = double, etc.)
+    if line_spacing is not None and line_spacing > 0:
+        line_height = line_spacing / 240.0
+        styles.append(f"line-height:{line_height:.2f}")
 
     return "; ".join(styles)
 

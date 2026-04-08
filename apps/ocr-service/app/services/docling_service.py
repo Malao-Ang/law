@@ -634,15 +634,21 @@ class DoclingService:
     def _extract_paragraph_layout(self, paragraph: ET.Element) -> dict:
         pPr = paragraph.find("w:pPr", self.NAMESPACES)
         alignment = indent_left = indent_first_line = indent_hanging = None
+        spacing_before = spacing_after = line_spacing = None
         tabs: list[dict] = []
         if pPr is not None:
             jc  = pPr.find("w:jc",  self.NAMESPACES)
             ind = pPr.find("w:ind", self.NAMESPACES)
+            spacing = pPr.find("w:spacing", self.NAMESPACES)
             if jc  is not None: alignment          = self._word_attr(jc, "val")
             if ind is not None:
                 indent_left       = self._parse_int_attr(ind, "left")
                 indent_first_line = self._parse_int_attr(ind, "firstLine")
                 indent_hanging    = self._parse_int_attr(ind, "hanging")
+            if spacing is not None:
+                spacing_before = self._parse_int_attr(spacing, "before")
+                spacing_after = self._parse_int_attr(spacing, "after")
+                line_spacing = self._parse_int_attr(spacing, "line")
             for tab in pPr.findall("w:tabs/w:tab", self.NAMESPACES):
                 pos = self._parse_int_attr(tab, "pos")
                 if pos is not None:
@@ -651,6 +657,8 @@ class DoclingService:
             "bbox": None, "reading_order": None, "alignment": alignment,
             "indent_left": indent_left, "indent_first_line": indent_first_line,
             "indent_hanging": indent_hanging, "tabs": tabs,
+            "spacing_before": spacing_before, "spacing_after": spacing_after,
+            "line_spacing": line_spacing,
         }
 
     def _parse_table_cell(self, cell: ET.Element) -> dict:

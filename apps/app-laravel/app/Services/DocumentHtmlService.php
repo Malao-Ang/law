@@ -393,17 +393,37 @@ class DocumentHtmlService
         $indentLeft = $layout['indent_left'] ?? null;
         $indentFirstLine = $layout['indent_first_line'] ?? null;
         $indentHanging = $layout['indent_hanging'] ?? null;
+        $spacingBefore = $layout['spacing_before'] ?? null;
+        $spacingAfter = $layout['spacing_after'] ?? null;
+        $lineSpacing = $layout['line_spacing'] ?? null;
 
         if (is_string($alignment) && $alignment !== '') {
             $styles[] = 'text-align:'.$alignment;
         }
         if (is_numeric($indentLeft)) {
+            // Word stores indent in twips (1/20 point), convert to points
             $styles[] = 'margin-left:'.((float) $indentLeft / 20).'pt';
         }
         if (is_numeric($indentFirstLine)) {
+            // First line indent (positive = indent, negative = hanging)
             $styles[] = 'text-indent:'.((float) $indentFirstLine / 20).'pt';
         } elseif (is_numeric($indentHanging)) {
+            // Hanging indent (always negative)
             $styles[] = 'text-indent:-'.((float) $indentHanging / 20).'pt';
+        }
+
+        // Paragraph spacing (before/after)
+        if (is_numeric($spacingBefore)) {
+            $styles[] = 'margin-top:'.((float) $spacingBefore / 20).'pt';
+        }
+        if (is_numeric($spacingAfter)) {
+            $styles[] = 'margin-bottom:'.((float) $spacingAfter / 20).'pt';
+        }
+
+        // Line spacing (Word uses 240 = single line, 480 = double, etc.)
+        if (is_numeric($lineSpacing) && $lineSpacing > 0) {
+            $lineHeight = (float) $lineSpacing / 240.0;
+            $styles[] = 'line-height:'.number_format($lineHeight, 2);
         }
 
         return $styles === [] ? '' : ' style="'.e(implode('; ', $styles)).'"';
