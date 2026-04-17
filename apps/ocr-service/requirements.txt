@@ -11,5 +11,4 @@ PyMuPDF
 pythainlp
 easyocr
 opencv-python-headless
-docling
 pytest

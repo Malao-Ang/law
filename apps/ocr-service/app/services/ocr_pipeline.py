@@ -5,13 +5,16 @@ import fitz
 import cv2
 import numpy as np
 
+from app.services.html_renderer import build_table_html, escape_html
+
 # Suppress torch pin_memory warnings when no GPU is available
 warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
 
 class OcrPipeline:
-    def __init__(self, data_root: Path) -> None:
+    def __init__(self, data_root: Path, row_group_threshold_px: int = 30) -> None:
         self.data_root = data_root
+        self._row_group_threshold_px = row_group_threshold_px
         self._reader = None
 
     def extract_scanned_pdf(self, file_path: Path, document_id: str) -> list[dict]:
@@ -80,26 +83,61 @@ class OcrPipeline:
         except Exception:
             return []
 
+    @staticmethod
+    def _compute_ocr_page_margin_x(lines: list[dict]) -> float:
+        """Return 10th-percentile of OCR line x0 pixel values as the left margin baseline."""
+        x0_vals = sorted(line["bbox"][0] for line in lines if line.get("bbox"))
+        if len(x0_vals) < 2:
+            return 0.0
+        return x0_vals[len(x0_vals) // 10]
+
+    @staticmethod
+    def _estimate_ocr_layout(line: dict, page_margin_x_px: float, reading_order: int) -> dict:
+        """Build layout dict from EasyOCR bbox (image pixels at 2x render scale).
+        Converts pixel offset to twips: 2px = 1 PDF point, 1 pt = 20 twips.
+        """
+        indent_left = None
+        bbox = line.get("bbox")
+        if bbox:
+            x0_px = bbox[0]
+            indent_px = max(0.0, x0_px - page_margin_x_px)
+            if indent_px >= 5.0:  # absorb EasyOCR position jitter
+                indent_pt = indent_px / 2.0
+                indent_left = round(indent_pt * 20)
+        return {
+            "bbox": bbox,
+            "reading_order": reading_order,
+            "alignment": None,
+            "indent_left": indent_left,
+            "indent_first_line": None,
+            "indent_hanging": None,
+            "tabs": [],
+            "spacing_before": None,
+            "spacing_after": None,
+            "line_spacing": None,
+        }
+
     def _group_ocr_results_by_tables(self, lines: list[dict], table_regions: list[dict], page_index: int) -> list[dict]:
         """Group OCR results by detected table regions and create table blocks."""
         blocks: list[dict] = []
         used_line_indices = set()
         reading_order = 1
-        
+        page_margin_x_px = self._compute_ocr_page_margin_x(lines)
+
         # Process each detected table region
         for region in table_regions:
             table_lines, new_used_indices = self._collect_lines_in_region(lines, region, used_line_indices)
-            
+
             if table_lines:
                 table_block = self._create_table_block_from_lines(table_lines, page_index, reading_order)
                 if table_block:
                     blocks.append(table_block)
                     reading_order += 1
                     used_line_indices = new_used_indices
-        
+
         # Add remaining lines as regular blocks
-        reading_order = self._add_remaining_lines(blocks, lines, used_line_indices, page_index, reading_order)
-        
+        reading_order = self._add_remaining_lines(blocks, lines, used_line_indices, page_index, reading_order, page_margin_x_px)
+
         return blocks
 
     def _collect_lines_in_region(self, lines: list[dict], region: dict, used_indices: set) -> tuple:
@@ -116,10 +154,10 @@ class OcrPipeline:
         
         return table_lines, new_used
 
-    def _add_remaining_lines(self, blocks: list[dict], lines: list[dict], used_indices: set, page_index: int, start_order: int) -> int:
+    def _add_remaining_lines(self, blocks: list[dict], lines: list[dict], used_indices: set, page_index: int, start_order: int, page_margin_x_px: float = 0.0) -> int:
         """Add remaining lines as regular paragraph blocks."""
         reading_order = start_order
-        
+
         for idx, line in enumerate(lines):
             if idx not in used_indices:
                 blocks.append({
@@ -130,9 +168,12 @@ class OcrPipeline:
                     "bbox": line["bbox"],
                     "confidence": line["confidence"],
                     "flags": ["ocr_scan"],
+                    "meta": {
+                        "layout": self._estimate_ocr_layout(line, page_margin_x_px, reading_order)
+                    },
                 })
                 reading_order += 1
-        
+
         return reading_order
 
     def _bbox_in_region(self, bbox: list, region: dict) -> bool:
@@ -175,7 +216,7 @@ class OcrPipeline:
         rows: list[list[dict]] = []
         current_row: list[dict] = []
         last_y = None
-        row_height_threshold = 30
+        row_height_threshold = self._row_group_threshold_px
         
         for line in sorted_lines:
             y_pos = line["bbox"][1]
@@ -218,7 +259,7 @@ class OcrPipeline:
         """Build complete table block structure."""
         headers = [cell["text"] for cell in table_rows[0]] if table_rows else []
         body = [[cell["text"] for cell in row] for row in table_rows[1:]] if len(table_rows) > 1 else []
-        html = self._build_table_html(table_rows)
+        html = build_table_html(table_rows)
         raw_text = "\n".join("\t".join(cell["text"] for cell in row) for row in table_rows)
         merged_bbox = self._merge_bboxes([line["bbox"] for line in sorted_lines])
         
@@ -265,23 +306,6 @@ class OcrPipeline:
             return None
         
         return [min(x_coords), min(y_coords), max(x1_coords), max(y1_coords)]
-
-    @staticmethod
-    def _build_table_html(rows: list[list[dict]]) -> str:
-        """Build HTML table from rows."""
-        html_rows: list[str] = []
-        
-        for row_index, row in enumerate(rows):
-            rendered_cells: list[str] = []
-            cell_tag = "th" if row_index == 0 else "td"
-            
-            for cell in row:
-                text = str(cell.get("text", "")).replace("<", "&lt;").replace(">", "&gt;")
-                rendered_cells.append(f"<{cell_tag}>{text}</{cell_tag}>")
-            
-            html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
-        
-        return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
 
     def _render_page_image(self, page: fitz.Page, document_id: str, page_no: int) -> Path:
         page_dir = self.data_root / "pages" / document_id

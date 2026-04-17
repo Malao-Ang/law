@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.api.schemas import (
     BlockPatchResponse,
@@ -14,8 +14,6 @@ from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
 from app.services.block_builder import build_document_output
-from app.services.docling_service import DoclingService
-from app.services.ocr_pipeline import OcrPipeline
 from app.services.thai_normalizer import normalize_text
 from app.utils.file_type import detect_file_type
 
@@ -28,7 +26,7 @@ def health() -> HealthResponse:
 
 
 @router.post("/pipeline/extract")
-def extract_document(payload: ExtractRequest) -> dict:
+def extract_document(payload: ExtractRequest, request: Request) -> dict:
     settings = get_settings()
     logger = get_logger(payload.document_id)
 
@@ -39,22 +37,21 @@ def extract_document(payload: ExtractRequest) -> dict:
     source_type = detect_file_type(file_path)
     logger.info("detected source type", extra={"source_type": source_type})
 
-    docling_service = DoclingService(data_root=settings.data_root)
-    ocr_pipeline = OcrPipeline(data_root=settings.data_root)
+    docling_service = request.app.state.docling_service
+    ocr_pipeline = request.app.state.ocr_pipeline
 
     if source_type == "pdf_scan":
         pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=payload.document_id)
     else:
         pages = docling_service.extract(file_path=file_path, source_type=source_type, document_id=payload.document_id)
 
-    ai_corrector = MockAICorrector()
     output = build_document_output(
         document_id=payload.document_id,
         source_file=file_path.name,
         source_type=source_type,
         pages=pages,
         normalizer=normalize_text,
-        ai_corrector=ai_corrector,
+        ai_corrector=MockAICorrector(),
         enable_ai_correction=payload.enable_ai_correction,
         review_threshold=settings.thai_review_threshold,
     )

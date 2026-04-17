@@ -8,8 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
-    data_root: Path = Path("/data/poc")
+    data_root: Path = Path("/data/documents")
     thai_review_threshold: float = 0.90
+    ocr_row_group_threshold_px: int = 30
 
 
 @lru_cache(maxsize=1)
