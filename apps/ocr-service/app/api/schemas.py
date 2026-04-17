@@ -11,6 +11,7 @@ class ExtractRequest(BaseModel):
     document_id: str = Field(min_length=1)
     file_path: str = Field(min_length=1)
     enable_ai_correction: bool = True
+    callback_url: str | None = None
 
 
 class ReprocessBlockRequest(BaseModel):
@@ -32,6 +33,7 @@ class BlockPatchResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: Literal["ocr-service"] = "ocr-service"
+    ocr_ready: bool = False
 
 
 class BlockDraft(BaseModel):

@@ -15,7 +15,7 @@ class ExtractDocumentJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 1800;
+    public int $timeout = 60;
 
     public function __construct(
         public readonly string $documentId,
@@ -31,20 +31,17 @@ class ExtractDocumentJob implements ShouldQueue
             'current_step' => 'extract_document',
         ]);
 
-        $output = $pipelineClient->extract(
+        $callbackUrl = route('pipeline.callback');
+
+        $pipelineClient->extract(
             documentId: $this->documentId,
             relativeInputPath: $this->relativeFilePath,
             enableAiCorrection: $this->enableAiCorrection,
+            callbackUrl: $callbackUrl,
         );
 
-        $reviewStore->writeReviewDocument($this->documentId, $output);
-
-        $reviewStore->setStatus($this->documentId, [
-            'status' => 'done',
-            'progress' => 100,
-            'current_step' => 'completed',
-            'review_path' => 'storage/app/poc/'.$reviewStore->reviewRelativePath($this->documentId),
-        ]);
+        // Python accepted the job (202). Status will be updated by PipelineCallbackController
+        // when Python posts the result back to $callbackUrl.
     }
 
     public function failed(Throwable $exception): void

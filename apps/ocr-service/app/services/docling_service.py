@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 import re
 import zipfile
 from xml.etree import ElementTree as ET
 
 import fitz
+
+from app.services.confidence_scorer import score_docx_block, score_text_pdf_block
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -41,33 +42,6 @@ def _join_thai_spans(parts: list[str]) -> str:
 # Image utilities
 # ─────────────────────────────────────────────────────────────────────────────
 
-_EXT_MIME: dict[str, str] = {
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "jfif": "image/jpeg",
-    "gif": "image/gif",
-    "webp": "image/webp",
-    "bmp": "image/bmp",
-    "tiff": "image/tiff",
-    "tif": "image/tiff",
-    "jpx": "image/jp2",
-}
-
-# Images larger than 2 MB are saved to disk only; smaller ones get an inline
-# data-URI so the API response is self-contained.
-_INLINE_MAX_BYTES = 2 * 1024 * 1024
-
-
-def _bytes_to_data_uri(data: bytes, ext: str) -> str | None:
-    """Return a base64 data-URI, or None when the payload exceeds the limit."""
-    if len(data) > _INLINE_MAX_BYTES:
-        return None
-    safe = ext.lstrip(".").lower()
-    if safe in {"jpg", "jfif"}:
-        safe = "jpeg"
-    mime = _EXT_MIME.get(safe, "image/png")
-    return f"data:{mime};base64,{base64.b64encode(data).decode()}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,6 +95,74 @@ class DoclingService:
             ]
 
         return []
+
+    def extract_mixed_pdf(
+        self,
+        file_path: Path,
+        page_classification: dict,
+        document_id: str,
+        ocr_pipeline: object,
+    ) -> list[dict]:
+        """Extract a PDF whose pages may be a mix of text and scanned.
+
+        page_classification is the dict returned by detect_file_type:
+            {"text": [0, 1, ...], "scan": [3, 4, ...]}
+
+        Text pages are handled via PyMuPDF; scan pages go through ocr_pipeline.
+        Results are merged and returned in page order.
+        """
+        text_indices: set[int] = set(page_classification.get("text", []))
+        scan_indices: set[int] = set(page_classification.get("scan", []))
+
+        import fitz
+
+        doc = fitz.open(file_path)
+        page_count = doc.page_count
+        doc.close()
+
+        # Build per-page results
+        pages_by_index: dict[int, dict] = {}
+
+        if text_indices:
+            text_pages_data = self._extract_pdf_blocks_selective(file_path, document_id, text_indices)
+            for page_no, blocks in text_pages_data:
+                pages_by_index[page_no - 1] = {"page_no": page_no, "image_path": None, "blocks": blocks}
+
+        if scan_indices:
+            scan_results = ocr_pipeline.extract_scanned_pdf_selective(
+                file_path=file_path,
+                document_id=document_id,
+                page_indices=scan_indices,
+            )
+            for page in scan_results:
+                idx = page["page_no"] - 1
+                pages_by_index[idx] = page
+
+        return [pages_by_index[i] for i in sorted(pages_by_index)]
+
+    def _extract_pdf_blocks_selective(
+        self, file_path: Path, document_id: str, page_indices: set[int]
+    ) -> list[tuple[int, list[dict]]]:
+        """Extract only the pages at the given 0-based indices."""
+        if self._converter is not None:
+            try:
+                self._converter.convert(str(file_path))
+            except Exception:
+                pass
+
+        import fitz
+
+        doc = fitz.open(file_path)
+        pages: list[tuple[int, list[dict]]] = []
+
+        for page_index, page in enumerate(doc, start=1):
+            if (page_index - 1) not in page_indices:
+                continue
+            blocks = self._extract_pdf_page_blocks(page, page_index, document_id)
+            pages.append((page_index, blocks))
+
+        doc.close()
+        return pages
 
     # ── DOCX ─────────────────────────────────────────────────────────────────
 
@@ -305,7 +347,6 @@ class DoclingService:
         ext = Path(zip_path).suffix
         img_name = f"img-{reading_order:04d}"
         img_path = self._save_image(img_data, ext, document_id, img_name)
-        data_uri = _bytes_to_data_uri(img_data, ext)
 
         return {
             "block_id": f"1-{reading_order}",
@@ -317,7 +358,6 @@ class DoclingService:
             "flags": [],
             "meta": {
                 "image_path": str(img_path),
-                "image_data_uri": data_uri,
                 "source": "docx_embedded",
             },
         }
@@ -383,14 +423,16 @@ class DoclingService:
                             spans.append(t)
 
                 if spans:
+                    joined = _join_thai_spans(spans)
+                    pdf_confidence, pdf_flags = score_text_pdf_block(joined)
                     blocks.append({
                         "block_id": f"{page_index}-{reading_order}",
                         "type": "paragraph",
                         "reading_order": reading_order,
-                        "raw_text": _join_thai_spans(spans),
+                        "raw_text": joined,
                         "bbox": list(block_rect),
-                        "confidence": 0.99,
-                        "flags": [],
+                        "confidence": pdf_confidence,
+                        "flags": pdf_flags,
                     })
                     reading_order += 1
 
@@ -404,18 +446,17 @@ class DoclingService:
         if not blocks:
             raw = page.get_text("text")
             lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
-            blocks = [
-                {
+            for idx, line in enumerate(lines, start=1):
+                line_confidence, line_flags = score_text_pdf_block(line)
+                blocks.append({
                     "block_id": f"{page_index}-{idx}",
                     "type": "paragraph",
                     "reading_order": idx,
                     "raw_text": line,
                     "bbox": None,
-                    "confidence": 0.99,
-                    "flags": [],
-                }
-                for idx, line in enumerate(lines, start=1)
-            ]
+                    "confidence": line_confidence,
+                    "flags": line_flags,
+                })
 
         return blocks
 
@@ -440,7 +481,6 @@ class DoclingService:
             ext      = block.get("ext", "png")
             img_name = f"p{page_index:03d}-img{reading_order:04d}"
             img_path = self._save_image(img_bytes, ext, document_id, img_name)
-            data_uri = _bytes_to_data_uri(img_bytes, ext)
 
             return {
                 "block_id": f"{page_index}-{reading_order}",
@@ -452,7 +492,6 @@ class DoclingService:
                 "flags": [],
                 "meta": {
                     "image_path": str(img_path),
-                    "image_data_uri": data_uri,
                     "width": width,
                     "height": height,
                     "source": "pdf_embedded",
@@ -537,24 +576,25 @@ class DoclingService:
         if text.strip() == "":
             return None
             
+        docx_confidence, docx_flags = score_docx_block(text)
         meta = {"layout": layout}
         if numbering_info:
             meta["numbering"] = numbering_info["meta"]
-            
+
         return {
             "block_id": f"1-{reading_order}",
             "type": self._classify_paragraph(
-                text=text, 
-                layout=layout, 
+                text=text,
+                layout=layout,
                 reading_order=reading_order,
                 has_numbering=numbering_info is not None,
-                numbering_ilvl=numbering_info["meta"]["ilvl"] if numbering_info else None
+                numbering_ilvl=numbering_info["meta"]["ilvl"] if numbering_info else None,
             ),
             "reading_order": reading_order,
             "raw_text": text,
             "bbox": None,
-            "confidence": 0.98,
-            "flags": [],
+            "confidence": docx_confidence,
+            "flags": docx_flags,
             "meta": meta,
         }
 

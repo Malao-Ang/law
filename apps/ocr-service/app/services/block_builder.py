@@ -56,6 +56,8 @@ def build_document_output(
             if table is not None:
                 reviewed_html = table["html"]
 
+            layout_css = build_layout_style(source_layout)
+
             transformed_blocks.append(
                 {
                     "block_id": block_id,
@@ -70,13 +72,12 @@ def build_document_output(
                     "needs_review": needs_review,
                     "flags": sorted(set(flags)),
                     "image_path": source_meta.get("image_path") if block_type == "image" else None,
-                    "image_data_uri": source_meta.get("image_data_uri") if block_type == "image" else None,
                     "meta": {
                         **source_meta,
                         "section_path": source_meta.get("section_path"),
                         "table_html": table["html"] if table is not None else source_meta.get("table_html"),
                         "reviewed_html": reviewed_html,
-                        "layout": source_layout,
+                        "layout": {**source_layout, "layout_css": layout_css},
                         "table": table,
                     },
                 }
@@ -145,13 +146,12 @@ def build_reviewed_html(block_type: str, text: str, layout: dict, block_id: str,
 
     if block_type == "image":
         source_meta = source_meta or {}
-        data_uri  = source_meta.get("image_data_uri")
-        img_path  = source_meta.get("image_path", "")
-        img_src   = data_uri or img_path or ""
-        if img_src:
+        img_path = source_meta.get("image_path", "")
+        if img_path:
             return (
-                f'<figure data-block-id="{block_id}" class="doc-image" style="text-align: center; margin: 1rem 0;">'
-                f'<img src="{img_src}" alt="embedded image" style="max-width:100%; height:auto; display: block; margin: 0 auto;"/>'
+                f'<figure data-block-id="{block_id}" class="doc-image" style="text-align:center; margin:1rem 0;">'
+                f'<img src="{escape_html(str(img_path))}" alt="embedded image" '
+                f'style="max-width:100%; height:auto; display:block; margin:0 auto;"/>'
                 f'</figure>'
             )
         return f'<figure data-block-id="{block_id}" class="doc-image doc-image--missing"></figure>'
@@ -351,10 +351,13 @@ def build_layout_style(layout: dict) -> str:
     if spacing_after is not None:
         styles.append(f"margin-bottom:{spacing_after / 20:.1f}pt")
 
-    # Line spacing (Word uses 240 = single line, 480 = double, etc.)
+    # Line spacing (Word uses 240 = single line, 480 = double, etc.).
+    # Enforce a minimum of 1.8 so Thai above/below-consonant vowel marks are not clipped.
     if line_spacing is not None and line_spacing > 0:
-        line_height = line_spacing / 240.0
-        styles.append(f"line-height:{line_height:.2f}")
+        line_height = max(line_spacing / 240.0, 1.8)
+    else:
+        line_height = 1.8
+    styles.append(f"line-height:{line_height:.2f}")
 
     return "; ".join(styles)
 

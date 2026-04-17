@@ -31,4 +31,4 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 
 COPY . /app
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010", "--reload", "--reload-dir", "/app/app"]
