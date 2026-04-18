@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(not exist *)"
+      "Bash(not exist *)",
+      "Bash(docker compose *)",
+      "Bash(curl -s http://localhost:8010/health)",
+      "Bash(curl -s -X POST http://localhost:8010/pipeline/extract -H \"Content-Type: application/json\" -d \"{\\\\\"document_id\\\\\":\\\\\"test\\\\\",\\\\\"file_path\\\\\":\\\\\"/tmp/test.pdf\\\\\"}\")",
+      "Bash(curl -s http://localhost:8000/api/health)"
     ]
   }
 }

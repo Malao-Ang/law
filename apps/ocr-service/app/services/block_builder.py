@@ -53,8 +53,6 @@ def build_document_output(
             bbox = block.get("bbox")
             block_id = block.get("block_id", f"{page_no}-{index}")
             reviewed_html = build_reviewed_html(block_type, approved_text, source_layout, block_id, table, source_meta)
-            if table is not None:
-                reviewed_html = table["html"]
 
             layout_css = build_layout_style(source_layout)
 
@@ -191,7 +189,7 @@ def build_table_payload(block: dict, raw_text: str, block_type: str) -> dict | N
         if cells:
             headers = normalize_string_row(source_table.get("headers")) or flatten_table_row(cells[0])
             rows = normalize_table_rows(source_table.get("rows")) or [flatten_table_row(row) for row in cells[1:]]
-            html = build_table_html(cells)
+            html = source_table.get("html") or build_table_html(cells)
             return {
                 "headers": headers,
                 "rows": rows,

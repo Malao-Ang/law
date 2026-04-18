@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 import fitz
 
 from app.services.confidence_scorer import score_docx_block, score_text_pdf_block
+from app.services.thai_normalizer import normalize_text as _normalize_thai_text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -423,7 +424,7 @@ class DoclingService:
                             spans.append(t)
 
                 if spans:
-                    joined = _join_thai_spans(spans)
+                    joined = _normalize_thai_text(_join_thai_spans(spans))["text"]
                     pdf_confidence, pdf_flags = score_text_pdf_block(joined)
                     blocks.append({
                         "block_id": f"{page_index}-{reading_order}",
@@ -447,6 +448,7 @@ class DoclingService:
             raw = page.get_text("text")
             lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
             for idx, line in enumerate(lines, start=1):
+                line = _normalize_thai_text(line)["text"]
                 line_confidence, line_flags = score_text_pdf_block(line)
                 blocks.append({
                     "block_id": f"{page_index}-{idx}",
@@ -513,7 +515,10 @@ class DoclingService:
             rows: list[list[dict]] = []
             for row_data in table_data:
                 row = [
-                    {"text": str(c or "").strip(), "colspan": 1, "rowspan": 1, "alignment": None}
+                    {
+                        "text": _normalize_thai_text(str(c or "").strip())["text"],
+                        "colspan": 1, "rowspan": 1, "alignment": None,
+                    }
                     for c in row_data
                 ]
                 if row:
@@ -620,6 +625,9 @@ class DoclingService:
                         mc["rowspan"] += 1
                         for off in range(colspan):
                             next_merges[col + off] = mc
+                    # else: vMerge continuation with no tracked restart (malformed DOCX).
+                    # Advance col but do not write next_merges — remaining columns stay
+                    # correctly indexed and the cell is silently skipped as intended.
                     col += colspan
                     continue
 
@@ -712,14 +720,25 @@ class DoclingService:
             if vm is not None: v_merge_state = self._word_attr(vm, "val") or "continue"
         text = "\n".join(
             part for part in (
-                self._extract_paragraph_text(p).strip()
+                _normalize_thai_text(self._extract_paragraph_text(p).strip())["text"]
                 for p in cell.findall("w:p", self.NAMESPACES)
             ) if part
+        )
+        # Detect images inside this cell (w:drawing contains r:embed or v:imagedata)
+        _REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        has_image = any(
+            node.get(f"{{{_REL_NS}}}embed") or (
+                (node.tag.split("}", 1)[-1] if "}" in node.tag else node.tag) == "imagedata"
+                and node.get(f"{{{_REL_NS}}}id")
+            )
+            for p in cell.findall("w:p", self.NAMESPACES)
+            for node in p.iter()
         )
         return {
             "text": text, "colspan": colspan, "rowspan": 1,
             "alignment": self._extract_cell_alignment(cell),
             "v_merge_state": v_merge_state,
+            "has_image": has_image,
         }
 
     def _extract_cell_alignment(self, cell: ET.Element) -> str | None:
@@ -750,7 +769,9 @@ class DoclingService:
                 if cell["alignment"]:
                     al = escape_html(str(cell["alignment"]))
                     attrs.append(f' data-cell-align="{al}" style="text-align:{al};"')
-                content = escape_html(cell["text"]).replace("\n", "<br>")
+                content = escape_html(cell.get("text") or "").replace("\n", "<br>")
+                if not content and cell.get("has_image"):
+                    content = '<span class="doc-cell-image">[image]</span>'
                 cells.append(f'<{tag}{"".join(attrs)}>{content}</{tag}>')
             html_rows.append("<tr>" + "".join(cells) + "</tr>")
         return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
@@ -935,10 +956,12 @@ class DoclingService:
     def _local_name(tag: str) -> str:
         return tag.split("}", 1)[-1]
 
-    def _word_attr(self, node: ET.Element, name: str) -> str | None:
+    def _word_attr(self, node: ET.Element | None, name: str) -> str | None:
+        if node is None:
+            return None
         return node.get(f"{{{self.WORD_NS}}}{name}")
 
-    def _parse_int_attr(self, node: ET.Element, name: str) -> int | None:
+    def _parse_int_attr(self, node: ET.Element | None, name: str) -> int | None:
         v = self._word_attr(node, name)
         return None if not v else int(v)
 
