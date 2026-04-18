@@ -416,16 +416,28 @@ class DoclingService:
                 if any(self._rects_overlap(block_rect, tr) for tr in table_rects):
                     continue  # covered by a table — handled below
 
-                spans: list[str] = []
-                for line in block.get("lines", []):
+                # P1/P2: Collect spans per-line so that:
+                #   - combining-mark-only spans are not lost by premature .strip()
+                #   - line boundaries are preserved as \n in the joined text
+                # Normalization is applied per-line (before joining) so that the
+                # normalizer's whitespace-collapse pass cannot destroy \n separators.
+                block_lines = block.get("lines", [])
+                lines_text: list[str] = []
+                for line in block_lines:
+                    line_spans: list[str] = []
                     for span in line.get("spans", []):
-                        t = span.get("text", "").strip()
-                        if t:
-                            spans.append(t)
+                        t = span.get("text", "")   # do NOT strip — preserves leading combining marks
+                        if t.strip():              # skip whitespace-only spans
+                            line_spans.append(t)
+                    if line_spans:
+                        raw_line = _join_thai_spans(line_spans)
+                        lines_text.append(_normalize_thai_text(raw_line)["text"])
 
-                if spans:
-                    joined = _normalize_thai_text(_join_thai_spans(spans))["text"]
+                if lines_text:
+                    joined = "\n".join(lines_text)
                     pdf_confidence, pdf_flags = score_text_pdf_block(joined)
+                    # P3/P4: infer layout from line x-positions and attach as meta
+                    layout = self._infer_pdf_paragraph_layout(block_lines, page.rect)
                     blocks.append({
                         "block_id": f"{page_index}-{reading_order}",
                         "type": "paragraph",
@@ -434,12 +446,13 @@ class DoclingService:
                         "bbox": list(block_rect),
                         "confidence": pdf_confidence,
                         "flags": pdf_flags,
+                        "meta": {"layout": layout},
                     })
                     reading_order += 1
 
         # ── table blocks ──────────────────────────────────────────────────
         for i, table in enumerate(page.find_tables() or []):
-            tb = self._extract_pdf_table(table, page_index, reading_order + i)
+            tb = self._extract_pdf_table(table, page, page_index, reading_order + i)
             if tb:
                 blocks.append(tb)
 
@@ -505,22 +518,37 @@ class DoclingService:
     # ── table ─────────────────────────────────────────────────────────────────
 
     def _extract_pdf_table(
-        self, table: object, page_index: int, reading_order: int
+        self, table: object, page: object, page_index: int, reading_order: int
     ) -> dict | None:
         try:
             table_data = table.extract()
             if not table_data:
                 return None
 
+            # P5: attempt per-cell span extraction so _join_thai_spans() can fix
+            # combining-mark ordering.  table.cells is a flat list of Rect objects
+            # in row-major order (matches table.extract() iteration order).
+            cell_rects: list | None = None
+            try:
+                raw_cells = table.cells  # available in PyMuPDF 1.23+
+                if raw_cells and len(raw_cells) == sum(len(r) for r in table_data):
+                    cell_rects = raw_cells
+            except Exception:
+                cell_rects = None
+
             rows: list[list[dict]] = []
+            cell_idx = 0
             for row_data in table_data:
-                row = [
-                    {
-                        "text": _normalize_thai_text(str(c or "").strip())["text"],
+                row: list[dict] = []
+                for c in row_data:
+                    cell_text = self._extract_pdf_cell_text(
+                        page, cell_rects[cell_idx] if cell_rects else None, c
+                    )
+                    row.append({
+                        "text": cell_text,
                         "colspan": 1, "rowspan": 1, "alignment": None,
-                    }
-                    for c in row_data
-                ]
+                    })
+                    cell_idx += 1
                 if row:
                     rows.append(row)
 
@@ -551,6 +579,102 @@ class DoclingService:
             }
         except Exception:
             return None
+
+    def _extract_pdf_cell_text(
+        self, page: object, cell_rect: object | None, fallback_text: str | None
+    ) -> str:
+        """Extract cell text with span-level awareness for Thai combining marks.
+
+        When a cell rect is available, re-extracts the text using
+        page.get_text("dict", clip=cell_rect) so that _join_thai_spans() can fix
+        combining-mark ordering.  Falls back to normalising the pre-assembled
+        string from table.extract() if the span-level path fails or is unavailable.
+        """
+        if cell_rect is not None:
+            try:
+                text_dict = page.get_text("dict", clip=cell_rect)
+                spans: list[str] = []
+                for blk in text_dict.get("blocks", []):
+                    if blk.get("type") != 0:
+                        continue
+                    for ln in blk.get("lines", []):
+                        for sp in ln.get("spans", []):
+                            t = sp.get("text", "")
+                            if t.strip():
+                                spans.append(t)
+                if spans:
+                    return _normalize_thai_text(_join_thai_spans(spans))["text"]
+            except Exception:
+                pass
+        # Fallback: normalise the pre-assembled string
+        return _normalize_thai_text(str(fallback_text or "").strip())["text"]
+
+    @staticmethod
+    def _infer_pdf_paragraph_layout(lines: list, page_rect: object) -> dict:
+        """Infer paragraph layout from per-line x-positions in a PyMuPDF block.
+
+        Returns a layout dict compatible with the DOCX layout schema used by
+        block_builder.normalize_layout().  All measurements are in twips
+        (1/20 pt) to match the DOCX encoding convention.
+
+        What can be inferred:
+        - indent_left: position of continuation lines relative to page left edge
+        - indent_hanging: first line is further LEFT than continuation lines
+        - indent_first_line: first line is further RIGHT than continuation lines
+
+        What cannot be trusted:
+        - alignment (center/justify/right) — needs right-edge analysis
+        - tab stops — PDFs don't encode them; only visual positions exist
+        - semantic meaning (numbered list vs. block quote vs. plain indent)
+        """
+        # Collect x0 positions only from lines that have actual spans
+        x0s: list[float] = []
+        for line in lines:
+            if line.get("spans"):
+                bbox = line.get("bbox")
+                if bbox and len(bbox) >= 1:
+                    x0s.append(float(bbox[0]))
+
+        # Page left edge (x0 of page mediabox)
+        try:
+            page_left = float(page_rect[0])
+        except Exception:
+            page_left = 0.0
+
+        if not x0s:
+            return {
+                "bbox": None, "reading_order": None, "alignment": None,
+                "indent_left": None, "indent_first_line": None, "indent_hanging": None,
+                "tabs": [], "spacing_before": None, "spacing_after": None, "line_spacing": None,
+            }
+
+        first_x0 = x0s[0] - page_left
+        rest_x0s = [x - page_left for x in x0s[1:]] if len(x0s) > 1 else [first_x0]
+        avg_rest = sum(rest_x0s) / len(rest_x0s)
+
+        # Threshold: 5 pt = 100 twips — ignore sub-pixel differences
+        INDENT_THRESHOLD_PT = 5.0
+        # diff_pt = first_x0 - avg_rest
+        #   negative: first line is further LEFT  → hanging indent  (label + tab pattern)
+        #   positive: first line is further RIGHT → first-line indent (indented opening)
+        diff_pt = first_x0 - avg_rest
+
+        indent_left       = int(avg_rest * 20)                             # continuation x0 → twips
+        indent_hanging    = int(-diff_pt * 20) if diff_pt < -INDENT_THRESHOLD_PT else None
+        indent_first_line = int(diff_pt * 20)  if diff_pt > INDENT_THRESHOLD_PT  else None
+
+        return {
+            "bbox": None,
+            "reading_order": None,
+            "alignment": None,
+            "indent_left": indent_left,
+            "indent_first_line": indent_first_line,
+            "indent_hanging": indent_hanging,
+            "tabs": [],
+            "spacing_before": None,
+            "spacing_after": None,
+            "line_spacing": None,
+        }
 
     @staticmethod
     def _rects_overlap(
