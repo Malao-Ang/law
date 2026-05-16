@@ -198,7 +198,9 @@ def normalize_text(text: str) -> NormalizeResult:
         flags.add("thai_vowel_fix")
     working = normalized_vowels
 
-    working = re.sub(r"\s+", " ", working)
+    # Collapse runs of horizontal whitespace only (spaces, tabs) to a single space.
+    # Newlines are preserved so that multi-line text retains line structure.
+    working = re.sub(r"[^\S\n]+", " ", working)
 
     # ── Late OCR fix (catches patterns revealed by the vowel fix) ─────────────
     late_fixed = _apply_ocr_fixes(working)

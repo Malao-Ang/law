@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(not exist *)",
+      "Bash(docker compose *)",
+      "Bash(curl -s http://localhost:8010/health)",
+      "Bash(curl -s -X POST http://localhost:8010/pipeline/extract -H \"Content-Type: application/json\" -d \"{\\\\\"document_id\\\\\":\\\\\"test\\\\\",\\\\\"file_path\\\\\":\\\\\"/tmp/test.pdf\\\\\"}\")",
+      "Bash(curl -s http://localhost:8000/api/health)",
+      "Bash(python3)",
+      "Bash(python3 -c \"import fitz; print\\(fitz.version\\)\")",
+      "Bash(python3 -c \"help\\(__import__\\('fitz'\\).Rect\\)\")",
+      "Bash(python -m pytest tests/test_pdf_text_extraction.py -v)",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_pdf_text_extraction.py tests/test_thai_normalizer.py tests/test_docx_tables.py -v)",
+      "Bash(python -m pytest tests/ -v --tb=no -q)",
+      "Bash(python -m pytest tests/ --ignore=tests/test_health.py -v --tb=no -q)"
+    ]
+  }
+}

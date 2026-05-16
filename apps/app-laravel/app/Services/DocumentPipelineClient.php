@@ -11,22 +11,17 @@ class DocumentPipelineClient
     public function __construct(private readonly HttpFactory $http) {}
 
     /**
-     * @return array<string, mixed>
+     * Fire an async extraction request.  The Python service returns 202 immediately
+     * and posts results to $callbackUrl when processing completes.
      */
-    public function extract(string $documentId, string $relativeInputPath, bool $enableAiCorrection): array
+    public function extract(string $documentId, string $relativeInputPath, bool $enableAiCorrection, string $callbackUrl): void
     {
-        $payload = [
+        $this->request()->post('/pipeline/extract', [
             'document_id' => $documentId,
             'file_path' => $this->toSharedPath($relativeInputPath),
             'enable_ai_correction' => $enableAiCorrection,
-        ];
-
-        $response = $this->request()->post('/pipeline/extract', $payload)->throw();
-
-        /** @var array<string, mixed> $json */
-        $json = $response->json();
-
-        return $json;
+            'callback_url' => $callbackUrl,
+        ])->throw();
     }
 
     /**
@@ -52,7 +47,7 @@ class DocumentPipelineClient
         return $this->http->baseUrl((string) config('services.ocr.base_url'))
             ->acceptJson()
             ->asJson()
-            ->timeout(600); // Increased to 10 minutes for EasyOCR model downloads
+            ->timeout(30);
     }
 
     private function toSharedPath(string $relativeInputPath): string

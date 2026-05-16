@@ -19,16 +19,8 @@ class DocumentHtmlService
             $pageNo = (int) ($page['page_no'] ?? 1);
             $blocks = is_array($page['blocks'] ?? null) ? $page['blocks'] : [];
 
-            usort($blocks, function (array $left, array $right): int {
-                $leftOrder = (int) ($left['reading_order'] ?? 0);
-                $rightOrder = (int) ($right['reading_order'] ?? 0);
-
-                if ($leftOrder === $rightOrder) {
-                    return strcmp((string) ($left['block_id'] ?? ''), (string) ($right['block_id'] ?? ''));
-                }
-
-                return $leftOrder <=> $rightOrder;
-            });
+            usort($blocks, fn (array $l, array $r): int => ($l['reading_order'] ?? 0) <=> ($r['reading_order'] ?? 0)
+                ?: strcmp((string) ($l['block_id'] ?? ''), (string) ($r['block_id'] ?? '')));
 
             $blockHtml = [];
             foreach ($blocks as $block) {
@@ -39,7 +31,14 @@ class DocumentHtmlService
 
                 $type = (string) ($block['type'] ?? 'paragraph');
                 $readingOrder = (int) ($block['reading_order'] ?? 0);
-                $contentHtml = $this->buildBlockHtml($block);
+
+                // Python is the single source of truth for block HTML.
+                // Use reviewed_html from meta when present; fall back to buildBlockHtml
+                // only for blocks that pre-date this convention or have no reviewed_html.
+                $inner = trim((string) ($block['meta']['reviewed_html'] ?? ''));
+                if ($inner === '') {
+                    $inner = $this->buildBlockHtml($block);
+                }
 
                 $blockHtml[] = sprintf(
                     '<div class="doc-block doc-block-%s" data-block-id="%s" data-block-type="%s" data-page-no="%d" data-reading-order="%d">%s</div>',
@@ -48,7 +47,7 @@ class DocumentHtmlService
                     e($type),
                     $pageNo,
                     $readingOrder,
-                    $contentHtml,
+                    $inner,
                 );
             }
 

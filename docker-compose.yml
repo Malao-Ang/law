@@ -10,9 +10,16 @@ services:
       dockerfile: Dockerfile
     container_name: thai-ocr-laravel-app
     working_dir: /var/www/html
-    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+    command: >
+      sh -c "git config --global --add safe.directory '*'
+      && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+      && php artisan config:clear
+      && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
       - poc_storage:/var/www/html/storage/app/poc
     env_file:
       - .env
@@ -23,17 +30,19 @@ services:
       - "8000:8000"
 
   laravel-vite:
-    image: node:20-alpine
+    image: node:20-bookworm-slim
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
-    command: sh -c "rm -f /root/.npmrc && rm -rf /root/.npm && npm config set registry https://registry.npmjs.org && npm config set strict-ssl false && npm install --include=optional && npm run dev"
+    command: >
+      sh -c "if [ ! -f node_modules/.bin/vite ]; then
+        echo 'ERROR: node_modules/.bin/vite missing. Run \"npm install\" in apps/app-laravel on the host first.' >&2;
+        exit 1;
+      fi
+      && npm run dev"
     environment:
-      - NPM_CONFIG_REGISTRY=https://registry.npmjs.org
-      - NPM_CONFIG_STRICT_SSL=false
       - HMR_HOST=localhost
     volumes:
       - ./apps/app-laravel:/var/www/html
-      - vite_node_modules:/var/www/html/node_modules
     ports:
       - "5173:5173"
 
@@ -43,9 +52,15 @@ services:
       dockerfile: Dockerfile
     container_name: thai-ocr-queue-worker
     working_dir: /var/www/html
-    command: php artisan queue:listen --tries=1 --timeout=1800
+    command: >
+      sh -c "git config --global --add safe.directory '*'
+      && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+      && php artisan queue:listen --tries=1 --timeout=1800"
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
       - poc_storage:/var/www/html/storage/app/poc
     env_file:
       - .env
@@ -77,6 +92,6 @@ services:
 
 volumes:
   poc_storage:
-  vite_node_modules:
+  laravel_vendor:
 
 

@@ -10,7 +10,8 @@ SourceType = Literal["docx", "pdf_text", "pdf_scan"]
 class ExtractRequest(BaseModel):
     document_id: str = Field(min_length=1)
     file_path: str = Field(min_length=1)
-    enable_ai_correction: bool = False
+    enable_ai_correction: bool = True
+    callback_url: str | None = None
 
 
 class ReprocessBlockRequest(BaseModel):
@@ -18,13 +19,6 @@ class ReprocessBlockRequest(BaseModel):
     page_no: int = Field(ge=1)
     block_id: str = Field(min_length=1)
     mode: Literal["ai_correction"] = "ai_correction"
-
-
-class PreviewRequest(BaseModel):
-    document_id: str = Field(min_length=1)
-    format: Literal["html", "raw_html"] = "html"
-    include_styles: bool = True
-    include_metadata: bool = False
 
 
 class BlockPatchResponse(BaseModel):
@@ -39,14 +33,7 @@ class BlockPatchResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     service: Literal["ocr-service"] = "ocr-service"
-
-
-class PreviewResponse(BaseModel):
-    document_id: str
-    format: str
-    html: str
-    css: str | None = None
-    metadata: dict | None = None
+    ocr_ready: bool = False
 
 
 class BlockDraft(BaseModel):
@@ -57,10 +44,6 @@ class BlockDraft(BaseModel):
     bbox: list[float] | None = None
     confidence: float = 1.0
     flags: list[str] = Field(default_factory=list)
-    # New fields for docling-parse architecture
-    indent_level: int = 0
-    x_position: float | None = None
-    font_size: float | None = None
 
 
 class PageDraft(BaseModel):

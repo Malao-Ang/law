@@ -50,9 +50,18 @@ class ReviewStore
      */
     public function setStatus(string $documentId, array $status): void
     {
-        $current = $this->getStatus($documentId) ?? ['document_id' => $documentId];
-        $payload = array_merge($current, $status, ['updated_at' => now()->toIso8601String()]);
-        $this->writeJson($this->statusPath($documentId), $payload);
+        $path = $this->statusPath($documentId);
+        File::ensureDirectoryExists(dirname($path));
+
+        $this->withLockedFile($path, function (array &$current) use ($documentId, $status): void {
+            if ($current === []) {
+                $current = ['document_id' => $documentId];
+            }
+            foreach ($status as $k => $v) {
+                $current[$k] = $v;
+            }
+            $current['updated_at'] = now()->toIso8601String();
+        });
     }
 
     /**
@@ -75,7 +84,10 @@ class ReviewStore
     public function writeReviewDocument(string $documentId, array $document): void
     {
         $this->syncDocumentReview($document);
-        $this->persistReviewDocument($documentId, $document);
+
+        $path = $this->intermediatePath($documentId);
+        File::ensureDirectoryExists(dirname($path));
+        $this->atomicWrite($path, $document);
     }
 
     /**
@@ -90,9 +102,13 @@ class ReviewStore
         }
 
         $document = $this->readJson($path);
-        if (! is_array($document['document_review'] ?? null)) {
+
+        $review = is_array($document['document_review'] ?? null) ? $document['document_review'] : [];
+        $needsSync = $review === [] || (bool) ($review['out_of_sync'] ?? false);
+
+        if ($needsSync) {
             $this->syncDocumentReview($document);
-            $this->persistReviewDocument($documentId, $document);
+            $this->atomicWrite($path, $document);
         }
 
         return $document;
@@ -104,53 +120,57 @@ class ReviewStore
      */
     public function patchApprovedBlock(string $documentId, int $pageNo, string $blockId, array $patch): array
     {
-        $document = $this->getReviewDocument($documentId);
-        $block = &$this->findBlockReference($document, $pageNo, $blockId);
+        $returnBlock = null;
 
-        $block['approved_text'] = (string) $patch['approved_text'];
-        $block['needs_review'] = (bool) ($patch['mark_uncertain'] ?? false);
-        $block['type'] = (string) ($patch['type'] ?? $block['type'] ?? 'paragraph');
-        $block['reading_order'] = (int) ($patch['reading_order'] ?? $block['reading_order'] ?? 0);
-        $block['bbox'] = $this->normalizeBbox($patch['bbox'] ?? $block['bbox'] ?? null);
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+            $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
-        $flags = collect($block['flags'] ?? [])->filter()->values();
-        if ($block['needs_review']) {
-            $flags = $flags->push('mark_uncertain')->unique()->values();
-        } else {
-            $flags = $flags->reject(fn (string $flag): bool => $flag === 'mark_uncertain')->values();
-        }
-        $block['flags'] = $flags->all();
+            $block['approved_text'] = (string) $patch['approved_text'];
+            $block['needs_review'] = (bool) ($patch['mark_uncertain'] ?? false);
+            $block['type'] = (string) ($patch['type'] ?? $block['type'] ?? 'paragraph');
+            $block['reading_order'] = (int) ($patch['reading_order'] ?? $block['reading_order'] ?? 0);
+            $block['bbox'] = $this->normalizeBbox($patch['bbox'] ?? $block['bbox'] ?? null);
 
-        $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
-        $existingLayout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
-        $table = $this->normalizeTable($patch['table'] ?? $existingMeta['table'] ?? null);
-        $layout = array_merge($existingLayout, [
-            'bbox' => $block['bbox'],
-            'reading_order' => $block['reading_order'],
-        ]);
+            $flags = collect($block['flags'] ?? [])->filter()->values();
+            if ($block['needs_review']) {
+                $flags = $flags->push('mark_uncertain')->unique()->values();
+            } else {
+                $flags = $flags->reject(fn (string $flag): bool => $flag === 'mark_uncertain')->values();
+            }
+            $block['flags'] = $flags->all();
 
-        $reviewedHtml = trim((string) ($patch['reviewed_html'] ?? ''));
-        if ($reviewedHtml === '') {
-            $reviewedHtml = $this->buildReviewedHtml($block, $table, $layout);
-        }
+            $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+            $existingLayout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+            $table = $this->normalizeTable($patch['table'] ?? $existingMeta['table'] ?? null);
+            $layout = array_merge($existingLayout, [
+                'bbox' => $block['bbox'],
+                'reading_order' => $block['reading_order'],
+            ]);
 
-        $block['meta'] = array_merge($existingMeta, [
-            'reviewed_html' => $reviewedHtml,
-            'layout' => $layout,
-            'table' => $table,
-            'table_html' => $table['html'] ?? null,
-            'review' => [
-                'approved_by' => $patch['approved_by'] ?? null,
-                'notes' => $patch['notes'] ?? null,
-                'updated_at' => now()->toIso8601String(),
-            ],
-        ]);
+            $reviewedHtml = trim((string) ($patch['reviewed_html'] ?? ''));
+            if ($reviewedHtml === '') {
+                $reviewedHtml = $this->rebuildBlockHtml($block, $table, $layout, $existingMeta);
+            }
 
-        $this->recalculateSummary($document);
-        $this->syncDocumentReview($document);
-        $this->persistReviewDocument($documentId, $document);
+            $block['meta'] = array_merge($existingMeta, [
+                'reviewed_html' => $reviewedHtml,
+                'layout' => $layout,
+                'table' => $table,
+                'table_html' => $table['html'] ?? null,
+                'review' => [
+                    'approved_by' => $patch['approved_by'] ?? null,
+                    'notes' => $patch['notes'] ?? null,
+                    'updated_at' => now()->toIso8601String(),
+                ],
+            ]);
 
-        return $block;
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+
+            $returnBlock = $block;
+        });
+
+        return $returnBlock;
     }
 
     /**
@@ -159,30 +179,34 @@ class ReviewStore
      */
     public function applyReprocessResult(string $documentId, array $result): array
     {
-        $document = $this->getReviewDocument($documentId);
-        $pageNo = (int) ($result['page_no'] ?? 0);
-        $blockId = (string) ($result['block_id'] ?? '');
-        $block = &$this->findBlockReference($document, $pageNo, $blockId);
+        $returnBlock = null;
 
-        $block['ai_suggested_text'] = (string) ($result['ai_suggested_text'] ?? $block['ai_suggested_text'] ?? '');
-        $block['confidence'] = max(0.0, min(1.0, (float) ($result['confidence'] ?? $block['confidence'] ?? 0.0)));
-        $block['flags'] = array_values(array_unique(array_map('strval', $result['flags'] ?? $block['flags'] ?? [])));
-        $block['needs_review'] = true;
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($result, &$returnBlock): void {
+            $pageNo = (int) ($result['page_no'] ?? 0);
+            $blockId = (string) ($result['block_id'] ?? '');
+            $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
-        $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
-        $layout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
-        $table = $this->normalizeTable($existingMeta['table'] ?? null);
-        $block['meta'] = array_merge($existingMeta, [
-            'reviewed_html' => $this->buildReviewedHtml($block, $table, $layout),
-            'table' => $table,
-            'table_html' => $table['html'] ?? null,
-        ]);
+            $block['ai_suggested_text'] = (string) ($result['ai_suggested_text'] ?? $block['ai_suggested_text'] ?? '');
+            $block['confidence'] = max(0.0, min(1.0, (float) ($result['confidence'] ?? $block['confidence'] ?? 0.0)));
+            $block['flags'] = array_values(array_unique(array_map('strval', $result['flags'] ?? $block['flags'] ?? [])));
+            $block['needs_review'] = true;
 
-        $this->recalculateSummary($document);
-        $this->syncDocumentReview($document);
-        $this->persistReviewDocument($documentId, $document);
+            $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+            $layout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+            $table = $this->normalizeTable($existingMeta['table'] ?? null);
+            $block['meta'] = array_merge($existingMeta, [
+                'reviewed_html' => $this->rebuildBlockHtml($block, $table, $layout, $existingMeta),
+                'table' => $table,
+                'table_html' => $table['html'] ?? null,
+            ]);
 
-        return $block;
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+
+            $returnBlock = $block;
+        });
+
+        return $returnBlock;
     }
 
     /**
@@ -191,37 +215,40 @@ class ReviewStore
      */
     public function updateDocumentReview(string $documentId, array $payload): array
     {
-        $document = $this->getReviewDocument($documentId);
-        $this->syncDocumentReview($document);
+        $returnReview = null;
 
-        $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
-        $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
-        $draftHtml = $resetToGenerated
-            ? $generatedHtml
-            : trim((string) ($payload['draft_html'] ?? ''));
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnReview): void {
+            $this->syncDocumentReview($document);
 
-        if ($draftHtml === '') {
-            throw new RuntimeException('Document HTML draft cannot be empty.');
-        }
+            $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
+            $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
+            $draftHtml = $resetToGenerated
+                ? $generatedHtml
+                : trim((string) ($payload['draft_html'] ?? ''));
 
-        $document['document_review'] = array_merge(
-            is_array($document['document_review'] ?? null) ? $document['document_review'] : [],
-            [
-                'generated_html' => $generatedHtml,
-                'draft_html' => $draftHtml,
-                'html_mode' => $resetToGenerated ? 'generated' : 'manual',
-                'out_of_sync' => $resetToGenerated
-                    ? false
-                    : $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
-                'updated_at' => now()->toIso8601String(),
-                'approved_by' => $payload['approved_by'] ?? null,
-                'notes' => $payload['notes'] ?? null,
-            ],
-        );
+            if ($draftHtml === '') {
+                throw new RuntimeException('Document HTML draft cannot be empty.');
+            }
 
-        $this->persistReviewDocument($documentId, $document);
+            $document['document_review'] = array_merge(
+                is_array($document['document_review'] ?? null) ? $document['document_review'] : [],
+                [
+                    'generated_html' => $generatedHtml,
+                    'draft_html' => $draftHtml,
+                    'html_mode' => $resetToGenerated ? 'generated' : 'manual',
+                    'out_of_sync' => $resetToGenerated
+                        ? false
+                        : $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
+                    'updated_at' => now()->toIso8601String(),
+                    'approved_by' => $payload['approved_by'] ?? null,
+                    'notes' => $payload['notes'] ?? null,
+                ],
+            );
 
-        return $document['document_review'];
+            $returnReview = $document['document_review'];
+        });
+
+        return $returnReview;
     }
 
     /**
@@ -281,6 +308,59 @@ class ReviewStore
     }
 
     /**
+     * Exclusive-lock the file at $path, read its JSON content (or [] if empty),
+     * pass the data by reference to $callback for in-place modification, then
+     * write it back atomically before releasing the lock.
+     *
+     * All read-modify-write operations on state files must go through this method
+     * to prevent concurrent queue workers from corrupting the same document.
+     *
+     * @param callable(array<string,mixed> &): void $callback
+     */
+    private function withLockedFile(string $path, callable $callback): void
+    {
+        File::ensureDirectoryExists(dirname($path));
+
+        $fp = fopen($path, 'c+');
+        if ($fp === false) {
+            throw new RuntimeException("Cannot open file for locked write: {$path}");
+        }
+
+        try {
+            flock($fp, LOCK_EX);
+
+            $size = fstat($fp)['size'] ?? 0;
+            $contents = $size > 0 ? stream_get_contents($fp) : '';
+            /** @var array<string, mixed> $data */
+            $data = ($contents !== false && $contents !== '')
+                ? json_decode($contents, true, 512, JSON_THROW_ON_ERROR)
+                : [];
+
+            $callback($data);
+
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        } finally {
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        }
+    }
+
+    /**
+     * Write a complete document to disk in one atomic operation.
+     * Used when we already have the full document in memory and only need to persist it.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function atomicWrite(string $path, array $data): void
+    {
+        $tmp = $path.'.tmp.'.getmypid();
+        file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        rename($tmp, $path);
+    }
+
+    /**
      * @param array<string, mixed> $document
      * @return array<string, mixed>
      */
@@ -335,6 +415,21 @@ class ReviewStore
     }
 
     /**
+     * Mark the document's generated HTML as out of sync with the current block states.
+     * The HTML will be lazily rebuilt the next time getReviewDocument is called.
+     *
+     * @param array<string, mixed> $document
+     */
+    private function markOutOfSync(array &$document): void
+    {
+        if (! is_array($document['document_review'] ?? null)) {
+            return;
+        }
+        $document['document_review']['out_of_sync'] = true;
+        $document['document_review']['updated_at'] = now()->toIso8601String();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function readJson(string $path): array
@@ -352,14 +447,6 @@ class ReviewStore
     {
         File::ensureDirectoryExists(dirname($path));
         File::put($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-    }
-
-    /**
-     * @param array<string, mixed> $document
-     */
-    private function persistReviewDocument(string $documentId, array $document): void
-    {
-        $this->writeJson($this->intermediatePath($documentId), $document);
     }
 
     /**
@@ -414,14 +501,39 @@ class ReviewStore
     }
 
     /**
+     * Rebuild a single block's reviewed_html after a text edit.
+     *
+     * Uses the precomputed layout_css from meta when available (Option B) to avoid
+     * an HTTP round-trip back to the Python service. Falls back to buildBlockHtml
+     * for tables and blocks without layout_css.
+     *
      * @param array<string, mixed> $block
      * @param array<string, mixed>|null $table
      * @param array<string, mixed> $layout
+     * @param array<string, mixed> $existingMeta
      */
-    private function buildReviewedHtml(array $block, ?array $table, array $layout): string
+    private function rebuildBlockHtml(array $block, ?array $table, array $layout, array $existingMeta): string
     {
+        $type = (string) ($block['type'] ?? 'paragraph');
+        $text = (string) ($block['approved_text'] ?? $block['ai_suggested_text'] ?? $block['normalized_text'] ?? '');
+        $layoutCss = trim((string) ($existingMeta['layout_css'] ?? ''));
+
+        if ($type !== 'table' && $type !== 'image' && $layoutCss !== '') {
+            $classMap = [
+                'list_item'      => 'doc-paragraph doc-list-item',
+                'title'          => 'doc-paragraph doc-title',
+                'section_header' => 'doc-paragraph doc-section-header',
+                'figure_caption' => 'doc-paragraph doc-figure-caption',
+                'footnote'       => 'doc-paragraph doc-footnote',
+            ];
+            $classes = $classMap[$type] ?? 'doc-paragraph';
+            $escaped = e(str_replace(["\r\n", "\r", "\n"], '<br>', $text));
+
+            return sprintf('<p class="%s" style="%s">%s</p>', e($classes), e($layoutCss), $escaped);
+        }
+
         $tempBlock = $block;
-        $tempBlock['meta'] = array_merge(is_array($block['meta'] ?? null) ? $block['meta'] : [], [
+        $tempBlock['meta'] = array_merge($existingMeta, [
             'reviewed_html' => '',
             'layout' => $layout,
             'table' => $table,

@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+import httpx
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from app.api.schemas import (
     BlockPatchResponse,
@@ -17,7 +18,7 @@ from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
 from app.services.block_builder import build_document_output, build_html_preview
 from app.services.docling_service import DoclingService
-from app.services.ocr_pipeline import OcrPipeline
+from app.services.ocr_pipeline import get_ocr_pipeline
 from app.services.thai_normalizer import normalize_text
 from app.utils.file_type import detect_file_type
 
@@ -26,28 +27,50 @@ router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse()
+    pipeline = get_ocr_pipeline()
+    return HealthResponse(ocr_ready=pipeline.is_ready())
 
 
-@router.post("/pipeline/extract")
-def extract_document(payload: ExtractRequest) -> dict:
-    settings = get_settings()
-    logger = get_logger(payload.document_id)
-
+@router.post("/pipeline/extract", status_code=202)
+def extract_document(payload: ExtractRequest, background_tasks: BackgroundTasks) -> dict:
     file_path = Path(payload.file_path)
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Input file does not exist")
 
-    source_type = detect_file_type(file_path)
-    logger.info("detected source type", extra={"source_type": source_type})
+    background_tasks.add_task(_run_extraction, payload)
+    return {"status": "accepted", "document_id": payload.document_id}
+
+
+def _run_extraction(payload: ExtractRequest) -> None:
+    settings = get_settings()
+    logger = get_logger(payload.document_id)
+
+    file_path = Path(payload.file_path)
+    classification = detect_file_type(file_path)
+    mode = classification["mode"]
+    logger.info("detected source type", extra={"mode": mode})
 
     docling_service = DoclingService(data_root=settings.data_root)
-    ocr_pipeline = OcrPipeline(data_root=settings.data_root)
+    ocr_pipeline = get_ocr_pipeline(data_root=settings.data_root)
 
-    if source_type == "pdf_scan":
+    if mode == "docx":
+        pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
+        source_type = "docx"
+    elif mode == "pdf_text":
+        pages = docling_service.extract(file_path=file_path, source_type="pdf_text", document_id=payload.document_id)
+        source_type = "pdf_text"
+    elif mode == "pdf_scan":
         pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=payload.document_id)
+        source_type = "pdf_scan"
     else:
-        pages = docling_service.extract(file_path=file_path, source_type=source_type, document_id=payload.document_id)
+        # mixed: route each page to the appropriate extractor
+        pages = docling_service.extract_mixed_pdf(
+            file_path=file_path,
+            page_classification=classification["pages"],
+            document_id=payload.document_id,
+            ocr_pipeline=ocr_pipeline,
+        )
+        source_type = "pdf_mixed"
 
     ai_corrector = MockAICorrector()
     output = build_document_output(
@@ -69,7 +92,18 @@ def extract_document(payload: ExtractRequest) -> dict:
     )
 
     logger.info("extraction completed", extra={"output_path": str(output_path)})
-    return output
+
+    if payload.callback_url:
+        _post_callback(payload.callback_url, payload.document_id, output, logger)
+
+
+def _post_callback(callback_url: str, document_id: str, output: dict, logger: object) -> None:
+    try:
+        with httpx.Client(timeout=30) as client:
+            client.post(callback_url, json={"document_id": document_id, "output": output})
+        logger.info("callback delivered", extra={"callback_url": callback_url})
+    except Exception as exc:
+        logger.error("callback failed", extra={"callback_url": callback_url, "error": str(exc)})
 
 
 @router.post("/pipeline/reprocess-block", response_model=BlockPatchResponse)
