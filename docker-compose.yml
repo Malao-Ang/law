@@ -1,3 +1,8 @@
+# Thai OCR POC - Optimized for faster builds
+# For best performance, run with BuildKit enabled:
+#   export DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1
+#   docker-compose build
+
 services:
   laravel-app:
     build:
@@ -52,7 +57,7 @@ services:
   ocr-service:
     build:
       context: ./apps/ocr-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.simple
     container_name: thai-ocr-service
     working_dir: /app
     volumes:
@@ -62,6 +67,7 @@ services:
       - .env
     ports:
       - "8010:8010"
+    user: "0:0"  # Run as root to handle volume permissions
 
   redis:
     image: redis:7-alpine

@@ -8,21 +8,42 @@ if "%SERVICE%"=="" set SERVICE=all
 echo 🚀 Fast rebuild script for Thai OCR POC
 echo ======================================
 
-if "%SERVICE%"=="all" if "%SERVICE%"=="ocr" (
-    echo 📦 Building OCR service with multi-stage cache...
-    docker-compose build ocr-service --parallel
-)
+if "%SERVICE%"=="all" goto :build_all
+if "%SERVICE%"=="ocr" goto :build_ocr
+if "%SERVICE%"=="laravel" goto :build_laravel
+if "%SERVICE%"=="vite" goto :restart_vite
 
-if "%SERVICE%"=="all" if "%SERVICE%"=="laravel" (
-    echo 📦 Building Laravel app with dependency cache...
-    docker-compose build laravel-app --parallel
-)
+echo ❌ Unknown service: %SERVICE%
+echo    Usage: %~nx0 [all|ocr|laravel|vite]
+goto :end
 
-if "%SERVICE%"=="all" if "%SERVICE%"=="vite" (
-    echo 📦 Restarting Vite (no rebuild needed for Node image)...
-    docker-compose restart laravel-vite
-)
+:build_all
+echo 📦 Building all services with BuildKit cache...
+set DOCKER_BUILDKIT=1
+set COMPOSE_DOCKER_CLI_BUILD=1
+docker-compose build --parallel
+goto :start_services
 
+:build_ocr
+echo 📦 Building OCR service with BuildKit cache...
+set DOCKER_BUILDKIT=1
+set COMPOSE_DOCKER_CLI_BUILD=1
+docker-compose build ocr-service
+goto :start_services
+
+:build_laravel
+echo 📦 Building Laravel app with BuildKit cache...
+set DOCKER_BUILDKIT=1
+set COMPOSE_DOCKER_CLI_BUILD=1
+docker-compose build laravel-app
+goto :start_services
+
+:restart_vite
+echo 📦 Restarting Vite (no rebuild needed for Node image)...
+docker-compose restart laravel-vite
+goto :start_services
+
+:start_services
 echo ✅ Build complete! Starting services...
 docker-compose up -d
 
@@ -34,4 +55,6 @@ echo.
 echo 💡 Tips:
 echo    - File changes will trigger automatic reloads
 echo    - First build after changes may take 2-3 minutes
-echo    - Subsequent builds will be much faster with multi-stage cache
+echo    - Subsequent builds will be much faster with BuildKit cache
+
+:end

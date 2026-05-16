@@ -186,13 +186,32 @@ function buildLayoutStyle(layout?: BlockLayout): string {
   if (layout.alignment) {
     styles.push(`text-align:${layout.alignment}`);
   }
+  
+  // Handle indent properly with hanging indent support
   if (layout.indent_left) {
-    styles.push(`margin-left:${layout.indent_left / 20}pt`);
-  }
-  if (layout.indent_first_line) {
-    styles.push(`text-indent:${layout.indent_first_line / 20}pt`);
+    // Convert DOCX twips (1/20 point) to points
+    const leftMarginPt = layout.indent_left / 20;
+    styles.push(`margin-left:${leftMarginPt}pt`);
+    
+    // Handle hanging indent properly
+    if (layout.indent_hanging && layout.indent_hanging > 0) {
+      // Hanging indent: first line is indented less than subsequent lines
+      // text-indent: negative value pulls first line back
+      const hangingPt = layout.indent_hanging / 20;
+      styles.push(`text-indent:-${hangingPt}pt`);
+    } else if (layout.indent_first_line && layout.indent_first_line > 0) {
+      // First line indent: first line indented more than subsequent lines
+      const firstLinePt = layout.indent_first_line / 20;
+      styles.push(`text-indent:${firstLinePt}pt`);
+    }
+  } else if (layout.indent_first_line) {
+    // First line indent without left margin
+    const firstLinePt = layout.indent_first_line / 20;
+    styles.push(`text-indent:${firstLinePt}pt`);
   } else if (layout.indent_hanging) {
-    styles.push(`text-indent:-${layout.indent_hanging / 20}pt`);
+    // Hanging indent without left margin
+    const hangingPt = layout.indent_hanging / 20;
+    styles.push(`text-indent:-${hangingPt}pt`);
   }
 
   return styles.join('; ');

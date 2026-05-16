@@ -5,42 +5,161 @@ import fitz
 import cv2
 import numpy as np
 
-from app.services.html_renderer import build_table_html, escape_html
+# Import new docling-parse based services
+from app.services.docling_parse_extractor import DoclingParseExtractor
+from app.utils.indent_detector import cluster_x_positions, detect_indent_level
+from app.utils.gap_detector import detect_gaps, join_cells_with_gaps
 
 # Suppress torch pin_memory warnings when no GPU is available
 warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
 
 class OcrPipeline:
-    def __init__(self, data_root: Path, row_group_threshold_px: int = 30) -> None:
+    def __init__(self, data_root: Path) -> None:
         self.data_root = data_root
-        self._row_group_threshold_px = row_group_threshold_px
         self._reader = None
+        # Initialize docling-parse extractor for hybrid approach
+        self._text_extractor = DoclingParseExtractor(fallback_to_fitz=False)
 
     def extract_scanned_pdf(self, file_path: Path, document_id: str) -> list[dict]:
+        """Extract text from scanned PDF using hybrid approach.
+        
+        New approach:
+        1. Try docling-parse first (some "scanned" PDFs have text layers)
+        2. Fall back to EasyOCR if docling-parse fails or returns minimal text
+        3. Apply indent/gap detection to OCR results
+        """
         doc = fitz.open(file_path)
         pages: list[dict] = []
 
         for page_index, page in enumerate(doc, start=1):
             image_path = self._render_page_image(page, document_id, page_index)
-            lines = self._ocr_image(image_path)
             
-            # Detect table regions in the image
-            table_regions = self._detect_table_regions(image_path)
-            
-            # Group OCR results by table regions
-            blocks = self._group_ocr_results_by_tables(lines, table_regions, page_index)
+            # Try hybrid approach: docling-parse + EasyOCR fallback
+            page_blocks = self._extract_page_with_hybrid_ocr(
+                file_path, page_index, document_id, image_path
+            )
 
             pages.append(
                 {
                     "page_no": page_index,
                     "image_path": str(image_path),
-                    "blocks": blocks,
+                    "blocks": page_blocks,
                 }
             )
 
         doc.close()
         return pages
+        
+    def _extract_page_with_hybrid_ocr(
+        self, file_path: Path, page_no: int, document_id: str, image_path: Path
+    ) -> list[dict]:
+        """Extract text from a single page using hybrid OCR approach."""
+        
+        # Step 1: Try docling-parse first
+        try:
+            text_pages = self._text_extractor.extract_pages(file_path)
+            if text_pages and page_no <= len(text_pages):
+                page_cells = text_pages[page_no - 1]
+                
+                # Check if docling-parse found meaningful text
+                total_text_length = sum(len(cell.text.strip()) for cell in page_cells.word_cells)
+                
+                if total_text_length > 50:  # Reasonable amount of text found
+                    return self._create_blocks_from_docling_parse_cells(
+                        page_cells, page_no, document_id
+                    )
+        except Exception as e:
+            warnings.warn(f"docling-parse failed for page {page_no}: {e}")
+            
+        # Step 2: Fall back to EasyOCR
+        ocr_lines = self._ocr_image(image_path)
+        
+        # Detect table regions in the image
+        table_regions = self._detect_table_regions(image_path)
+        
+        # Group OCR results by table regions
+        blocks = self._group_ocr_results_by_tables(ocr_lines, table_regions, page_no)
+        
+        return blocks
+        
+    def _create_blocks_from_docling_parse_cells(
+        self, page_cells, page_no: int, document_id: str
+    ) -> list[dict]:
+        """Create blocks from docling-parse cells with layout analysis."""
+        blocks = []
+        reading_order = 1
+        
+        # Analyze indent patterns
+        x_positions = [cell.x0 for cell in page_cells.word_cells]
+        indent_clusters = cluster_x_positions(x_positions)
+        
+        # Group cells into lines (use existing line grouping from docling-parse)
+        for line_idx, line_cell in enumerate(page_cells.line_cells):
+            # Detect gaps between cells in this line
+            gaps = detect_gaps(line_cell.cells)
+            
+            # Join text with appropriate spacing
+            joined_text = join_cells_with_gaps(line_cell.cells, gaps)
+            
+            # Detect indent level (use first cell's x0)
+            indent_level = 0
+            if line_cell.cells:
+                indent_level = detect_indent_level(line_cell.cells[0].x0, indent_clusters)
+                
+            # Classify block type
+            block_type = self._classify_ocr_block(joined_text, indent_level, line_idx)
+            
+            block = {
+                "block_id": f"{page_no}-{reading_order}",
+                "type": block_type,
+                "reading_order": reading_order,
+                "raw_text": joined_text,
+                "bbox": list(line_cell.bbox),
+                "confidence": 0.95,  # High confidence for docling-parse
+                "flags": ["docling_parse_ocr"],
+                "meta": {
+                    "indent_level": indent_level,
+                    "x_position": line_cell.cells[0].x0 if line_cell.cells else 0,
+                    "gaps": gaps,
+                    "layout": {
+                        "bbox": list(line_cell.bbox),
+                        "reading_order": reading_order,
+                        "alignment": None,
+                        "indent_left": line_cell.cells[0].x0 if line_cell.cells else 0,
+                        "indent_first_line": None,
+                        "indent_hanging": None,
+                        "tabs": [],
+                    },
+                },
+            }
+            
+            blocks.append(block)
+            reading_order += 1
+            
+        return blocks
+        
+    def _classify_ocr_block(self, text: str, indent_level: int, position: int) -> str:
+        """Classify OCR block type."""
+        stripped = text.strip()
+        
+        if not stripped:
+            return "paragraph"
+            
+        # Title detection (early position, no indent)
+        if position <= 2 and indent_level == 0 and len(stripped) < 50:
+            return "title"
+            
+        # Section headers
+        import re
+        if re.match(r"^(ข้อ\s*[๐-๙0-9]+|ข้อ[๐-๙0-9]+|มาตรา\s*[๐-๙0-9]+|มาตรา[๐-๙0-9]+)", stripped):
+            return "section_header"
+            
+        # List items
+        if re.match(r"^(\([๐-๙0-9]+\)|-|•|\d+\.|[ก-ฮ]\.\s)", stripped):
+            return "list_item"
+            
+        return "paragraph"
 
     def _detect_table_regions(self, image_path: Path) -> list[dict]:
         """Detect table regions in an image using OpenCV."""
@@ -83,61 +202,26 @@ class OcrPipeline:
         except Exception:
             return []
 
-    @staticmethod
-    def _compute_ocr_page_margin_x(lines: list[dict]) -> float:
-        """Return 10th-percentile of OCR line x0 pixel values as the left margin baseline."""
-        x0_vals = sorted(line["bbox"][0] for line in lines if line.get("bbox"))
-        if len(x0_vals) < 2:
-            return 0.0
-        return x0_vals[len(x0_vals) // 10]
-
-    @staticmethod
-    def _estimate_ocr_layout(line: dict, page_margin_x_px: float, reading_order: int) -> dict:
-        """Build layout dict from EasyOCR bbox (image pixels at 2x render scale).
-        Converts pixel offset to twips: 2px = 1 PDF point, 1 pt = 20 twips.
-        """
-        indent_left = None
-        bbox = line.get("bbox")
-        if bbox:
-            x0_px = bbox[0]
-            indent_px = max(0.0, x0_px - page_margin_x_px)
-            if indent_px >= 5.0:  # absorb EasyOCR position jitter
-                indent_pt = indent_px / 2.0
-                indent_left = round(indent_pt * 20)
-        return {
-            "bbox": bbox,
-            "reading_order": reading_order,
-            "alignment": None,
-            "indent_left": indent_left,
-            "indent_first_line": None,
-            "indent_hanging": None,
-            "tabs": [],
-            "spacing_before": None,
-            "spacing_after": None,
-            "line_spacing": None,
-        }
-
     def _group_ocr_results_by_tables(self, lines: list[dict], table_regions: list[dict], page_index: int) -> list[dict]:
         """Group OCR results by detected table regions and create table blocks."""
         blocks: list[dict] = []
         used_line_indices = set()
         reading_order = 1
-        page_margin_x_px = self._compute_ocr_page_margin_x(lines)
-
+        
         # Process each detected table region
         for region in table_regions:
             table_lines, new_used_indices = self._collect_lines_in_region(lines, region, used_line_indices)
-
+            
             if table_lines:
                 table_block = self._create_table_block_from_lines(table_lines, page_index, reading_order)
                 if table_block:
                     blocks.append(table_block)
                     reading_order += 1
                     used_line_indices = new_used_indices
-
+        
         # Add remaining lines as regular blocks
-        reading_order = self._add_remaining_lines(blocks, lines, used_line_indices, page_index, reading_order, page_margin_x_px)
-
+        reading_order = self._add_remaining_lines(blocks, lines, used_line_indices, page_index, reading_order)
+        
         return blocks
 
     def _collect_lines_in_region(self, lines: list[dict], region: dict, used_indices: set) -> tuple:
@@ -154,26 +238,50 @@ class OcrPipeline:
         
         return table_lines, new_used
 
-    def _add_remaining_lines(self, blocks: list[dict], lines: list[dict], used_indices: set, page_index: int, start_order: int, page_margin_x_px: float = 0.0) -> int:
-        """Add remaining lines as regular paragraph blocks."""
+    def _add_remaining_lines(self, blocks: list[dict], lines: list[dict], used_indices: set, page_index: int, start_order: int) -> int:
+        """Add remaining lines as regular paragraph blocks with layout analysis."""
         reading_order = start_order
-
+        
+        # Analyze indent patterns for all remaining lines
+        remaining_lines = [line for idx, line in enumerate(lines) if idx not in used_indices]
+        if remaining_lines:
+            x_positions = [line["bbox"][0] for line in remaining_lines]
+            indent_clusters = cluster_x_positions(x_positions)
+        
         for idx, line in enumerate(lines):
             if idx not in used_indices:
+                # Detect indent level
+                indent_level = 0
+                if remaining_lines:
+                    indent_level = detect_indent_level(line["bbox"][0], indent_clusters)
+                
+                # Classify block type
+                block_type = self._classify_ocr_block(line["text"], indent_level, reading_order)
+                
                 blocks.append({
                     "block_id": f"{page_index}-{reading_order}",
-                    "type": "paragraph" if reading_order > 1 else "title",
+                    "type": block_type,
                     "reading_order": reading_order,
                     "raw_text": line["text"],
                     "bbox": line["bbox"],
                     "confidence": line["confidence"],
                     "flags": ["ocr_scan"],
                     "meta": {
-                        "layout": self._estimate_ocr_layout(line, page_margin_x_px, reading_order)
+                        "indent_level": indent_level,
+                        "x_position": line["bbox"][0],
+                        "layout": {
+                            "bbox": line["bbox"],
+                            "reading_order": reading_order,
+                            "alignment": None,
+                            "indent_left": line["bbox"][0],
+                            "indent_first_line": None,
+                            "indent_hanging": None,
+                            "tabs": [],
+                        },
                     },
                 })
                 reading_order += 1
-
+        
         return reading_order
 
     def _bbox_in_region(self, bbox: list, region: dict) -> bool:
@@ -216,7 +324,7 @@ class OcrPipeline:
         rows: list[list[dict]] = []
         current_row: list[dict] = []
         last_y = None
-        row_height_threshold = self._row_group_threshold_px
+        row_height_threshold = 30
         
         for line in sorted_lines:
             y_pos = line["bbox"][1]
@@ -259,7 +367,7 @@ class OcrPipeline:
         """Build complete table block structure."""
         headers = [cell["text"] for cell in table_rows[0]] if table_rows else []
         body = [[cell["text"] for cell in row] for row in table_rows[1:]] if len(table_rows) > 1 else []
-        html = build_table_html(table_rows)
+        html = self._build_table_html(table_rows)
         raw_text = "\n".join("\t".join(cell["text"] for cell in row) for row in table_rows)
         merged_bbox = self._merge_bboxes([line["bbox"] for line in sorted_lines])
         
@@ -306,6 +414,23 @@ class OcrPipeline:
             return None
         
         return [min(x_coords), min(y_coords), max(x1_coords), max(y1_coords)]
+
+    @staticmethod
+    def _build_table_html(rows: list[list[dict]]) -> str:
+        """Build HTML table from rows."""
+        html_rows: list[str] = []
+        
+        for row_index, row in enumerate(rows):
+            rendered_cells: list[str] = []
+            cell_tag = "th" if row_index == 0 else "td"
+            
+            for cell in row:
+                text = str(cell.get("text", "")).replace("<", "&lt;").replace(">", "&gt;")
+                rendered_cells.append(f"<{cell_tag}>{text}</{cell_tag}>")
+            
+            html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
+        
+        return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
 
     def _render_page_image(self, page: fitz.Page, document_id: str, page_no: int) -> Path:
         page_dir = self.data_root / "pages" / document_id

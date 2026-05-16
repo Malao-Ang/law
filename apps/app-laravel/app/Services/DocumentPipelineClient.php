@@ -52,7 +52,7 @@ class DocumentPipelineClient
         return $this->http->baseUrl((string) config('services.ocr.base_url'))
             ->acceptJson()
             ->asJson()
-            ->timeout(180);
+            ->timeout(600); // Increased to 10 minutes for EasyOCR model downloads
     }
 
     private function toSharedPath(string $relativeInputPath): string

@@ -1,19 +1,23 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import (
     BlockPatchResponse,
     ExtractRequest,
     HealthResponse,
+    PreviewRequest,
+    PreviewResponse,
     ReprocessBlockRequest,
     intermediate_output_path,
 )
 from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
-from app.services.block_builder import build_document_output
+from app.services.block_builder import build_document_output, build_html_preview
+from app.services.docling_service import DoclingService
+from app.services.ocr_pipeline import OcrPipeline
 from app.services.thai_normalizer import normalize_text
 from app.utils.file_type import detect_file_type
 
@@ -26,7 +30,7 @@ def health() -> HealthResponse:
 
 
 @router.post("/pipeline/extract")
-def extract_document(payload: ExtractRequest, request: Request) -> dict:
+def extract_document(payload: ExtractRequest) -> dict:
     settings = get_settings()
     logger = get_logger(payload.document_id)
 
@@ -37,21 +41,22 @@ def extract_document(payload: ExtractRequest, request: Request) -> dict:
     source_type = detect_file_type(file_path)
     logger.info("detected source type", extra={"source_type": source_type})
 
-    docling_service = request.app.state.docling_service
-    ocr_pipeline = request.app.state.ocr_pipeline
+    docling_service = DoclingService(data_root=settings.data_root)
+    ocr_pipeline = OcrPipeline(data_root=settings.data_root)
 
     if source_type == "pdf_scan":
         pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=payload.document_id)
     else:
         pages = docling_service.extract(file_path=file_path, source_type=source_type, document_id=payload.document_id)
 
+    ai_corrector = MockAICorrector()
     output = build_document_output(
         document_id=payload.document_id,
         source_file=file_path.name,
         source_type=source_type,
         pages=pages,
         normalizer=normalize_text,
-        ai_corrector=MockAICorrector(),
+        ai_corrector=ai_corrector,
         enable_ai_correction=payload.enable_ai_correction,
         review_threshold=settings.thai_review_threshold,
     )
@@ -110,3 +115,54 @@ def reprocess_block(payload: ReprocessBlockRequest) -> BlockPatchResponse:
         confidence=ai["confidence"],
         flags=target_block["flags"],
     )
+
+
+@router.post("/preview", response_model=PreviewResponse)
+def generate_preview(payload: PreviewRequest) -> PreviewResponse:
+    """Generate HTML preview for a processed document."""
+    settings = get_settings()
+    logger = get_logger(payload.document_id)
+
+    output_path = intermediate_output_path(settings.data_root, payload.document_id)
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        # Load document data
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        
+        # Generate HTML preview
+        preview_data = build_html_preview(
+            document_data=data,
+            format=payload.format,
+            include_styles=payload.include_styles
+        )
+        
+        # Add metadata if requested
+        if payload.include_metadata:
+            preview_data["metadata"] = {
+                "source_file": data.get("source_file"),
+                "source_type": data.get("source_type"),
+                "language": data.get("language"),
+                "summary": data.get("summary"),
+                "processing_info": {
+                    "format": payload.format,
+                    "include_styles": payload.include_styles,
+                    "generated_at": logger.handlers[0].formatter.formatTime(logger.handlers[0].record) if logger.handlers else None
+                }
+            }
+        
+        logger.info("preview generated", extra={
+            "document_id": payload.document_id,
+            "format": payload.format,
+            "include_styles": payload.include_styles
+        })
+        
+        return PreviewResponse(**preview_data)
+        
+    except Exception as e:
+        logger.error("preview generation failed", extra={
+            "document_id": payload.document_id,
+            "error": str(e)
+        })
+        raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")
