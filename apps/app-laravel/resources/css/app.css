@@ -55,8 +55,119 @@ body {
   gap: 16px;
 }
 
+/* Full-viewport review layout */
+.review-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--bg);
+  z-index: 200;
+}
+
+.review-main {
+  padding: 0 !important;
+}
+
+.review-topbar {
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: #102b3f;
+  color: #f5f9fb;
+}
+
+.review-topbar .review-title {
+  flex: 1;
+}
+
+.review-topbar h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #f5f9fb;
+}
+
+.review-topbar .hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #c8e5e1;
+}
+
+.review-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pane-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: #f5f9fb;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .review-grid {
-  align-items: start;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.review-grid.left-collapsed {
+  grid-template-columns: 0 minmax(0, 1fr) 360px;
+}
+
+.review-grid.right-collapsed {
+  grid-template-columns: 320px minmax(0, 1fr) 0;
+}
+
+.review-grid.left-collapsed.right-collapsed {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+
+.review-grid > .list-panel,
+.review-grid > .editor-panel,
+.review-grid > .review-side-column {
+  min-width: 0;
+  overflow: auto;
+  border-radius: 0;
+  border-right: 1px solid var(--border);
+  background: #fff;
+}
+
+.review-grid > .review-side-column {
+  border-right: 0;
+  border-left: 1px solid var(--border);
+  overflow: auto;
+}
+
+.review-grid.left-collapsed > .list-panel {
+  overflow: hidden;
+}
+
+.review-grid.right-collapsed > .review-side-column {
+  overflow: hidden;
+}
+
+.pane-inner {
+  padding: 14px;
+  min-width: 0;
 }
 
 .panel {
@@ -81,6 +192,11 @@ body {
 .list-panel {
   max-height: 80vh;
   overflow: auto;
+}
+
+/* Inside the full-viewport review shell, list-panel fills its grid cell */
+.review-grid > .list-panel {
+  max-height: none;
 }
 
 .block-list {
@@ -168,28 +284,53 @@ textarea {
   top: 16px;
 }
 
-.canvas-shell {
-  position: relative;
-  width: 100%;
-  min-height: 1200px;
-  overflow: auto;
-  border-radius: 12px;
-  box-shadow: 0 20px 50px var(--canvas-shadow);
+.review-center-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.document-canvas {
+.review-center-toolbar,
+.review-mode-toggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.page-preview-shell {
+  border-radius: 12px;
+  box-shadow: 0 20px 50px var(--canvas-shadow);
+  background: linear-gradient(180deg, #f2ece1 0%, #eceff2 100%);
+  padding: 18px;
+}
+
+.page-stage {
+  position: relative;
   width: 100%;
-  max-width: 900px;
-  background: #f8fafb;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.page-stage--paper {
+  background: #fffdf8;
+  border-radius: 12px;
+  border: 1px solid #d7d1c5;
+  min-height: 70vh;
+  overflow: hidden;
+}
+
+.page-preview-image {
+  width: 100%;
   display: block;
   border-radius: 12px;
+  border: 1px solid #d7d1c5;
+  background: #fff;
 }
 
 .html-overlay {
   position: absolute;
   inset: 0;
-  width: 900px;
-  max-width: 100%;
   pointer-events: none;
 }
 
@@ -220,25 +361,48 @@ textarea {
   margin-bottom: 8px;
 }
 
+.overlay-html {
+  font-size: 0.9rem;
+}
+
+.doc-table,
 .overlay-html table,
 .html-preview-card table,
 .document-rich-editor table,
 .doc-review-document table {
-  width: 100%;
   border-collapse: collapse;
+  border: 1px solid #8e9aa2;
+  margin: 12px 0;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  word-break: break-word;
 }
 
-.overlay-html th,
-.overlay-html td,
-.html-preview-card th,
-.html-preview-card td,
-.document-rich-editor th,
-.document-rich-editor td,
-.doc-review-document th,
-.doc-review-document td {
-  border: 1px solid #cbd8df;
-  padding: 4px 6px;
+.doc-table th, .doc-table td,
+.overlay-html th, .overlay-html td,
+.html-preview-card th, .html-preview-card td,
+.document-rich-editor th, .document-rich-editor td,
+.doc-review-document th, .doc-review-document td {
+  border: 1px solid #8e9aa2;
+  padding: 6px 8px;
   vertical-align: top;
+}
+
+.doc-table th,
+.document-rich-editor th {
+  background: #f2efe8;
+  font-weight: 600;
+}
+
+.doc-block-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.doc-block-table table {
+  width: 100%;
+  min-width: 0;
 }
 
 .layout-grid {
@@ -346,6 +510,8 @@ textarea {
   border-radius: 14px;
   background: linear-gradient(180deg, #fffef9 0%, #f6f7f9 100%);
   padding: 24px;
+  /* Allow wide tables to scroll instead of breaking the grid layout. */
+  overflow-x: auto;
 }
 
 .document-rich-editor {
@@ -357,6 +523,25 @@ textarea {
   box-shadow: 0 18px 50px rgba(16, 43, 63, 0.08);
   outline: none;
   line-height: 1.75;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Inside the full-viewport review shell, let the editor fill the center column */
+.review-grid .editor-panel .document-rich-editor {
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: 0;
+  min-height: 100%;
+}
+
+/* When both side panels are collapsed, center the editor body for readability */
+.review-grid.left-collapsed.right-collapsed .editor-panel .document-rich-editor {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .document-rich-editor .doc-review-document {
@@ -365,19 +550,31 @@ textarea {
 
 .document-rich-editor .doc-page {
   position: relative;
-  margin-bottom: 28px;
-  padding-top: 24px;
+  margin: 0 auto 32px;
+  padding: 24px 36px 36px;
+  background: #fff;
+  border: 1px solid #d9d2bf;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  page-break-after: always;
+}
+
+.document-rich-editor .doc-page + .doc-page {
+  margin-top: 24px;
 }
 
 .document-rich-editor .doc-page-marker {
-  position: sticky;
-  top: 0;
-  margin-bottom: 18px;
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
+  position: static;
+  display: block;
+  margin: -24px -36px 18px;
+  padding: 6px 16px;
+  background: #f2efe8;
+  border-bottom: 1px solid #d9d2bf;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7a6e5a;
-  background: rgba(255, 253, 248, 0.92);
+  color: #6b6657;
 }
 
 .document-rich-editor .doc-block {
@@ -387,11 +584,25 @@ textarea {
   transition: background 0.18s ease, box-shadow 0.18s ease;
   font-size: 18px;
   font-weight: 400;
+  /* Prevent deeply-indented blocks from overflowing the canvas. */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .document-rich-editor .doc-block p.doc-paragraph {
   font-size: 18px;
   line-height: 1.6;
+  /* Thai text wraps naturally; enforce wrapping so indented paragraphs
+     don't extend past the canvas boundary. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Subtle marker for first-line indents inferred from a leading TAB —
+   reviewers can see the inference was automatic and override if wrong. */
+.document-rich-editor .doc-block p.has-inferred-indent {
+  border-left: 2px dotted #c8b89a;
 }
 
 .document-rich-editor .doc-block.type-paragraph {
@@ -512,7 +723,22 @@ textarea {
   margin-bottom: 4px;
 }
 
+.table-cell-wrapper {
+  position: relative;
+}
+
+.cell-span-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
 .doc-tab {
+  min-width: 0.5em;
+  max-width: 60pt;
+  display: inline-block;
   border-bottom: 1px dotted rgba(15, 107, 93, 0.24);
 }
 
@@ -524,6 +750,20 @@ textarea {
 .html-preview-card .doc-list-item {
   padding-left: 0.2rem;
 }
+
+/* Document-wide indent levels (set by layout_inferrer on the Python side).
+   18pt ≈ 0.25in ≈ one tab stop in legal documents. */
+.doc-indent-0 { margin-left: 0; }
+.doc-indent-1 { margin-left: 18pt; }
+.doc-indent-2 { margin-left: 36pt; }
+.doc-indent-3 { margin-left: 54pt; }
+.doc-indent-4 { margin-left: 72pt; }
+.doc-indent-5 { margin-left: 90pt; }
+.doc-indent-6 { margin-left: 108pt; }
+.doc-indent-7 { margin-left: 126pt; }
+.doc-indent-8 { margin-left: 144pt; }
+.doc-indent-9 { margin-left: 162pt; }
+.doc-indent-10 { margin-left: 180pt; }
 
 .document-rich-editor .doc-tab,
 .html-preview-card .doc-tab {

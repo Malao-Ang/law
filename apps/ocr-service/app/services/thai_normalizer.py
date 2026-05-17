@@ -72,6 +72,13 @@ _THAI_OCR_FIXES_RAW: dict[str, str] = {
     "ร้อู อน": "รู้ออน",   # เรียนรู้ออนไลน์ encoded as เรียนร้อู อนไลน์
     "ชวั่": "ชั่ว",
 
+    # ── ghost tone-mark (dropped tone from bad ToUnicode CMap) ──────────────
+    # After ghost-sentinel detection the space is suppressed but the mark itself
+    # is still missing; dictionary lookup provides the last-resort recovery.
+    "ชัวโมง": "ชั่วโมง",   # ชั่วโมง with mai ek dropped → recovered
+    "นาฬกา": "นาฬิกา",
+    "ปจจุบน": "ปัจจุบัน",
+
     # ── sara-aa split in safe compound words ─────────────────────────────────
     "ชั่ว โมง": "ชั่วโมง",
     "รูป แบบ": "รูปแบบ",
@@ -97,6 +104,7 @@ COMBINING_MARKS = "ิีึืุูั็่้๊๋์ํฺ๎"
 ZERO_WIDTH_CHARS = {
     "\u200b", "\u200c", "\u200d", "\u2060", "\ufeff",
 }
+ZERO_WIDTH_CLASS = "".join(ZERO_WIDTH_CHARS)
 
 # _AFTER_BASE_PATTERN: consonant + space(s) + combining mark → remove space
 _AFTER_BASE_PATTERN = re.compile(rf"([ก-ฮ])\s+([{COMBINING_MARKS}])")
@@ -112,6 +120,12 @@ _INTERNAL_DANGLING_PATTERN = re.compile(rf"(\s)[{COMBINING_MARKS}]+(?=\s)")
 
 def _remove_zero_width(text: str) -> str:
     return "".join(ch for ch in text if ch not in ZERO_WIDTH_CHARS)
+
+
+def _preserve_zero_width_boundaries(text: str) -> str:
+    # Thai legal labels often arrive as "ข้อ<ZW>๑". Preserve that word/number
+    # boundary before stripping the zero-width characters themselves.
+    return re.sub(rf"([ก-๙])(?:[{ZERO_WIDTH_CLASS}]+)([0-9๐-๙])", r"\1 \2", text)
 
 
 def _collapse_combining_whitespace(text: str) -> str:
@@ -167,11 +181,35 @@ def normalize_text(text: str) -> NormalizeResult:
     if stripped != working:
         flags.add("trim_whitespace")
     working = stripped
+    original_working = working
 
-    zero_width_cleaned = _remove_zero_width(working)
+    if "\ufffd" in working:
+        flags.add("replacement_char")
+        working = working.replace("\ufffd", "")
+
+    if "\u0e4d\u0e32" in original_working or "\u0e4d \u0e32" in original_working:
+        flags.add("sara_am_fix")
+    if re.search(r"[ \u00a0\u2000-\u200a\u202f\u205f\u3000]{2,}", original_working):
+        flags.add("duplicate_spaces")
+
+    zero_width_cleaned = _remove_zero_width(_preserve_zero_width_boundaries(working))
     if zero_width_cleaned != working:
         flags.add("zero_width_removed")
     working = zero_width_cleaned
+
+    # Run explicit OCR repair rules before PyThaiNLP normalization so broken
+    # combining-mark sequences like "บญญตั ิ" are corrected before the library
+    # can discard the dangling mark and make the error irreversible.
+    early_fixed = _apply_ocr_fixes(working)
+    if early_fixed != working:
+        flags.add("thai_pattern_fix")
+        if re.search(rf"[{COMBINING_MARKS}]\s|ํา", working):
+            flags.add("thai_vowel_fix")
+        if re.search(r"[ก-๙]\s+[ก-๙]", working):
+            flags.add("thai_split_word")
+        if "ํา" in working:
+            flags.add("sara_am_fix")
+    working = early_fixed
 
     if pythainlp_normalize is not None:
         try:
@@ -183,11 +221,6 @@ def normalize_text(text: str) -> NormalizeResult:
                 flags.add("pythainlp_normalized")
             working = normalized
 
-    early_fixed = _apply_ocr_fixes(working)
-    if early_fixed != working:
-        flags.add("thai_pattern_fix")
-    working = early_fixed
-
     collapsed = _collapse_combining_whitespace(working)
     if collapsed != working:
         flags.add("thai_combining_fix")
@@ -196,16 +229,23 @@ def normalize_text(text: str) -> NormalizeResult:
     normalized_vowels = normalize_thai_vowels(working)
     if normalized_vowels != working:
         flags.add("thai_vowel_fix")
+        if "\u0e4d\u0e32" in working or "\u0e4d \u0e32" in working:
+            flags.add("sara_am_fix")
     working = normalized_vowels
 
-    # Collapse runs of horizontal whitespace only (spaces, tabs) to a single space.
-    # Newlines are preserved so that multi-line text retains line structure.
-    working = re.sub(r"[^\S\n]+", " ", working)
+    # Collapse runs of plain spaces (incl. NBSP and unicode spaces) to a single space.
+    # Preserve \t and \n so tab structure and line breaks emitted by the extractor survive.
+    collapsed_spaces = re.sub(r"[ \u00a0\u2000-\u200a\u202f\u205f\u3000]+", " ", working)
+    working = collapsed_spaces
 
     # ── Late OCR fix (catches patterns revealed by the vowel fix) ─────────────
     late_fixed = _apply_ocr_fixes(working)
     if late_fixed != working:
         flags.add("thai_pattern_fix")
+        if re.search(r"[ก-๙]\s+[ก-๙]", working):
+            flags.add("thai_split_word")
+        if "\u0e4d\u0e32" in working or "\u0e4d \u0e32" in working:
+            flags.add("sara_am_fix")
     working = late_fixed
 
     if "ํา" in working:

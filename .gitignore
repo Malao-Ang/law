@@ -1,6 +1,15 @@
 .env
 .env.*
 !.env.example
+.claude/settings.local.json
+.claude/worktrees/
+.kiro/
+
+# Local sample inputs / generated assets
+/image*.png
+/test_upload.pdf
+/Person3701 (1).pdf
+/ระเบียบว่าด้วยอัตราค่าธรรมเนียม-V3 (2).docx
 
 # OS / editor
 .DS_Store

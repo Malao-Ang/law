@@ -35,7 +35,7 @@ def build_table_html(rows: list[list[dict]]) -> str:
             rendered_cells.append(f'<{cell_tag}{"".join(attrs)}>{text}</{cell_tag}>')
         html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
 
-    return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
+    return '<table class="doc-table" border="1" cellspacing="0" cellpadding="4"><tbody>' + "".join(html_rows) + "</tbody></table>"
 
 
 def build_layout_style(layout: dict) -> str:

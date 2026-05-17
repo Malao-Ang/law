@@ -1,0 +1,77 @@
+{
+  "description": "Golden fixture: HTML block generation with data-block-id",
+  "html_generation_tests": [
+    {
+      "block": {
+        "block_id": "p1-b003",
+        "type": "paragraph",
+        "approved_text": "ข้อความทดสอบ",
+        "meta": {
+          "layout": {
+            "layout_css": "margin-left:36pt; line-height:1.80"
+          }
+        }
+      },
+      "expected_html_contains": [
+        "data-block-id=\"p1-b003\"",
+        "doc-paragraph",
+        "margin-left:36pt"
+      ],
+      "expected_html_not_contains": [
+        "data-block-id=\"\"",
+        "layout_css"
+      ]
+    },
+    {
+      "block": {
+        "block_id": "p1-t001",
+        "type": "table",
+        "approved_text": "",
+        "meta": {
+          "table": {
+            "headers": ["A", "B"],
+            "rows": [["1", "2"]],
+            "cells": [
+              [{"text": "A", "colspan": 1, "rowspan": 1}],
+              [{"text": "1", "colspan": 1, "rowspan": 1}]
+            ],
+            "html": "<table><tbody><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></tbody></table>"
+          }
+        }
+      },
+      "expected_html_contains": [
+        "data-block-id=\"p1-t001\"",
+        "<table",
+        "<th>A</th>"
+      ]
+    },
+    {
+      "block": {
+        "block_id": "p1-i001",
+        "type": "image",
+        "approved_text": "",
+        "meta": {
+          "image_path": "images/p001-img0001.png",
+          "caption": null
+        }
+      },
+      "expected_html_contains": [
+        "data-block-id=\"p1-i001\"",
+        "doc-image",
+        "images/p001-img0001.png"
+      ]
+    }
+  ],
+  "document_html_tests": [
+    {
+      "description": "Full document HTML must wrap blocks with data attributes",
+      "expected_contains": [
+        "<article class=\"doc-review-document\">",
+        "<section class=\"doc-page\"",
+        "data-page-no=\"1\"",
+        "data-block-type=\"paragraph\"",
+        "data-reading-order="
+      ]
+    }
+  ]
+}

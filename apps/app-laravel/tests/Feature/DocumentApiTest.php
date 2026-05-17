@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\ExtractDocumentJob;
 use App\Services\ReviewStore;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -30,6 +31,27 @@ class DocumentApiTest extends TestCase
                 'document_id' => $documentId,
                 'status' => 'queued',
             ]);
+    }
+
+    public function test_upload_accepts_scan_extraction_mode_and_passes_it_to_job(): void
+    {
+        Queue::fake();
+
+        $response = $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
+            'scan_extraction_mode' => 'landingai',
+        ]);
+
+        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
+        $documentId = (string) $response->json('document_id');
+
+        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
+            return $job->scanExtractionMode === 'landingai';
+        });
+
+        $this->getJson('/api/documents/'.$documentId)
+            ->assertOk()
+            ->assertJsonPath('scan_extraction_mode_requested', 'landingai');
     }
 
     public function test_generated_html_preserves_docx_layout_and_tables(): void
@@ -261,5 +283,65 @@ class DocumentApiTest extends TestCase
         $status = $store->getStatus($documentId);
         $this->assertSame('ingested', $status['status']);
         $this->assertSame(1, $status['ingested_chunk_count']);
+    }
+
+    public function test_review_response_exposes_scan_page_image_metadata(): void
+    {
+        /** @var ReviewStore $store */
+        $store = app(ReviewStore::class);
+
+        $documentId = 'doc_test_scan_review';
+        $pageDir = storage_path('app/poc/pages/'.$documentId);
+        File::ensureDirectoryExists($pageDir);
+        file_put_contents($pageDir.'/page-1-z1_5.png', 'fake-image');
+
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'source_file' => 'scan.pdf',
+            'source_type' => 'pdf_scan',
+            'language' => 'th',
+            'summary' => [
+                'page_count' => 1,
+                'block_count' => 1,
+                'review_required_count' => 0,
+            ],
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => '/data/poc/pages/'.$documentId.'/page-1-z1_5.png',
+                'blocks' => [[
+                    'block_id' => '1-1',
+                    'type' => 'paragraph',
+                    'bbox' => [10, 10, 100, 40],
+                    'reading_order' => 1,
+                    'raw_text' => 'scan text',
+                    'normalized_text' => 'scan text',
+                    'ai_suggested_text' => 'scan text',
+                    'approved_text' => 'scan text',
+                    'confidence' => 0.95,
+                    'needs_review' => false,
+                    'flags' => [],
+                    'meta' => [
+                        'layout' => [
+                            'bbox' => [10, 10, 100, 40],
+                            'reading_order' => 1,
+                            'alignment' => null,
+                            'indent_left' => null,
+                            'indent_first_line' => null,
+                            'indent_hanging' => null,
+                            'tabs' => [],
+                        ],
+                    ],
+                ]],
+            ]],
+        ]);
+
+        $this->getJson('/api/documents/'.$documentId.'/review')
+            ->assertOk()
+            ->assertJsonPath('pages.0.source_kind', 'pdf_scan')
+            ->assertJsonPath('pages.0.image_url', '/api/documents/'.$documentId.'/pages/1/image');
+
+        $this->get('/api/documents/'.$documentId.'/pages/1/image')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
     }
 }

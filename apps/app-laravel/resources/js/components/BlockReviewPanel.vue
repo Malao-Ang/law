@@ -39,11 +39,24 @@
 
     <div v-if="block.meta.layout" class="layout-metadata">
       <p class="hint">Alignment: {{ block.meta.layout.alignment ?? 'left' }}</p>
+      <p class="hint">Indent level: {{ block.meta.layout.indent_level ?? 0 }}</p>
       <p class="hint">
         Indent L/F/H: {{ block.meta.layout.indent_left ?? 0 }} / {{ block.meta.layout.indent_first_line ?? 0 }} /
         {{ block.meta.layout.indent_hanging ?? 0 }}
       </p>
+      <p v-if="block.meta.layout.indent_source || block.meta.layout.indent_reason" class="hint">
+        Indent rule: {{ block.meta.layout.indent_source ?? 'unknown' }} / {{ block.meta.layout.indent_reason ?? 'none' }}
+      </p>
+      <p v-if="block.meta.layout.first_line_inferred" class="hint">
+        First-line indent inferred: {{ block.meta.layout.first_line_inferred }}
+      </p>
       <p class="hint">Tabs: {{ layoutTabsText }}</p>
+      <p v-if="block.meta.table_confidence != null" class="hint">
+        Table confidence: {{ Number(block.meta.table_confidence).toFixed(2) }}
+      </p>
+      <p v-if="block.meta.table_detection_reason" class="hint">
+        Table reason: {{ block.meta.table_detection_reason }}
+      </p>
     </div>
 
     <label>Reviewed HTML</label>
@@ -59,9 +72,19 @@
               :key="`cell-${rowIndex}-${cellIndex}`"
               :colspan="cell.colspan"
               :rowspan="cell.rowspan"
+              class="table-cell-wrapper"
             >
               <textarea v-model="tableCells[rowIndex][cellIndex].text" class="table-cell-input"></textarea>
-              <p class="hint">merge {{ cell.rowspan }}x{{ cell.colspan }}</p>
+              <div class="cell-span-controls">
+                <span class="hint">{{ cell.rowspan }}r × {{ cell.colspan }}c</span>
+                <button class="btn btn-tiny" title="Merge right (colspan +1)"
+                  @click="adjustSpan(rowIndex, cellIndex, 'colspan', +1)">→</button>
+                <button class="btn btn-tiny" title="Merge down (rowspan +1)"
+                  @click="adjustSpan(rowIndex, cellIndex, 'rowspan', +1)">↓</button>
+                <button class="btn btn-tiny" title="Split (reset to 1×1)"
+                  :disabled="cell.colspan === 1 && cell.rowspan === 1"
+                  @click="adjustSpan(rowIndex, cellIndex, 'reset', 0)">✕</button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -101,6 +124,7 @@ const blockTypes: BlockType[] = [
   'paragraph',
   'list_item',
   'table',
+  'image',
   'figure_caption',
   'footnote',
   'unknown',
@@ -311,6 +335,18 @@ function buildTableHtml(cells: ReviewedTableCell[][]): string {
     .join('');
 
   return `<table><tbody>${rows}</tbody></table>`;
+}
+
+function adjustSpan(rowIndex: number, cellIndex: number, axis: 'colspan' | 'rowspan' | 'reset', delta: number): void {
+  const cell = tableCells.value[rowIndex]?.[cellIndex];
+  if (!cell) return;
+  if (axis === 'reset') {
+    cell.colspan = 1;
+    cell.rowspan = 1;
+  } else {
+    const current = cell[axis] ?? 1;
+    cell[axis] = Math.max(1, current + delta);
+  }
 }
 
 function syncReviewedHtml(): void {

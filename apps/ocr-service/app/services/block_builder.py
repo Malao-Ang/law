@@ -3,9 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.services.ai_corrector import MockAICorrector
+from app.services.layout_inferrer import infer_indent_levels
+from app.services.numbering_tokenizer import annotate_blocks as annotate_list_markers
+from app.services.semantic_indent_resolver import resolve_semantic_indents
+from app.services.thai_spellchecker import get_spell_checker
 
 
-TAB_FALLBACK_PT = 48.0
+TAB_FALLBACK_PT = 18.0
 
 
 def build_document_output(
@@ -21,6 +25,20 @@ def build_document_output(
     output_pages: list[dict] = []
     block_count = 0
     review_required = 0
+
+    # Document-wide passes:
+    # 1. Infer indent levels by clustering left-edge x positions across all
+    #    pages so the same nesting depth maps to the same level everywhere.
+    # 2. Detect leading list markers (มาตรา / ข้อ / (ก) / ๑.๑ / bullets) so the
+    #    block model carries structured numbering even when DOCX `w:numPr` was
+    #    not used (legal docs often type markers as literal text).
+    infer_indent_levels(pages)
+    for page in pages:
+        annotate_list_markers(page.get("blocks", []) or [])
+    # 3. Apply semantic Thai legal indent conventions (มาตรา/ข้อ/paren hierarchy,
+    #    continuation text, divider→โดย rule).  Overwrites indent_level from the
+    #    geometry pass where marker rules are stronger.
+    resolve_semantic_indents(pages)
 
     for page in pages:
         transformed_blocks: list[dict] = []
@@ -42,6 +60,16 @@ def build_document_output(
 
             needs_review = confidence < review_threshold or len(flags) > 0
             ai_text = normalized["text"]
+
+            # Spell suggestions — advisory only, never auto-applied.
+            # Only computed for blocks that already need review to avoid slowing
+            # down high-confidence extractions.
+            spell_suggestions: list[dict] = []
+            if needs_review and raw_text and block_type not in {"table", "image"}:
+                try:
+                    spell_suggestions = get_spell_checker().check(normalized["text"])
+                except Exception:
+                    pass
 
             if enable_ai_correction and raw_text != "" and (needs_review or block_type in {"table", "section_header"}):
                 ai_result = ai_corrector.suggest(normalized["text"])
@@ -77,6 +105,7 @@ def build_document_output(
                         "reviewed_html": reviewed_html,
                         "layout": {**source_layout, "layout_css": layout_css},
                         "table": table,
+                        "spell_suggestions": spell_suggestions if spell_suggestions else source_meta.get("spell_suggestions", []),
                     },
                 }
             )
@@ -89,6 +118,8 @@ def build_document_output(
             {
                 "page_no": page_no,
                 "image_path": page.get("image_path"),
+                "image_url": page.get("image_url"),
+                "source_kind": page.get("source_kind") or _default_page_source_kind(source_type, page),
                 "blocks": transformed_blocks,
             }
         )
@@ -123,6 +154,22 @@ def normalize_layout(layout: object, bbox: object, reading_order: object) -> dic
             }
         )
 
+    indent_level_raw = source.get("indent_level")
+    indent_level: int | None
+    if indent_level_raw is None:
+        indent_level = None
+    else:
+        try:
+            indent_level = max(0, min(10, int(indent_level_raw)))
+        except (TypeError, ValueError):
+            indent_level = None
+
+    indent_unit_raw = source.get("indent_unit_pt")
+    try:
+        indent_unit_pt = float(indent_unit_raw) if indent_unit_raw is not None else None
+    except (TypeError, ValueError):
+        indent_unit_pt = None
+
     return {
         "bbox": bbox if isinstance(bbox, list) or bbox is None else source.get("bbox"),
         "reading_order": int(source.get("reading_order") or reading_order or 0),
@@ -130,10 +177,13 @@ def normalize_layout(layout: object, bbox: object, reading_order: object) -> dic
         "indent_left": to_int_or_none(source.get("indent_left")),
         "indent_first_line": to_int_or_none(source.get("indent_first_line")),
         "indent_hanging": to_int_or_none(source.get("indent_hanging")),
+        "indent_level": indent_level,
+        "indent_unit_pt": indent_unit_pt,
         "tabs": tabs,
         "spacing_before": to_int_or_none(source.get("spacing_before")),
         "spacing_after": to_int_or_none(source.get("spacing_after")),
         "line_spacing": to_int_or_none(source.get("line_spacing")),
+        "layout_css": str(source.get("layout_css") or "") if source.get("layout_css") else "",
     }
 
 
@@ -168,7 +218,13 @@ def build_reviewed_html(block_type: str, text: str, layout: dict, block_id: str,
     elif block_type == "footnote":
         classes.append("doc-footnote")
 
+    indent_level = layout.get("indent_level") if isinstance(layout, dict) else None
+    if isinstance(indent_level, int) and indent_level >= 0:
+        classes.append(f"doc-indent-{indent_level}")
+
     style = build_layout_style(layout)
+    if not style and isinstance(layout, dict):
+        style = str(layout.get("layout_css") or "")
     text_html = render_text_with_layout(text, layout)
     class_attr = f' class="{" ".join(classes)}"' if classes else ""
     style_attr = f' style="{style}"' if style else ""
@@ -294,7 +350,7 @@ def build_table_html(rows: list[list[dict]]) -> str:
             rendered_cells.append(f'<{cell_tag}{"".join(attrs)}>{text}</{cell_tag}>')
         html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
 
-    return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
+    return '<table class="doc-table" border="1" cellspacing="0" cellpadding="4"><tbody>' + "".join(html_rows) + "</tbody></table>"
 
 
 def render_text_with_layout(text: str, layout: dict) -> str:
@@ -328,6 +384,7 @@ def build_layout_style(layout: dict) -> str:
     indent_left = to_int_or_none(layout.get("indent_left"))
     indent_first_line = to_int_or_none(layout.get("indent_first_line"))
     indent_hanging = to_int_or_none(layout.get("indent_hanging"))
+    indent_level = layout.get("indent_level")
     spacing_before = to_int_or_none(layout.get("spacing_before"))
     spacing_after = to_int_or_none(layout.get("spacing_after"))
     line_spacing = to_int_or_none(layout.get("line_spacing"))
@@ -357,13 +414,31 @@ def build_layout_style(layout: dict) -> str:
         line_height = 1.8
     styles.append(f"line-height:{line_height:.2f}")
 
-    return "; ".join(styles)
+    generated_style = "; ".join(styles)
+    existing_style = str(layout.get("layout_css") or "").strip() if isinstance(layout, dict) else ""
+    if not existing_style:
+        return generated_style
+    if not generated_style:
+        return existing_style
+    if generated_style == existing_style:
+        return generated_style
+    return f"{existing_style}; {generated_style}"
 
 
 def to_int_or_none(value: object) -> int | None:
     if value is None or value == "":
         return None
     return int(value)
+
+
+def _default_page_source_kind(source_type: str, page: dict) -> str:
+    if page.get("image_path"):
+        return "pdf_scan"
+    if source_type == "pdf_scan":
+        return "pdf_scan"
+    if source_type == "docx":
+        return "docx"
+    return "pdf_text"
 
 
 def escape_html(value: str) -> str:

@@ -1,6 +1,7 @@
 ﻿import type {
   DocumentStatus,
   ExportResponse,
+  LayoutPatch,
   ReprocessResponse,
   ReviewDocument,
   ReviewedTable,
@@ -31,9 +32,10 @@ async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T
   return (await response.json()) as T;
 }
 
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export async function uploadDocument(file: File, scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto'): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
+  form.append('scan_extraction_mode', scanExtractionMode);
 
   const response = await fetch('/api/documents', {
     method: 'POST',
@@ -103,6 +105,17 @@ export function reprocessBlock(
 ): Promise<ReprocessResponse> {
   return jsonRequest<ReprocessResponse>(`/api/documents/${documentId}/blocks/${blockId}/reprocess`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchBlockLayout(
+  documentId: string,
+  blockId: string,
+  payload: LayoutPatch,
+): Promise<{ status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}/layout`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }

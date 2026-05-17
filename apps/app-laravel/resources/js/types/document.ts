@@ -4,15 +4,46 @@ export type BlockType =
   | 'paragraph'
   | 'list_item'
   | 'table'
+  | 'image'
   | 'figure_caption'
   | 'footnote'
   | 'unknown';
+
+export type ListMarkerType =
+  | 'thai-numeral'
+  | 'arabic'
+  | 'legal-มาตรา'
+  | 'legal-ข้อ'
+  | 'legal-วรรค'
+  | 'paren'
+  | 'bullet';
+
+export interface ListMarker {
+  text: string;
+  type: ListMarkerType;
+  level: number;
+  raw_match: string;
+}
+
+export interface BlockImage {
+  src_path: string;
+  src_url?: string | null;
+  data_uri?: string | null;
+  width?: number | null;
+  height?: number | null;
+  caption?: string | null;
+}
 
 export interface ReviewedTableCell {
   text: string;
   colspan: number;
   rowspan: number;
   alignment?: 'left' | 'center' | 'right' | 'justify' | string | null;
+}
+
+export interface TabStop {
+  position: number;
+  type: 'left' | 'center' | 'right' | 'decimal';
 }
 
 export interface ReviewedTable {
@@ -29,17 +60,34 @@ export interface BlockLayout {
   indent_left?: number | null;
   indent_first_line?: number | null;
   indent_hanging?: number | null;
-  tabs?: Array<{
-    align: string;
-    position: number;
-  }>;
+  indent_level?: number | null;
+  indent_unit_pt?: number | null;
+  indent_source?: string | null;
+  indent_reason?: string | null;
+  first_line_inferred?: string | null;
+  tabs?: TabStop[];
+}
+
+export interface LayoutPatch {
+  page_no: number;
+  indent_level?: number | null;
+  list_marker_level?: number | null;
+  alignment?: 'left' | 'center' | 'right' | 'justify' | null;
+  indent_left?: number | null;
+  indent_first_line?: number | null;
+  indent_hanging?: number | null;
+  tabs?: TabStop[] | null;
 }
 
 export interface BlockMeta {
   section_path?: string | null;
   table_html?: string | null;
   reviewed_html?: string | null;
+  table_confidence?: number | null;
+  table_detection_reason?: string | null;
   layout?: BlockLayout;
+  list_marker?: ListMarker | null;
+  image?: BlockImage | null;
   table?: ReviewedTable | null;
   review?: {
     approved_by?: string | null;
@@ -67,6 +115,8 @@ export interface DocumentBlock {
 export interface DocumentPage {
   page_no: number;
   image_path: string | null;
+  image_url?: string | null;
+  source_kind?: 'docx' | 'pdf_text' | 'pdf_scan';
   blocks: DocumentBlock[];
 }
 
@@ -89,11 +139,17 @@ export interface DocumentReviewState {
 export interface ReviewDocument {
   document_id: string;
   source_file: string;
-  source_type: 'docx' | 'pdf_text' | 'pdf_scan';
+  source_type: 'docx' | 'pdf_text' | 'pdf_scan' | 'pdf_mixed';
   language: 'th';
   summary: DocumentSummary;
   pages: DocumentPage[];
   document_review: DocumentReviewState;
+  timings?: Record<string, number> | null;
+  extraction?: {
+    scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
+    scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
+    path?: string[];
+  } | null;
 }
 
 export interface DocumentStatus {
@@ -106,6 +162,10 @@ export interface DocumentStatus {
   export_path?: string;
   ingest_path?: string;
   ingested_chunk_count?: number;
+  scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
+  scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
+  extraction_path?: string[] | null;
+  timings?: Record<string, number> | null;
   error?: string;
 }
 

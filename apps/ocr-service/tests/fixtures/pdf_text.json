@@ -1,0 +1,48 @@
+{
+  "description": "Golden fixture: Thai text PDF with tables and index pages",
+  "document_id": "fixture_pdf_text",
+  "source_file": "test_text.pdf",
+  "source_type": "pdf_text",
+  "language": "th",
+  "expected_page_count": 2,
+  "expected_block_types": ["title", "section_header", "paragraph", "table", "list_item"],
+  "validation_rules": {
+    "thai_text": {
+      "check_combining_marks": true,
+      "check_replacement_chars": true,
+      "check_sara_am": true,
+      "min_thai_ratio": 0.7
+    },
+    "tables": {
+      "check_bbox_overlap": true,
+      "check_cell_text": true,
+      "expected_table_count": 1
+    },
+    "reading_order": {
+      "check_sequential": true,
+      "no_duplicate_orders": true
+    }
+  },
+  "sample_blocks": [
+    {
+      "block_id": "1-1",
+      "type": "title",
+      "raw_text": "พระราชบัญญัติ...",
+      "confidence": 0.98,
+      "expected_flags": []
+    },
+    {
+      "block_id": "2-5",
+      "type": "table",
+      "meta": {
+        "table": {
+          "headers": ["มาตรา", "บทบัญญัติ"],
+          "cells": [
+            [{"text": "มาตรา", "colspan": 1, "rowspan": 1}],
+            [{"text": "๑", "colspan": 1, "rowspan": 1}]
+          ]
+        }
+      }
+    }
+  ]
+}

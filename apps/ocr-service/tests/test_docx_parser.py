@@ -84,9 +84,45 @@ DOCX_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 
 
-def write_docx(path: Path, document_xml: str) -> None:
+def write_docx(path: Path, document_xml: str, numbering_xml: str | None = None) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("word/document.xml", document_xml)
+        if numbering_xml is not None:
+            archive.writestr("word/numbering.xml", numbering_xml)
+
+
+NUMBERING_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="0">
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1" />
+      <w:numFmt w:val="thaiNumbers" />
+      <w:lvlText w:val="(%1)" />
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1">
+    <w:abstractNumId w:val="0" />
+  </w:num>
+</w:numbering>
+"""
+
+
+NUMBERED_DOCX_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:numPr>
+          <w:ilvl w:val="0" />
+          <w:numId w:val="1" />
+        </w:numPr>
+      </w:pPr>
+      <w:r><w:t>รายการตัวอย่าง</w:t></w:r>
+    </w:p>
+    <w:sectPr />
+  </w:body>
+</w:document>
+"""
 
 
 def test_docx_parser_preserves_tables_and_layout(tmp_path: Path) -> None:
@@ -129,3 +165,16 @@ def test_docx_parser_preserves_tables_and_layout(tmp_path: Path) -> None:
     full_width_table = table_blocks[2]["meta"]["table"]
     assert full_width_table["cells"][0][0]["colspan"] == 3
     assert 'colspan="3"' in full_width_table["html"]
+
+
+def test_docling_service_docx_numbered_items_use_single_space_separator(tmp_path: Path) -> None:
+    file_path = tmp_path / "numbered.docx"
+    write_docx(file_path, NUMBERED_DOCX_XML, numbering_xml=NUMBERING_XML)
+
+    pages = DoclingService().extract(file_path, "docx")
+
+    assert len(pages) == 1
+    block = pages[0]["blocks"][0]
+    assert block["type"] == "list_item"
+    assert block["raw_text"] == "(๑) รายการตัวอย่าง"
+    assert "\t" not in block["raw_text"]

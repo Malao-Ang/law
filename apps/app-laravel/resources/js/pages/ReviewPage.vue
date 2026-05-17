@@ -1,82 +1,161 @@
 ﻿<template>
-  <section>
-    <div class="panel review-header">
-      <div>
+  <section class="review-shell">
+    <header class="review-topbar">
+      <button
+        class="pane-toggle"
+        :title="leftCollapsed ? 'Show blocks' : 'Hide blocks'"
+        @click="leftCollapsed = !leftCollapsed"
+      >{{ leftCollapsed ? '▶' : '◀' }}</button>
+
+      <div class="review-title">
         <h2>Review Document</h2>
         <p v-if="review" class="hint">
           {{ review.source_file }} · {{ review.source_type }} · {{ review.summary.block_count }} blocks
-        </p>
-        <p v-if="documentStatus" class="hint">
-          Pipeline: {{ documentStatus.status }} · {{ documentStatus.current_step }}
-          <span v-if="documentStatus.ingested_chunk_count">· {{ documentStatus.ingested_chunk_count }} chunks</span>
+          <span v-if="documentStatus"> · Pipeline: {{ documentStatus.status }}</span>
         </p>
         <p v-else class="hint">Loading review data...</p>
       </div>
-      <div class="review-actions">
+
+      <div class="review-topbar-actions">
         <p v-if="exportMessage" class="hint">{{ exportMessage }}</p>
       </div>
-    </div>
 
-    <div class="grid review-grid" v-if="review">
-      <section class="panel list-panel">
-        <h3>Blocks</h3>
-        <p class="hint">เลือก block เพื่อดูข้อความ OCR เดิมและปรับแก้แบบละเอียด</p>
-        <ul class="block-list">
-          <li
-            v-for="item in flatBlocks"
-            :key="`${item.page_no}-${item.block.block_id}`"
-            :class="{ active: selected?.block.block_id === item.block.block_id }"
-            @click="selected = item"
-          >
-            <div>
-              <strong>P{{ item.page_no }}</strong> · {{ item.block.block_id }}
-            </div>
-            <div class="hint">{{ item.block.type }} · {{ item.block.needs_review ? 'needs review' : 'ok' }}</div>
-          </li>
-        </ul>
+      <button
+        class="pane-toggle"
+        :title="rightCollapsed ? 'Show metadata' : 'Hide metadata'"
+        @click="rightCollapsed = !rightCollapsed"
+      >{{ rightCollapsed ? '◀' : '▶' }}</button>
+    </header>
+
+    <div
+      v-if="review"
+      class="review-grid"
+      :class="{ 'left-collapsed': leftCollapsed, 'right-collapsed': rightCollapsed }"
+    >
+      <section class="list-panel">
+        <div class="pane-inner">
+          <h3>Blocks</h3>
+          <p class="hint">คลิก block เพื่อแก้ไข · ใช้ปุ่ม +/− ปรับระดับ indent</p>
+          <DocumentBlockEditor
+            :document-id="documentId"
+            :pages="review.pages"
+            :selected-block-id="selected?.block.block_id ?? null"
+            @select-block="(pageNo, block) => { selected = { page_no: pageNo, block } }"
+            @layout-updated="() => reloadReview({ preserveLocalHtml: documentHtmlDirty })"
+            @block-saved="() => reloadReview({ preserveLocalHtml: documentHtmlDirty })"
+          />
+        </div>
       </section>
 
-      <section class="panel editor-panel">
-        <DocumentHtmlEditor
-          v-model="documentHtml"
-          :selected-block-id="selected?.block.block_id ?? null"
-          :html-mode="review.document_review.html_mode"
-          :out-of-sync="review.document_review.out_of_sync"
-          @update:modelValue="onEditorInput"
-          @select-block="selectBlockById"
-        />
+      <section class="editor-panel">
+        <div class="pane-inner">
+          <section class="panel review-center-panel">
+            <div class="review-center-toolbar">
+              <div class="review-mode-toggle">
+                <button
+                  class="btn btn-tiny"
+                  :class="{ 'btn-primary': centerMode === 'viewer' }"
+                  @click="centerMode = 'viewer'"
+                >Page Review</button>
+                <button
+                  class="btn btn-tiny"
+                  :class="{ 'btn-primary': centerMode === 'document' }"
+                  @click="centerMode = 'document'"
+                >Document HTML</button>
+              </div>
+
+              <div v-if="centerMode === 'viewer'" class="review-mode-toggle">
+                <button
+                  class="btn btn-tiny"
+                  :class="{ 'btn-primary': pageViewerMode === 'original' }"
+                  :disabled="!selectedPage?.image_url"
+                  @click="pageViewerMode = 'original'"
+                >Original</button>
+                <button
+                  class="btn btn-tiny"
+                  :class="{ 'btn-primary': pageViewerMode === 'overlay' }"
+                  :disabled="!selectedPage?.image_url"
+                  @click="pageViewerMode = 'overlay'"
+                >OCR Overlay</button>
+                <button
+                  class="btn btn-tiny"
+                  :class="{ 'btn-primary': pageViewerMode === 'html' }"
+                  @click="pageViewerMode = 'html'"
+                >Extracted HTML</button>
+              </div>
+            </div>
+
+            <DocumentViewer
+              v-if="centerMode === 'viewer'"
+              :page="selectedPage"
+              :block="selected?.block ?? null"
+              :mode="pageViewerMode"
+              @select-block="selectBlockById"
+            />
+
+            <DocumentHtmlEditor
+              v-else
+              v-model="documentHtml"
+              :selected-block-id="selected?.block.block_id ?? null"
+              :html-mode="review.document_review.html_mode"
+              :out-of-sync="review.document_review.out_of_sync"
+              @update:modelValue="onEditorInput"
+              @select-block="selectBlockById"
+            />
+          </section>
+        </div>
       </section>
 
       <div class="review-side-column">
-        <section class="panel document-review-meta">
-          <h3>Document Draft</h3>
-          <p class="hint">Current mode: {{ review.document_review.html_mode }}</p>
-          <p class="hint">Unsaved changes: {{ documentHtmlDirty ? 'yes' : 'no' }}</p>
-          <p class="hint">Out of sync with block edits: {{ review.document_review.out_of_sync ? 'yes' : 'no' }}</p>
-          <p v-if="documentStatus?.ingest_path" class="hint">RAG artifact: {{ documentStatus.ingest_path }}</p>
-        </section>
+        <div class="pane-inner">
+          <section class="panel document-review-meta">
+            <h3>Document Draft</h3>
+            <p class="hint">Current mode: {{ review.document_review.html_mode }}</p>
+            <p class="hint">Unsaved changes: {{ documentHtmlDirty ? 'yes' : 'no' }}</p>
+            <p class="hint">Out of sync with block edits: {{ review.document_review.out_of_sync ? 'yes' : 'no' }}</p>
+            <p v-if="review.extraction?.scan_extraction_mode_requested" class="hint">
+              Scan mode requested: {{ review.extraction.scan_extraction_mode_requested }}
+            </p>
+            <p v-if="review.extraction?.scan_extraction_mode_effective" class="hint">
+              Scan mode effective: {{ review.extraction.scan_extraction_mode_effective }}
+            </p>
+            <p v-if="review.extraction?.path?.length" class="hint">
+              Extraction path: {{ review.extraction.path.join(' -> ') }}
+            </p>
+            <p v-if="review.timings" class="hint">
+              Timings: {{ formatTimings(review.timings) }}
+            </p>
+            <p v-if="documentStatus?.ingest_path" class="hint">RAG artifact: {{ documentStatus.ingest_path }}</p>
+          </section>
 
-        <BlockReviewPanel
-          :document-id="documentId"
-          :page-no="selected?.page_no ?? 1"
-          :block="selected?.block ?? null"
-          @saved="handleBlockSaved"
-          @reprocessed="handleBlockReprocessed"
-        />
+          <BlockReviewPanel
+            :document-id="documentId"
+            :page-no="selected?.page_no ?? 1"
+            :block="selected?.block ?? null"
+            @saved="handleBlockSaved"
+            @reprocessed="handleBlockReprocessed"
+          />
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { exportDocument, fetchReview, fetchStatus, saveDocumentReview } from '../api/client';
 import type { DocumentBlock, DocumentStatus, ReviewDocument } from '../types/document';
 import BlockReviewPanel from '../components/BlockReviewPanel.vue';
+import DocumentBlockEditor from '../components/DocumentBlockEditor.vue';
 import DocumentHtmlEditor from '../components/DocumentHtmlEditor.vue';
-import HeaderComponent from '../components/HeaderComponent.vue';
+import DocumentViewer from '../components/DocumentViewer.vue';
 
 const props = defineProps<{ documentId: string }>();
+
+const leftCollapsed = ref(localStorage.getItem('review.leftCollapsed') === '1');
+const rightCollapsed = ref(localStorage.getItem('review.rightCollapsed') === '1');
+watch(leftCollapsed, (v) => localStorage.setItem('review.leftCollapsed', v ? '1' : '0'));
+watch(rightCollapsed, (v) => localStorage.setItem('review.rightCollapsed', v ? '1' : '0'));
 
 const review = ref<ReviewDocument | null>(null);
 const documentStatus = ref<DocumentStatus | null>(null);
@@ -85,6 +164,8 @@ const selected = ref<{ page_no: number; block: DocumentBlock } | null>(null);
 const documentHtml = ref('');
 const documentHtmlDirty = ref(false);
 const busy = ref(false);
+const centerMode = ref<'viewer' | 'document'>('document');
+const pageViewerMode = ref<'original' | 'overlay' | 'html'>('html');
 let statusPollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const flatBlocks = computed(() => {
@@ -93,6 +174,15 @@ const flatBlocks = computed(() => {
 });
 
 const serverDraftHtml = computed(() => review.value?.document_review.draft_html ?? '');
+const selectedPage = computed(() => {
+  if (!review.value || !selected.value) {
+    return null;
+  }
+  return review.value.pages.find((page) => page.page_no === selected.value?.page_no) ?? null;
+});
+watch(selectedPage, () => {
+  syncCenterMode();
+});
 
 async function reloadReview(options: { preserveLocalHtml?: boolean } = {}): Promise<void> {
   const preserveLocalHtml = options.preserveLocalHtml ?? false;
@@ -111,6 +201,7 @@ async function reloadReview(options: { preserveLocalHtml?: boolean } = {}): Prom
 
   if (!currentSelectedBlockId && flatBlocks.value.length > 0) {
     selected.value = flatBlocks.value[0];
+    syncCenterMode();
     return;
   }
 
@@ -118,6 +209,8 @@ async function reloadReview(options: { preserveLocalHtml?: boolean } = {}): Prom
     const match = flatBlocks.value.find((item) => item.block.block_id === currentSelectedBlockId);
     selected.value = match ?? flatBlocks.value[0] ?? null;
   }
+
+  syncCenterMode();
 }
 
 async function refreshStatus(): Promise<void> {
@@ -143,6 +236,12 @@ function normalizeHtml(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function formatTimings(timings: Record<string, number>): string {
+  return Object.entries(timings)
+    .map(([stage, ms]) => `${stage}=${ms}ms`)
+    .join(', ');
+}
+
 function onEditorInput(value: string): void {
   documentHtml.value = value;
   documentHtmlDirty.value = normalizeHtml(value) !== normalizeHtml(serverDraftHtml.value);
@@ -152,7 +251,15 @@ function selectBlockById(blockId: string): void {
   const match = flatBlocks.value.find((item) => item.block.block_id === blockId);
   if (match) {
     selected.value = match;
+    syncCenterMode();
   }
+}
+
+function syncCenterMode(): void {
+  const page = selectedPage.value;
+  const isScanPage = page?.source_kind === 'pdf_scan';
+  centerMode.value = isScanPage ? 'viewer' : 'document';
+  pageViewerMode.value = isScanPage ? 'original' : 'html';
 }
 
 async function persistDocumentReview(resetToGenerated = false): Promise<void> {

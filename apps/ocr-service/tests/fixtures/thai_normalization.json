@@ -1,0 +1,50 @@
+{
+  "description": "Golden fixture: Thai text normalization rules",
+  "normalization_tests": [
+    {
+      "input": "พระราชบญญตั ิ",
+      "expected": "พระราชบัญญัติ",
+      "expected_flags": ["thai_vowel_fix"],
+      "description": "Fix separated combining marks"
+    },
+    {
+      "input": "ํา",
+      "expected": "ำ",
+      "expected_flags": ["sara_am_fix"],
+      "description": "Normalize sara-am"
+    },
+    {
+      "input": "ม าตรา",
+      "expected": "มาตรา",
+      "expected_flags": ["thai_split_word"],
+      "description": "Fix split legal keyword"
+    },
+    {
+      "input": "\u200b\u200bข้อ\u200b\u200b๑",
+      "expected": "ข้อ ๑",
+      "expected_flags": ["zero_width_removed"],
+      "description": "Remove zero-width spaces"
+    },
+    {
+      "input": "เลข  ๑   ๒",
+      "expected": "เลข ๑ ๒",
+      "expected_flags": ["duplicate_spaces"],
+      "description": "Collapse duplicate spaces"
+    },
+    {
+      "input": "\ufffd\ufffd",
+      "expected": "",
+      "expected_flags": ["replacement_char"],
+      "description": "Detect replacement characters"
+    }
+  ],
+  "list_prefix_tests": [
+    {"input": "1. ข้อความ", "valid": true, "type": "decimal"},
+    {"input": "1.1 ข้อความ", "valid": true, "type": "decimal_multi"},
+    {"input": "(1) ข้อความ", "valid": true, "type": "parentheses"},
+    {"input": "(ก) ข้อความ", "valid": true, "type": "thai_letter"},
+    {"input": "๑. ข้อความ", "valid": true, "type": "thai_digit"},
+    {"input": "ข้อ ๑ ข้อความ", "valid": true, "type": "thai_clause"},
+    {"input": "a. ข้อความ", "valid": false, "type": "invalid"}
+  ]
+}

@@ -97,7 +97,7 @@ class DoclingTableExtractor:
                 pipeline_options.do_ocr = False  # Disable OCR
                 pipeline_options.do_table_structure = True  # Enable TableFormer
                 pipeline_options.table_structure_options = TableStructureOptions(
-                    do_cell_matching=False  # Disable cell matching for now
+                    do_cell_matching=True
                 )
                 
                 self._converter = DocumentConverter(
@@ -112,99 +112,153 @@ class DoclingTableExtractor:
         return DOCLING_AVAILABLE and self._converter is not None
         
     def extract_tables(self, file_path: Path) -> List[TableResult]:
-        """Extract table structures from all pages."""
+        """Extract table structures from all pages.
+
+        Uses docling TableFormer when available (with ``do_cell_matching=True``
+        so cells carry both structure *and* text).  Falls back to PyMuPDF
+        ``find_tables()`` on any failure.
+        """
         if not self.is_available():
             if self.fallback_to_fitz:
                 return self._extract_tables_fitz_fallback(file_path)
-            else:
-                raise RuntimeError("docling not available and fallback disabled")
-                
+            raise RuntimeError("docling not available and fallback disabled")
+
         try:
             result = self._converter.convert(str(file_path))
-            tables = []
-            
-            # Process each page for tables
-            for page_no, page in enumerate(result.pages, start=1):
-                page_tables = self._extract_tables_from_page(page, page_no)
-                tables.extend(page_tables)
-                
-            return tables
-            
+            tables: List[TableResult] = []
+
+            # Read page heights from PyMuPDF so we can flip docling's
+            # PDF-origin (y=0 at bottom) bboxes to screen-origin (y=0 at top).
+            page_heights: Dict[int, float] = {}
+            try:
+                doc = fitz.open(str(file_path))
+                for i, pg in enumerate(doc, start=1):
+                    page_heights[i] = float(pg.rect.height)
+                doc.close()
+            except Exception:
+                pass
+
+            # Docling exposes tables via document.iterate_items().
+            # Each TableItem has .prov (provenance: page + bbox) and
+            # .data.table_cells (structured cell list with span info).
+            try:
+                from docling.datamodel.document import TableItem  # type: ignore
+                item_iter = result.document.iterate_items(item_types=[TableItem])
+            except Exception:
+                # Older docling: try document.tables attribute directly
+                item_iter = ((t, 0) for t in (getattr(result.document, "tables", None) or []))
+
+            for item, _level in item_iter:
+                table_result = self._convert_docling_table_item(item, page_heights)
+                if table_result:
+                    tables.append(table_result)
+
+            if tables:
+                return tables
+
+            # If docling found no tables, fall through to fitz
+            warnings.warn("docling found 0 tables; using fitz fallback.")
+            return self._extract_tables_fitz_fallback(file_path)
+
         except Exception as e:
             warnings.warn(f"docling table extraction failed: {e}. Using fallback.")
             if self.fallback_to_fitz:
                 return self._extract_tables_fitz_fallback(file_path)
-            else:
-                raise
-                
-    def _extract_tables_from_page(self, page, page_no: int) -> List[TableResult]:
-        """Extract tables from a single docling page."""
-        tables = []
-        
-        # Check if page has table elements
-        if hasattr(page, 'tables') and page.tables:
-            for table_idx, table in enumerate(page.tables):
-                # Convert docling table to our format
-                table_result = self._convert_docling_table(table, page_no)
-                if table_result:
-                    tables.append(table_result)
-                    
-        return tables
-        
-    def _convert_docling_table(self, docling_table, page_no: int) -> Optional[TableResult]:
-        """Convert docling table to TableResult format."""
+            raise
+
+    def _convert_docling_table_item(self, item, page_heights: Dict[int, float] | None = None) -> Optional[TableResult]:
+        """Convert a docling TableItem to our TableResult format."""
         try:
-            # Extract table bbox
-            if hasattr(docling_table, 'bbox'):
-                bbox = tuple(docling_table.bbox)
+            # Provenance: page number and bounding box.
+            prov_list = getattr(item, "prov", None) or []
+            prov = prov_list[0] if prov_list else None
+            page_no: int = int(getattr(prov, "page_no", 1)) if prov else 1
+
+            raw_bbox = getattr(prov, "bbox", None) if prov else None
+            if raw_bbox is not None:
+                # Docling uses PDF coordinate origin (y=0 at bottom of page,
+                # increasing upward).  PyMuPDF uses screen origin (y=0 at top,
+                # increasing downward).  We must flip the y-axis so that
+                # _rects_overlap() comparisons against PyMuPDF block bboxes work.
+                #
+                # Docling BoundingBox field names vary by version:
+                #   newer: l/t/r/b  (left/top/right/bottom in PDF coords)
+                #   older: x0/y0/x1/y1
+                page_h = (page_heights or {}).get(page_no, 792.0)
+                dl_l = float(getattr(raw_bbox, "l", getattr(raw_bbox, "x0", 0)))
+                dl_t = float(getattr(raw_bbox, "t", getattr(raw_bbox, "y0", 0)))
+                dl_r = float(getattr(raw_bbox, "r", getattr(raw_bbox, "x1", 0)))
+                dl_b = float(getattr(raw_bbox, "b", getattr(raw_bbox, "y1", 0)))
+                # In PDF coords "t" > "b" when the origin is at the bottom.
+                # Convert to screen coords: screen_y = page_h - pdf_y.
+                screen_y0 = page_h - max(dl_t, dl_b)
+                screen_y1 = page_h - min(dl_t, dl_b)
+                bbox = (min(dl_l, dl_r), screen_y0, max(dl_l, dl_r), screen_y1)
             else:
-                # Fallback: calculate bbox from cells
-                bbox = self._calculate_table_bbox(docling_table)
-                
-            # Extract rows and cells
-            rows = []
-            if hasattr(docling_table, 'cells'):
-                for row_idx, row_cells in enumerate(docling_table.cells):
-                    row_rects = []
-                    for col_idx, cell in enumerate(row_cells):
-                        cell_rect = self._convert_docling_cell(cell, row_idx, col_idx)
-                        if cell_rect:
-                            row_rects.append(cell_rect)
-                    if row_rects:
-                        rows.append(row_rects)
-                        
+                bbox = (0.0, 0.0, 100.0, 50.0)
+
+            # table_cells: flat list of TableCell with structural info.
+            table_data = getattr(item, "data", None)
+            flat_cells = list(getattr(table_data, "table_cells", None) or [])
+            if not flat_cells:
+                return None
+
+            # Determine grid size.
+            num_rows = max(
+                (getattr(c, "end_row_offset_idx", getattr(c, "start_row_offset_idx", 0) + 1) or 1)
+                for c in flat_cells
+            )
+            num_cols = max(
+                (getattr(c, "end_col_offset_idx", getattr(c, "start_col_offset_idx", 0) + 1) or 1)
+                for c in flat_cells
+            )
+
+            # Build a 2-D grid of CellRect (one entry per unique top-left position).
+            grid: Dict[Tuple[int, int], CellRect] = {}
+            for cell in flat_cells:
+                r0 = int(getattr(cell, "start_row_offset_idx", 0))
+                c0 = int(getattr(cell, "start_col_offset_idx", 0))
+                r1 = int(getattr(cell, "end_row_offset_idx", r0 + 1))
+                c1 = int(getattr(cell, "end_col_offset_idx", c0 + 1))
+                rowspan = max(1, r1 - r0)
+                colspan = max(1, c1 - c0)
+
+                text = str(getattr(cell, "text", "") or "").strip()
+
+                cell_bbox_obj = getattr(cell, "bbox", None)
+                if cell_bbox_obj is not None:
+                    cell_bbox: Tuple[float, float, float, float] = (
+                        float(getattr(cell_bbox_obj, "l", getattr(cell_bbox_obj, "x0", 0))),
+                        float(getattr(cell_bbox_obj, "t", getattr(cell_bbox_obj, "y0", 0))),
+                        float(getattr(cell_bbox_obj, "r", getattr(cell_bbox_obj, "x1", 0))),
+                        float(getattr(cell_bbox_obj, "b", getattr(cell_bbox_obj, "y1", 0))),
+                    )
+                else:
+                    cell_bbox = (0.0, 0.0, 50.0, 10.0)
+
+                if (r0, c0) not in grid:
+                    grid[(r0, c0)] = CellRect(
+                        text=text, bbox=cell_bbox, row=r0, col=c0,
+                        colspan=colspan, rowspan=rowspan,
+                    )
+
+            if not grid:
+                return None
+
+            # Reconstruct row-major list (only top-left cells of each span).
+            rows: List[List[CellRect]] = []
+            for r in range(num_rows):
+                row: List[CellRect] = [grid[(r, c)] for c in range(num_cols) if (r, c) in grid]
+                if row:
+                    rows.append(row)
+
             if not rows:
                 return None
-                
+
             return TableResult(bbox=bbox, rows=rows, page_no=page_no)
-            
+
         except Exception as e:
-            warnings.warn(f"Failed to convert docling table: {e}")
-            return None
-            
-    def _convert_docling_cell(self, docling_cell, row: int, col: int) -> Optional[CellRect]:
-        """Convert docling cell to CellRect format."""
-        try:
-            text = str(getattr(docling_cell, 'text', '')).strip()
-            if not text:
-                text = ''
-                
-            # Get cell bbox
-            if hasattr(docling_cell, 'bbox'):
-                bbox = tuple(docling_cell.bbox)
-            else:
-                # Create a minimal bbox based on position
-                bbox = (0.0, 0.0, 50.0, 10.0)  # Default size
-                
-            # Get colspan/rowspan if available
-            colspan = getattr(docling_cell, 'colspan', 1) or 1
-            rowspan = getattr(docling_cell, 'rowspan', 1) or 1
-            
-            return CellRect(text=text, bbox=bbox, row=row, col=col,
-                          colspan=colspan, rowspan=rowspan)
-                          
-        except Exception as e:
-            warnings.warn(f"Failed to convert docling cell: {e}")
+            warnings.warn(f"Failed to convert docling TableItem: {e}")
             return None
             
     def _calculate_table_bbox(self, docling_table) -> Tuple[float, float, float, float]:

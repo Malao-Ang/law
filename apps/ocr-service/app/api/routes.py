@@ -1,5 +1,8 @@
 import json
+import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -8,16 +11,15 @@ from app.api.schemas import (
     BlockPatchResponse,
     ExtractRequest,
     HealthResponse,
-    PreviewRequest,
-    PreviewResponse,
     ReprocessBlockRequest,
     intermediate_output_path,
 )
 from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
-from app.services.block_builder import build_document_output, build_html_preview
+from app.services.block_builder import build_document_output
 from app.services.docling_service import DoclingService
+from app.services.landingai_parser import LandingAiAdeParser
 from app.services.ocr_pipeline import get_ocr_pipeline
 from app.services.thai_normalizer import normalize_text
 from app.utils.file_type import detect_file_type
@@ -25,10 +27,28 @@ from app.utils.file_type import detect_file_type
 router = APIRouter()
 
 
+@contextmanager
+def _stage_timer(document_id: str, stage: str, logger: object, timings: dict) -> Iterator[None]:
+    """Emit a structured STAGE log line and record elapsed ms in *timings*."""
+    t0 = time.monotonic()
+    try:
+        yield
+    finally:
+        ms = round((time.monotonic() - t0) * 1000)
+        timings[stage] = ms
+        logger.info("STAGE", extra={"document_id": document_id, "stage": stage, "ms": ms})
+
+
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     pipeline = get_ocr_pipeline()
-    return HealthResponse(ocr_ready=pipeline.is_ready())
+    settings = get_settings()
+    return HealthResponse(
+        ocr_ready=pipeline.is_ready(),
+        device=pipeline.device,
+        ocr_gpu_concurrency=settings.ocr_gpu_concurrency,
+        ocr_recognizer_batch_size=settings.ocr_recognizer_batch_size,
+    )
 
 
 @router.post("/pipeline/extract", status_code=202)
@@ -46,64 +66,243 @@ def _run_extraction(payload: ExtractRequest) -> None:
     logger = get_logger(payload.document_id)
 
     file_path = Path(payload.file_path)
-    classification = detect_file_type(file_path)
-    mode = classification["mode"]
-    logger.info("detected source type", extra={"mode": mode})
-
-    docling_service = DoclingService(data_root=settings.data_root)
-    ocr_pipeline = get_ocr_pipeline(data_root=settings.data_root)
-
-    if mode == "docx":
-        pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
-        source_type = "docx"
-    elif mode == "pdf_text":
-        pages = docling_service.extract(file_path=file_path, source_type="pdf_text", document_id=payload.document_id)
-        source_type = "pdf_text"
-    elif mode == "pdf_scan":
-        pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=payload.document_id)
-        source_type = "pdf_scan"
-    else:
-        # mixed: route each page to the appropriate extractor
-        pages = docling_service.extract_mixed_pdf(
-            file_path=file_path,
-            page_classification=classification["pages"],
-            document_id=payload.document_id,
-            ocr_pipeline=ocr_pipeline,
-        )
-        source_type = "pdf_mixed"
-
-    ai_corrector = MockAICorrector()
-    output = build_document_output(
-        document_id=payload.document_id,
-        source_file=file_path.name,
-        source_type=source_type,
-        pages=pages,
-        normalizer=normalize_text,
-        ai_corrector=ai_corrector,
-        enable_ai_correction=payload.enable_ai_correction,
-        review_threshold=settings.thai_review_threshold,
-    )
-
     output_path = intermediate_output_path(settings.data_root, payload.document_id)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(output, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
 
-    logger.info("extraction completed", extra={"output_path": str(output_path)})
+    timings: dict[str, int] = {}
 
-    if payload.callback_url:
-        _post_callback(payload.callback_url, payload.document_id, output, logger)
-
-
-def _post_callback(callback_url: str, document_id: str, output: dict, logger: object) -> None:
     try:
-        with httpx.Client(timeout=30) as client:
-            client.post(callback_url, json={"document_id": document_id, "output": output})
-        logger.info("callback delivered", extra={"callback_url": callback_url})
+        classification = detect_file_type(file_path)
+        mode = classification["mode"]
+        logger.info("detected source type", extra={"mode": mode})
+
+        docling_service = DoclingService(data_root=settings.data_root)
+        requested_scan_mode = payload.scan_extraction_mode
+        effective_scan_mode = requested_scan_mode
+        extraction_path: list[str] = []
+
+        if mode == "docx":
+            with _stage_timer(payload.document_id, "extract", logger, timings):
+                pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
+            extraction_path.append("docling:docx")
+            source_type = "docx"
+        elif mode == "pdf_text":
+            with _stage_timer(payload.document_id, "extract", logger, timings):
+                pages = docling_service.extract(file_path=file_path, source_type="pdf_text", document_id=payload.document_id)
+            extraction_path.append("docling:pdf_text")
+            source_type = "pdf_text"
+        elif mode == "pdf_scan":
+            with _stage_timer(payload.document_id, "ocr", logger, timings):
+                pages, effective_scan_mode = _extract_scan_pages(
+                    file_path=file_path,
+                    document_id=payload.document_id,
+                    requested_mode=requested_scan_mode,
+                    data_root=settings.data_root,
+                )
+            extraction_path.append(f"scan:{effective_scan_mode}")
+            source_type = "pdf_scan"
+        else:
+            # mixed: route each page to the appropriate extractor
+            with _stage_timer(payload.document_id, "extract", logger, timings):
+                scan_indices = set(classification["pages"].get("scan", []))
+                scan_results = None
+                if scan_indices:
+                    scan_results, effective_scan_mode = _extract_scan_pages_selective(
+                        file_path=file_path,
+                        document_id=payload.document_id,
+                        requested_mode=requested_scan_mode,
+                        page_indices=scan_indices,
+                        data_root=settings.data_root,
+                    )
+                    extraction_path.append(f"scan:{effective_scan_mode}")
+                pages = docling_service.extract_mixed_pdf(
+                    file_path=file_path,
+                    page_classification=classification["pages"],
+                    document_id=payload.document_id,
+                    ocr_pipeline=_get_ocr_pipeline_if_needed(scan_results is None and bool(scan_indices), settings.data_root),
+                    scan_results=scan_results,
+                )
+            extraction_path.append("docling:pdf_mixed")
+            source_type = "pdf_mixed"
+
+        ai_corrector = MockAICorrector()
+        with _stage_timer(payload.document_id, "build", logger, timings):
+            output = build_document_output(
+                document_id=payload.document_id,
+                source_file=file_path.name,
+                source_type=source_type,
+                pages=pages,
+                normalizer=normalize_text,
+                ai_corrector=ai_corrector,
+                enable_ai_correction=payload.enable_ai_correction,
+                review_threshold=settings.thai_review_threshold,
+            )
+
+        output["timings"] = timings
+        output["extraction"] = {
+            "scan_extraction_mode_requested": requested_scan_mode,
+            "scan_extraction_mode_effective": effective_scan_mode,
+            "path": extraction_path,
+        }
+        output_path.write_text(
+            json.dumps(output, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        logger.info("extraction completed", extra={"output_path": str(output_path), "timings": timings})
+
+        if payload.callback_url:
+            with _stage_timer(payload.document_id, "callback", logger, timings):
+                _post_callback(payload.callback_url, payload.document_id, {"status": "success", "output": output}, logger)
+
+    except Exception as exc:
+        logger.error("extraction failed", extra={"error": str(exc)})
+
+        failure_payload = {
+            "status": "failed",
+            "error": str(exc),
+            "error_code": "EXTRACTION_FAILED",
+        }
+
+        # Write failure state to output path so it can be inspected locally.
+        # Guard against the case where output_path itself is not yet defined
+        # (e.g. the mkdir call above failed).
+        try:
+            output_path.write_text(
+                json.dumps(failure_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as write_exc:
+            logger.error("failed to write failure payload", extra={"error": str(write_exc)})
+
+        # Always attempt the failure callback so Laravel can mark the document
+        # as failed rather than leaving it stuck in "processing".
+        if payload.callback_url:
+            try:
+                _post_callback(payload.callback_url, payload.document_id, failure_payload, logger)
+            except Exception as cb_exc:
+                logger.error("failure callback also failed", extra={"error": str(cb_exc)})
+
+        raise
+
+
+def _post_callback(callback_url: str, document_id: str, payload: dict, logger: object) -> None:
+    try:
+        with httpx.Client(timeout=10) as client:
+            response = client.post(callback_url, json={"document_id": document_id, **payload})
+        response.raise_for_status()
+        logger.info("callback delivered", extra={"callback_url": callback_url, "status_code": response.status_code})
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "callback rejected by Laravel",
+            extra={"callback_url": callback_url, "status_code": exc.response.status_code, "body": exc.response.text[:500]},
+        )
+        raise
     except Exception as exc:
         logger.error("callback failed", extra={"callback_url": callback_url, "error": str(exc)})
+        raise
+
+
+def _extract_scan_pages(
+    file_path: Path,
+    document_id: str,
+    requested_mode: str,
+    data_root: Path,
+) -> tuple[list[dict], str]:
+    logger = get_logger(document_id)
+    if requested_mode == "local":
+        ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+        return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local"
+    if requested_mode == "landingai":
+        parser = LandingAiAdeParser(data_root=data_root)
+        return parser.parse_pdf(file_path=file_path, document_id=document_id), "landingai"
+
+    # auto: try local first; fall back to LandingAI only if key is configured
+    ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+    local_pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
+    if _scan_quality_good(local_pages):
+        return local_pages, "local"
+    if not get_settings().landingai_api_key:
+        logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
+        return local_pages, "local"
+    parser = LandingAiAdeParser(data_root=data_root)
+    return parser.parse_pdf(file_path=file_path, document_id=document_id), "landingai"
+
+
+def _extract_scan_pages_selective(
+    file_path: Path,
+    document_id: str,
+    requested_mode: str,
+    page_indices: set[int],
+    data_root: Path,
+) -> tuple[list[dict], str]:
+    logger = get_logger(document_id)
+    if requested_mode == "local":
+        ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+        pages = ocr_pipeline.extract_scanned_pdf_selective(
+            file_path=file_path,
+            document_id=document_id,
+            page_indices=page_indices,
+        )
+        return pages, "local"
+    if requested_mode == "landingai":
+        parser = LandingAiAdeParser(data_root=data_root)
+        return parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices), "landingai"
+
+    # auto: try local first; fall back to LandingAI only if key is configured
+    ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+    local_pages = ocr_pipeline.extract_scanned_pdf_selective(
+        file_path=file_path,
+        document_id=document_id,
+        page_indices=page_indices,
+    )
+    if _scan_quality_good(local_pages):
+        return local_pages, "local"
+    if not get_settings().landingai_api_key:
+        logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
+        return local_pages, "local"
+    parser = LandingAiAdeParser(data_root=data_root)
+    return parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices), "landingai"
+
+
+def _get_ocr_pipeline_if_needed(needed: bool, data_root: Path) -> object | None:
+    if not needed:
+        return None
+    return get_ocr_pipeline(data_root=data_root)
+
+
+def _scan_quality_good(pages: list[dict]) -> bool:
+    if not pages:
+        return False
+
+    text_blocks = 0
+    confidence_sum = 0.0
+    confidence_count = 0
+    uncertain_count = 0
+
+    for page in pages:
+        for block in page.get("blocks", []):
+            if block.get("type") in {"image"}:
+                continue
+            text_blocks += 1
+            try:
+                confidence = float(block.get("confidence", 0.0))
+            except (TypeError, ValueError):
+                confidence = 0.0
+            confidence_sum += confidence
+            confidence_count += 1
+            flags = block.get("flags") or []
+            if isinstance(flags, list) and any("low" in str(flag).lower() for flag in flags):
+                uncertain_count += 1
+
+    if text_blocks < 3:
+        return False
+    if confidence_count == 0:
+        return False
+
+    mean_confidence = confidence_sum / confidence_count
+    uncertain_ratio = uncertain_count / max(1, text_blocks)
+    return mean_confidence >= 0.78 and uncertain_ratio <= 0.50
 
 
 @router.post("/pipeline/reprocess-block", response_model=BlockPatchResponse)
@@ -149,54 +348,3 @@ def reprocess_block(payload: ReprocessBlockRequest) -> BlockPatchResponse:
         confidence=ai["confidence"],
         flags=target_block["flags"],
     )
-
-
-@router.post("/preview", response_model=PreviewResponse)
-def generate_preview(payload: PreviewRequest) -> PreviewResponse:
-    """Generate HTML preview for a processed document."""
-    settings = get_settings()
-    logger = get_logger(payload.document_id)
-
-    output_path = intermediate_output_path(settings.data_root, payload.document_id)
-    if not output_path.exists():
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    try:
-        # Load document data
-        data = json.loads(output_path.read_text(encoding="utf-8"))
-        
-        # Generate HTML preview
-        preview_data = build_html_preview(
-            document_data=data,
-            format=payload.format,
-            include_styles=payload.include_styles
-        )
-        
-        # Add metadata if requested
-        if payload.include_metadata:
-            preview_data["metadata"] = {
-                "source_file": data.get("source_file"),
-                "source_type": data.get("source_type"),
-                "language": data.get("language"),
-                "summary": data.get("summary"),
-                "processing_info": {
-                    "format": payload.format,
-                    "include_styles": payload.include_styles,
-                    "generated_at": logger.handlers[0].formatter.formatTime(logger.handlers[0].record) if logger.handlers else None
-                }
-            }
-        
-        logger.info("preview generated", extra={
-            "document_id": payload.document_id,
-            "format": payload.format,
-            "include_styles": payload.include_styles
-        })
-        
-        return PreviewResponse(**preview_data)
-        
-    except Exception as e:
-        logger.error("preview generation failed", extra={
-            "document_id": payload.document_id,
-            "error": str(e)
-        })
-        raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")

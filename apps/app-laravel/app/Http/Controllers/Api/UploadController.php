@@ -16,6 +16,7 @@ class UploadController extends Controller
     {
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
+        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'auto');
 
         $this->reviewStore->setStatus($documentId, [
             'status' => 'queued',
@@ -23,12 +24,14 @@ class UploadController extends Controller
             'current_step' => 'queued',
             'source_file' => $storedFile['source_file'],
             'source_path' => $storedFile['relative_path'],
+            'scan_extraction_mode_requested' => $scanExtractionMode,
         ]);
 
         ExtractDocumentJob::dispatch(
             documentId: $documentId,
             relativeFilePath: $storedFile['relative_path'],
             enableAiCorrection: (bool) config('services.ocr.enable_ai_correction', true),
+            scanExtractionMode: $scanExtractionMode,
         );
 
         return response()->json([

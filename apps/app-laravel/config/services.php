@@ -32,6 +32,7 @@ return [
     'ocr' => [
         'base_url' => env('OCR_SERVICE_BASE_URL', 'http://ocr-service:8010'),
         'shared_storage_root' => env('OCR_SHARED_STORAGE_ROOT', '/data/poc'),
+        'internal_callback_url' => env('INTERNAL_CALLBACK_URL', 'http://laravel-app:8000/api/internal/pipeline-callback'),
         'enable_ai_correction' => filter_var(env('AI_CORRECTION_ENABLED', true), FILTER_VALIDATE_BOOL),
     ],
 

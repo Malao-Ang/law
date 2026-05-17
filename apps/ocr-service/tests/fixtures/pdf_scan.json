@@ -1,0 +1,33 @@
+{
+  "description": "Golden fixture: Thai scanned PDF with official forms",
+  "document_id": "fixture_pdf_scan",
+  "source_file": "test_scan.pdf",
+  "source_type": "pdf_scan",
+  "language": "th",
+  "expected_page_count": 1,
+  "expected_block_types": ["title", "paragraph", "table"],
+  "validation_rules": {
+    "ocr_quality": {
+      "min_confidence": 0.75,
+      "check_thai_accuracy": true,
+      "expected_keywords": ["มาตรา", "ประกาศ", "ข้อ", "ลงชื่อ"]
+    },
+    "table_detection": {
+      "check_table_regions": true,
+      "min_table_count": 1
+    },
+    "flags": {
+      "expected": ["ocr_scan"],
+      "allow_additional": true
+    }
+  },
+  "sample_blocks": [
+    {
+      "block_id": "1-1",
+      "type": "title",
+      "raw_text": "แบบฟอร์ม...",
+      "flags": ["ocr_scan"],
+      "confidence_min": 0.75
+    }
+  ]
+}

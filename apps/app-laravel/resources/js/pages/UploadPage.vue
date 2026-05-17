@@ -31,6 +31,19 @@
                 class="mb-4"
               ></v-progress-linear>
 
+              <p v-if="status.scan_extraction_mode_requested" class="text-body-2 mb-1">
+                Scan mode requested: {{ status.scan_extraction_mode_requested }}
+              </p>
+              <p v-if="status.scan_extraction_mode_effective" class="text-body-2 mb-4">
+                Scan mode effective: {{ status.scan_extraction_mode_effective }}
+              </p>
+              <p v-if="status.extraction_path?.length" class="text-body-2 mb-1">
+                Extraction path: {{ status.extraction_path.join(' -> ') }}
+              </p>
+              <p v-if="status.timings" class="text-body-2 mb-4">
+                Timings: {{ formatTimings(status.timings) }}
+              </p>
+
               <v-btn
                 v-if="canOpenReview"
                 color="success"
@@ -97,6 +110,12 @@ function getStatusText(status: string): string {
     default:
       return status;
   }
+}
+
+function formatTimings(timings: Record<string, number>): string {
+  return Object.entries(timings)
+    .map(([stage, ms]) => `${stage}=${ms}ms`)
+    .join(', ');
 }
 
 function onUploaded(id: string): void {

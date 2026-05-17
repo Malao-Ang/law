@@ -160,6 +160,25 @@ def test_whitespace_only_collapses() -> None:
     assert result["text"] == ""
 
 
+def test_tab_preserved_between_words() -> None:
+    # Extractors insert \t between indent prefix and body text; the normalizer
+    # must NOT collapse it to a space, or HTML rendering loses tab structure.
+    assert normalised("foo\tbar") == "foo\tbar"
+    assert normalised("ก\tข") == "ก\tข"
+
+
+def test_newline_preserved_between_lines() -> None:
+    # Multi-line blocks (e.g. DOCX paragraphs with soft breaks) must retain \n.
+    assert normalised("line1\nline2") == "line1\nline2"
+
+
+def test_multiple_spaces_still_collapsed() -> None:
+    # Spaces must still collapse — only \t and \n are exempt.
+    assert normalised("foo     bar") == "foo bar"
+    # NBSP and unicode spaces also collapse.
+    assert normalised("foo  bar") == "foo bar"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Pattern ordering regression — longer patterns must win over sub-patterns
 # ─────────────────────────────────────────────────────────────────────────────

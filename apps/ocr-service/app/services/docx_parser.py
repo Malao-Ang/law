@@ -113,11 +113,23 @@ class DocxParser:
 
         numbering_info = self._resolve_numbering(paragraph, numbering_context, layout)
         if numbering_info:
-            text = numbering_info["prefix"] + "\t" + text
+            text = numbering_info["prefix"] + " " + text
             layout = numbering_info["layout"]
 
         if text.strip() == "":
             return None
+
+        # Infer first-line indent from a leading TAB when w:firstLine is absent.
+        # Thai legal DOCX files routinely use a literal tab at the start of body
+        # paragraphs instead of setting w:ind/@firstLine.
+        # Skip for numbered list items — their text already starts with
+        # `prefix + "\t"` as a structural marker separator, not a body indent.
+        layout = layout.copy()
+        if numbering_info is None and layout.get("indent_first_line") is None and text.startswith("\t"):
+            from app.core.config import get_settings
+            text = text.lstrip("\t")
+            layout["indent_first_line"] = get_settings().first_line_indent_default_twips
+            layout["first_line_inferred"] = "leading_tab"
 
         meta: dict = {"layout": layout}
         if numbering_info:
@@ -191,9 +203,14 @@ class DocxParser:
             return "list_item"
         if layout.get("alignment") == "center":
             return "title" if reading_order <= 4 else "section_header"
-        if re.match(r"^(ข้อ\s*[๐-๙0-9]+|ข้อ[๐-๙0-9]+)", stripped):
+        # Top-level legal section headers: มาตรา / ข้อ
+        if re.match(r"^(มาตรา\s+[๐-๙0-9]+(?:/[๐-๙0-9]+)?)\b", stripped):
             return "section_header"
-        if re.match(r"^(\([๐-๙0-9]+\)|-|•)", stripped):
+        if re.match(r"^ข้อ\s*[๐-๙0-9]+(?:\.[๐-๙0-9]+)*", stripped):
+            return "section_header"
+        # List items: parenthesised markers (numbers OR Thai/Latin letters),
+        # multi-level numerics, single-level numerics, dashes, bullets.
+        if re.match(r"^(\(([๐-๙0-9]+|[ก-ฮ]|[a-zA-Z])\)|[๐-๙0-9]+(?:\.[๐-๙0-9]+)+\.?\s|[๐-๙0-9]+\.\s|-|•)", stripped):
             return "list_item"
         return "paragraph"
 

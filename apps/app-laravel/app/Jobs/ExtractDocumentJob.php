@@ -21,6 +21,7 @@ class ExtractDocumentJob implements ShouldQueue
         public readonly string $documentId,
         public readonly string $relativeFilePath,
         public readonly bool $enableAiCorrection,
+        public readonly string $scanExtractionMode = 'auto',
     ) {}
 
     public function handle(DocumentPipelineClient $pipelineClient, ReviewStore $reviewStore): void
@@ -31,13 +32,18 @@ class ExtractDocumentJob implements ShouldQueue
             'current_step' => 'extract_document',
         ]);
 
-        $callbackUrl = route('pipeline.callback');
+        // IMPORTANT: Use the Docker-internal service name (laravel-app:8000), NOT APP_URL.
+        // APP_URL points to localhost which resolves to the Python container itself inside Docker.
+        // INTERNAL_CALLBACK_URL must be set to http://laravel-app:8000/api/internal/pipeline-callback
+        // in .env so the Python service can reach Laravel across the Docker bridge network.
+        $callbackUrl = config('services.ocr.internal_callback_url') ?: route('pipeline.callback');
 
         $pipelineClient->extract(
             documentId: $this->documentId,
             relativeInputPath: $this->relativeFilePath,
             enableAiCorrection: $this->enableAiCorrection,
             callbackUrl: $callbackUrl,
+            scanExtractionMode: $this->scanExtractionMode,
         );
 
         // Python accepted the job (202). Status will be updated by PipelineCallbackController

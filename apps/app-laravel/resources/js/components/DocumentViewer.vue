@@ -2,18 +2,15 @@
   <section class="panel viewer-panel">
     <div class="viewer-header">
       <div>
-        <h3>Document Viewer</h3>
-        <p v-if="page" class="hint">Page {{ page.page_no }} · HTML canvas review</p>
+        <h3>Page Review</h3>
+        <p v-if="page" class="hint">Page {{ page.page_no }} · {{ page.source_kind ?? 'unknown' }} · {{ modeLabel }}</p>
       </div>
-      <button v-if="block" class="btn" @click="emit('sync-selected')">Use Selected Layout</button>
     </div>
 
-    <div v-if="!page" class="hint">Select a block to preview.</div>
+    <div v-if="!page" class="preview-fallback">Select a block to preview.</div>
 
-    <div v-else class="canvas-shell">
-      <canvas ref="canvasRef" class="document-canvas" width="900" height="1200"></canvas>
-
-      <div class="html-overlay">
+    <div v-else-if="mode === 'html'" class="page-preview-shell">
+      <div class="page-stage page-stage--paper" :style="pageStageStyle">
         <article
           v-for="overlayBlock in positionedBlocks"
           :key="overlayBlock.block_id"
@@ -31,6 +28,37 @@
       </div>
     </div>
 
+    <div v-else-if="page.image_url" class="page-preview-shell">
+      <div class="page-stage">
+        <img
+          :src="page.image_url"
+          :alt="`Page ${page.page_no}`"
+          class="page-preview-image"
+          @load="onImageLoad"
+        />
+        <div v-if="mode === 'overlay'" class="html-overlay">
+          <article
+            v-for="overlayBlock in positionedBlocks"
+            :key="overlayBlock.block_id"
+            class="overlay-block"
+            :class="{
+              selected: overlayBlock.block_id === block?.block_id,
+              table: overlayBlock.type === 'table',
+            }"
+            :style="overlayBlock.style"
+            @click="emit('select-block', overlayBlock.block_id)"
+          >
+            <div class="overlay-label">{{ overlayBlock.type }} · {{ overlayBlock.block_id }}</div>
+            <div class="overlay-html">{{ overlayBlock.preview }}</div>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="preview-fallback">
+      No page image is available for this page. Switch to Extracted HTML to review OCR output.
+    </div>
+
     <div v-if="block" class="meta">
       <p><strong>Block:</strong> {{ block.block_id }}</p>
       <p><strong>Type:</strong> {{ block.type }}</p>
@@ -40,25 +68,56 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import type { DocumentBlock, DocumentPage } from '../types/document';
 
 const props = defineProps<{
   page: DocumentPage | null;
   block: DocumentBlock | null;
+  mode: 'original' | 'overlay' | 'html';
 }>();
 
 const emit = defineEmits<{
   'select-block': [blockId: string];
-  'sync-selected': [];
 }>();
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
+const naturalWidth = ref(900);
+const naturalHeight = ref(1200);
+
+const modeLabel = computed(() => {
+  if (props.mode === 'original') return 'Original';
+  if (props.mode === 'overlay') return 'OCR Overlay';
+  return 'Extracted HTML';
+});
+
+const pageBounds = computed(() => {
+  const imageWidth = naturalWidth.value;
+  const imageHeight = naturalHeight.value;
+  if (props.page?.image_url) {
+    return { width: imageWidth, height: imageHeight };
+  }
+
+  const bboxes = props.page?.blocks
+    .map((pageBlock) => pageBlock.meta.layout?.bbox ?? pageBlock.bbox)
+    .filter((bbox): bbox is [number, number, number, number] => Array.isArray(bbox) && bbox.length === 4) ?? [];
+
+  const width = bboxes.length > 0 ? Math.max(...bboxes.map((bbox) => bbox[2])) + 48 : imageWidth;
+  const height = bboxes.length > 0 ? Math.max(...bboxes.map((bbox) => bbox[3])) + 48 : imageHeight;
+
+  return { width, height };
+});
+
+const pageStageStyle = computed(() => ({
+  aspectRatio: `${pageBounds.value.width} / ${pageBounds.value.height}`,
+}));
 
 const positionedBlocks = computed(() => {
   if (!props.page) {
     return [];
   }
+
+  const pageWidth = Math.max(pageBounds.value.width, 1);
+  const pageHeight = Math.max(pageBounds.value.height, 1);
 
   return props.page.blocks.map((pageBlock, index) => {
     const layout = pageBlock.meta.layout;
@@ -66,48 +125,33 @@ const positionedBlocks = computed(() => {
     const fallbackTop = 24 + index * 88;
     const top = bbox?.[1] ?? fallbackTop;
     const left = bbox?.[0] ?? 24;
-    const width = Math.max((bbox?.[2] ?? 760) - left, 260);
-    const height = Math.max((bbox?.[3] ?? top + 72) - top, pageBlock.type === 'table' ? 160 : 72);
+    const width = Math.max((bbox?.[2] ?? 760) - left, 140);
+    const height = Math.max((bbox?.[3] ?? top + 72) - top, pageBlock.type === 'table' ? 96 : 54);
     const html = pageBlock.meta.reviewed_html ?? `<p>${escapeHtml(pageBlock.approved_text || pageBlock.ai_suggested_text)}</p>`;
+    const preview = (pageBlock.approved_text || pageBlock.ai_suggested_text || pageBlock.raw_text).replace(/\s+/g, ' ').trim();
 
     return {
       ...pageBlock,
       html,
+      preview: preview.slice(0, 140),
       style: {
-        top: `${top}px`,
-        left: `${left}px`,
-        width: `${width}px`,
-        minHeight: `${height}px`,
+        top: `${(top / pageHeight) * 100}%`,
+        left: `${(left / pageWidth) * 100}%`,
+        width: `${(width / pageWidth) * 100}%`,
+        minHeight: `${(height / pageHeight) * 100}%`,
       },
     };
   });
 });
 
-function drawCanvas(): void {
-  const canvas = canvasRef.value;
-  if (!canvas) {
+function onImageLoad(event: Event): void {
+  const image = event.target as HTMLImageElement | null;
+  if (!image) {
     return;
   }
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    return;
-  }
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#fbfaf5');
-  gradient.addColorStop(1, '#eef3f6');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.strokeStyle = '#c5d0d9';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
-
-  ctx.fillStyle = '#6b7b8c';
-  ctx.font = '18px sans-serif';
-  ctx.fillText(`Review Canvas - Page ${props.page?.page_no ?? ''}`, 28, 48);
+  naturalWidth.value = image.naturalWidth || 900;
+  naturalHeight.value = image.naturalHeight || 1200;
 }
 
 function escapeHtml(value: string): string {
@@ -119,7 +163,4 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;')
     .replaceAll('\n', '<br>');
 }
-
-onMounted(drawCanvas);
-watch(() => props.page, drawCanvas, { deep: true });
 </script>

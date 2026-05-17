@@ -252,6 +252,73 @@ class ReviewStore
     }
 
     /**
+     * Patch layout metadata on a block without touching approved_text.
+     *
+     * Supported keys include indent level, marker level, alignment,
+     * explicit DOCX-style indent fields, and tab stops.
+     *
+     * @param array<string, mixed> $patch
+     * @return array<string, mixed>
+     */
+    public function patchBlockLayout(string $documentId, int $pageNo, string $blockId, array $patch): array
+    {
+        $returnBlock = null;
+
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+            $block = &$this->findBlockReference($document, $pageNo, $blockId);
+
+            $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+            $existingLayout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+
+            if (array_key_exists('indent_level', $patch)) {
+                $level = $patch['indent_level'];
+                $existingLayout['indent_level'] = $level === null ? null : max(0, min(10, (int) $level));
+            }
+
+            if (array_key_exists('alignment', $patch)) {
+                $existingLayout['alignment'] = $patch['alignment'];  // already validated against allowed set
+            }
+
+            foreach (['indent_left', 'indent_first_line', 'indent_hanging'] as $twipsKey) {
+                if (array_key_exists($twipsKey, $patch)) {
+                    $value = $patch[$twipsKey];
+                    $existingLayout[$twipsKey] = $value === null ? null : max(0, min(14400, (int) $value));
+                }
+            }
+
+            if (array_key_exists('tabs', $patch)) {
+                $tabs = [];
+                foreach ((array) $patch['tabs'] as $tab) {
+                    if (!is_array($tab)) {
+                        continue;
+                    }
+                    $tabs[] = [
+                        'position' => max(0, min(14400, (int) ($tab['position'] ?? 0))),
+                        'type'     => (string) ($tab['type'] ?? 'left'),
+                    ];
+                }
+                $existingLayout['tabs'] = $tabs;
+            }
+
+            $block['meta'] = array_merge($existingMeta, ['layout' => $existingLayout]);
+
+            if (array_key_exists('list_marker_level', $patch)) {
+                $existingMarker = is_array($existingMeta['list_marker'] ?? null) ? $existingMeta['list_marker'] : null;
+                if ($existingMarker !== null) {
+                    $markerLevel = $patch['list_marker_level'];
+                    $existingMarker['level'] = max(1, min(6, (int) $markerLevel));
+                    $block['meta']['list_marker'] = $existingMarker;
+                }
+            }
+
+            $this->markOutOfSync($document);
+            $returnBlock = $block;
+        });
+
+        return $returnBlock;
+    }
+
+    /**
      * @param array<string, mixed> $exportData
      */
     public function writeExport(string $documentId, array $exportData): string
@@ -516,7 +583,10 @@ class ReviewStore
     {
         $type = (string) ($block['type'] ?? 'paragraph');
         $text = (string) ($block['approved_text'] ?? $block['ai_suggested_text'] ?? $block['normalized_text'] ?? '');
-        $layoutCss = trim((string) ($existingMeta['layout_css'] ?? ''));
+
+        // layout_css is standardized under meta.layout.layout_css (set by Python block_builder)
+        $existingLayout = is_array($existingMeta['layout'] ?? null) ? $existingMeta['layout'] : [];
+        $layoutCss = trim((string) ($existingLayout['layout_css'] ?? ''));
 
         if ($type !== 'table' && $type !== 'image' && $layoutCss !== '') {
             $classMap = [

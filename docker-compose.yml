@@ -52,12 +52,17 @@ services:
       dockerfile: Dockerfile
     container_name: thai-ocr-queue-worker
     working_dir: /var/www/html
+    # For bulk throughput, run multiple workers:
+    #   docker compose up -d --scale queue-worker=3 --no-recreate
+    # Each worker processes one document concurrently; throughput scales linearly
+    # up to ~3-4 workers before the GPU becomes the bottleneck.
     command: >
       sh -c "git config --global --add safe.directory '*'
       && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
-      && php artisan queue:listen --tries=1 --timeout=1800"
+      && php artisan queue:work --tries=2 --backoff=10 --timeout=1800"
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
+      - QUEUE_CONNECTION=redis
     volumes:
       - ./apps/app-laravel:/var/www/html
       - laravel_vendor:/var/www/html/vendor
@@ -72,6 +77,9 @@ services:
   ocr-service:
     build:
       context: ./apps/ocr-service
+      # GPU (recommended when NVIDIA driver + nvidia-container-toolkit are present):
+      #   dockerfile: Dockerfile.gpu
+      # CPU fallback:
       dockerfile: Dockerfile.simple
     container_name: thai-ocr-service
     working_dir: /app
@@ -83,6 +91,16 @@ services:
     ports:
       - "8010:8010"
     user: "0:0"  # Run as root to handle volume permissions
+    # Uncomment the deploy block below when using Dockerfile.gpu.
+    # Requires nvidia-container-toolkit installed in WSL2:
+    #   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   redis:
     image: redis:7-alpine

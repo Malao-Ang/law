@@ -32,17 +32,20 @@ class DocumentHtmlService
                 $type = (string) ($block['type'] ?? 'paragraph');
                 $readingOrder = (int) ($block['reading_order'] ?? 0);
 
-                // Python is the single source of truth for block HTML.
-                // Use reviewed_html from meta when present; fall back to buildBlockHtml
-                // only for blocks that pre-date this convention or have no reviewed_html.
-                $inner = trim((string) ($block['meta']['reviewed_html'] ?? ''));
-                if ($inner === '') {
-                    $inner = $this->buildBlockHtml($block);
+                // Always recompute HTML from structured block fields (approved_text,
+                // meta.layout, meta.table, meta.image). reviewed_html is kept on disk
+                // as a legacy field but is no longer the rendering source of truth.
+                $inner = $this->buildBlockHtml($block);
+
+                $formatting = is_array($block['meta']['formatting'] ?? null) ? $block['meta']['formatting'] : [];
+                $blockClasses = 'doc-block doc-block-'.e($type);
+                if (($formatting['weight'] ?? null) === 'bold') {
+                    $blockClasses .= ' weight-bold';
                 }
 
                 $blockHtml[] = sprintf(
-                    '<div class="doc-block doc-block-%s" data-block-id="%s" data-block-type="%s" data-page-no="%d" data-reading-order="%d">%s</div>',
-                    e($type),
+                    '<div class="%s" data-block-id="%s" data-block-type="%s" data-page-no="%d" data-reading-order="%d">%s</div>',
+                    $blockClasses,
                     e($blockId),
                     e($type),
                     $pageNo,
@@ -67,11 +70,6 @@ class DocumentHtmlService
         $type = (string) ($block['type'] ?? 'paragraph');
         $blockId = (string) ($block['block_id'] ?? '');
         $table = $this->normalizeTablePayload($block['meta']['table'] ?? null);
-        $html = trim((string) ($block['meta']['reviewed_html'] ?? ''));
-
-        if ($html !== '') {
-            return $html;
-        }
 
         if ($type === 'table' && $table !== null) {
             $tableHtml = (string) ($table['html'] ?? '');
@@ -79,6 +77,25 @@ class DocumentHtmlService
                 return preg_replace('/<table/i', '<table data-block-id="'.e($blockId).'"', $tableHtml, 1) ?? $tableHtml;
             }
             return $tableHtml;
+        }
+
+        // image block
+        if ($type === 'image') {
+            $imgMeta = is_array($block['meta']['image'] ?? null) ? $block['meta']['image'] : null;
+            $srcUrl = trim((string) ($imgMeta['src_url'] ?? $imgMeta['data_uri'] ?? $block['meta']['image_path'] ?? ''));
+            $caption = trim((string) ($imgMeta['caption'] ?? ''));
+            if ($srcUrl !== '') {
+                return sprintf(
+                    '<figure data-block-id="%s" class="doc-image" style="text-align:center;margin:1rem 0;">'.
+                    '<img src="%s" alt="%s" style="max-width:100%%;height:auto;display:block;margin:0 auto;"/>'.
+                    '%s</figure>',
+                    e($blockId),
+                    e($srcUrl),
+                    e($caption ?: 'embedded image'),
+                    $caption !== '' ? sprintf('<figcaption>%s</figcaption>', e($caption)) : '',
+                );
+            }
+            return sprintf('<figure data-block-id="%s" class="doc-image doc-image--missing"></figure>', e($blockId));
         }
 
         $text = trim((string) ($block['approved_text'] ?? $block['ai_suggested_text'] ?? $block['normalized_text'] ?? ''));
@@ -100,6 +117,14 @@ class DocumentHtmlService
         }
         if ($type === 'footnote') {
             $classNames[] = 'doc-footnote';
+        }
+
+        $indentLevel = $layout['indent_level'] ?? null;
+        if (is_int($indentLevel) && $indentLevel >= 0) {
+            $classNames[] = 'doc-indent-'.max(0, min(10, $indentLevel));
+        }
+        if (($layout['first_line_inferred'] ?? null) === 'leading_tab') {
+            $classNames[] = 'has-inferred-indent';
         }
 
         $attributes = '';
@@ -390,6 +415,7 @@ class DocumentHtmlService
         $styles = [];
         $alignment = $layout['alignment'] ?? null;
         $indentLeft = $layout['indent_left'] ?? null;
+        $indentLevel = $layout['indent_level'] ?? null;
         $indentFirstLine = $layout['indent_first_line'] ?? null;
         $indentHanging = $layout['indent_hanging'] ?? null;
         $spacingBefore = $layout['spacing_before'] ?? null;
@@ -399,9 +425,16 @@ class DocumentHtmlService
         if (is_string($alignment) && $alignment !== '') {
             $styles[] = 'text-align:'.$alignment;
         }
-        if (is_numeric($indentLeft)) {
-            // Word stores indent in twips (1/20 point), convert to points
-            $styles[] = 'margin-left:'.((float) $indentLeft / 20).'pt';
+        // When indent_level is set, indent comes from the doc-indent-N CSS
+        // class (added in buildBlockHtml). Avoid emitting an inline margin-left
+        // too, or the two indent sources would compound.
+        if (is_numeric($indentLeft) && !is_int($indentLevel)) {
+            // Word stores indent in twips (1/20 point), convert to points.
+            // Clamp to 200pt — values beyond that are almost always parsing
+            // artefacts (e.g. a paragraph styled with a deeply-nested list
+            // indent) and would push the text outside the canvas.
+            $marginPt = min((float) $indentLeft / 20, 200.0);
+            $styles[] = 'margin-left:'.$marginPt.'pt';
         }
         if (is_numeric($indentFirstLine)) {
             // First line indent (positive = indent, negative = hanging)
@@ -439,7 +472,7 @@ class DocumentHtmlService
             if (! is_array($tab) || ! is_numeric($tab['position'] ?? null)) {
                 continue;
             }
-            $tabs[] = max(((float) $tab['position']) / 20, 48.0);
+            $tabs[] = max(((float) $tab['position']) / 20, 18.0);
         }
 
         $parts = explode("\t", $text);
@@ -449,7 +482,7 @@ class DocumentHtmlService
             if ($index >= count($parts) - 1) {
                 continue;
             }
-            $width = $tabs[$index] ?? 48.0;
+            $width = $tabs[$index] ?? 18.0;
             $html .= '<span class="doc-tab" style="display:inline-block; width:'.$width.'pt;"></span>';
         }
 

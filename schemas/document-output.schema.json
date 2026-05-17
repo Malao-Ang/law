@@ -7,7 +7,7 @@
   "properties": {
     "document_id": { "type": "string" },
     "source_file": { "type": "string" },
-    "source_type": { "type": "string", "enum": ["docx", "pdf_text", "pdf_scan"] },
+    "source_type": { "type": "string", "enum": ["docx", "pdf_text", "pdf_scan", "pdf_mixed"] },
     "language": { "type": "string", "const": "th" },
     "summary": {
       "type": "object",
@@ -19,6 +19,18 @@
       },
       "additionalProperties": false
     },
+    "timings": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" }
+    },
+    "extraction": {
+      "type": "object",
+      "properties": {
+        "scan_extraction_mode_requested": { "type": "string", "enum": ["auto", "local", "landingai"] },
+        "scan_extraction_mode_effective": { "type": "string", "enum": ["auto", "local", "landingai"] }
+      },
+      "additionalProperties": true
+    },
     "pages": {
       "type": "array",
       "items": {
@@ -27,6 +39,8 @@
         "properties": {
           "page_no": { "type": "integer", "minimum": 1 },
           "image_path": { "type": ["string", "null"] },
+          "image_url": { "type": ["string", "null"] },
+          "source_kind": { "type": ["string", "null"], "enum": ["docx", "pdf_text", "pdf_scan", null] },
           "blocks": {
             "type": "array",
             "items": {
@@ -52,6 +66,7 @@
                     "paragraph",
                     "list_item",
                     "table",
+                    "image",
                     "figure_caption",
                     "footnote",
                     "unknown"
@@ -80,6 +95,8 @@
                     "section_path": { "type": ["string", "null"] },
                     "table_html": { "type": ["string", "null"] },
                     "reviewed_html": { "type": ["string", "null"] },
+                    "table_confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                    "table_detection_reason": { "type": ["string", "null"] },
                     "layout": {
                       "type": "object",
                       "properties": {
@@ -94,6 +111,9 @@
                         "indent_left": { "type": ["integer", "null"] },
                         "indent_first_line": { "type": ["integer", "null"] },
                         "indent_hanging": { "type": ["integer", "null"] },
+                        "indent_level": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+                        "indent_unit_pt": { "type": ["number", "null"] },
+                        "first_line_inferred": { "type": ["string", "null"], "enum": ["leading_tab", null] },
                         "tabs": {
                           "type": "array",
                           "items": {
@@ -108,6 +128,65 @@
                         }
                       },
                       "additionalProperties": true
+                    },
+                    "list_marker": {
+                      "type": ["object", "null"],
+                      "required": ["text", "type", "level"],
+                      "properties": {
+                        "text": { "type": "string" },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "thai-numeral",
+                            "arabic",
+                            "legal-มาตรา",
+                            "legal-ข้อ",
+                            "legal-วรรค",
+                            "paren",
+                            "bullet"
+                          ]
+                        },
+                        "level": { "type": "integer", "minimum": 1, "maximum": 6 },
+                        "raw_match": { "type": "string" }
+                      },
+                      "additionalProperties": false
+                    },
+                    "image": {
+                      "type": ["object", "null"],
+                      "required": ["src_path"],
+                      "properties": {
+                        "src_path": { "type": "string" },
+                        "src_url": { "type": ["string", "null"] },
+                        "data_uri": { "type": ["string", "null"] },
+                        "width": { "type": ["integer", "null"] },
+                        "height": { "type": ["integer", "null"] },
+                        "caption": { "type": ["string", "null"] }
+                      },
+                      "additionalProperties": true
+                    },
+                    "spell_suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["token", "suggestion"],
+                        "properties": {
+                          "token": { "type": "string" },
+                          "suggestion": { "type": "string" },
+                          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                          "offset": { "type": "integer", "minimum": 0 }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "formatting": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "weight":         { "type": ["string", "null"], "enum": ["bold", "medium", null] },
+                        "bold_runs":      { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 } },
+                        "italic_runs":    { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 } },
+                        "underline_runs": { "type": "array", "items": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 } }
+                      },
+                      "additionalProperties": false
                     },
                     "table": {
                       "type": ["object", "null"],

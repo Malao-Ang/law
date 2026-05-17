@@ -1274,8 +1274,35 @@ Requirements:
 
 ```bash
 cp .env.example .env
+```
 
-docker compose up --build
+เพิ่มค่า LandingAI token ใน `.env`:
+
+```bash
+VISION_AGENT_API_KEY=your_landingai_token
+LANDINGAI_BASE_URL=https://api.va.landing.ai
+LANDINGAI_PARSE_MODEL=dpt-2-latest
+LANDINGAI_TIMEOUT_SECONDS=60
+```
+
+รันแบบ Dev (Docker compose):
+
+```bash
+docker compose --env-file .env up --build
+```
+
+รันแบบ Deploy (Docker compose detached):
+
+```bash
+docker compose --env-file .env up -d --build
+docker compose --env-file .env ps
+docker compose --env-file .env logs -f ocr-service
+```
+
+หยุดระบบ:
+
+```bash
+docker compose --env-file .env down
 ```
 
 หลังจากระบบขึ้นแล้ว:

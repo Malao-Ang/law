@@ -14,13 +14,20 @@ class DocumentPipelineClient
      * Fire an async extraction request.  The Python service returns 202 immediately
      * and posts results to $callbackUrl when processing completes.
      */
-    public function extract(string $documentId, string $relativeInputPath, bool $enableAiCorrection, string $callbackUrl): void
+    public function extract(
+        string $documentId,
+        string $relativeInputPath,
+        bool $enableAiCorrection,
+        string $callbackUrl,
+        string $scanExtractionMode = 'auto',
+    ): void
     {
-        $this->request()->post('/pipeline/extract', [
+        $this->request(5)->post('/pipeline/extract', [
             'document_id' => $documentId,
             'file_path' => $this->toSharedPath($relativeInputPath),
             'enable_ai_correction' => $enableAiCorrection,
             'callback_url' => $callbackUrl,
+            'scan_extraction_mode' => $scanExtractionMode,
         ])->throw();
     }
 
@@ -29,7 +36,7 @@ class DocumentPipelineClient
      */
     public function reprocessBlock(string $documentId, int $pageNo, string $blockId, string $mode): array
     {
-        $response = $this->request()->post('/pipeline/reprocess-block', [
+        $response = $this->request(120)->post('/pipeline/reprocess-block', [
             'document_id' => $documentId,
             'page_no' => $pageNo,
             'block_id' => $blockId,
@@ -42,12 +49,12 @@ class DocumentPipelineClient
         return $json;
     }
 
-    private function request(): PendingRequest
+    private function request(int $timeout = 30): PendingRequest
     {
         return $this->http->baseUrl((string) config('services.ocr.base_url'))
             ->acceptJson()
             ->asJson()
-            ->timeout(30);
+            ->timeout($timeout);
     }
 
     private function toSharedPath(string $relativeInputPath): string
