@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree as ET
+try:
+    from lxml import etree as ET
+except ImportError:
+    from xml.etree import ElementTree as ET
 
 from app.services.html_renderer import build_table_html, escape_html
 from app.services.image_extractor import ImageExtractor

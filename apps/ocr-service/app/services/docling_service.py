@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 import re
 import zipfile
-from xml.etree import ElementTree as ET
+try:
+    from lxml import etree as ET
+except ImportError:
+    from xml.etree import ElementTree as ET
 
 import fitz
 
