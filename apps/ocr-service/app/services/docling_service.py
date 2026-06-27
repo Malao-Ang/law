@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 import fitz
 
 from app.services.confidence_scorer import score_docx_block, score_text_pdf_block
+from app.services.html_renderer import build_table_html
 from app.services.thai_normalizer import normalize_text as _normalize_thai_text
 
 
@@ -358,7 +359,6 @@ def _merge_column_pair_tables(blocks: list[dict], page_index: int) -> list[dict]
             ]
             first_ro = min(b.get("reading_order", 0) for b in all_blocks_in_run)
 
-            from app.services.html_renderer import build_table_html
             html = build_table_html(rows_out)
             headers = [c["text"] for c in rows_out[0]] if rows_out else []
             body = [[c["text"] for c in r] for r in rows_out[1:]]
@@ -871,7 +871,7 @@ class DoclingService:
                     line_text, line_tabs = _extract_line_text_with_tabs(line, page_margin_x)
                     if line_text:
                         lbb = line.get("bbox") or [0, 0, 0, 0]
-                        line_records.append((_normalize_thai_text(line_text)["text"],
+                        line_records.append((line_text,
                                              (lbb[1] + lbb[3]) / 2.0,
                                              float(lbb[0])))
                         for t in line_tabs:
@@ -981,7 +981,7 @@ class DoclingService:
                     headers = [c["text"] for c in cell_grid[0]] if cell_grid else []
                     body = [[c["text"] for c in r] for r in cell_grid[1:]]
                     raw_text = "\n".join("\t".join(c["text"] for c in r) for r in cell_grid)
-                    html = self._render_table_html(cell_grid)
+                    html = build_table_html(cell_grid)
                     blocks.append({
                         "block_id": f"{page_index}-tbl{reading_order + i}",
                         "type": "table",
@@ -1037,7 +1037,6 @@ class DoclingService:
             raw = page.get_text("text")
             lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
             for idx, line in enumerate(lines, start=1):
-                line = _normalize_thai_text(line)["text"]
                 line_confidence, line_flags = score_text_pdf_block(line)
                 blocks.append({
                     "block_id": f"{page_index}-{idx}",
@@ -1131,7 +1130,7 @@ class DoclingService:
 
             headers  = [c["text"] for c in rows[0]]
             body     = [[c["text"] for c in r] for r in rows[1:]]
-            html     = self._render_table_html(rows)
+            html     = build_table_html(rows)
             raw_text = "\n".join("\t".join(c["text"] for c in r) for r in rows)
 
             return {
@@ -1177,11 +1176,11 @@ class DoclingService:
                             if t.strip():
                                 spans.append(t)
                 if spans:
-                    return _normalize_thai_text(_join_thai_spans(spans))["text"]
+                    return _join_thai_spans(spans)
             except Exception:
                 pass
-        # Fallback: normalise the pre-assembled string
-        return _normalize_thai_text(str(fallback_text or "").strip())["text"]
+        # Fallback: return the pre-assembled string verbatim (normalization happens in block_builder)
+        return str(fallback_text or "").strip()
 
     @staticmethod
     def _infer_pdf_paragraph_layout(lines: list, page_rect: object) -> dict:
@@ -1453,7 +1452,7 @@ class DoclingService:
             if vm is not None: v_merge_state = self._word_attr(vm, "val") or "continue"
         text = "\n".join(
             part for part in (
-                _normalize_thai_text(self._extract_paragraph_text(p).strip())["text"]
+                self._extract_paragraph_text(p).strip()
                 for p in cell.findall("w:p", self.NAMESPACES)
             ) if part
         )
@@ -1486,28 +1485,9 @@ class DoclingService:
     ) -> dict:
         headers  = flattened_rows[0] if flattened_rows else []
         body     = flattened_rows[1:]
-        html     = self._render_table_html(rows)
+        html     = build_table_html(rows)
         raw_text = "\n".join("\t".join(c for c in r if c) for r in flattened_rows)
         return {"headers": headers, "rows": body, "cells": rows, "html": html, "text": raw_text}
-
-    def _render_table_html(self, rows: list[list[dict]]) -> str:
-        html_rows: list[str] = []
-        for ri, row in enumerate(rows):
-            cells: list[str] = []
-            tag = "th" if ri == 0 else "td"
-            for cell in row:
-                attrs: list[str] = []
-                if cell["colspan"] > 1: attrs.append(f' colspan="{cell["colspan"]}"')
-                if cell["rowspan"] > 1: attrs.append(f' rowspan="{cell["rowspan"]}"')
-                if cell["alignment"]:
-                    al = escape_html(str(cell["alignment"]))
-                    attrs.append(f' data-cell-align="{al}" style="text-align:{al};"')
-                content = escape_html(cell.get("text") or "").replace("\n", "<br>")
-                if not content and cell.get("has_image"):
-                    content = '<span class="doc-cell-image">[image]</span>'
-                cells.append(f'<{tag}{"".join(attrs)}>{content}</{tag}>')
-            html_rows.append("<tr>" + "".join(cells) + "</tr>")
-        return '<table class="doc-table" border="1" cellspacing="0" cellpadding="4"><tbody>' + "".join(html_rows) + "</tbody></table>"
 
     def _resolve_numbering(self, paragraph: ET.Element, numbering_context: dict, layout: dict) -> dict | None:
         """Resolve numbering for a paragraph and return prefix and updated layout."""

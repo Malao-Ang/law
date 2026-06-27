@@ -12,6 +12,8 @@ import fitz
 import cv2
 import numpy as np
 
+from app.services.html_renderer import build_table_html
+
 # Suppress torch pin_memory warnings when no GPU is available
 warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
@@ -551,7 +553,7 @@ class OcrPipeline:
         headers = [cell["text"] for cell in table_rows[0]] if table_rows else []
         body = [[cell["text"] for cell in row] for row in table_rows[1:]] if len(table_rows) > 1 else []
         clean_rows = [[{k: v for k, v in cell.items() if k != "_bbox"} for cell in row] for row in table_rows]
-        html = self._build_table_html(clean_rows)
+        html = build_table_html(clean_rows)
         raw_text = "\n".join("\t".join(cell["text"] for cell in row) for row in clean_rows)
         merged_bbox = self._merge_bboxes([line["bbox"] for line in sorted_lines])
 
@@ -672,23 +674,6 @@ class OcrPipeline:
             return None
 
         return [min(x_coords), min(y_coords), max(x1_coords), max(y1_coords)]
-
-    @staticmethod
-    def _build_table_html(rows: list[list[dict]]) -> str:
-        """Build HTML table from rows."""
-        html_rows: list[str] = []
-
-        for row_index, row in enumerate(rows):
-            rendered_cells: list[str] = []
-            cell_tag = "th" if row_index == 0 else "td"
-
-            for cell in row:
-                text = str(cell.get("text", "")).replace("<", "&lt;").replace(">", "&gt;")
-                rendered_cells.append(f"<{cell_tag}>{text}</{cell_tag}>")
-
-            html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
-
-        return "<table><tbody>" + "".join(html_rows) + "</tbody></table>"
 
     def _extract_embedded_images(
         self, page: fitz.Page, doc: fitz.Document, document_id: str, page_index: int

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.services.ai_corrector import MockAICorrector
+from app.services.html_renderer import build_table_html
 from app.services.layout_inferrer import infer_indent_levels
 from app.services.numbering_tokenizer import annotate_blocks as annotate_list_markers
 from app.services.semantic_indent_resolver import resolve_semantic_indents
@@ -327,30 +328,6 @@ def normalize_table_rows(value: object) -> list[list[str]]:
 
 def flatten_table_row(row: list[dict]) -> list[str]:
     return [str(cell.get("text") or "") for cell in row]
-
-
-def build_table_html(rows: list[list[dict]]) -> str:
-    html_rows: list[str] = []
-
-    for row_index, row in enumerate(rows):
-        rendered_cells: list[str] = []
-        cell_tag = "th" if row_index == 0 else "td"
-        for cell in row:
-            attrs: list[str] = []
-            colspan = max(1, int(cell.get("colspan") or 1))
-            rowspan = max(1, int(cell.get("rowspan") or 1))
-            alignment = cell.get("alignment")
-            if colspan > 1:
-                attrs.append(f' colspan="{colspan}"')
-            if rowspan > 1:
-                attrs.append(f' rowspan="{rowspan}"')
-            if alignment:
-                attrs.append(f' style="text-align:{escape_html(str(alignment))};"')
-            text = escape_html(str(cell.get("text") or "")).replace("\n", "<br>")
-            rendered_cells.append(f'<{cell_tag}{"".join(attrs)}>{text}</{cell_tag}>')
-        html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
-
-    return '<table class="doc-table" border="1" cellspacing="0" cellpadding="4"><tbody>' + "".join(html_rows) + "</tbody></table>"
 
 
 def render_text_with_layout(text: str, layout: dict) -> str:

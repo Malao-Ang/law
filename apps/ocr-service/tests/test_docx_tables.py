@@ -8,6 +8,7 @@ import zipfile
 
 from app.services.block_builder import build_reviewed_html, build_table_payload
 from app.services.docling_service import DoclingService
+from app.services.html_renderer import build_table_html
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,11 +101,10 @@ def test_build_table_payload_falls_back_when_no_html() -> None:
 # Patch 3 — ThaiNormalizer applied to cell text
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_cell_text_thai_normalizer_applied() -> None:
-    """Thai text in a cell must be normalised (e.g. sara-am split corrected)."""
-    # Sara-am = เ + า, often OCR/input splits as สร + า instead of สระ อำ
-    # Use a simpler detectable case: ZWSP (U+200B) between Thai characters must be stripped.
-    zwsp = "\u200b"
+def test_cell_text_verbatim_raw_text() -> None:
+    """Cell text stored in raw_text must be verbatim (normalization deferred to block_builder)."""
+    # ZWSP (U+200B) in source text must be preserved here; block_builder removes it later.
+    zwsp = "​"
     cell_xml = (
         f'<w:tc {NSMAP}>'
         f'<w:p><w:r><w:t>ก{zwsp}ข</w:t></w:r></w:p>'
@@ -114,15 +114,10 @@ def test_cell_text_thai_normalizer_applied() -> None:
     cell_elem = ET.fromstring(cell_xml)
     svc = _svc()
     result = svc._parse_table_cell(cell_elem)
-    # ZWSP should be removed by ThaiNormalizer
-    assert zwsp not in result["text"]
-    assert "กข" in result["text"]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Multi-paragraph cell reading order
-# ─────────────────────────────────────────────────────────────────────────────
-
+    # raw_text is verbatim -- ZWSP is present; block_builder normalize pass strips it later
+    assert zwsp in result["text"], "ZWSP should be preserved in raw cell text"
+    assert "ก" in result["text"]
+    assert "ข" in result["text"]
 def test_multi_paragraph_cell_reading_order() -> None:
     """Two paragraphs in a cell must appear in document order, joined by newline."""
     cell_xml = (
@@ -150,8 +145,7 @@ def test_colspan_in_html() -> None:
             {"text": "Normal", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": False},
         ]
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert 'colspan="2"' in html
     assert 'colspan="1"' not in html  # colspan=1 is the default, must not be emitted
 
@@ -162,8 +156,7 @@ def test_rowspan_in_html() -> None:
         [{"text": "Spans two", "colspan": 1, "rowspan": 2, "alignment": None, "has_image": False}],
         [{"text": "Other", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": False}],
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert 'rowspan="2"' in html
 
 
@@ -200,8 +193,7 @@ def test_cell_with_image_renders_placeholder() -> None:
     rows = [
         [{"text": "", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": True}]
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert "doc-cell-image" in html
     assert "[image]" in html
 
