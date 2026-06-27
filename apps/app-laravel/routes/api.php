@@ -18,6 +18,7 @@ Route::put('/documents/{documentId}/document-review', [ReviewController::class, 
 Route::patch('/documents/{documentId}/blocks/{blockId}', [ReviewController::class, 'update']);
 Route::patch('/documents/{documentId}/blocks/{blockId}/layout', [ReviewController::class, 'updateLayout']);
 Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewController::class, 'reprocess']);
+Route::post('/documents/{documentId}/pages/{pageNo}/reprocess', [ReviewController::class, 'reprocessPage']);
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);

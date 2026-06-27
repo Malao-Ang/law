@@ -12,6 +12,7 @@ from app.api.schemas import (
     ExtractRequest,
     HealthResponse,
     ReprocessBlockRequest,
+    ReprocessPageRequest,
     intermediate_output_path,
 )
 from app.core.config import get_settings
@@ -80,6 +81,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
         requested_scan_mode = payload.scan_extraction_mode
         effective_scan_mode = requested_scan_mode
         extraction_path: list[str] = []
+        landingai_metadata: dict[str, object] | None = None
 
         if mode == "docx":
             with _stage_timer(payload.document_id, "extract", logger, timings):
@@ -93,7 +95,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
             source_type = "pdf_text"
         elif mode == "pdf_scan":
             with _stage_timer(payload.document_id, "ocr", logger, timings):
-                pages, effective_scan_mode = _extract_scan_pages(
+                pages, effective_scan_mode, landingai_metadata = _extract_scan_pages(
                     file_path=file_path,
                     document_id=payload.document_id,
                     requested_mode=requested_scan_mode,
@@ -107,7 +109,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 scan_indices = set(classification["pages"].get("scan", []))
                 scan_results = None
                 if scan_indices:
-                    scan_results, effective_scan_mode = _extract_scan_pages_selective(
+                    scan_results, effective_scan_mode, landingai_metadata = _extract_scan_pages_selective(
                         file_path=file_path,
                         document_id=payload.document_id,
                         requested_mode=requested_scan_mode,
@@ -144,6 +146,8 @@ def _run_extraction(payload: ExtractRequest) -> None:
             "scan_extraction_mode_effective": effective_scan_mode,
             "path": extraction_path,
         }
+        if landingai_metadata is not None:
+            output["extraction"]["landingai"] = landingai_metadata
         output_path.write_text(
             json.dumps(output, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -208,25 +212,27 @@ def _extract_scan_pages(
     document_id: str,
     requested_mode: str,
     data_root: Path,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, dict[str, object] | None]:
     logger = get_logger(document_id)
     if requested_mode == "local":
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-        return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local"
+        return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local", None
     if requested_mode == "landingai":
         parser = LandingAiAdeParser(data_root=data_root)
-        return parser.parse_pdf(file_path=file_path, document_id=document_id), "landingai"
+        pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
+        return pages, "landingai", parser.last_metadata
 
     # auto: try local first; fall back to LandingAI only if key is configured
     ocr_pipeline = get_ocr_pipeline(data_root=data_root)
     local_pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
     if _scan_quality_good(local_pages):
-        return local_pages, "local"
+        return local_pages, "local", None
     if not get_settings().landingai_api_key:
         logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
-        return local_pages, "local"
+        return local_pages, "local", None
     parser = LandingAiAdeParser(data_root=data_root)
-    return parser.parse_pdf(file_path=file_path, document_id=document_id), "landingai"
+    pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
+    return pages, "landingai", parser.last_metadata
 
 
 def _extract_scan_pages_selective(
@@ -235,7 +241,7 @@ def _extract_scan_pages_selective(
     requested_mode: str,
     page_indices: set[int],
     data_root: Path,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, dict[str, object] | None]:
     logger = get_logger(document_id)
     if requested_mode == "local":
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
@@ -244,10 +250,11 @@ def _extract_scan_pages_selective(
             document_id=document_id,
             page_indices=page_indices,
         )
-        return pages, "local"
+        return pages, "local", None
     if requested_mode == "landingai":
         parser = LandingAiAdeParser(data_root=data_root)
-        return parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices), "landingai"
+        pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+        return pages, "landingai", parser.last_metadata
 
     # auto: try local first; fall back to LandingAI only if key is configured
     ocr_pipeline = get_ocr_pipeline(data_root=data_root)
@@ -257,12 +264,13 @@ def _extract_scan_pages_selective(
         page_indices=page_indices,
     )
     if _scan_quality_good(local_pages):
-        return local_pages, "local"
+        return local_pages, "local", None
     if not get_settings().landingai_api_key:
         logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
-        return local_pages, "local"
+        return local_pages, "local", None
     parser = LandingAiAdeParser(data_root=data_root)
-    return parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices), "landingai"
+    pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+    return pages, "landingai", parser.last_metadata
 
 
 def _get_ocr_pipeline_if_needed(needed: bool, data_root: Path) -> object | None:
@@ -303,6 +311,82 @@ def _scan_quality_good(pages: list[dict]) -> bool:
     mean_confidence = confidence_sum / confidence_count
     uncertain_ratio = uncertain_count / max(1, text_blocks)
     return mean_confidence >= 0.78 and uncertain_ratio <= 0.50
+
+
+@router.post("/pipeline/reprocess-page", status_code=202)
+def reprocess_page(payload: ReprocessPageRequest, background_tasks: BackgroundTasks) -> dict:
+    file_path = Path(payload.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Input file does not exist")
+    background_tasks.add_task(_run_page_reprocess, payload)
+    return {"status": "accepted", "document_id": payload.document_id, "page_no": payload.page_no}
+
+
+def _run_page_reprocess(payload: ReprocessPageRequest) -> None:
+    settings = get_settings()
+    logger = get_logger(payload.document_id)
+    file_path = Path(payload.file_path)
+    output_path = intermediate_output_path(settings.data_root, payload.document_id)
+
+    try:
+        pages, effective_mode, landingai_meta = _extract_scan_pages(
+            file_path=file_path,
+            document_id=payload.document_id,
+            requested_mode=payload.scan_extraction_mode,
+            data_root=settings.data_root,
+        )
+
+        # Filter to only the requested page.
+        new_page = next((p for p in pages if p.get("page_no") == payload.page_no), None)
+        if new_page is None:
+            logger.warning("reprocess-page: page %d not found in new extraction", payload.page_no)
+            return
+
+        # Apply post-processors to the new page.
+        from app.services.layout_inferrer import infer_indent_levels
+        from app.services.numbering_tokenizer import annotate_blocks
+        infer_indent_levels([new_page])
+        annotate_blocks(new_page.get("blocks", []))
+        for block in new_page.get("blocks", []):
+            raw = block.get("raw_text", "")
+            result = normalize_text(raw)
+            block["normalized_text"] = result["text"]
+            block["flags"] = list(set((block.get("flags") or []) + result.get("flags", [])))
+            block.setdefault("ai_suggested_text", result["text"])
+            block.setdefault("approved_text", result["text"])
+            block.setdefault("needs_review", False)
+
+        # Merge into existing output, replacing the old page.
+        if output_path.exists():
+            data = json.loads(output_path.read_text(encoding="utf-8"))
+        else:
+            data = {"pages": []}
+
+        existing_pages = [p for p in data.get("pages", []) if p.get("page_no") != payload.page_no]
+        existing_pages.append(new_page)
+        existing_pages.sort(key=lambda p: p.get("page_no", 0))
+        data["pages"] = existing_pages
+
+        extraction = data.get("extraction") or {}
+        extraction["scan_extraction_mode_effective"] = effective_mode
+        if landingai_meta:
+            extraction["landingai"] = landingai_meta
+        data["extraction"] = extraction
+
+        output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info("page reprocessed", extra={"page_no": payload.page_no, "mode": effective_mode})
+
+        if payload.callback_url:
+            _post_callback(payload.callback_url, payload.document_id, {"status": "success", "output": data}, logger)
+
+    except Exception as exc:
+        logger.error("page reprocess failed", extra={"page_no": payload.page_no, "error": str(exc)})
+        if payload.callback_url:
+            try:
+                _post_callback(payload.callback_url, payload.document_id, {"status": "failed", "error": str(exc)}, logger)
+            except Exception:
+                pass
+        raise
 
 
 @router.post("/pipeline/reprocess-block", response_model=BlockPatchResponse)

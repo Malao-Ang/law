@@ -149,6 +149,17 @@ export interface ReviewDocument {
     scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
     scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
     path?: string[];
+    landingai?: {
+      status_code?: number | null;
+      filename?: string | null;
+      org_id?: string | null;
+      page_count?: number | null;
+      duration_ms?: number | null;
+      credit_usage?: number | null;
+      job_id?: string | null;
+      version?: string | null;
+      failed_pages?: number[];
+    } | null;
   } | null;
 }
 

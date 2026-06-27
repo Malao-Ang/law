@@ -126,3 +126,14 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
     body: JSON.stringify({}),
   });
 }
+
+export function reprocessPageWithLandingAI(
+  documentId: string,
+  pageNo: number,
+  scanExtractionMode: 'landingai' | 'local' | 'auto' = 'landingai',
+): Promise<{ document_id: string; page_no: number; status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/pages/${pageNo}/reprocess`, {
+    method: 'POST',
+    body: JSON.stringify({ page_no: pageNo, scan_extraction_mode: scanExtractionMode }),
+  });
+}

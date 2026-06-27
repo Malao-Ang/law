@@ -16,11 +16,13 @@
 
       <v-select
         v-model="scanExtractionMode"
-        label="Scanned PDF Mode"
+        label="PDF parser engine (scanned pages)"
         :items="scanModeOptions"
         item-title="title"
         item-value="value"
         density="comfortable"
+        hint="DOCX and text-PDF always use Docling. This setting applies to scanned pages only."
+        persistent-hint
       ></v-select>
 
       <v-btn

@@ -34,8 +34,12 @@
     >
       <section class="list-panel">
         <div class="pane-inner">
-          <h3>Blocks</h3>
-          <p class="hint">คลิก block เพื่อแก้ไข · ใช้ปุ่ม +/− ปรับระดับ indent</p>
+          <MatraToc
+            :items="matraBlocks"
+            :current-block-id="currentMatraBlockId"
+            @jump="scrollToBlock"
+          />
+          <p class="hint" style="margin-bottom:0.25rem;">คลิก block เพื่อแก้ไข · ใช้ปุ่ม +/− ปรับระดับ indent</p>
           <DocumentBlockEditor
             :document-id="documentId"
             :pages="review.pages"
@@ -43,6 +47,7 @@
             @select-block="(pageNo, block) => { selected = { page_no: pageNo, block } }"
             @layout-updated="() => reloadReview({ preserveLocalHtml: documentHtmlDirty })"
             @block-saved="() => reloadReview({ preserveLocalHtml: documentHtmlDirty })"
+            @current-block-change="onCurrentBlockChange"
           />
         </div>
       </section>
@@ -122,6 +127,16 @@
             <p v-if="review.extraction?.path?.length" class="hint">
               Extraction path: {{ review.extraction.path.join(' -> ') }}
             </p>
+            <p v-if="review.extraction?.landingai?.job_id" class="hint">
+              LandingAI job: {{ review.extraction.landingai.job_id }}
+            </p>
+            <p v-if="review.extraction?.landingai?.page_count != null" class="hint">
+              LandingAI pages: {{ review.extraction.landingai.page_count }}
+              <span v-if="review.extraction.landingai.duration_ms != null"> · {{ review.extraction.landingai.duration_ms }}ms</span>
+            </p>
+            <p v-if="review.extraction?.landingai?.failed_pages?.length" class="hint">
+              LandingAI failed pages: {{ review.extraction.landingai.failed_pages.join(', ') }}
+            </p>
             <p v-if="review.timings" class="hint">
               Timings: {{ formatTimings(review.timings) }}
             </p>
@@ -144,11 +159,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { exportDocument, fetchReview, fetchStatus, saveDocumentReview } from '../api/client';
-import type { DocumentBlock, DocumentStatus, ReviewDocument } from '../types/document';
+import type { DocumentBlock, DocumentStatus, ListMarker, ReviewDocument } from '../types/document';
 import BlockReviewPanel from '../components/BlockReviewPanel.vue';
 import DocumentBlockEditor from '../components/DocumentBlockEditor.vue';
 import DocumentHtmlEditor from '../components/DocumentHtmlEditor.vue';
 import DocumentViewer from '../components/DocumentViewer.vue';
+import MatraToc from '../components/MatraToc.vue';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -172,6 +188,36 @@ const flatBlocks = computed(() => {
   if (!review.value) return [];
   return review.value.pages.flatMap((page) => page.blocks.map((block) => ({ page_no: page.page_no, block })));
 });
+
+const matraBlocks = computed(() =>
+  flatBlocks.value.filter((item) => item.block.meta.list_marker?.type === 'legal-มาตรา'),
+);
+
+const currentMatraBlockId = ref<string | null>(null);
+
+function scrollToBlock(blockId: string): void {
+  document.getElementById(`block-${blockId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  selectBlockById(blockId);
+}
+
+function onCurrentBlockChange(blockId: string, _matra: ListMarker | null): void {
+  const matraItem = matraBlocks.value.find((item) => item.block.block_id === blockId);
+  if (matraItem) {
+    currentMatraBlockId.value = blockId;
+  } else {
+    // Find the closest preceding มาตรา block.
+    const allIds = flatBlocks.value.map((item) => item.block.block_id);
+    const idx = allIds.indexOf(blockId);
+    for (let i = idx; i >= 0; i--) {
+      const candidate = flatBlocks.value[i];
+      if (candidate.block.meta.list_marker?.type === 'legal-มาตรา') {
+        currentMatraBlockId.value = candidate.block.block_id;
+        return;
+      }
+    }
+    currentMatraBlockId.value = null;
+  }
+}
 
 const serverDraftHtml = computed(() => review.value?.document_review.draft_html ?? '');
 const selectedPage = computed(() => {

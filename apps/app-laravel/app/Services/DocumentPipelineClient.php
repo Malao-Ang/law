@@ -32,6 +32,26 @@ class DocumentPipelineClient
     }
 
     /**
+     * Reprocess a single page with the given extraction mode (defaults to landingai).
+     * Returns 202 immediately; result is posted to $callbackUrl.
+     */
+    public function reprocessPage(
+        string $documentId,
+        string $relativeInputPath,
+        int $pageNo,
+        string $callbackUrl,
+        string $scanExtractionMode = 'landingai',
+    ): void {
+        $this->request(5)->post('/pipeline/reprocess-page', [
+            'document_id' => $documentId,
+            'file_path' => $this->toSharedPath($relativeInputPath),
+            'page_no' => $pageNo,
+            'scan_extraction_mode' => $scanExtractionMode,
+            'callback_url' => $callbackUrl,
+        ])->throw();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function reprocessBlock(string $documentId, int $pageNo, string $blockId, string $mode): array

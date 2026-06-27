@@ -23,6 +23,14 @@ class ReprocessBlockRequest(BaseModel):
     mode: Literal["ai_correction"] = "ai_correction"
 
 
+class ReprocessPageRequest(BaseModel):
+    document_id: str = Field(min_length=1)
+    file_path: str = Field(min_length=1)
+    page_no: int = Field(ge=1)
+    scan_extraction_mode: ScanExtractionMode = "landingai"
+    callback_url: str | None = None
+
+
 class BlockPatchResponse(BaseModel):
     document_id: str
     page_no: int

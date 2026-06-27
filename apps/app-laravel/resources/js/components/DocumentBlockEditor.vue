@@ -4,14 +4,39 @@
       <p class="hint">No blocks to display.</p>
     </div>
 
-    <div v-for="page in pages" :key="page.page_no" class="block-editor__page">
+    <div v-for="page in uniquePages" :key="page.page_no" class="block-editor__page">
       <div class="block-editor__page-header">
         <span class="hint">Page {{ page.page_no }}</span>
+        <button
+          v-if="page.image_url"
+          class="btn btn-tiny block-editor__thumb-toggle"
+          :title="thumbVisible[page.page_no] ? 'Hide preview' : 'Show preview'"
+          @click.stop="thumbVisible[page.page_no] = !thumbVisible[page.page_no]"
+        >{{ thumbVisible[page.page_no] ? '🖼 Hide' : '🖼 Preview' }}</button>
+        <button
+          class="btn btn-tiny block-editor__landingai-btn"
+          :disabled="reprocessingPage[page.page_no]"
+          :title="'Re-run page ' + page.page_no + ' with LandingAI'"
+          @click.stop="runLandingAI(page.page_no)"
+        >{{ reprocessingPage[page.page_no] ? 'Running…' : 'LandingAI ↺' }}</button>
       </div>
 
+      <!-- Page image thumbnail (togglable) -->
+      <div v-if="thumbVisible[page.page_no] && page.image_url" class="block-editor__thumb">
+        <img :src="page.image_url" alt="Page preview" class="block-editor__thumb-img" />
+      </div>
+
+      <template v-for="block in page.blocks" :key="block.block_id">
+        <!-- มาตรา section divider -->
+        <div
+          v-if="block.meta.list_marker?.type === 'legal-มาตรา'"
+          class="block-editor__matra-divider"
+        >
+          <span class="block-editor__matra-divider-label">{{ block.meta.list_marker.text }}</span>
+        </div>
+
       <div
-        v-for="block in page.blocks"
-        :key="block.block_id"
+        :id="`block-${block.block_id}`"
         class="block-editor__block"
         :class="[
           `block-type--${block.type}`,
@@ -21,6 +46,11 @@
         ]"
         @click="selectBlock(page.page_no, block)"
       >
+        <!-- Sticky มาตรา pill for non-มาตรา blocks -->
+        <div
+          v-if="blockMatraMap.get(block.block_id) && block.meta.list_marker?.type !== 'legal-มาตรา'"
+          class="block-editor__matra-pill"
+        >{{ blockMatraMap.get(block.block_id)?.text }}</div>
         <!-- Image block -->
         <template v-if="block.type === 'image'">
           <figure class="block-editor__image">
@@ -215,18 +245,19 @@
           <span v-if="errors[block.block_id]" class="hint block-editor__error">{{ errors[block.block_id] }}</span>
         </div>
       </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onBeforeUnmount } from 'vue';
+import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import { patchBlock, patchBlockLayout } from '../api/client';
 import BlockRulerEditor from './BlockRulerEditor.vue';
-import type { DocumentBlock, DocumentPage, LayoutPatch } from '../types/document';
+import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../types/document';
 
 interface SpellSuggestion {
   token: string;
@@ -245,7 +276,47 @@ const emit = defineEmits<{
   'select-block': [pageNo: number, block: DocumentBlock];
   'layout-updated': [pageNo: number, block: DocumentBlock];
   'block-saved': [pageNo: number, block: DocumentBlock];
+  'current-block-change': [blockId: string, matra: ListMarker | null];
 }>();
+
+// Maps every block_id to the closest preceding มาตรา marker (or null).
+const blockMatraMap = computed(() => {
+  const map = new Map<string, ListMarker>();
+  let current: ListMarker | null = null;
+  for (const page of props.pages) {
+    for (const block of page.blocks) {
+      if (block.meta.list_marker?.type === 'legal-มาตรา') {
+        current = block.meta.list_marker;
+      }
+      if (current) map.set(block.block_id, current);
+    }
+  }
+  return map;
+});
+
+// IntersectionObserver: emit which block is currently near the top of the viewport.
+let observer: IntersectionObserver | null = null;
+
+function setupObserver(): void {
+  observer?.disconnect();
+  observer = new IntersectionObserver(
+    (entries) => {
+      const top = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (top) {
+        const blockId = top.target.id.replace(/^block-/, '');
+        emit('current-block-change', blockId, blockMatraMap.value.get(blockId) ?? null);
+      }
+    },
+    { rootMargin: '-10% 0px -75% 0px' },
+  );
+  document.querySelectorAll<HTMLElement>('.block-editor__block').forEach((el) => observer!.observe(el));
+}
+
+onMounted(() => nextTick(setupObserver));
+
+watch(() => props.pages, () => nextTick(setupObserver), { deep: false });
 
 const busy = reactive<Record<string, boolean>>({});
 const errors = reactive<Record<string, string>>({});
@@ -385,6 +456,7 @@ async function sendLayoutPatch(
 
 onBeforeUnmount(() => {
   cancelEdit();
+  observer?.disconnect();
 });
 </script>
 
@@ -564,6 +636,22 @@ onBeforeUnmount(() => {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* มาตรา sticky pill */
+.block-editor__matra-pill {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: inline-block;
+  margin-bottom: 2px;
+  padding: 1px 8px;
+  background: #d1fae5;
+  color: #047857;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 /* Spell suggestions */

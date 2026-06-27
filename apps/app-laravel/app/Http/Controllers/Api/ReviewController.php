@@ -9,8 +9,10 @@ use App\Http\Requests\UpdateBlockRequest;
 use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
 use App\Services\DocumentHtmlService;
+use App\Services\DocumentPipelineClient;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use RuntimeException;
 
 class ReviewController extends Controller
@@ -18,6 +20,7 @@ class ReviewController extends Controller
     public function __construct(
         private readonly ReviewStore $reviewStore,
         private readonly DocumentHtmlService $documentHtmlService,
+        private readonly DocumentPipelineClient $pipelineClient,
     ) {}
 
     public function show(string $documentId): JsonResponse
@@ -136,6 +139,48 @@ class ReviewController extends Controller
             'status' => 'updated',
             'block' => $updatedBlock,
         ]);
+    }
+
+    public function reprocessPage(Request $request, string $documentId): JsonResponse
+    {
+        $pageNo = (int) $request->input('page_no', 0);
+        $mode = (string) $request->input('scan_extraction_mode', 'landingai');
+
+        if ($pageNo < 1) {
+            return response()->json(['message' => 'page_no must be >= 1'], 422);
+        }
+
+        try {
+            $status = $this->reviewStore->getStatus($documentId);
+        } catch (RuntimeException) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $sourceFile = (string) ($status['source_file'] ?? '');
+        if ($sourceFile === '') {
+            return response()->json(['message' => 'Source file path not available.'], 422);
+        }
+
+        $callbackUrl = route('pipeline.callback');
+        $this->pipelineClient->reprocessPage(
+            documentId: $documentId,
+            relativeInputPath: 'uploads/'.$documentId.'/'.$sourceFile,
+            pageNo: $pageNo,
+            callbackUrl: $callbackUrl,
+            scanExtractionMode: $mode,
+        );
+
+        $this->reviewStore->setStatus($documentId, [
+            'status' => 'processing',
+            'current_step' => 'reprocess_page_landingai',
+        ]);
+
+        return response()->json([
+            'document_id' => $documentId,
+            'page_no' => $pageNo,
+            'scan_extraction_mode' => $mode,
+            'status' => 'queued',
+        ], 202);
     }
 
     public function reprocess(ReprocessBlockRequest $request, string $documentId, string $blockId): JsonResponse
