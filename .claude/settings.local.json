@@ -13,7 +13,15 @@
       "Bash(pip install *)",
       "Bash(python -m pytest tests/test_pdf_text_extraction.py tests/test_thai_normalizer.py tests/test_docx_tables.py -v)",
       "Bash(python -m pytest tests/ -v --tb=no -q)",
-      "Bash(python -m pytest tests/ --ignore=tests/test_health.py -v --tb=no -q)"
+      "Bash(python -m pytest tests/ --ignore=tests/test_health.py -v --tb=no -q)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git *)",
+      "Bash(python -m pytest tests/test_docling_service.py tests/test_docx_parser.py tests/test_docx_indent.py tests/test_docx_tables.py -v)",
+      "mcp__claude_ai_Figma__get_design_context",
+      "mcp__claude_ai_Figma__get_screenshot"
     ]
   }
 }

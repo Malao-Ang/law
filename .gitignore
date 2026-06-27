@@ -42,3 +42,8 @@ tmp/
 temp/
 *.env
 *.env.example
+docs/*
+*.docx
+*.pdf
+*.jpg
+*.doc
