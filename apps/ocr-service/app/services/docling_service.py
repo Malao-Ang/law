@@ -572,10 +572,10 @@ class DoclingService:
 
     # ── DOCX ─────────────────────────────────────────────────────────────────
 
-    def _parse_numbering_xml(self, archive: zipfile.ZipFile) -> dict:
+    def _parse_numbering_xml(self, archive: zipfile.ZipFile, name_set: frozenset[str]) -> dict:
         """Parse word/numbering.xml and return numbering context."""
         numbering_path = "word/numbering.xml"
-        if numbering_path not in archive.namelist():
+        if numbering_path not in name_set:
             return {"abstract_nums": {}, "num_map": {}, "counters": {}}
 
         with archive.open(numbering_path) as fh:
@@ -677,10 +677,12 @@ class DoclingService:
 
     def _extract_docx_blocks(self, file_path: Path, document_id: str) -> list[dict]:
         with zipfile.ZipFile(file_path) as archive:
+            name_set = frozenset(archive.namelist())
+
             # Build rId → zip-path map for embedded images
             rel_map: dict[str, str] = {}
             rel_path = "word/_rels/document.xml.rels"
-            if rel_path in archive.namelist():
+            if rel_path in name_set:
                 with archive.open(rel_path) as fh:
                     for rel in ET.parse(fh).getroot():
                         if rel.get("Type", "").endswith("/image"):
@@ -691,7 +693,7 @@ class DoclingService:
                             rel_map[rid] = target
 
             # Parse numbering definitions
-            numbering_context = self._parse_numbering_xml(archive)
+            numbering_context = self._parse_numbering_xml(archive, name_set)
 
             with archive.open("word/document.xml") as fh:
                 root = ET.parse(fh).getroot()
@@ -710,7 +712,7 @@ class DoclingService:
                 if tag == "p":
                     # Check for embedded image before treating as paragraph
                     img = self._parse_docx_image(
-                        child, archive, rel_map, document_id, reading_order
+                        child, archive, rel_map, name_set, document_id, reading_order
                     )
                     if img is not None:
                         block = img
@@ -731,6 +733,7 @@ class DoclingService:
         paragraph: ET.Element,
         archive: zipfile.ZipFile,
         rel_map: dict[str, str],
+        name_set: frozenset[str],
         document_id: str,
         reading_order: int,
     ) -> dict | None:
@@ -746,7 +749,7 @@ class DoclingService:
             return None
 
         zip_path = rel_map[rid]
-        if zip_path not in archive.namelist():
+        if zip_path not in name_set:
             return None
 
         img_data = archive.read(zip_path)
