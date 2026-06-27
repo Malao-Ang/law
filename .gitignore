@@ -3,12 +3,12 @@
 !.env.example
 .claude/settings.local.json
 .claude/worktrees/
+.claude/
 .kiro/
 
 # OS / editor
 .DS_Store
 Thumbs.db
-<<<<<<< HEAD
 .idea/
 .vscode/
 
@@ -37,38 +37,9 @@ tmp/
 temp/
 *.env
 *.env.example
-docs/*
-*.docx
-*.pdf
+docs/
 *.jpg
+*.png
+*.pdf
+*.docx
 *.doc
-=======
-.idea/
-.vscode/
-
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-venv/
-
-# Node / frontend
-node_modules/
-npm-debug.log*
-
-# PHP / Composer
-vendor/
-
-# Build / runtime outputs
-dist/
-build/
-coverage/
-*.log
-tmp/
-temp/
-*.env
-*.env.example
->>>>>>> 4e3dee9 (Stop ignoring pdf and docx samples)
