@@ -74,26 +74,42 @@ class ThaiSpellChecker:
 
         Returns ``[]`` when spellcheck is unavailable or the text is clean.
         """
-        if not self.is_available() or not text.strip():
-            return []
+        return self.bulk_check([text])[0]
+
+    def bulk_check(self, texts: list[str]) -> list[list[dict]]:
+        """Return spell suggestions for each input text, preserving order."""
+        results: list[list[dict]] = [[] for _ in texts]
+        if not texts or not self.is_available():
+            return results
 
         assert self._checker is not None
         assert self._tokenizer is not None
 
-        suggestions: list[dict] = []
-        offset = 0
-        tokens: list[str] = self._tokenizer(text, engine="newmm")
+        candidate_cache: dict[str, list[str]] = {}
 
-        for token in tokens:
-            token_start = text.find(token, offset)
-            if token_start < 0:
-                token_start = offset
-            token_offset = token_start
+        for text_index, text in enumerate(texts):
+            if not text.strip():
+                continue
 
-            # Only check Thai-script tokens; skip punctuation, numbers, spaces.
-            if _THAI_WORD_RE.fullmatch(token) and token not in _LEGAL_TERMS:
-                try:
-                    candidates = self._checker.spell(token)
+            suggestions: list[dict] = []
+            offset = 0
+            tokens: list[str] = self._tokenizer(text, engine="newmm")
+
+            for token in tokens:
+                token_start = text.find(token, offset)
+                if token_start < 0:
+                    token_start = offset
+                token_offset = token_start
+
+                # Only check Thai-script tokens; skip punctuation, numbers, spaces.
+                if _THAI_WORD_RE.fullmatch(token) and token not in _LEGAL_TERMS:
+                    if token not in candidate_cache:
+                        try:
+                            candidate_cache[token] = list(self._checker.spell(token))
+                        except Exception:
+                            candidate_cache[token] = []
+
+                    candidates = candidate_cache[token]
                     if candidates and candidates[0] != token:
                         suggestions.append({
                             "token": token,
@@ -101,12 +117,12 @@ class ThaiSpellChecker:
                             "confidence": round(1.0 / max(len(candidates), 1), 3),
                             "offset": token_offset,
                         })
-                except Exception:
-                    pass
 
-            offset = token_start + len(token)
+                offset = token_start + len(token)
 
-        return suggestions
+            results[text_index] = suggestions
+
+        return results
 
 
 # Module-level singleton — shared across requests.

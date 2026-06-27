@@ -285,6 +285,69 @@ class DocumentApiTest extends TestCase
         $this->assertSame(1, $status['ingested_chunk_count']);
     }
 
+    public function test_compose_state_is_saved_without_requiring_draft_html(): void
+    {
+        /** @var ReviewStore $store */
+        $store = app(ReviewStore::class);
+
+        $documentId = 'doc_test_compose_state';
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'source_file' => 'compose.pdf',
+            'source_type' => 'pdf_text',
+            'language' => 'th',
+            'summary' => [
+                'page_count' => 1,
+                'block_count' => 1,
+                'review_required_count' => 0,
+            ],
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => null,
+                'blocks' => [[
+                    'block_id' => '1-1',
+                    'type' => 'paragraph',
+                    'bbox' => [12, 12, 320, 80],
+                    'reading_order' => 1,
+                    'raw_text' => 'ประกาศทดสอบ',
+                    'normalized_text' => 'ประกาศทดสอบ',
+                    'ai_suggested_text' => 'ประกาศทดสอบ',
+                    'approved_text' => 'ประกาศทดสอบ',
+                    'confidence' => 0.96,
+                    'needs_review' => false,
+                    'flags' => [],
+                    'meta' => [
+                        'reviewed_html' => '<p>ประกาศทดสอบ</p>',
+                    ],
+                ]],
+            ]],
+        ]);
+
+        $this->putJson('/api/documents/'.$documentId.'/document-review', [
+            'font_family' => 'angsana',
+            'font_size_pt' => 18,
+            'metadata' => [
+                'subject' => 'ประกาศแต่งตั้ง',
+                'recipient' => 'ผู้อำนวยการกองกลาง',
+            ],
+        ])->assertOk()
+            ->assertJson([
+                'document_id' => $documentId,
+                'status' => 'updated',
+            ])
+            ->assertJsonPath('compose_state.font_family', 'angsana')
+            ->assertJsonPath('compose_state.font_size_pt', 18)
+            ->assertJsonPath('compose_state.metadata.subject', 'ประกาศแต่งตั้ง');
+
+        $review = $store->getReviewDocument($documentId);
+
+        $this->assertSame('angsana', $review['compose_state']['font_family']);
+        $this->assertSame(18, $review['compose_state']['font_size_pt']);
+        $this->assertSame('ประกาศแต่งตั้ง', $review['compose_state']['metadata']['subject']);
+        $this->assertSame('ผู้อำนวยการกองกลาง', $review['compose_state']['metadata']['recipient']);
+        $this->assertNotEmpty($review['document_review']['draft_html']);
+    }
+
     public function test_review_response_exposes_scan_page_image_metadata(): void
     {
         /** @var ReviewStore $store */

@@ -108,7 +108,7 @@ class ReviewController extends Controller
     public function updateDocumentReview(UpdateDocumentReviewRequest $request, string $documentId): JsonResponse
     {
         try {
-            $documentReview = $this->reviewStore->updateDocumentReview($documentId, $request->validated());
+            $payload = $this->reviewStore->updateDocumentReview($documentId, $request->validated());
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -116,7 +116,8 @@ class ReviewController extends Controller
         return response()->json([
             'document_id' => $documentId,
             'status' => 'updated',
-            'document_review' => $documentReview,
+            'document_review' => $payload['document_review'],
+            'compose_state' => $payload['compose_state'],
         ]);
     }
 

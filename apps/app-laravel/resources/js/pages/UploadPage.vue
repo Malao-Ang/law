@@ -44,13 +44,21 @@
                 Timings: {{ formatTimings(status.timings) }}
               </p>
 
-              <v-btn
-                v-if="canOpenReview"
-                color="success"
-                @click="goToReview"
-              >
-                ตรวจสอบเอกสาร
-              </v-btn>
+              <div v-if="canOpenReview" class="upload-actions">
+                <v-btn
+                  color="success"
+                  @click="goToReview"
+                >
+                  ตรวจสอบเอกสาร
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  variant="tonal"
+                  @click="goToCompose"
+                >
+                  เปิด Compose Editor
+                </v-btn>
+              </div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -142,4 +150,17 @@ function goToReview(): void {
   if (!documentId.value) return;
   router.push(`/documents/${documentId.value}/review`);
 }
+
+function goToCompose(): void {
+  if (!documentId.value) return;
+  router.push(`/documents/${documentId.value}/compose`);
+}
 </script>
+
+<style scoped>
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+</style>

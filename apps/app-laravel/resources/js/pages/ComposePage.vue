@@ -1,5 +1,5 @@
 <template>
-  <DocumentComposeWorkspace :document-id="documentId" mode="review" />
+  <DocumentComposeWorkspace :document-id="documentId" mode="compose" />
 </template>
 
 <script setup lang="ts">

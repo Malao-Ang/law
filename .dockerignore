@@ -36,3 +36,5 @@ venv
 **/*.log
 **/tmp
 **/temp
+*.docx
+*.pdf

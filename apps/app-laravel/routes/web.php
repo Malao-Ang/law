@@ -10,3 +10,4 @@ Route::get('/health', fn () => response()->json([
 
 Route::view('/', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/documents/{documentId}/compose', 'app')->where('documentId', '[A-Za-z0-9_\-]+');

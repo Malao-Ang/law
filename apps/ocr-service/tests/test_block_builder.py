@@ -7,7 +7,24 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from app.services.block_builder import build_document_output
+import pytest
+
+from app.services.block_builder import _is_marker_only, build_document_output
+
+
+class FakeSpellChecker:
+    def __init__(self, results: list[list[dict]] | None = None) -> None:
+        self.results = results or []
+        self.bulk_calls: list[list[str]] = []
+        self.check_calls: list[str] = []
+
+    def bulk_check(self, texts: list[str]) -> list[list[dict]]:
+        self.bulk_calls.append(texts)
+        return self.results or [[] for _ in texts]
+
+    def check(self, text: str) -> list[dict]:
+        self.check_calls.append(text)
+        raise AssertionError("build_document_output must use bulk_check")
 
 
 def _make_page(raw_text: str) -> dict:
@@ -27,6 +44,34 @@ def _make_page(raw_text: str) -> dict:
                 "meta": {},
             }
         ],
+    }
+
+
+def _make_multi_block_page(blocks: list[dict]) -> dict:
+    return {
+        "page_no": 1,
+        "width": 595.0,
+        "height": 842.0,
+        "blocks": blocks,
+    }
+
+
+def _make_block(
+    raw_text: str,
+    block_id: str,
+    reading_order: int,
+    confidence: float = 1.0,
+    block_type: str = "paragraph",
+) -> dict:
+    return {
+        "block_id": block_id,
+        "type": block_type,
+        "reading_order": reading_order,
+        "raw_text": raw_text,
+        "confidence": confidence,
+        "flags": [],
+        "bbox": [72, 100 + reading_order * 20, 500, 120 + reading_order * 20],
+        "meta": {},
     }
 
 
@@ -85,3 +130,89 @@ def test_normalized_text_differs_from_raw_when_normalizer_transforms():
     block = _run_build(raw)
     # counting_normalizer replaces า→ๅ; raw has า so texts must differ
     assert block["normalized_text"] != raw
+
+
+@pytest.mark.parametrize("text", ["มาตรา ๑", "ข้อ ๒", "วรรค ๓", "(ก)", "(๑)", "1.", "๑.๑"])
+def test_is_marker_only_matches_explicit_markers(text):
+    assert _is_marker_only(text) is True
+
+
+@pytest.mark.parametrize("text", ["คำ", "หมวด", "มาตรา ๑ บททั่วไป", "ข้อ ๒ ให้ดำเนินการ"])
+def test_is_marker_only_rejects_words_and_marker_with_body_text(text):
+    assert _is_marker_only(text) is False
+
+
+def test_build_document_output_calls_bulk_spellcheck_once(monkeypatch):
+    spellchecker = FakeSpellChecker(
+        [
+            [{"token": "ผิดดด", "suggestion": "ผิด", "confidence": 1.0, "offset": 0}],
+            [],
+        ]
+    )
+    monkeypatch.setattr("app.services.block_builder.get_spell_checker", lambda: spellchecker)
+
+    page = _make_multi_block_page(
+        [
+            _make_block("ผิดดด", "1-1", 1, confidence=0.50),
+            _make_block("ถูกต้อง", "1-2", 2, confidence=0.40),
+        ]
+    )
+    ai = MagicMock()
+
+    output = build_document_output(
+        document_id="test",
+        source_file="test.pdf",
+        source_type="pdf_text",
+        pages=[page],
+        normalizer=lambda text: {"text": text, "flags": []},
+        ai_corrector=ai,
+        enable_ai_correction=False,
+        review_threshold=0.90,
+    )
+
+    assert spellchecker.bulk_calls == [["ผิดดด", "ถูกต้อง"]]
+    assert spellchecker.check_calls == []
+    blocks = output["pages"][0]["blocks"]
+    assert blocks[0]["meta"]["spell_suggestions"] == [
+        {"token": "ผิดดด", "suggestion": "ผิด", "confidence": 1.0, "offset": 0}
+    ]
+    assert blocks[1]["meta"]["spell_suggestions"] == []
+
+
+def test_marker_only_blocks_skip_normalizer():
+    normalizer = MagicMock(side_effect=AssertionError("marker-only text should not be normalized"))
+    ai = MagicMock()
+
+    output = build_document_output(
+        document_id="test",
+        source_file="test.pdf",
+        source_type="pdf_text",
+        pages=[_make_page("มาตรา ๑")],
+        normalizer=normalizer,
+        ai_corrector=ai,
+        enable_ai_correction=False,
+        review_threshold=0.90,
+    )
+
+    block = output["pages"][0]["blocks"][0]
+    assert normalizer.call_count == 0
+    assert block["normalized_text"] == "มาตรา ๑"
+
+
+def test_non_marker_thai_text_still_calls_normalizer():
+    normalizer = MagicMock(return_value={"text": "normalized", "flags": []})
+    ai = MagicMock()
+
+    output = build_document_output(
+        document_id="test",
+        source_file="test.pdf",
+        source_type="pdf_text",
+        pages=[_make_page("มาตรา ๑ บททั่วไป")],
+        normalizer=normalizer,
+        ai_corrector=ai,
+        enable_ai_correction=False,
+        review_threshold=0.90,
+    )
+
+    normalizer.assert_called_once_with("มาตรา ๑ บททั่วไป")
+    assert output["pages"][0]["blocks"][0]["normalized_text"] == "normalized"

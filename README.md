@@ -1272,11 +1272,13 @@ Requirements:
 
 ## 27) คำสั่งเริ่มต้นใช้งาน
 
+### 27.1 เตรียมไฟล์ environment
+
 ```bash
 cp .env.example .env
 ```
 
-เพิ่มค่า LandingAI token ใน `.env`:
+ถ้าต้องการใช้ LandingAI สำหรับ PDF scan ให้เพิ่มค่าเหล่านี้ใน `.env`:
 
 ```bash
 VISION_AGENT_API_KEY=your_landingai_token
@@ -1285,18 +1287,66 @@ LANDINGAI_PARSE_MODEL=dpt-2-latest
 LANDINGAI_TIMEOUT_SECONDS=60
 ```
 
-รันแบบ Dev (Docker compose):
+ถ้ายังไม่มี dependency ของ Vite ในเครื่อง host ให้ติดตั้งก่อน เพราะ service `laravel-vite` mount โค้ดจาก host และตรวจ `node_modules/.bin/vite`:
 
 ```bash
-docker compose --env-file .env up --build
+cd apps/app-laravel
+npm install
+cd ../..
 ```
 
-รันแบบ Deploy (Docker compose detached):
+### 27.2 Start ด้วย Docker Compose
+
+รัน build และ start ทุก service:
 
 ```bash
 docker compose --env-file .env up -d --build
+```
+
+ตรวจว่า container ขึ้นครบ:
+
+```bash
 docker compose --env-file .env ps
-docker compose --env-file .env logs -f ocr-service
+```
+
+ดู log ระหว่างประมวลผลเอกสาร:
+
+```bash
+docker compose --env-file .env logs -f laravel-app queue-worker ocr-service
+```
+
+หลังจากระบบขึ้นแล้ว:
+- Upload / Review UI: `http://localhost:8000`
+- Vite dev server: `http://localhost:5173`
+- OCR service health: `http://localhost:8010/health`
+
+### 27.3 ทดสอบ flow พื้นฐาน
+
+1. เปิด `http://localhost:8000`
+2. Upload ไฟล์ `DOCX`, `PDF text`, หรือ `PDF scan`
+3. รอ status เป็น `done`
+4. กด `ตรวจสอบเอกสาร` เพื่อเปิด `/documents/{documentId}/review`
+5. หรือกด `เปิด Compose Editor` เพื่อเปิด `/documents/{documentId}/compose`
+6. แก้ block หรือ metadata แล้วรอข้อความ auto save
+
+### 27.4 คำสั่งที่ใช้บ่อย
+
+Restart เฉพาะ OCR service:
+
+```bash
+docker compose --env-file .env restart ocr-service
+```
+
+Restart queue worker:
+
+```bash
+docker compose --env-file .env restart queue-worker
+```
+
+Rebuild หลังแก้ Dockerfile หรือ dependency:
+
+```bash
+docker compose --env-file .env up -d --build
 ```
 
 หยุดระบบ:
@@ -1305,10 +1355,23 @@ docker compose --env-file .env logs -f ocr-service
 docker compose --env-file .env down
 ```
 
-หลังจากระบบขึ้นแล้ว:
-- Laravel API: `http://localhost:8000`
-- Vue: `http://localhost:5173`
-- Python OCR Service: `http://localhost:8010`
+ล้าง volume ข้อมูล POC ทั้งหมด:
+
+```bash
+docker compose --env-file .env down -v
+```
+
+### 27.5 หมายเหตุเรื่อง GPU
+
+ค่าเริ่มต้นของ `docker-compose.yml` ใช้ OCR แบบ CPU ผ่าน `Dockerfile.simple`.
+
+ไฟล์ `docker-compose.gpu.yml` รองรับ NVIDIA CUDA เท่านั้น:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+เครื่องที่มี Intel Arc GPU จะยังใช้ CPU ใน setup ปัจจุบัน เพราะโค้ด OCR ตรวจ `torch.cuda.is_available()` และ CUDA เป็นของ NVIDIA.
 
 ---
 

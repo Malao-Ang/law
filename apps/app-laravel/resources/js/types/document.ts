@@ -136,6 +136,28 @@ export interface DocumentReviewState {
   notes?: string | null;
 }
 
+export type ThaiFont = 'sarabun' | 'psk-sarabun' | 'angsana';
+
+export interface DocumentMetadata {
+  department: string;
+  doc_number: string;
+  date: string;
+  subject: string;
+  recipient: string;
+  reference: string;
+  attachments: string;
+  urgency: string;
+  confidentiality: string;
+  signatory_name: string;
+  signatory_position: string;
+}
+
+export interface ComposeState {
+  font_family: ThaiFont;
+  font_size_pt: number;
+  metadata: DocumentMetadata;
+}
+
 export interface ReviewDocument {
   document_id: string;
   source_file: string;
@@ -144,6 +166,7 @@ export interface ReviewDocument {
   summary: DocumentSummary;
   pages: DocumentPage[];
   document_review: DocumentReviewState;
+  compose_state?: ComposeState;
   timings?: Record<string, number> | null;
   extraction?: {
     scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
@@ -203,4 +226,5 @@ export interface UpdateDocumentReviewResponse {
   document_id: string;
   status: 'updated';
   document_review: DocumentReviewState;
+  compose_state?: ComposeState;
 }
