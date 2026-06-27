@@ -871,7 +871,7 @@ class DoclingService:
                     line_text, line_tabs = _extract_line_text_with_tabs(line, page_margin_x)
                     if line_text:
                         lbb = line.get("bbox") or [0, 0, 0, 0]
-                        line_records.append((_normalize_thai_text(line_text)["text"],
+                        line_records.append((line_text,
                                              (lbb[1] + lbb[3]) / 2.0,
                                              float(lbb[0])))
                         for t in line_tabs:
@@ -1037,7 +1037,6 @@ class DoclingService:
             raw = page.get_text("text")
             lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
             for idx, line in enumerate(lines, start=1):
-                line = _normalize_thai_text(line)["text"]
                 line_confidence, line_flags = score_text_pdf_block(line)
                 blocks.append({
                     "block_id": f"{page_index}-{idx}",
@@ -1177,11 +1176,11 @@ class DoclingService:
                             if t.strip():
                                 spans.append(t)
                 if spans:
-                    return _normalize_thai_text(_join_thai_spans(spans))["text"]
+                    return _join_thai_spans(spans)
             except Exception:
                 pass
-        # Fallback: normalise the pre-assembled string
-        return _normalize_thai_text(str(fallback_text or "").strip())["text"]
+        # Fallback: return the pre-assembled string verbatim (normalization happens in block_builder)
+        return str(fallback_text or "").strip()
 
     @staticmethod
     def _infer_pdf_paragraph_layout(lines: list, page_rect: object) -> dict:
@@ -1453,7 +1452,7 @@ class DoclingService:
             if vm is not None: v_merge_state = self._word_attr(vm, "val") or "continue"
         text = "\n".join(
             part for part in (
-                _normalize_thai_text(self._extract_paragraph_text(p).strip())["text"]
+                self._extract_paragraph_text(p).strip()
                 for p in cell.findall("w:p", self.NAMESPACES)
             ) if part
         )

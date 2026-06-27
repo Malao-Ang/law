@@ -207,18 +207,19 @@ def test_extract_pdf_cell_text_fallback_when_no_rect() -> None:
     assert "กำหนด" in result
 
 
-def test_extract_pdf_cell_text_normalizes_fallback() -> None:
-    """Fallback path still applies Thai normalization."""
+def test_extract_pdf_cell_text_fallback_returns_verbatim() -> None:
+    """Fallback path returns verbatim text; normalization deferred to block_builder."""
     svc = DoclingService.__new__(DoclingService)
 
     class _NoOpPage:
         pass
 
-    # "ส านัก" has sara-am split — normalizer should fix it
+    # "ส านัก" (ส านัก with sara-am split) is returned verbatim;
+    # block_builder will call normalize_text() which fixes the split.
     result = svc._extract_pdf_cell_text(_NoOpPage(), None, "ส านัก")
-    assert "สำนัก" in result, f"normalization not applied in fallback: {result!r}"
-
-
+    assert "ส" in result, f"verbatim text should be preserved: {result!r}"
+    # sara-am is NOT yet merged here (that happens in block_builder)
+    assert "ส านัก" == result
 def test_extract_pdf_cell_text_span_path_applies_join_thai_spans() -> None:
     """When page.get_text returns spans, _join_thai_spans is applied to them."""
     svc = DoclingService.__new__(DoclingService)
