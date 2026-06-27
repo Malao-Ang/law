@@ -72,7 +72,7 @@
         <!-- Table block -->
         <template v-else-if="block.type === 'table'">
           <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-html="block.meta.table_html ?? ''" class="block-editor__table-html" />
+          <div v-html="sanitizeHtml(block.meta.table_html ?? '')" class="block-editor__table-html" />
         </template>
 
         <!-- Text block — TipTap inline editor when selected, plain text otherwise -->
@@ -255,9 +255,17 @@ import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, watch } 
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
+import DOMPurify from 'dompurify';
 import { patchBlock, patchBlockLayout } from '../api/client';
 import BlockRulerEditor from './BlockRulerEditor.vue';
 import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../types/document';
+
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div', 'sub', 'sup'],
+    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan'],
+  });
+}
 
 interface SpellSuggestion {
   token: string;
@@ -350,11 +358,16 @@ function startEdit(pageNo: number, block: DocumentBlock): void {
   editingBlockId.value = block.block_id;
   editingPageNo.value = pageNo;
 
+  const richHtml = block.meta.reviewed_html;
+  const content = richHtml
+    ? sanitizeHtml(richHtml)
+    : block.approved_text
+      ? `<p>${block.approved_text.replace(/\n/g, '<br>')}</p>`
+      : '<p></p>';
+
   const editor = useEditor({
     extensions: [StarterKit, Underline],
-    content: block.approved_text
-      ? `<p>${block.approved_text.replace(/\n/g, '<br>')}</p>`
-      : '<p></p>',
+    content,
   });
 
   editors[block.block_id] = editor;
@@ -384,21 +397,23 @@ async function saveBlock(pageNo: number, block: DocumentBlock): Promise<void> {
   busy[id] = true;
   errors[id] = '';
 
-  // Extract plain text from TipTap (preserving line structure).
   const approvedText = editor.value.getText({ blockSeparator: '\n' });
+  const reviewedHtml = editor.value.getHTML();
 
   try {
     await patchBlock(props.documentId, id, {
       page_no: pageNo,
       approved_text: approvedText,
+      reviewed_html: reviewedHtml,
       mark_uncertain: false,
       type: block.type,
       reading_order: block.reading_order,
       bbox: block.bbox,
     });
 
-    // Optimistic update
     block.approved_text = approvedText;
+    if (!block.meta) block.meta = {};
+    block.meta.reviewed_html = reviewedHtml;
     emit('block-saved', pageNo, block);
     cancelEdit();
   } catch (err) {

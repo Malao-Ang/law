@@ -148,6 +148,9 @@ class ReviewStore
             ]);
 
             $reviewedHtml = trim((string) ($patch['reviewed_html'] ?? ''));
+            if ($reviewedHtml !== '') {
+                $reviewedHtml = $this->sanitizeHtml($reviewedHtml);
+            }
             if ($reviewedHtml === '') {
                 $reviewedHtml = $this->rebuildBlockHtml($block, $table, $layout, $existingMeta);
             }
@@ -539,6 +542,16 @@ class ReviewStore
                 && $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
             'updated_at' => now()->toIso8601String(),
         ]);
+    }
+
+    private function sanitizeHtml(string $html): string
+    {
+        $allowed = '<p><br><strong><em><u><s><h1><h2><h3><h4><h5><h6><ul><ol><li><blockquote><table><thead><tbody><tr><th><td><span><div><sub><sup>';
+        $clean = strip_tags($html, $allowed);
+        $clean = preg_replace('/\s*on\w+\s*=\s*"[^"]*"/i', '', $clean) ?? $clean;
+        $clean = preg_replace('/\s*on\w+\s*=\s*\'[^\']*\'/i', '', $clean) ?? $clean;
+
+        return $clean;
     }
 
     private function normalizeHtmlForCompare(string $html): string
