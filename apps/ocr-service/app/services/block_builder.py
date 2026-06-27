@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from app.services.ai_corrector import MockAICorrector
@@ -11,6 +12,11 @@ from app.services.thai_spellchecker import get_spell_checker
 
 
 TAB_FALLBACK_PT = 18.0
+_MARKER_ONLY_PATTERNS = (
+    re.compile(r"^(?:มาตรา|ข้อ|วรรค)\s+[0-9๐-๙]+$"),
+    re.compile(r"^\((?:[ก-ฮ]|[0-9๐-๙]+)\)$"),
+    re.compile(r"^(?:[0-9๐-๙]+\.|[0-9๐-๙]+(?:\.[0-9๐-๙]+)+)$"),
+)
 
 
 def build_document_output(
@@ -23,6 +29,9 @@ def build_document_output(
     enable_ai_correction: bool,
     review_threshold: float,
 ) -> dict:
+    prepared_pages: list[dict] = []
+    spellcheck_inputs: list[str] = []
+    spellcheck_targets: list[dict] = []
     output_pages: list[dict] = []
     block_count = 0
     review_required = 0
@@ -42,7 +51,7 @@ def build_document_output(
     resolve_semantic_indents(pages)
 
     for page in pages:
-        transformed_blocks: list[dict] = []
+        prepared_blocks: list[dict] = []
         page_no = int(page.get("page_no", 1))
 
         for index, block in enumerate(page.get("blocks", []), start=1):
@@ -55,22 +64,69 @@ def build_document_output(
             if raw_text == "" and table is None and block_type != "image":
                 continue
 
-            normalized = normalizer(raw_text) if raw_text != "" else {"text": "", "flags": []}
+            normalized = _normalize_block_text(raw_text, normalizer)
             confidence = float(block.get("confidence", 1.0))
             flags = list(set(block.get("flags", []) + normalized.get("flags", [])))
 
             needs_review = confidence < review_threshold or len(flags) > 0
-            ai_text = normalized["text"]
 
-            # Spell suggestions — advisory only, never auto-applied.
-            # Only computed for blocks that already need review to avoid slowing
-            # down high-confidence extractions.
-            spell_suggestions: list[dict] = []
+            prepared = {
+                "block": block,
+                "index": index,
+                "page_no": page_no,
+                "raw_text": raw_text,
+                "block_type": block_type,
+                "source_meta": source_meta,
+                "source_layout": source_layout,
+                "table": table,
+                "normalized": normalized,
+                "confidence": confidence,
+                "flags": flags,
+                "needs_review": needs_review,
+                "spell_suggestions": [],
+            }
+            prepared_blocks.append(prepared)
+
             if needs_review and raw_text and block_type not in {"table", "image"}:
-                try:
-                    spell_suggestions = get_spell_checker().check(normalized["text"])
-                except Exception:
-                    pass
+                spellcheck_inputs.append(str(normalized["text"]))
+                spellcheck_targets.append(prepared)
+
+        prepared_pages.append(
+            {
+                "page": page,
+                "page_no": page_no,
+                "blocks": prepared_blocks,
+            }
+        )
+
+    if spellcheck_inputs:
+        try:
+            spellcheck_results = get_spell_checker().bulk_check(spellcheck_inputs)
+            for target, suggestions in zip(spellcheck_targets, spellcheck_results):
+                target["spell_suggestions"] = suggestions
+        except Exception:
+            pass
+
+    for prepared_page in prepared_pages:
+        page = prepared_page["page"]
+        page_no = prepared_page["page_no"]
+        transformed_blocks: list[dict] = []
+
+        for prepared in prepared_page["blocks"]:
+            block = prepared["block"]
+            index = prepared["index"]
+            raw_text = prepared["raw_text"]
+            block_type = prepared["block_type"]
+            source_meta = prepared["source_meta"]
+            source_layout = prepared["source_layout"]
+            table = prepared["table"]
+            normalized = prepared["normalized"]
+            confidence = prepared["confidence"]
+            flags = prepared["flags"]
+            needs_review = prepared["needs_review"]
+            spell_suggestions = prepared["spell_suggestions"]
+
+            ai_text = normalized["text"]
 
             if enable_ai_correction and raw_text != "" and (needs_review or block_type in {"table", "section_header"}):
                 ai_result = ai_corrector.suggest(normalized["text"])
@@ -137,6 +193,21 @@ def build_document_output(
         },
         "pages": output_pages,
     }
+
+
+def _normalize_block_text(raw_text: str, normalizer: Callable[[str], dict]) -> dict:
+    if raw_text == "":
+        return {"text": "", "flags": []}
+    if _is_marker_only(raw_text):
+        return {"text": raw_text, "flags": []}
+    return normalizer(raw_text)
+
+
+def _is_marker_only(text: str) -> bool:
+    value = text.strip()
+    if not value:
+        return False
+    return any(pattern.fullmatch(value) for pattern in _MARKER_ONLY_PATTERNS)
 
 
 def normalize_layout(layout: object, bbox: object, reading_order: object) -> dict:

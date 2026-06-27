@@ -23,19 +23,27 @@ def create_app() -> FastAPI:
         # Load the EasyOCR model in a background thread so the service becomes
         # reachable immediately while the ~2 GB model weights are loading.
         from app.services.ocr_pipeline import get_ocr_pipeline, warmup_ocr
+        from app.services.thai_spellchecker import get_spell_checker
         import logging
 
         data_root = settings.data_root
         pipeline = get_ocr_pipeline(data_root=data_root)
+        logger = logging.getLogger("uvicorn")
 
         def _warmup_and_log() -> None:
             warmup_ocr()
-            logging.getLogger("uvicorn").info(
-                "OCR model ready — device: %s", pipeline.device
-            )
+            logger.info("OCR model ready — device: %s", pipeline.device)
+
+        def _warmup_spellchecker() -> None:
+            try:
+                get_spell_checker().is_available()
+            except Exception:
+                logger.exception("Thai spellchecker warmup failed")
 
         thread = threading.Thread(target=_warmup_and_log, daemon=True, name="ocr-warmup")
         thread.start()
+        spell_thread = threading.Thread(target=_warmup_spellchecker, daemon=True, name="spellchecker-warmup")
+        spell_thread.start()
 
     return application
 
