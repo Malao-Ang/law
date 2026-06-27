@@ -135,13 +135,12 @@ def test_parse_numbering_xml_level_override_missing_optional_elements() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# namelist() must be cached per-document (Task 1: DOCX speedup)
+# namelist() caching
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _make_docx_with_image(tmp_path: Path) -> Path:
     """Build an in-memory DOCX with several paragraphs and one embedded image."""
-    REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-    R_NS = REL_NS
+    R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
     document_xml = (
         f'<?xml version="1.0"?><w:document {NSMAP} xmlns:r="{R_NS}">'
@@ -190,12 +189,7 @@ def _make_docx_with_image(tmp_path: Path) -> Path:
 
 
 def test_extract_docx_blocks_caches_namelist(tmp_path: Path, monkeypatch) -> None:
-    """_extract_docx_blocks must call archive.namelist() at most once per document.
-
-    Regression guard: _parse_docx_image previously called namelist() on every
-    paragraph, causing O(N*M) zip directory scans for documents with many
-    paragraphs. The fix caches the name set once and threads it down.
-    """
+    """_extract_docx_blocks must call archive.namelist() at most once per document."""
     docx_path = _make_docx_with_image(tmp_path)
 
     call_count = {"n": 0}
