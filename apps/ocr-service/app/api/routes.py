@@ -214,15 +214,27 @@ def _extract_scan_pages(
     data_root: Path,
 ) -> tuple[list[dict], str, dict[str, object] | None]:
     logger = get_logger(document_id)
+
     if requested_mode == "local":
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
         return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local", None
-    if requested_mode == "landingai":
-        parser = LandingAiAdeParser(data_root=data_root)
-        pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
-        return pages, "landingai", parser.last_metadata
 
-    # auto: try local first; fall back to LandingAI only if key is configured
+    if requested_mode == "landingai":
+        if not get_settings().landingai_api_key:
+            raise RuntimeError("LandingAI mode selected but VISION_AGENT_API_KEY is not configured")
+        try:
+            parser = LandingAiAdeParser(data_root=data_root)
+            pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
+            return pages, "landingai", parser.last_metadata
+        except Exception as exc:
+            logger.warning(
+                "landingai mode: API call failed, falling back to local OCR",
+                extra={"error": str(exc)},
+            )
+            ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+            return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local", None
+
+    # auto: try local first; fall back to LandingAI if quality is poor and key is configured
     ocr_pipeline = get_ocr_pipeline(data_root=data_root)
     local_pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
     if _scan_quality_good(local_pages):
@@ -230,9 +242,16 @@ def _extract_scan_pages(
     if not get_settings().landingai_api_key:
         logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
         return local_pages, "local", None
-    parser = LandingAiAdeParser(data_root=data_root)
-    pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
-    return pages, "landingai", parser.last_metadata
+    try:
+        parser = LandingAiAdeParser(data_root=data_root)
+        pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
+        return pages, "landingai", parser.last_metadata
+    except Exception as exc:
+        logger.warning(
+            "auto-mode: LandingAI API failed after quality gate, falling back to local OCR",
+            extra={"error": str(exc)},
+        )
+        return local_pages, "local", None
 
 
 def _extract_scan_pages_selective(
@@ -243,6 +262,7 @@ def _extract_scan_pages_selective(
     data_root: Path,
 ) -> tuple[list[dict], str, dict[str, object] | None]:
     logger = get_logger(document_id)
+
     if requested_mode == "local":
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
         pages = ocr_pipeline.extract_scanned_pdf_selective(
@@ -251,12 +271,28 @@ def _extract_scan_pages_selective(
             page_indices=page_indices,
         )
         return pages, "local", None
-    if requested_mode == "landingai":
-        parser = LandingAiAdeParser(data_root=data_root)
-        pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
-        return pages, "landingai", parser.last_metadata
 
-    # auto: try local first; fall back to LandingAI only if key is configured
+    if requested_mode == "landingai":
+        if not get_settings().landingai_api_key:
+            raise RuntimeError("LandingAI mode selected but VISION_AGENT_API_KEY is not configured")
+        try:
+            parser = LandingAiAdeParser(data_root=data_root)
+            pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+            return pages, "landingai", parser.last_metadata
+        except Exception as exc:
+            logger.warning(
+                "landingai mode: API call failed, falling back to local OCR",
+                extra={"error": str(exc)},
+            )
+            ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+            pages = ocr_pipeline.extract_scanned_pdf_selective(
+                file_path=file_path,
+                document_id=document_id,
+                page_indices=page_indices,
+            )
+            return pages, "local", None
+
+    # auto: try local first; fall back to LandingAI if quality is poor and key is configured
     ocr_pipeline = get_ocr_pipeline(data_root=data_root)
     local_pages = ocr_pipeline.extract_scanned_pdf_selective(
         file_path=file_path,
@@ -268,9 +304,16 @@ def _extract_scan_pages_selective(
     if not get_settings().landingai_api_key:
         logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
         return local_pages, "local", None
-    parser = LandingAiAdeParser(data_root=data_root)
-    pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
-    return pages, "landingai", parser.last_metadata
+    try:
+        parser = LandingAiAdeParser(data_root=data_root)
+        pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+        return pages, "landingai", parser.last_metadata
+    except Exception as exc:
+        logger.warning(
+            "auto-mode: LandingAI API failed after quality gate, falling back to local OCR",
+            extra={"error": str(exc)},
+        )
+        return local_pages, "local", None
 
 
 def _get_ocr_pipeline_if_needed(needed: bool, data_root: Path) -> object | None:
