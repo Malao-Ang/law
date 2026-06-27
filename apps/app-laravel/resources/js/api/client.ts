@@ -1,4 +1,5 @@
 ﻿import type {
+  ComposeState,
   DocumentStatus,
   ExportResponse,
   LayoutPatch,
@@ -69,6 +70,16 @@ export function saveDocumentReview(
     notes?: string;
     reset_to_generated?: boolean;
   },
+): Promise<UpdateDocumentReviewResponse> {
+  return jsonRequest<UpdateDocumentReviewResponse>(`/api/documents/${documentId}/document-review`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateComposeState(
+  documentId: string,
+  payload: Partial<ComposeState>,
 ): Promise<UpdateDocumentReviewResponse> {
   return jsonRequest<UpdateDocumentReviewResponse>(`/api/documents/${documentId}/document-review`, {
     method: 'PUT',

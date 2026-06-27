@@ -218,40 +218,72 @@ class ReviewStore
      */
     public function updateDocumentReview(string $documentId, array $payload): array
     {
-        $returnReview = null;
+        $returnPayload = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnReview): void {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnPayload): void {
             $this->syncDocumentReview($document);
+            $this->ensureComposeStateDefaults($document);
 
             $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
             $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
-            $draftHtml = $resetToGenerated
-                ? $generatedHtml
-                : trim((string) ($payload['draft_html'] ?? ''));
+            $hasDraftHtml = array_key_exists('draft_html', $payload);
+            $shouldUpdateDraft = $resetToGenerated || $hasDraftHtml;
 
-            if ($draftHtml === '') {
-                throw new RuntimeException('Document HTML draft cannot be empty.');
+            if ($shouldUpdateDraft) {
+                $draftHtml = $resetToGenerated
+                    ? $generatedHtml
+                    : trim((string) ($payload['draft_html'] ?? ''));
+
+                if ($draftHtml === '') {
+                    throw new RuntimeException('Document HTML draft cannot be empty.');
+                }
+
+                $document['document_review'] = array_merge(
+                    is_array($document['document_review'] ?? null) ? $document['document_review'] : [],
+                    [
+                        'generated_html' => $generatedHtml,
+                        'draft_html' => $draftHtml,
+                        'html_mode' => $resetToGenerated ? 'generated' : 'manual',
+                        'out_of_sync' => $resetToGenerated
+                            ? false
+                            : $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
+                        'updated_at' => now()->toIso8601String(),
+                    ],
+                );
             }
 
-            $document['document_review'] = array_merge(
-                is_array($document['document_review'] ?? null) ? $document['document_review'] : [],
-                [
-                    'generated_html' => $generatedHtml,
-                    'draft_html' => $draftHtml,
-                    'html_mode' => $resetToGenerated ? 'generated' : 'manual',
-                    'out_of_sync' => $resetToGenerated
-                        ? false
-                        : $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
-                    'updated_at' => now()->toIso8601String(),
-                    'approved_by' => $payload['approved_by'] ?? null,
-                    'notes' => $payload['notes'] ?? null,
-                ],
-            );
+            if (array_key_exists('approved_by', $payload)) {
+                $document['document_review']['approved_by'] = $payload['approved_by'];
+                $document['document_review']['updated_at'] = now()->toIso8601String();
+            }
 
-            $returnReview = $document['document_review'];
+            if (array_key_exists('notes', $payload)) {
+                $document['document_review']['notes'] = $payload['notes'];
+                $document['document_review']['updated_at'] = now()->toIso8601String();
+            }
+
+            if (array_key_exists('font_family', $payload)) {
+                $document['compose_state']['font_family'] = (string) $payload['font_family'];
+            }
+
+            if (array_key_exists('font_size_pt', $payload) && $payload['font_size_pt'] !== null) {
+                $document['compose_state']['font_size_pt'] = (int) $payload['font_size_pt'];
+            }
+
+            if (array_key_exists('metadata', $payload) && is_array($payload['metadata'])) {
+                $document['compose_state']['metadata'] = array_merge(
+                    is_array($document['compose_state']['metadata'] ?? null) ? $document['compose_state']['metadata'] : [],
+                    $payload['metadata'],
+                );
+            }
+
+            $returnPayload = [
+                'document_review' => $document['document_review'],
+                'compose_state' => $document['compose_state'],
+            ];
         });
 
-        return $returnReview;
+        return $returnPayload;
     }
 
     /**
@@ -524,6 +556,8 @@ class ReviewStore
      */
     private function syncDocumentReview(array &$document): void
     {
+        $this->ensureComposeStateDefaults($document);
+
         $generatedHtml = $this->documentHtmlService->buildGeneratedHtml($document);
         $existing = is_array($document['document_review'] ?? null) ? $document['document_review'] : [];
         $mode = ($existing['html_mode'] ?? 'generated') === 'manual' ? 'manual' : 'generated';
@@ -541,6 +575,35 @@ class ReviewStore
             'out_of_sync' => $mode === 'manual'
                 && $this->normalizeHtmlForCompare($draftHtml) !== $this->normalizeHtmlForCompare($generatedHtml),
             'updated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     */
+    private function ensureComposeStateDefaults(array &$document): void
+    {
+        $compose = is_array($document['compose_state'] ?? null) ? $document['compose_state'] : [];
+        $metadata = is_array($compose['metadata'] ?? null) ? $compose['metadata'] : [];
+
+        $document['compose_state'] = array_merge([
+            'font_family' => 'sarabun',
+            'font_size_pt' => 16,
+            'metadata' => [],
+        ], $compose, [
+            'metadata' => array_merge([
+                'department' => '',
+                'doc_number' => '',
+                'date' => '',
+                'subject' => '',
+                'recipient' => '',
+                'reference' => '',
+                'attachments' => '',
+                'urgency' => '',
+                'confidentiality' => '',
+                'signatory_name' => '',
+                'signatory_position' => '',
+            ], $metadata),
         ]);
     }
 
