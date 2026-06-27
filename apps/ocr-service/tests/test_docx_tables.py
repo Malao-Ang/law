@@ -8,6 +8,7 @@ import zipfile
 
 from app.services.block_builder import build_reviewed_html, build_table_payload
 from app.services.docling_service import DoclingService
+from app.services.html_renderer import build_table_html
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -144,8 +145,7 @@ def test_colspan_in_html() -> None:
             {"text": "Normal", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": False},
         ]
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert 'colspan="2"' in html
     assert 'colspan="1"' not in html  # colspan=1 is the default, must not be emitted
 
@@ -156,8 +156,7 @@ def test_rowspan_in_html() -> None:
         [{"text": "Spans two", "colspan": 1, "rowspan": 2, "alignment": None, "has_image": False}],
         [{"text": "Other", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": False}],
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert 'rowspan="2"' in html
 
 
@@ -194,8 +193,7 @@ def test_cell_with_image_renders_placeholder() -> None:
     rows = [
         [{"text": "", "colspan": 1, "rowspan": 1, "alignment": None, "has_image": True}]
     ]
-    svc = _svc()
-    html = svc._render_table_html(rows)
+    html = build_table_html(rows)
     assert "doc-cell-image" in html
     assert "[image]" in html
 

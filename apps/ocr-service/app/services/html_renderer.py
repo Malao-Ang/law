@@ -32,6 +32,8 @@ def build_table_html(rows: list[list[dict]]) -> str:
                 al = escape_html(str(alignment))
                 attrs.append(f' data-cell-align="{al}" style="text-align:{al};"')
             text = escape_html(str(cell.get("text") or "")).replace("\n", "<br>")
+            if not text and cell.get("has_image"):
+                text = '<span class="doc-cell-image">[image]</span>'
             rendered_cells.append(f'<{cell_tag}{"".join(attrs)}>{text}</{cell_tag}>')
         html_rows.append("<tr>" + "".join(rendered_cells) + "</tr>")
 
