@@ -455,8 +455,11 @@ def reprocess_block(payload: ReprocessBlockRequest) -> BlockPatchResponse:
     if target_block is None:
         raise HTTPException(status_code=404, detail="Block not found")
 
-    normal_text = target_block.get("normalized_text") or target_block.get("raw_text") or ""
-    ai = MockAICorrector().suggest(normal_text)
+    raw_text = target_block.get("raw_text") or ""
+    norm_result = normalize_text(raw_text)
+    target_block["normalized_text"] = norm_result["text"]
+    target_block["flags"] = list(set((target_block.get("flags") or []) + norm_result.get("flags", [])))
+    ai = MockAICorrector().suggest(norm_result["text"])
 
     target_block["ai_suggested_text"] = ai["suggested_text"]
     target_block["confidence"] = ai["confidence"]
