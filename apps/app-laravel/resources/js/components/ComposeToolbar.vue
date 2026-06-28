@@ -54,7 +54,7 @@
         :model-value="props.editorState.alignment"
         density="compact"
         variant="text"
-        @update:model-value="emit('action', 'setAlignment', $event)"
+        @update:model-value="$event !== undefined && emit('action', 'setAlignment', $event)"
       >
         <v-btn
           value="left"
