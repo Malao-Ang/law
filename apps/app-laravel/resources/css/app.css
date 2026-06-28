@@ -1364,14 +1364,11 @@ textarea {
 }
 
 .doc-block.needs-review {
-  border-left: 3px solid #d9a23e;
-  padding-left: 10px;
+  /* yellow left-border removed — clean document view */
 }
 
 .doc-block.is-editing {
-  outline: 2px solid #1976d2;
-  outline-offset: 4px;
-  border-radius: 2px;
+  /* no outline — Word-like seamless editing */
 }
 
 .is-edit-mode .doc-block:not(.is-editing) .doc-block__body:hover {
@@ -1401,9 +1398,63 @@ textarea {
   min-height: 2em;
 }
 
+.doc-block__editor .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.doc-block__editor .ProseMirror th,
+.doc-block__editor .ProseMirror td {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  background: none !important;
+}
+
+.doc-block__editor .ProseMirror th {
+  font-weight: bold;
+}
+
 .doc-block__image img {
   width: 100%;
   border: 1px solid #e1e8f5;
+}
+
+.resizable-image-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.resizable-image-container img {
+  display: block;
+  width: 100%;
+  border: 1px solid #e1e8f5;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background: #1976d2;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  cursor: se-resize;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.resize-tooltip {
+  position: absolute;
+  bottom: 18px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .doc-block__table {
