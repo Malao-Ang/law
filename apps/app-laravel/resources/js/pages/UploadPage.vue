@@ -46,6 +46,7 @@
               <p v-if="status.timings" class="text-body-2 mb-4">
                 Timings: {{ formatTimings(status.timings) }}
               </p>
+              <v-alert v-if="pollError" type="error" class="mt-4">{{ pollError }}</v-alert>
             </v-card-text>
           </v-card>
         </v-col>
@@ -55,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import UploadForm from '../components/UploadForm.vue';
 import HeaderComponent from '../components/HeaderComponent.vue';
@@ -66,8 +67,17 @@ const router = useRouter();
 const documentId = ref<string | null>(null);
 const status = ref<DocumentStatus | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let errorRetryCount = 0;
+const pollError = ref<string | null>(null);
 
-function getStatusColor(s: string): string {
+onUnmounted(() => {
+  if (pollTimer !== null) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+});
+
+function getStatusColor(s: DocumentStatus['status']): string {
   switch (s) {
     case 'done': case 'exported': case 'ingested': return 'success';
     case 'processing': case 'ingesting': return 'warning';
@@ -76,7 +86,7 @@ function getStatusColor(s: string): string {
   }
 }
 
-function getStatusText(s: string): string {
+function getStatusText(s: DocumentStatus['status']): string {
   switch (s) {
     case 'queued': return 'รอดำเนินการ';
     case 'processing': return 'กำลังประมวลผล';
@@ -99,6 +109,12 @@ function formatDuration(ms?: number | null): string {
 }
 
 function onUploaded(id: string): void {
+  if (pollTimer !== null) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+  errorRetryCount = 0;
+  pollError.value = null;
   documentId.value = id;
   status.value = null;
   pollStatus();
@@ -114,6 +130,11 @@ async function pollStatus(): Promise<void> {
       router.push(`/documents/${documentId.value}/review`);
     }
   } catch {
+    errorRetryCount++;
+    if (errorRetryCount >= 10) {
+      pollError.value = 'ไม่สามารถตรวจสอบสถานะได้ กรุณารีเฟรชหน้า';
+      return;
+    }
     pollTimer = setTimeout(pollStatus, 2000);
   }
 }
