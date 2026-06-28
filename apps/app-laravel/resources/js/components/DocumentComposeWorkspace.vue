@@ -108,7 +108,8 @@ import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, Th
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel' | 'indent' | 'outdent' | 'setAlignment';
+  value?: string;
 }
 
 interface EditorStateSnapshot {
@@ -120,6 +121,7 @@ interface EditorStateSnapshot {
   isUnderline: boolean;
   isBulletList: boolean;
   isOrderedList: boolean;
+  alignment: 'left' | 'center' | 'right' | 'justify';
 }
 
 interface ScrollTarget {
@@ -158,6 +160,7 @@ const editorState = ref<EditorStateSnapshot>({
   isUnderline: false,
   isBulletList: false,
   isOrderedList: false,
+  alignment: 'left',
 });
 const leftDrawer = ref(true);
 const rightDrawer = ref(true);
@@ -310,7 +313,7 @@ function onMetadataUpdate(next: DocumentMetadata): void {
   }
 }
 
-function dispatchToolbarAction(type: ToolbarCommand['type'] | 'export' | 'saveActiveBlock' | 'cancelActiveBlock'): void {
+function dispatchToolbarAction(type: string, value?: string): void {
   if (type === 'export') {
     void triggerExport();
     return;
@@ -329,7 +332,7 @@ function dispatchToolbarAction(type: ToolbarCommand['type'] | 'export' | 'saveAc
   }
 
   toolbarCommandId += 1;
-  toolbarCommand.value = { id: toolbarCommandId, type };
+  toolbarCommand.value = { id: toolbarCommandId, type: type as ToolbarCommand['type'], value };
 }
 
 function handleToggleEditMode(): void {

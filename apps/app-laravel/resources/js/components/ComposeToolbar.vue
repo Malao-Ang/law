@@ -1,7 +1,7 @@
 <template>
   <v-toolbar class="compose-toolbar-card" density="comfortable" flat>
     <template #prepend>
-      <v-btn icon="mdi-menu" variant="text" @click="$emit('toggle:navigator')" />
+      <v-btn icon="mdi-menu" variant="text" @click="emit('toggle:navigator')" />
     </template>
 
     <v-toolbar-title class="compose-toolbar-title">
@@ -19,7 +19,7 @@
         :items="fontOptions"
         :model-value="font"
         variant="outlined"
-        @update:model-value="$emit('update:font', $event as ThaiFont)"
+        @update:model-value="emit('update:font', $event as ThaiFont)"
       />
 
       <v-select
@@ -29,7 +29,7 @@
         :items="fontSizes"
         :model-value="fontSize"
         variant="outlined"
-        @update:model-value="$emit('update:fontSize', Number($event))"
+        @update:model-value="emit('update:fontSize', Number($event))"
       />
 
       <v-chip class="compose-toolbar-status" :color="statusColor" variant="tonal" size="small">
@@ -47,7 +47,60 @@
         :title="button.label"
         size="small"
         variant="text"
-        @click="$emit('action', button.action)"
+        @click="emit('action', button.action)"
+      />
+
+      <v-btn-toggle
+        :model-value="props.editorState.alignment"
+        density="compact"
+        variant="text"
+        @update:model-value="emit('action', 'setAlignment', $event)"
+      >
+        <v-btn
+          value="left"
+          icon="mdi-format-align-left"
+          size="small"
+          title="ชิดซ้าย"
+          :disabled="!props.editorState.active"
+        />
+        <v-btn
+          value="center"
+          icon="mdi-format-align-center"
+          size="small"
+          title="กึ่งกลาง"
+          :disabled="!props.editorState.active"
+        />
+        <v-btn
+          value="right"
+          icon="mdi-format-align-right"
+          size="small"
+          title="ชิดขวา"
+          :disabled="!props.editorState.active"
+        />
+        <v-btn
+          value="justify"
+          icon="mdi-format-align-justify"
+          size="small"
+          title="เต็มบรรทัด"
+          :disabled="!props.editorState.active"
+        />
+      </v-btn-toggle>
+
+      <v-btn
+        icon="mdi-format-indent-decrease"
+        size="small"
+        title="ลดย่อหน้า"
+        variant="text"
+        :disabled="!props.editorState.active"
+        @click="emit('action', 'outdent')"
+      />
+      <v-btn
+        icon="mdi-format-indent-increase"
+        size="small"
+        title="เพิ่มย่อหน้า"
+        variant="text"
+        :disabled="!props.editorState.active"
+        @click="emit('action', 'indent')"
       />
 
       <v-divider vertical class="compose-toolbar-divider" />
@@ -59,7 +112,7 @@
         variant="tonal"
         color="primary"
         :title="props.correctionInProgress ? 'รอ AI correction เสร็จ' : 'ส่งออก RAG JSON'"
-        @click="$emit('action', 'export')"
+        @click="emit('action', 'export')"
       >
         Export
       </v-btn>
@@ -76,14 +129,14 @@
         size="small"
         title="รีโหลดข้อมูล"
         variant="text"
-        @click="$emit('reload')"
+        @click="emit('reload')"
       />
       <v-btn
         icon="mdi-file-document-edit-outline"
         size="small"
         title="ข้อมูลหนังสือ"
         variant="text"
-        @click="$emit('toggle:details')"
+        @click="emit('toggle:details')"
       />
 
       <v-divider vertical class="compose-toolbar-divider" />
@@ -95,7 +148,7 @@
         color="primary"
         prepend-icon="mdi-pencil-outline"
         title="แก้ไขบล็อกที่เลือก"
-        @click="$emit('toggle:editMode')"
+        @click="emit('toggle:editMode')"
       >
         แก้ไข
       </v-btn>
@@ -107,7 +160,7 @@
           color="success"
           prepend-icon="mdi-content-save-outline"
           title="บันทึกการแก้ไข"
-          @click="$emit('action', 'saveActiveBlock')"
+          @click="emit('action', 'saveActiveBlock')"
         >
           บันทึก
         </v-btn>
@@ -116,7 +169,7 @@
           variant="outlined"
           prepend-icon="mdi-close"
           title="ยกเลิกการแก้ไข"
-          @click="$emit('action', 'cancelActiveBlock')"
+          @click="emit('action', 'cancelActiveBlock')"
         >
           ยกเลิก
         </v-btn>
@@ -138,9 +191,10 @@ interface EditorStateSnapshot {
   isUnderline: boolean;
   isBulletList: boolean;
   isOrderedList: boolean;
+  alignment: 'left' | 'center' | 'right' | 'justify';
 }
 
-type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveActiveBlock' | 'cancelActiveBlock';
+type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveActiveBlock' | 'cancelActiveBlock' | 'indent' | 'outdent' | 'setAlignment';
 
 const props = defineProps<{
   title: string;
@@ -155,9 +209,9 @@ const props = defineProps<{
   correctionInProgress?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   reload: [];
-  action: [ToolbarAction];
+  action: [type: ToolbarAction, value?: string];
   'toggle:navigator': [];
   'toggle:details': [];
   'toggle:editMode': [];
