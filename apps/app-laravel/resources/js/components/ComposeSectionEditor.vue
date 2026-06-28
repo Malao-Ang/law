@@ -20,11 +20,12 @@
         @click="editMode && selectBlock(item.block.block_id)"
       >
         <div v-if="item.block.type === 'image'" class="doc-block__image">
-          <img
+          <ResizableImage
             v-if="item.block.meta.image?.src_url"
             :src="item.block.meta.image.src_url"
             :alt="item.block.meta.image.caption ?? 'document image'"
-          >
+            :edit-mode="editMode"
+          />
           <p v-else class="hint">ไม่พบรูปภาพสำหรับบล็อกนี้</p>
         </div>
 
@@ -69,6 +70,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { patchBlock } from '../api/client';
+import ResizableImage from './ResizableImage.vue';
 import type { DocumentBlock, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
