@@ -2,7 +2,7 @@
   <section
     ref="scrollContainer"
     class="compose-editor-surface"
-    :class="fontClass"
+    :class="[fontClass, { 'is-edit-mode': editMode }]"
     :style="{ '--compose-font-size': `${fontSize}pt` }"
   >
     <div class="compose-paper">
@@ -10,25 +10,16 @@
         v-for="item in blocks"
         :id="`compose-block-${item.block.block_id}`"
         :key="item.block.block_id"
-        class="compose-card"
+        :data-type="item.block.type"
+        class="doc-block"
         :class="{
           'is-selected': item.block.block_id === selectedBlockId,
           'is-editing': item.block.block_id === editingBlockId,
           'needs-review': item.block.needs_review,
         }"
-        @click="selectBlock(item.block.block_id)"
+        @click="editMode && selectBlock(item.block.block_id)"
       >
-        <header class="compose-card__header">
-          <div class="compose-card__chips">
-            <span class="compose-card__chip compose-card__chip--primary">{{ blockLabel(item.block) }}</span>
-            <span class="compose-card__chip">{{ blockTypeLabel(item.block.type) }}</span>
-            <span v-if="item.block.needs_review" class="compose-card__chip compose-card__chip--warning">รอตรวจทาน</span>
-          </div>
-
-          <span class="compose-card__meta">หน้า {{ item.page_no }} · ลำดับ {{ item.block.reading_order }}</span>
-        </header>
-
-        <div v-if="item.block.type === 'image'" class="compose-card__image">
+        <div v-if="item.block.type === 'image'" class="doc-block__image">
           <img
             v-if="item.block.meta.image?.src_url"
             :src="item.block.meta.image.src_url"
@@ -39,50 +30,33 @@
 
         <div
           v-else-if="item.block.type === 'table'"
-          class="compose-card__html compose-card__table"
+          class="doc-block__html doc-block__table"
           v-html="renderReadOnlyHtml(item.block)"
         ></div>
 
-        <div v-else class="compose-card__body" @dblclick="startEdit(item)">
+        <div
+          v-else
+          class="doc-block__body"
+          @click.stop="editMode && isEditable(item.block) && startEdit(item)"
+        >
           <EditorContent
             v-if="item.block.block_id === editingBlockId"
             :editor="editor"
-            class="compose-card__editor"
+            class="doc-block__editor"
           />
-
           <div
             v-else
-            class="compose-card__html"
+            class="doc-block__html"
             v-html="renderReadOnlyHtml(item.block)"
           ></div>
         </div>
-
-        <footer class="compose-card__footer">
-          <div class="compose-card__actions">
-            <button
-              v-if="isEditable(item.block) && item.block.block_id !== editingBlockId"
-              type="button"
-              class="btn btn-tiny"
-              @click.stop="startEdit(item)"
-            >
-              <i class="mdi mdi-pencil-outline"></i>
-              แก้ไขข้อความ
-            </button>
-
-            <template v-if="item.block.block_id === editingBlockId">
-              <button type="button" class="btn btn-tiny btn-primary" :disabled="busy" @click.stop="saveActiveBlock">
-                <i class="mdi mdi-content-save-outline"></i>
-                บันทึกบล็อก
-              </button>
-              <button type="button" class="btn btn-tiny" :disabled="busy" @click.stop="cancelEdit">
-                ยกเลิก
-              </button>
-            </template>
-          </div>
-
-          <p v-if="item.block.block_id === editingBlockId && errorMessage" class="error">{{ errorMessage }}</p>
-        </footer>
       </article>
+    </div>
+
+    <div v-if="errorMessage" class="doc-edit-error">
+      <v-icon icon="mdi-alert-circle-outline" size="16" color="error" />
+      <span>{{ errorMessage }}</span>
+      <v-btn size="x-small" variant="text" @click="errorMessage = ''">ปิด</v-btn>
     </div>
   </section>
 </template>
@@ -94,11 +68,11 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import { patchBlock } from '../api/client';
-import type { BlockType, DocumentBlock, ThaiFont } from '../types/document';
+import type { DocumentBlock, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel';
 }
 
 interface BlockItem {
@@ -130,12 +104,15 @@ const props = defineProps<{
   font: ThaiFont;
   fontSize: number;
   toolbarCommand: ToolbarCommand | null;
+  editMode: boolean;
+  mode?: 'review' | 'compose';
 }>();
 
 const emit = defineEmits<{
   selectBlock: [string];
   visibleBlockChange: [string];
   blockSaved: [string];
+  editCancelled: [];
   editorState: [EditorStateSnapshot];
 }>();
 
@@ -165,14 +142,9 @@ let observer: IntersectionObserver | null = null;
 watch(
   () => props.scrollTarget?.requestId,
   (next) => {
-    if (!next) {
-      return;
-    }
-
+    if (!next) return;
     nextTick(() => {
-      if (props.scrollTarget) {
-        scrollToBlock(props.scrollTarget.blockId);
-      }
+      if (props.scrollTarget) scrollToBlock(props.scrollTarget.blockId);
     });
   },
   { immediate: true },
@@ -180,16 +152,21 @@ watch(
 
 watch(
   () => props.blocks.map((item) => item.block.block_id).join('|'),
-  () => {
-    setupBlockObserver();
-  },
+  () => setupBlockObserver(),
   { flush: 'post', immediate: true },
 );
 
 watch(
   () => props.toolbarCommand?.id,
-  () => {
-    applyToolbarCommand(props.toolbarCommand);
+  () => applyToolbarCommand(props.toolbarCommand),
+);
+
+watch(
+  () => props.editMode,
+  (next) => {
+    if (!next && editingBlockId.value !== null) {
+      cancelEdit();
+    }
   },
 );
 
@@ -204,9 +181,7 @@ function setupBlockObserver(): void {
 
   nextTick(() => {
     const root = scrollContainer.value;
-    if (!root) {
-      return;
-    }
+    if (!root) return;
 
     observer = new IntersectionObserver(onBlockIntersection, {
       root,
@@ -215,9 +190,7 @@ function setupBlockObserver(): void {
 
     props.blocks.forEach((item) => {
       const element = document.getElementById(`compose-block-${item.block.block_id}`);
-      if (element) {
-        observer?.observe(element);
-      }
+      if (element) observer?.observe(element);
     });
   });
 }
@@ -229,7 +202,6 @@ function onBlockIntersection(entries: IntersectionObserverEntry[]): void {
       visibleEntries.delete(blockId);
       return;
     }
-
     const rootTop = entry.rootBounds?.top ?? scrollContainer.value?.getBoundingClientRect().top ?? 0;
     visibleEntries.set(blockId, {
       offset: Math.abs(entry.boundingClientRect.top - rootTop),
@@ -239,10 +211,7 @@ function onBlockIntersection(entries: IntersectionObserverEntry[]): void {
 
   const [nearest] = [...visibleEntries.entries()].sort((left, right) => {
     const offsetDelta = left[1].offset - right[1].offset;
-    if (Math.abs(offsetDelta) > 8) {
-      return offsetDelta;
-    }
-
+    if (Math.abs(offsetDelta) > 8) return offsetDelta;
     return right[1].ratio - left[1].ratio;
   });
 
@@ -254,25 +223,18 @@ function onBlockIntersection(entries: IntersectionObserverEntry[]): void {
 function scrollToBlock(blockId: string): void {
   const container = scrollContainer.value;
   const element = document.getElementById(`compose-block-${blockId}`);
-
-  if (!container || !element) {
-    return;
-  }
+  if (!container || !element) return;
 
   const containerRect = container.getBoundingClientRect();
   const elementRect = element.getBoundingClientRect();
   const top = container.scrollTop + elementRect.top - containerRect.top - 18;
   const distance = Math.abs(top - container.scrollTop);
-
-  container.scrollTo({
-    top,
-    behavior: distance < 900 ? 'smooth' : 'auto',
-  });
+  container.scrollTo({ top, behavior: distance < 900 ? 'smooth' : 'auto' });
 }
 
 function emitEditorState(): void {
   const active = Boolean(editingBlockId.value && editor.value);
-  const nextState: EditorStateSnapshot = {
+  emit('editorState', {
     active,
     canUndo: active ? editor.value?.can().undo() ?? false : false,
     canRedo: active ? editor.value?.can().redo() ?? false : false,
@@ -281,9 +243,7 @@ function emitEditorState(): void {
     isUnderline: active ? editor.value?.isActive('underline') ?? false : false,
     isBulletList: active ? editor.value?.isActive('bulletList') ?? false : false,
     isOrderedList: active ? editor.value?.isActive('orderedList') ?? false : false,
-  };
-
-  emit('editorState', nextState);
+  });
 }
 
 function selectBlock(blockId: string): void {
@@ -295,9 +255,7 @@ function isEditable(block: DocumentBlock): boolean {
 }
 
 function startEdit(item: BlockItem): void {
-  if (!isEditable(item.block) || !editor.value) {
-    return;
-  }
+  if (!isEditable(item.block) || !editor.value) return;
 
   editingBlockId.value = item.block.block_id;
   errorMessage.value = '';
@@ -320,9 +278,7 @@ function cancelEdit(): void {
 }
 
 async function saveActiveBlock(): Promise<void> {
-  if (!editor.value || !activeItem.value) {
-    return;
-  }
+  if (!editor.value || !activeItem.value) return;
 
   busy.value = true;
   errorMessage.value = '';
@@ -337,38 +293,47 @@ async function saveActiveBlock(): Promise<void> {
       reading_order: activeItem.value.block.reading_order,
       bbox: activeItem.value.block.bbox,
     });
-
     emit('blockSaved', activeItem.value.block.block_id);
     cancelEdit();
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Save failed';
+    errorMessage.value = error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ';
   } finally {
     busy.value = false;
   }
 }
 
 function applyToolbarCommand(command: ToolbarCommand | null): void {
-  if (!command || !editor.value || editingBlockId.value === null) {
+  if (!command || !editor.value) return;
+
+  if (command.type === 'startEdit') {
+    const target =
+      props.blocks.find((item) => item.block.block_id === props.selectedBlockId && isEditable(item.block))
+      ?? props.blocks.find((item) => isEditable(item.block));
+    if (target) startEdit(target);
     return;
   }
 
-  const chain = editor.value.chain().focus();
-
-  if (command.type === 'undo') {
-    chain.undo().run();
-  } else if (command.type === 'redo') {
-    chain.redo().run();
-  } else if (command.type === 'bold') {
-    chain.toggleBold().run();
-  } else if (command.type === 'italic') {
-    chain.toggleItalic().run();
-  } else if (command.type === 'underline') {
-    chain.toggleUnderline().run();
-  } else if (command.type === 'bulletList') {
-    chain.toggleBulletList().run();
-  } else if (command.type === 'orderedList') {
-    chain.toggleOrderedList().run();
+  if (command.type === 'save') {
+    void saveActiveBlock();
+    return;
   }
+
+  if (command.type === 'cancel') {
+    cancelEdit();
+    emit('editCancelled');
+    return;
+  }
+
+  if (editingBlockId.value === null) return;
+
+  const chain = editor.value.chain().focus();
+  if (command.type === 'undo') chain.undo().run();
+  else if (command.type === 'redo') chain.redo().run();
+  else if (command.type === 'bold') chain.toggleBold().run();
+  else if (command.type === 'italic') chain.toggleItalic().run();
+  else if (command.type === 'underline') chain.toggleUnderline().run();
+  else if (command.type === 'bulletList') chain.toggleBulletList().run();
+  else if (command.type === 'orderedList') chain.toggleOrderedList().run();
 
   emitEditorState();
 }
@@ -384,7 +349,6 @@ function readOnlyHtml(block: DocumentBlock): string {
   if (block.type === 'table') {
     return String(block.meta.table_html ?? block.meta.reviewed_html ?? '<p></p>');
   }
-
   return String(block.meta.reviewed_html ?? `<p>${escapeHtml(block.approved_text || block.normalized_text).replaceAll('\n', '<br>')}</p>`);
 }
 
@@ -395,33 +359,5 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-}
-
-function blockLabel(block: DocumentBlock): string {
-  if (block.meta.list_marker?.text) {
-    return block.meta.list_marker.text;
-  }
-
-  if (block.type === 'title') {
-    return 'หัวเรื่อง';
-  }
-
-  if (block.type === 'section_header') {
-    return 'หัวข้อ';
-  }
-
-  return 'เนื้อหา';
-}
-
-function blockTypeLabel(type: BlockType): string {
-  if (type === 'paragraph') return 'ย่อหน้า';
-  if (type === 'list_item') return 'รายการ';
-  if (type === 'section_header') return 'หัวข้อ';
-  if (type === 'title') return 'หัวเอกสาร';
-  if (type === 'table') return 'ตาราง';
-  if (type === 'image') return 'รูปภาพ';
-  if (type === 'figure_caption') return 'คำอธิบายภาพ';
-  if (type === 'footnote') return 'เชิงอรรถ';
-  return 'บล็อก';
 }
 </script>
