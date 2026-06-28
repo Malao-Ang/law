@@ -178,6 +178,7 @@ watch(
   (next) => {
     if (next) {
       nextTick(() => {
+        Object.values(editors.value).forEach((e) => e.destroy());
         const newEditors: Record<string, Editor> = {};
         props.blocks.forEach((item) => {
           if (!isEditable(item.block)) return;
@@ -197,6 +198,7 @@ watch(
 
 onBeforeUnmount(() => {
   observer?.disconnect();
+  visibleEntries.clear();
   Object.values(editors.value).forEach((e) => e.destroy());
 });
 
@@ -214,7 +216,6 @@ function createEditor(item: BlockItem): Editor {
       emitEditorState();
     },
     onSelectionUpdate: emitEditorState,
-    onTransaction: emitEditorState,
   });
 }
 

@@ -142,12 +142,12 @@
       <v-divider vertical class="compose-toolbar-divider" />
 
       <v-btn
-        v-if="!props.editorState.active"
+        v-if="!props.editMode"
         size="small"
         variant="tonal"
         color="primary"
         prepend-icon="mdi-pencil-outline"
-        title="แก้ไขบล็อกที่เลือก"
+        title="เข้าสู่โหมดแก้ไขเอกสาร"
         @click="emit('toggle:editMode')"
       >
         แก้ไข
@@ -159,19 +159,19 @@
           variant="tonal"
           color="success"
           prepend-icon="mdi-content-save-outline"
-          title="บันทึกการแก้ไข"
-          @click="emit('action', 'saveActiveBlock')"
+          title="บันทึกทุก block ที่แก้ไข"
+          @click="emit('action', 'saveAll')"
         >
-          บันทึก
+          บันทึกทั้งหมด
         </v-btn>
         <v-btn
           size="small"
           variant="outlined"
           prepend-icon="mdi-close"
-          title="ยกเลิกการแก้ไข"
-          @click="emit('action', 'cancelActiveBlock')"
+          title="ออกจากโหมดแก้ไข"
+          @click="emit('action', 'cancelAll')"
         >
-          ยกเลิก
+          ออก
         </v-btn>
       </template>
     </div>
@@ -194,7 +194,7 @@ interface EditorStateSnapshot {
   alignment: 'left' | 'center' | 'right' | 'justify';
 }
 
-type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveActiveBlock' | 'cancelActiveBlock' | 'indent' | 'outdent' | 'setAlignment';
+type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
 
 const props = defineProps<{
   title: string;
@@ -207,6 +207,7 @@ const props = defineProps<{
   alternateRouteLabel: string;
   alternateRoute: string;
   correctionInProgress?: boolean;
+  editMode: boolean;
 }>();
 
 const emit = defineEmits<{
