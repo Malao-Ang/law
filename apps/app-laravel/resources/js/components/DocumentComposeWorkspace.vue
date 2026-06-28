@@ -25,7 +25,11 @@
         :review="review"
         :document-id="documentId"
         :save-message="autoSaveLabel"
+        :correction-status="docStatus?.correction_status ?? null"
+        :export-busy="exporting"
         @update:model-value="onMetadataUpdate"
+        @export="triggerExport"
+        @reload="reloadReview"
       />
     </v-navigation-drawer>
 
@@ -42,6 +46,15 @@
       </div>
 
       <section v-else-if="review" class="document-compose-shell">
+        <div v-if="correctionInProgress" class="compose-correction-banner">
+          <v-progress-circular indeterminate size="18" color="primary" />
+          <span>กำลังปรับปรุงด้วย AI ระบบจะรีเฟรชอัตโนมัติเมื่อเสร็จ</span>
+        </div>
+        <div v-else-if="correctionFailed" class="compose-correction-banner compose-correction-banner--error">
+          <v-icon icon="mdi-alert-circle-outline" size="18" />
+          <span>AI correction failed. คุณยังแก้ไขเอกสารต่อได้ แต่ Export จะถูกบล็อกไว้</span>
+        </div>
+
         <ComposeToolbar
           :title="pageTitle"
           :subtitle="pageSubtitle"
@@ -52,10 +65,12 @@
           :auto-save-label="autoSaveLabel"
           :alternate-route-label="alternateRouteLabel"
           :alternate-route="alternateRoute"
+          :correction-in-progress="correctionInProgress || correctionFailed"
           @action="dispatchToolbarAction"
           @reload="reloadReview"
           @toggle:navigator="leftDrawer = !leftDrawer"
           @toggle:details="rightDrawer = !rightDrawer"
+          @toggle:editMode="handleToggleEditMode"
           @update:font="font = $event"
           @update:font-size="fontSize = $event"
         />
@@ -68,9 +83,12 @@
           :font="font"
           :font-size="fontSize"
           :toolbar-command="toolbarCommand"
+          :edit-mode="editMode"
+          :mode="mode"
           @select-block="selectedBlockId = $event"
           @visible-block-change="selectedBlockId = $event"
-          @block-saved="reloadReview"
+          @block-saved="onBlockSaved"
+          @edit-cancelled="handleEditCancelled"
           @editor-state="editorState = $event"
         />
       </section>
@@ -85,12 +103,12 @@ import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { fetchReview, updateComposeState } from '../api/client';
-import type { ComposeState, DocumentMetadata, ReviewDocument, ThaiFont } from '../types/document';
+import { exportDocument, fetchReview, fetchStatus, updateComposeState } from '../api/client';
+import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel';
 }
 
 interface EditorStateSnapshot {
@@ -120,6 +138,7 @@ const { mdAndDown } = useDisplay();
 const loading = ref(true);
 const error = ref('');
 const review = ref<ReviewDocument | null>(null);
+const docStatus = ref<DocumentStatus | null>(null);
 const selectedBlockId = ref<string | null>(null);
 const scrollTarget = ref<ScrollTarget | null>(null);
 const font = ref<ThaiFont>('sarabun');
@@ -129,6 +148,7 @@ const hydrating = ref(false);
 const autoSaveState = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
 const autoSaveMessage = ref('ยังไม่มีการแก้ไข');
 const toolbarCommand = ref<ToolbarCommand | null>(null);
+const editMode = ref(false);
 const editorState = ref<EditorStateSnapshot>({
   active: false,
   canUndo: false,
@@ -141,12 +161,20 @@ const editorState = ref<EditorStateSnapshot>({
 });
 const leftDrawer = ref(true);
 const rightDrawer = ref(true);
+const exporting = ref(false);
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let correctionPollTimer: ReturnType<typeof setTimeout> | null = null;
 let toolbarCommandId = 0;
 let scrollRequestId = 0;
 
 const isCompact = computed(() => mdAndDown.value);
+const correctionInProgress = computed(() =>
+  ['pending', 'in_progress'].includes(docStatus.value?.correction_status ?? ''),
+);
+const correctionFailed = computed(() =>
+  docStatus.value?.correction_status === 'failed',
+);
 
 const pageTitle = computed(() => (
   props.mode === 'compose' ? 'Compose Editor' : 'Review Editor'
@@ -209,11 +237,15 @@ watch([font, fontSize], () => {
 
 onMounted(async () => {
   await reloadReview();
+  void pollCorrectionStatus();
 });
 
 onBeforeUnmount(() => {
   if (saveTimer) {
     clearTimeout(saveTimer);
+  }
+  if (correctionPollTimer) {
+    clearTimeout(correctionPollTimer);
   }
 });
 
@@ -278,9 +310,77 @@ function onMetadataUpdate(next: DocumentMetadata): void {
   }
 }
 
-function dispatchToolbarAction(type: ToolbarCommand['type']): void {
+function dispatchToolbarAction(type: ToolbarCommand['type'] | 'export' | 'saveActiveBlock' | 'cancelActiveBlock'): void {
+  if (type === 'export') {
+    void triggerExport();
+    return;
+  }
+
+  if (type === 'saveActiveBlock') {
+    toolbarCommandId += 1;
+    toolbarCommand.value = { id: toolbarCommandId, type: 'save' };
+    return;
+  }
+
+  if (type === 'cancelActiveBlock') {
+    toolbarCommandId += 1;
+    toolbarCommand.value = { id: toolbarCommandId, type: 'cancel' };
+    return;
+  }
+
   toolbarCommandId += 1;
   toolbarCommand.value = { id: toolbarCommandId, type };
+}
+
+function handleToggleEditMode(): void {
+  editMode.value = true;
+  toolbarCommandId += 1;
+  toolbarCommand.value = { id: toolbarCommandId, type: 'startEdit' };
+}
+
+function handleEditCancelled(): void {
+  editMode.value = false;
+}
+
+function onBlockSaved(blockId: string): void {
+  editMode.value = false;
+  void reloadReview();
+}
+
+async function pollCorrectionStatus(): Promise<void> {
+  try {
+    docStatus.value = await fetchStatus(props.documentId);
+  } catch {
+    correctionPollTimer = setTimeout(() => {
+      void pollCorrectionStatus();
+    }, 2500);
+    return;
+  }
+
+  if (correctionInProgress.value) {
+    correctionPollTimer = setTimeout(() => {
+      void pollCorrectionStatus();
+    }, 2500);
+  } else if (docStatus.value?.correction_status === 'done') {
+    await reloadReview();
+  }
+}
+
+async function triggerExport(): Promise<void> {
+  if (exporting.value || correctionInProgress.value || correctionFailed.value) {
+    return;
+  }
+
+  exporting.value = true;
+
+  try {
+    await exportDocument(props.documentId);
+    docStatus.value = await fetchStatus(props.documentId);
+  } catch (nextError) {
+    error.value = nextError instanceof Error ? nextError.message : 'Export failed';
+  } finally {
+    exporting.value = false;
+  }
 }
 
 function scheduleComposeSave(): void {
@@ -338,3 +438,21 @@ function defaultMetadata(): DocumentMetadata {
   };
 }
 </script>
+
+<style scoped>
+.compose-correction-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--law-primary-soft);
+  color: var(--law-primary);
+  font-size: 13px;
+  border-bottom: 1px solid var(--law-border);
+}
+
+.compose-correction-banner--error {
+  background: #fef2f2;
+  color: var(--law-danger);
+}
+</style>
