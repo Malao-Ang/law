@@ -55,6 +55,15 @@
           <span>AI correction failed. คุณยังแก้ไขเอกสารต่อได้ แต่ Export จะถูกบล็อกไว้</span>
         </div>
 
+        <ComposeBlockSelectionBar
+          :count="selectedBlockIds.size"
+          :busy="blockOpBusy"
+          @merge="handleMergeSelected"
+          @create-after="handleCreateAfterSelected"
+          @delete="handleDeleteSelected"
+          @clear="selectedBlockIds = new Set()"
+        />
+
         <ComposeToolbar
           :title="pageTitle"
           :subtitle="pageSubtitle"
@@ -77,9 +86,11 @@
         />
 
         <ComposeSectionEditor
+          ref="sectionEditor"
           :document-id="documentId"
           :blocks="flatBlocks"
           :selected-block-id="selectedBlockId"
+          :selected-block-ids="selectedBlockIds"
           :scroll-target="scrollTarget"
           :font="font"
           :font-size="fontSize"
@@ -91,6 +102,8 @@
           @all-blocks-saved="onAllBlocksSaved"
           @edit-cancelled="handleEditCancelled"
           @editor-state="editorState = $event"
+          @selected-blocks-change="selectedBlockIds = $event"
+          @split-block="handleSplitBlock"
         />
       </section>
     </v-main>
@@ -100,11 +113,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
+import ComposeBlockSelectionBar from './ComposeBlockSelectionBar.vue';
 import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { exportDocument, fetchReview, fetchStatus, updateComposeState } from '../api/client';
+import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, updateComposeState } from '../api/client';
 import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
@@ -152,6 +166,9 @@ const autoSaveState = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
 const autoSaveMessage = ref('ยังไม่มีการแก้ไข');
 const toolbarCommand = ref<ToolbarCommand | null>(null);
 const editMode = ref(false);
+const selectedBlockIds = ref(new Set<string>());
+const blockOpBusy = ref(false);
+const sectionEditor = ref<InstanceType<typeof ComposeSectionEditor> | null>(null);
 const editorState = ref<EditorStateSnapshot>({
   active: false,
   canUndo: false,
@@ -270,6 +287,10 @@ async function reloadReview(): Promise<void> {
       review.value.pages.flatMap((page) => page.blocks.map((block) => block.block_id)),
     );
 
+    selectedBlockIds.value = new Set(
+      [...selectedBlockIds.value].filter((id) => availableIds.has(id)),
+    );
+
     selectedBlockId.value = currentSelected && availableIds.has(currentSelected)
       ? currentSelected
       : review.value.pages.flatMap((page) => page.blocks)[0]?.block_id ?? null;
@@ -349,6 +370,75 @@ function handleToggleEditMode(): void {
 function handleEditCancelled(): void {
   editMode.value = false;
   void reloadReview();
+}
+
+async function handleSplitBlock(_payload: {
+  blockId: string;
+  pageNo: number;
+  beforeText: string;
+  beforeHtml: string;
+  afterText: string;
+  afterHtml: string;
+}): Promise<void> {
+  // Task 6 implements this — stub to satisfy the emit handler
+}
+
+async function handleMergeSelected(): Promise<void> {
+  if (selectedBlockIds.value.size < 2 || blockOpBusy.value) return;
+  blockOpBusy.value = true;
+  try {
+    const ordered = flatBlocks.value
+      .filter((item) => selectedBlockIds.value.has(item.block.block_id))
+      .map((item) => item.block.block_id);
+    await mergeBlocks(props.documentId, ordered);
+    selectedBlockIds.value = new Set();
+    await reloadReview();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'รวมบล็อกไม่สำเร็จ';
+  } finally {
+    blockOpBusy.value = false;
+  }
+}
+
+async function handleDeleteSelected(): Promise<void> {
+  if (selectedBlockIds.value.size === 0 || blockOpBusy.value) return;
+  blockOpBusy.value = true;
+  try {
+    for (const item of flatBlocks.value) {
+      if (selectedBlockIds.value.has(item.block.block_id)) {
+        await deleteBlock(props.documentId, item.block.block_id, item.page_no);
+      }
+    }
+    selectedBlockIds.value = new Set();
+    await reloadReview();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'ลบบล็อกไม่สำเร็จ';
+  } finally {
+    blockOpBusy.value = false;
+  }
+}
+
+async function handleCreateAfterSelected(): Promise<void> {
+  const lastSelected = flatBlocks.value
+    .filter((item) => selectedBlockIds.value.has(item.block.block_id))
+    .at(-1);
+  if (!lastSelected) return;
+  blockOpBusy.value = true;
+  try {
+    await createBlock(props.documentId, {
+      page_no: lastSelected.page_no,
+      after_block_id: lastSelected.block.block_id,
+      type: 'paragraph',
+      approved_text: '',
+      reviewed_html: '<p></p>',
+    });
+    selectedBlockIds.value = new Set();
+    await reloadReview();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'เพิ่มบล็อกไม่สำเร็จ';
+  } finally {
+    blockOpBusy.value = false;
+  }
 }
 
 function onAllBlocksSaved(): void {

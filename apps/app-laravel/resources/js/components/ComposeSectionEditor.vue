@@ -14,10 +14,21 @@
         class="doc-block"
         :class="{
           'is-selected': item.block.block_id === selectedBlockId,
+          'is-multi-selected': selectedBlockIds.has(item.block.block_id),
           'needs-review': item.block.needs_review,
         }"
         @click="editMode && selectBlock(item.block.block_id)"
       >
+        <button
+          class="doc-block__select-check"
+          :class="{ 'is-checked': selectedBlockIds.has(item.block.block_id) }"
+          @click.stop="toggleBlockSelection(item.block.block_id, $event)"
+        >
+          <v-icon
+            :icon="selectedBlockIds.has(item.block.block_id) ? 'mdi-checkbox-marked-circle' : 'mdi-checkbox-blank-circle-outline'"
+            size="18"
+          />
+        </button>
         <div v-if="item.block.type === 'image'" class="doc-block__image">
           <ResizableImage
             v-if="item.block.meta.image?.src_url"
@@ -102,6 +113,7 @@ const props = defineProps<{
   documentId: string;
   blocks: BlockItem[];
   selectedBlockId: string | null;
+  selectedBlockIds: Set<string>;
   scrollTarget: ScrollTarget | null;
   font: ThaiFont;
   fontSize: number;
@@ -116,6 +128,8 @@ const emit = defineEmits<{
   allBlocksSaved: [];
   editCancelled: [];
   editorState: [EditorStateSnapshot];
+  selectedBlocksChange: [Set<string>];
+  splitBlock: [{ blockId: string; pageNo: number; beforeText: string; beforeHtml: string; afterText: string; afterHtml: string }];
 }>();
 
 const scrollContainer = ref<HTMLElement | null>(null);
@@ -125,6 +139,7 @@ const focusedBlockId = ref<string | null>(null);
 const dirtyBlockIds = ref(new Set<string>());
 const editors = shallowRef<Record<string, Editor>>({});
 const visibleEntries = new Map<string, { offset: number; ratio: number }>();
+const lastCheckedId = ref<string | null>(null);
 
 const editorExtensions: Extensions = [
   StarterKit,
@@ -386,6 +401,56 @@ function applyToolbarCommand(command: ToolbarCommand | null): void {
   emitEditorState();
 }
 
+function toggleBlockSelection(blockId: string, event: MouseEvent): void {
+  const next = new Set(props.selectedBlockIds);
+  if (event.shiftKey && lastCheckedId.value) {
+    const ids = props.blocks.map((b) => b.block.block_id);
+    const a = ids.indexOf(lastCheckedId.value);
+    const b = ids.indexOf(blockId);
+    const [start, end] = a < b ? [a, b] : [b, a];
+    for (let i = start; i <= end; i++) next.add(ids[i]);
+  } else if (next.has(blockId)) {
+    next.delete(blockId);
+  } else {
+    next.add(blockId);
+  }
+  lastCheckedId.value = blockId;
+  emit('selectedBlocksChange', next);
+}
+
+function executeSplitAtCursor(): void {
+  const blockId = focusedBlockId.value;
+  if (!blockId) return;
+  const ed = editors.value[blockId];
+  if (!ed) return;
+  const item = props.blocks.find((b) => b.block.block_id === blockId);
+  if (!item) return;
+
+  const { from } = ed.state.selection;
+  const doc = ed.state.doc;
+
+  const tempBefore = new Editor({
+    extensions: editorExtensions,
+    content: doc.cut(0, from).toJSON(),
+  });
+  const tempAfter = new Editor({
+    extensions: editorExtensions,
+    content: doc.cut(from, doc.content.size).toJSON(),
+  });
+
+  emit('splitBlock', {
+    blockId,
+    pageNo: item.page_no,
+    beforeText: tempBefore.getText({ blockSeparator: '\n' }),
+    beforeHtml: tempBefore.getHTML(),
+    afterText: tempAfter.getText({ blockSeparator: '\n' }),
+    afterHtml: tempAfter.getHTML(),
+  });
+
+  tempBefore.destroy();
+  tempAfter.destroy();
+}
+
 function renderReadOnlyHtml(block: DocumentBlock): string {
   return DOMPurify.sanitize(readOnlyHtml(block), {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div', 'sub', 'sup'],
@@ -408,4 +473,35 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 }
+
+defineExpose({ executeSplitAtCursor });
 </script>
+
+<style scoped>
+.doc-block {
+  position: relative;
+}
+.doc-block__select-check {
+  position: absolute;
+  top: 6px;
+  left: -28px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgb(var(--v-theme-primary));
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.doc-block:hover .doc-block__select-check,
+.doc-block.is-multi-selected .doc-block__select-check {
+  opacity: 1;
+}
+.doc-block.is-multi-selected {
+  background: color-mix(in srgb, rgb(var(--v-theme-primary)) 8%, transparent);
+  border-left: 3px solid rgb(var(--v-theme-primary));
+}
+</style>
