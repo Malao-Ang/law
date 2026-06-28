@@ -17,8 +17,9 @@ class StoreDocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'max:51200', 'mimes:pdf,docx'],
+            'file' => ['required', 'file', 'max:51200', 'mimes:pdf,doc,docx'],
             'scan_extraction_mode' => ['nullable', 'in:auto,local,landingai'],
+            'extraction_engine' => ['nullable', 'in:standard,fast'],
         ];
     }
 }
