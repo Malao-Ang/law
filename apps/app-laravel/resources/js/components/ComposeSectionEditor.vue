@@ -14,7 +14,6 @@
         class="doc-block"
         :class="{
           'is-selected': item.block.block_id === selectedBlockId,
-          'is-editing': item.block.block_id === editingBlockId,
           'needs-review': item.block.needs_review,
         }"
         @click="editMode && selectBlock(item.block.block_id)"
@@ -35,14 +34,10 @@
           v-html="renderReadOnlyHtml(item.block)"
         ></div>
 
-        <div
-          v-else
-          class="doc-block__body"
-          @click.stop="editMode && isEditable(item.block) && startEdit(item)"
-        >
+        <div v-else class="doc-block__body">
           <EditorContent
-            v-if="item.block.block_id === editingBlockId"
-            :editor="editor"
+            v-if="editMode && isEditable(item.block) && editors[item.block.block_id]"
+            :editor="editors[item.block.block_id]"
             class="doc-block__editor"
           />
           <div
@@ -63,20 +58,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import DOMPurify from 'dompurify';
-import { EditorContent, useEditor } from '@tiptap/vue-3';
+import { Editor, type Extensions } from '@tiptap/core';
+import { EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { IndentExtension } from '../extensions/IndentExtension';
 import { patchBlock } from '../api/client';
+import { IndentExtension } from '../extensions/IndentExtension';
 import ResizableImage from './ResizableImage.vue';
 import type { DocumentBlock, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel' | 'indent' | 'outdent' | 'setAlignment';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
   value?: string;
 }
 
@@ -117,38 +113,49 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectBlock: [string];
   visibleBlockChange: [string];
-  blockSaved: [string];
+  allBlocksSaved: [];
   editCancelled: [];
   editorState: [EditorStateSnapshot];
 }>();
 
 const scrollContainer = ref<HTMLElement | null>(null);
-const editingBlockId = ref<string | null>(null);
 const busy = ref(false);
 const errorMessage = ref('');
+const focusedBlockId = ref<string | null>(null);
+const dirtyBlockIds = ref(new Set<string>());
+const editors = shallowRef<Record<string, Editor>>({});
 const visibleEntries = new Map<string, { offset: number; ratio: number }>();
 
-const editor = useEditor({
-  extensions: [
-    StarterKit,
-    Underline,
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    IndentExtension,
-  ],
-  content: '<p></p>',
-  editable: false,
-  onUpdate: emitEditorState,
-  onSelectionUpdate: emitEditorState,
-  onTransaction: emitEditorState,
-});
+const editorExtensions: Extensions = [
+  StarterKit,
+  Underline,
+  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  IndentExtension,
+];
 
 const fontClass = computed(() => `doc-font--${props.font}`);
 
-const activeItem = computed(() =>
-  props.blocks.find((item) => item.block.block_id === editingBlockId.value) ?? null,
-);
-
 let observer: IntersectionObserver | null = null;
+
+watch(
+  () => props.blocks.map((item) => item.block.block_id).join('|'),
+  (next, prev) => {
+    setupBlockObserver();
+    if (props.editMode && next !== prev) {
+      const current = editors.value;
+      const newEditors = { ...current };
+      let changed = false;
+      props.blocks.forEach((item) => {
+        if (isEditable(item.block) && !newEditors[item.block.block_id]) {
+          newEditors[item.block.block_id] = createEditor(item);
+          changed = true;
+        }
+      });
+      if (changed) editors.value = newEditors;
+    }
+  },
+  { flush: 'post', immediate: true },
+);
 
 watch(
   () => props.scrollTarget?.requestId,
@@ -162,12 +169,6 @@ watch(
 );
 
 watch(
-  () => props.blocks.map((item) => item.block.block_id).join('|'),
-  () => setupBlockObserver(),
-  { flush: 'post', immediate: true },
-);
-
-watch(
   () => props.toolbarCommand?.id,
   () => applyToolbarCommand(props.toolbarCommand),
 );
@@ -175,16 +176,47 @@ watch(
 watch(
   () => props.editMode,
   (next) => {
-    if (!next && editingBlockId.value !== null) {
-      cancelEdit();
+    if (next) {
+      nextTick(() => {
+        const newEditors: Record<string, Editor> = {};
+        props.blocks.forEach((item) => {
+          if (!isEditable(item.block)) return;
+          newEditors[item.block.block_id] = createEditor(item);
+        });
+        editors.value = newEditors;
+      });
+    } else {
+      Object.values(editors.value).forEach((e) => e.destroy());
+      editors.value = {};
+      focusedBlockId.value = null;
+      dirtyBlockIds.value = new Set();
+      emitEditorState();
     }
   },
 );
 
 onBeforeUnmount(() => {
   observer?.disconnect();
-  editor.value?.destroy();
+  Object.values(editors.value).forEach((e) => e.destroy());
 });
+
+function createEditor(item: BlockItem): Editor {
+  return new Editor({
+    extensions: editorExtensions,
+    content: readOnlyHtml(item.block),
+    editable: true,
+    onFocus: () => {
+      focusedBlockId.value = item.block.block_id;
+      emitEditorState();
+    },
+    onUpdate: () => {
+      dirtyBlockIds.value = new Set([...dirtyBlockIds.value, item.block.block_id]);
+      emitEditorState();
+    },
+    onSelectionUpdate: emitEditorState,
+    onTransaction: emitEditorState,
+  });
+}
 
 function setupBlockObserver(): void {
   observer?.disconnect();
@@ -244,21 +276,22 @@ function scrollToBlock(blockId: string): void {
 }
 
 function emitEditorState(): void {
-  const active = Boolean(editingBlockId.value && editor.value);
+  const focusedEditor = focusedBlockId.value ? editors.value[focusedBlockId.value] : null;
+  const active = Boolean(focusedEditor);
   const alignment: EditorStateSnapshot['alignment'] = active ? (
-    editor.value?.isActive({ textAlign: 'center' }) ? 'center' :
-    editor.value?.isActive({ textAlign: 'right' })  ? 'right'  :
-    editor.value?.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+    focusedEditor?.isActive({ textAlign: 'center' }) ? 'center' :
+    focusedEditor?.isActive({ textAlign: 'right' })  ? 'right'  :
+    focusedEditor?.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
   ) : 'left';
   emit('editorState', {
     active,
-    canUndo: active ? editor.value?.can().undo() ?? false : false,
-    canRedo: active ? editor.value?.can().redo() ?? false : false,
-    isBold: active ? editor.value?.isActive('bold') ?? false : false,
-    isItalic: active ? editor.value?.isActive('italic') ?? false : false,
-    isUnderline: active ? editor.value?.isActive('underline') ?? false : false,
-    isBulletList: active ? editor.value?.isActive('bulletList') ?? false : false,
-    isOrderedList: active ? editor.value?.isActive('orderedList') ?? false : false,
+    canUndo: active ? focusedEditor?.can().undo() ?? false : false,
+    canRedo: active ? focusedEditor?.can().redo() ?? false : false,
+    isBold: active ? focusedEditor?.isActive('bold') ?? false : false,
+    isItalic: active ? focusedEditor?.isActive('italic') ?? false : false,
+    isUnderline: active ? focusedEditor?.isActive('underline') ?? false : false,
+    isBulletList: active ? focusedEditor?.isActive('bulletList') ?? false : false,
+    isOrderedList: active ? focusedEditor?.isActive('orderedList') ?? false : false,
     alignment,
   });
 }
@@ -271,81 +304,71 @@ function isEditable(block: DocumentBlock): boolean {
   return block.type !== 'image' && block.type !== 'table';
 }
 
-function startEdit(item: BlockItem): void {
-  if (busy.value) return;
-  if (!isEditable(item.block) || !editor.value) return;
-
-  editingBlockId.value = item.block.block_id;
+async function saveAllBlocks(): Promise<void> {
+  if (busy.value || dirtyBlockIds.value.size === 0) return;
+  busy.value = true;
   errorMessage.value = '';
-  emit('selectBlock', item.block.block_id);
-  editor.value.commands.setContent(readOnlyHtml(item.block), false);
-  editor.value.setEditable(true);
 
-  nextTick(() => {
-    editor.value?.commands.focus('end');
-    emitEditorState();
+  const dirtyArray = [...dirtyBlockIds.value];
+  const results = await Promise.allSettled(
+    dirtyArray.map((blockId) => {
+      const item = props.blocks.find((b) => b.block.block_id === blockId);
+      const ed = editors.value[blockId];
+      if (!item || !ed) return Promise.resolve();
+      return patchBlock(props.documentId, blockId, {
+        page_no: item.page_no,
+        approved_text: ed.getText({ blockSeparator: '\n' }),
+        reviewed_html: ed.getHTML(),
+        mark_uncertain: false,
+        type: item.block.type,
+        reading_order: item.block.reading_order,
+        bbox: item.block.bbox,
+      });
+    }),
+  );
+
+  const newDirty = new Set(dirtyBlockIds.value);
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled') newDirty.delete(dirtyArray[i]);
   });
+  dirtyBlockIds.value = newDirty;
+
+  const failCount = results.filter((r) => r.status === 'rejected').length;
+  if (failCount > 0) {
+    errorMessage.value = `บันทึกไม่สำเร็จ ${failCount} block — กดบันทึกอีกครั้ง`;
+  } else {
+    emit('allBlocksSaved');
+  }
+
+  busy.value = false;
 }
 
 function cancelEdit(): void {
-  editingBlockId.value = null;
-  errorMessage.value = '';
-  editor.value?.commands.clearContent();
-  editor.value?.setEditable(false);
+  Object.values(editors.value).forEach((e) => e.destroy());
+  editors.value = {};
+  focusedBlockId.value = null;
+  dirtyBlockIds.value = new Set();
   emitEditorState();
   emit('editCancelled');
 }
 
-async function saveActiveBlock(): Promise<void> {
-  if (!editor.value || !activeItem.value) return;
-
-  busy.value = true;
-  errorMessage.value = '';
-
-  try {
-    await patchBlock(props.documentId, activeItem.value.block.block_id, {
-      page_no: activeItem.value.page_no,
-      approved_text: editor.value.getText({ blockSeparator: '\n' }),
-      reviewed_html: editor.value.getHTML(),
-      mark_uncertain: false,
-      type: activeItem.value.block.type,
-      reading_order: activeItem.value.block.reading_order,
-      bbox: activeItem.value.block.bbox,
-    });
-    emit('blockSaved', activeItem.value.block.block_id);
-    cancelEdit();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ';
-  } finally {
-    busy.value = false;
-  }
-}
-
 function applyToolbarCommand(command: ToolbarCommand | null): void {
-  if (!command || !editor.value) return;
+  if (!command) return;
 
-  if (command.type === 'startEdit') {
-    const target = props.blocks.find(
-      (item) => item.block.block_id === props.selectedBlockId && isEditable(item.block),
-    );
-    if (target) startEdit(target);
+  if (command.type === 'saveAll') {
+    if (!busy.value) void saveAllBlocks();
     return;
   }
 
-  if (command.type === 'save') {
-    if (busy.value) return;
-    void saveActiveBlock();
-    return;
-  }
-
-  if (command.type === 'cancel') {
+  if (command.type === 'cancelAll') {
     cancelEdit();
     return;
   }
 
-  if (editingBlockId.value === null) return;
+  const focusedEditor = focusedBlockId.value ? editors.value[focusedBlockId.value] : null;
+  if (!focusedEditor) return;
 
-  const chain = editor.value.chain().focus();
+  const chain = focusedEditor.chain().focus();
   if (command.type === 'undo') chain.undo().run();
   else if (command.type === 'redo') chain.redo().run();
   else if (command.type === 'bold') chain.toggleBold().run();
