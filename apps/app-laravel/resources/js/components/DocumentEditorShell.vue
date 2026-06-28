@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-shell" :style="{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }">
+  <div class="editor-shell">
     <!-- Editor/Preview Toggle Toolbar -->
     <div class="editor-shell-header">
       <div class="editor-shell-title">
@@ -170,7 +170,6 @@ async function saveDocument(): Promise<void> {
       draft_html: html,
     });
     isDirty.value = false;
-    error.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ';
   } finally {
@@ -179,6 +178,8 @@ async function saveDocument(): Promise<void> {
 }
 
 async function saveAndContinue(): Promise<void> {
+  if (saving.value) return;
+  if (!editor.value) return;
   await saveDocument();
   if (!error.value) {
     router.push(`/documents/${props.documentId}/compose`);
