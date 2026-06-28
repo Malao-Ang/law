@@ -255,6 +255,7 @@ function isEditable(block: DocumentBlock): boolean {
 }
 
 function startEdit(item: BlockItem): void {
+  if (busy.value) return;
   if (!isEditable(item.block) || !editor.value) return;
 
   editingBlockId.value = item.block.block_id;
@@ -275,6 +276,7 @@ function cancelEdit(): void {
   editor.value?.commands.clearContent();
   editor.value?.setEditable(false);
   emitEditorState();
+  emit('editCancelled');
 }
 
 async function saveActiveBlock(): Promise<void> {
@@ -306,21 +308,21 @@ function applyToolbarCommand(command: ToolbarCommand | null): void {
   if (!command || !editor.value) return;
 
   if (command.type === 'startEdit') {
-    const target =
-      props.blocks.find((item) => item.block.block_id === props.selectedBlockId && isEditable(item.block))
-      ?? props.blocks.find((item) => isEditable(item.block));
+    const target = props.blocks.find(
+      (item) => item.block.block_id === props.selectedBlockId && isEditable(item.block),
+    );
     if (target) startEdit(target);
     return;
   }
 
   if (command.type === 'save') {
+    if (busy.value) return;
     void saveActiveBlock();
     return;
   }
 
   if (command.type === 'cancel') {
     cancelEdit();
-    emit('editCancelled');
     return;
   }
 
