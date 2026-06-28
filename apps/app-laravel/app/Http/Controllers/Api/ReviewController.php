@@ -184,6 +184,27 @@ class ReviewController extends Controller
         ], 202);
     }
 
+    public function reorderBlocks(Request $request, string $documentId): JsonResponse
+    {
+        $blockIds = $request->input('block_ids', []);
+
+        if (! is_array($blockIds) || empty($blockIds)) {
+            return response()->json(['message' => 'block_ids must be a non-empty array'], 422);
+        }
+
+        try {
+            $this->reviewStore->reorderBlocks($documentId, $blockIds);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status' => 'updated',
+            'reordered_block_ids' => $blockIds,
+        ]);
+    }
+
     public function reprocess(ReprocessBlockRequest $request, string $documentId, string $blockId): JsonResponse
     {
         ReprocessBlockJob::dispatch(
@@ -204,5 +225,97 @@ class ReviewController extends Controller
             'block_id' => $blockId,
             'status' => 'queued',
         ], 202);
+    }
+
+    public function deleteBlock(Request $request, string $documentId, string $blockId): JsonResponse
+    {
+        $validated = $request->validate(['page_no' => 'required|integer|min:1']);
+        $pageNo = (int) $validated['page_no'];
+
+        try {
+            $this->reviewStore->deleteBlock($documentId, $pageNo, $blockId);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        return response()->json(['document_id' => $documentId, 'block_id' => $blockId, 'status' => 'deleted']);
+    }
+
+    public function mergeBlocks(Request $request, string $documentId): JsonResponse
+    {
+        $blockIds = $request->input('block_ids', []);
+        if (!is_array($blockIds) || count($blockIds) < 2) {
+            return response()->json(['message' => 'block_ids must contain at least 2 IDs'], 422);
+        }
+        foreach ($blockIds as $id) {
+            if (!is_string($id) || trim($id) === '') {
+                return response()->json(['message' => 'Each block_id must be a non-empty string'], 422);
+            }
+        }
+
+        try {
+            $merged = $this->reviewStore->mergeBlocks($documentId, $blockIds);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        return response()->json(['document_id' => $documentId, 'status' => 'merged', 'block' => $merged]);
+    }
+
+    public function splitBlock(Request $request, string $documentId, string $blockId): JsonResponse
+    {
+        $validated = $request->validate([
+            'page_no'     => 'required|integer|min:1',
+            'before_text' => 'required|string',
+            'before_html' => 'required|string',
+            'after_text'  => 'required|string',
+            'after_html'  => 'required|string',
+        ]);
+
+        try {
+            $result = $this->reviewStore->splitBlock(
+                $documentId,
+                (int) $validated['page_no'],
+                $blockId,
+                $validated['before_text'],
+                $validated['before_html'],
+                $validated['after_text'],
+                $validated['after_html'],
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status'      => 'split',
+            'first'       => $result['first'],
+            'second'      => $result['second'],
+        ]);
+    }
+
+    public function createBlock(Request $request, string $documentId): JsonResponse
+    {
+        $validated = $request->validate([
+            'page_no'        => 'required|integer|min:1',
+            'after_block_id' => 'nullable|string',
+            'type'           => 'string|in:paragraph,list_item,section_header,title,footnote',
+            'approved_text'  => 'string',
+            'reviewed_html'  => 'string',
+            'layout'         => 'array',
+        ]);
+
+        try {
+            $newBlock = $this->reviewStore->createBlock(
+                $documentId,
+                (int) $validated['page_no'],
+                $validated['after_block_id'] ?? null,
+                $validated,
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['document_id' => $documentId, 'status' => 'created', 'block' => $newBlock]);
     }
 }

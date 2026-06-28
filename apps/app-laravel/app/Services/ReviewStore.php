@@ -492,6 +492,215 @@ class ReviewStore
         });
     }
 
+    public function deleteBlock(string $documentId, int $pageNo, string $blockId): void
+    {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId): void {
+            $deleted = false;
+            foreach ($document['pages'] as &$page) {
+                if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
+                    continue;
+                }
+                $before = count($page['blocks'] ?? []);
+                $page['blocks'] = array_values(
+                    array_filter(
+                        $page['blocks'] ?? [],
+                        static fn (array $b): bool => (string) ($b['block_id'] ?? '') !== $blockId,
+                    ),
+                );
+                if (count($page['blocks']) < $before) {
+                    $deleted = true;
+                }
+            }
+            if (!$deleted) {
+                throw new RuntimeException("Block not found: {$blockId}");
+            }
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+        });
+    }
+
+    /**
+     * @param array<string> $blockIds
+     * @return array<string, mixed>
+     */
+    public function mergeBlocks(string $documentId, array $blockIds): array
+    {
+        if (count($blockIds) < 2) {
+            throw new \InvalidArgumentException('mergeBlocks requires at least 2 block IDs.');
+        }
+
+        $returnBlock = null;
+
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($blockIds, &$returnBlock): void {
+            $ordered = [];
+            foreach ($blockIds as $id) {
+                foreach (($document['pages'] ?? []) as $page) {
+                    foreach (($page['blocks'] ?? []) as $b) {
+                        if ((string) ($b['block_id'] ?? '') === $id) {
+                            $ordered[$id] = $b;
+                        }
+                    }
+                }
+            }
+
+            if (count($ordered) !== count($blockIds)) {
+                throw new RuntimeException('One or more blocks not found for merge.');
+            }
+
+            $mergedText = implode("\n", array_map(
+                static fn (array $b): string => (string) ($b['approved_text'] ?? $b['normalized_text'] ?? ''),
+                array_values($ordered),
+            ));
+            $mergedHtml = implode('', array_map(
+                static fn (array $b): string => (string) ($b['meta']['reviewed_html'] ?? ''),
+                array_values($ordered),
+            ));
+
+            $firstId = $blockIds[0];
+            $toRemove = array_slice($blockIds, 1);
+
+            foreach ($document['pages'] as &$page) {
+                foreach ($page['blocks'] as &$block) {
+                    if ((string) ($block['block_id'] ?? '') === $firstId) {
+                        $block['approved_text'] = $mergedText;
+                        $block['meta']['reviewed_html'] = $mergedHtml;
+                        $block['needs_review'] = false;
+                        $returnBlock = $block;
+                    }
+                }
+                unset($block);
+                $page['blocks'] = array_values(array_filter(
+                    $page['blocks'],
+                    static fn (array $b): bool => !in_array((string) ($b['block_id'] ?? ''), $toRemove, true),
+                ));
+            }
+            unset($page);
+
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+        });
+
+        if ($returnBlock === null) {
+            throw new RuntimeException("Merge target block '{$blockIds[0]}' could not be updated.");
+        }
+
+        /** @var array<string, mixed> $returnBlock */
+        return $returnBlock;
+    }
+
+    /**
+     * @return array{first: array<string, mixed>, second: array<string, mixed>}
+     */
+    public function splitBlock(
+        string $documentId,
+        int $pageNo,
+        string $blockId,
+        string $beforeText,
+        string $beforeHtml,
+        string $afterText,
+        string $afterHtml,
+    ): array {
+        $result = null;
+
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($documentId, $pageNo, $blockId, $beforeText, $beforeHtml, $afterText, $afterHtml, &$result): void {
+            foreach ($document['pages'] as &$page) {
+                if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
+                    continue;
+                }
+                $newBlocks = [];
+                foreach ($page['blocks'] as $block) {
+                    if ((string) ($block['block_id'] ?? '') === $blockId) {
+                        $block['approved_text'] = $beforeText;
+                        $block['meta']['reviewed_html'] = $this->sanitizeHtml($beforeHtml);
+                        $block['needs_review'] = false;
+                        $newBlocks[] = $block;
+
+                        $newId = $documentId . '_split_' . substr(bin2hex(random_bytes(3)), 0, 6);
+                        $second = $block;
+                        $second['block_id'] = $newId;
+                        $second['approved_text'] = $afterText;
+                        $second['meta']['reviewed_html'] = $this->sanitizeHtml($afterHtml);
+                        $newBlocks[] = $second;
+
+                        $result = ['first' => $block, 'second' => $second];
+                    } else {
+                        $newBlocks[] = $block;
+                    }
+                }
+                foreach ($newBlocks as $i => &$b) {
+                    $b['reading_order'] = $i + 1;
+                }
+                unset($b);
+                $page['blocks'] = $newBlocks;
+            }
+
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+        });
+
+        if ($result === null) {
+            throw new RuntimeException("Block not found: {$blockId}");
+        }
+
+        /** @var array{first: array<string, mixed>, second: array<string, mixed>} $result */
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    public function createBlock(string $documentId, int $pageNo, ?string $afterBlockId, array $data): array
+    {
+        $newBlockId = $documentId . '_new_' . substr(bin2hex(random_bytes(3)), 0, 6);
+        $newBlock = [
+            'block_id'          => $newBlockId,
+            'type'              => (string) ($data['type'] ?? 'paragraph'),
+            'bbox'              => null,
+            'reading_order'     => 0,
+            'raw_text'          => (string) ($data['approved_text'] ?? ''),
+            'normalized_text'   => (string) ($data['approved_text'] ?? ''),
+            'ai_suggested_text' => '',
+            'approved_text'     => (string) ($data['approved_text'] ?? ''),
+            'confidence'        => 1.0,
+            'needs_review'      => false,
+            'flags'             => [],
+            'meta'              => [
+                'reviewed_html' => $this->sanitizeHtml((string) ($data['reviewed_html'] ?? '<p></p>')),
+                'layout'        => is_array($data['layout'] ?? null) ? $data['layout'] : [],
+            ],
+        ];
+
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $afterBlockId, $newBlock): void {
+            foreach ($document['pages'] as &$page) {
+                if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
+                    continue;
+                }
+                if ($afterBlockId === null) {
+                    $page['blocks'][] = $newBlock;
+                } else {
+                    $rebuilt = [];
+                    foreach ($page['blocks'] as $b) {
+                        $rebuilt[] = $b;
+                        if ((string) ($b['block_id'] ?? '') === $afterBlockId) {
+                            $rebuilt[] = $newBlock;
+                        }
+                    }
+                    $page['blocks'] = $rebuilt;
+                }
+                foreach ($page['blocks'] as $i => &$b) {
+                    $b['reading_order'] = $i + 1;
+                }
+                unset($b);
+                break;
+            }
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+        });
+
+        return $newBlock;
+    }
+
     /**
      * Write a complete document to disk in one atomic operation.
      * Used when we already have the full document in memory and only need to persist it.
