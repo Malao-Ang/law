@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from app.api.schemas import (
     BlockPatchResponse,
+    CorrectRequest,
     ExtractRequest,
     HealthResponse,
     ReprocessBlockRequest,
@@ -19,6 +20,8 @@ from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.services.ai_corrector import MockAICorrector
 from app.services.block_builder import build_document_output
+from app.services.correction_service import run_correction
+from app.services.doc_converter import DocConversionError, DocConverter
 from app.services.docling_service import DoclingService
 from app.services.landingai_parser import LandingAiAdeParser
 from app.services.ocr_pipeline import get_ocr_pipeline
@@ -62,11 +65,26 @@ def extract_document(payload: ExtractRequest, background_tasks: BackgroundTasks)
     return {"status": "accepted", "document_id": payload.document_id}
 
 
+@router.post("/pipeline/correct", status_code=202)
+def correct_document(payload: CorrectRequest, background_tasks: BackgroundTasks) -> dict:
+    settings = get_settings()
+    background_tasks.add_task(
+        run_correction,
+        document_id=payload.document_id,
+        data_root=settings.data_root,
+        enable_ai_correction=payload.enable_ai_correction,
+        review_threshold=settings.thai_review_threshold,
+        callback_url=payload.callback_url,
+    )
+    return {"status": "accepted", "document_id": payload.document_id}
+
+
 def _run_extraction(payload: ExtractRequest) -> None:
     settings = get_settings()
     logger = get_logger(payload.document_id)
 
     file_path = Path(payload.file_path)
+    source_file_name = file_path.name
     output_path = intermediate_output_path(settings.data_root, payload.document_id)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,8 +100,29 @@ def _run_extraction(payload: ExtractRequest) -> None:
         effective_scan_mode = requested_scan_mode
         extraction_path: list[str] = []
         landingai_metadata: dict[str, object] | None = None
+        conversion_metadata: dict[str, object] | None = None
 
-        if mode == "docx":
+        if mode == "doc":
+            converter = DocConverter(
+                soffice_binary=settings.soffice_binary,
+                timeout_seconds=settings.doc_conversion_timeout_seconds,
+            )
+            with _stage_timer(payload.document_id, "convert", logger, timings):
+                conversion = converter.convert(file_path, payload.document_id)
+            conversion_metadata = {
+                "tool": "libreoffice",
+                "duration_ms": conversion.duration_ms,
+                "exit_code": conversion.exit_code,
+                "soffice_version": conversion.soffice_version,
+            }
+            file_path = conversion.output_path
+            extraction_path.append("doc_to_docx_conversion")
+
+            with _stage_timer(payload.document_id, "extract", logger, timings):
+                pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
+            extraction_path.append("docling_docx")
+            source_type = "docx"
+        elif mode == "docx":
             with _stage_timer(payload.document_id, "extract", logger, timings):
                 pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
             extraction_path.append("docling:docx")
@@ -131,7 +170,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
         with _stage_timer(payload.document_id, "build", logger, timings):
             output = build_document_output(
                 document_id=payload.document_id,
-                source_file=file_path.name,
+                source_file=source_file_name,
                 source_type=source_type,
                 pages=pages,
                 normalizer=normalize_text,
@@ -148,6 +187,8 @@ def _run_extraction(payload: ExtractRequest) -> None:
         }
         if landingai_metadata is not None:
             output["extraction"]["landingai"] = landingai_metadata
+        if conversion_metadata is not None:
+            output["extraction"]["conversion"] = conversion_metadata
         output_path.write_text(
             json.dumps(output, ensure_ascii=False, indent=2),
             encoding="utf-8",

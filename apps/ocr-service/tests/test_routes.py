@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.doc_converter import ConversionResult
 
 
 # ---------------------------------------------------------------------------
@@ -145,3 +146,56 @@ def test_landingai_mode_skips_local_ocr_pipeline_for_scan_pdf(tmp_path: Path) ->
 
     assert response.status_code == 202
     mock_get_ocr_pipeline.assert_not_called()
+
+
+def test_extract_doc_routes_through_converter(tmp_path: Path) -> None:
+    source = tmp_path / "sample.doc"
+    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"legacy-doc")
+    converted = tmp_path / "converted.docx"
+    converted.write_bytes(b"PK\x03\x04converted")
+    payload = {
+        "document_id": DOCUMENT_ID,
+        "file_path": str(source),
+        "enable_ai_correction": False,
+        "callback_url": CALLBACK_URL,
+    }
+
+    captured_calls: list[tuple[str, str, dict]] = []
+
+    def _fake_callback(url: str, document_id: str, callback_payload: dict, _logger: object) -> None:
+        captured_calls.append((url, document_id, callback_payload))
+
+    with (
+        patch("app.api.routes.detect_file_type", return_value={"mode": "doc", "pages": {}}),
+        patch(
+            "app.api.routes.DocConverter.convert",
+            return_value=ConversionResult(
+                output_path=converted,
+                duration_ms=4823,
+                exit_code=0,
+                soffice_version="LibreOffice 24.2.3.2",
+            ),
+        ) as mock_convert,
+        patch("app.api.routes.DoclingService.extract", return_value=[]) as mock_extract,
+        patch(
+            "app.api.routes.build_document_output",
+            return_value={"document_id": DOCUMENT_ID, "source_file": source.name, "source_type": "docx", "pages": []},
+        ),
+        patch("app.api.routes._post_callback", side_effect=_fake_callback),
+    ):
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.post("/pipeline/extract", json=payload)
+
+    assert response.status_code == 202
+    mock_convert.assert_called_once()
+    mock_extract.assert_called_once_with(file_path=converted, source_type="docx", document_id=DOCUMENT_ID)
+    assert len(captured_calls) == 1
+    _, _, callback_payload = captured_calls[0]
+    assert callback_payload["status"] == "success"
+    assert callback_payload["output"]["extraction"]["path"] == ["doc_to_docx_conversion", "docling_docx"]
+    assert callback_payload["output"]["extraction"]["conversion"] == {
+        "tool": "libreoffice",
+        "duration_ms": 4823,
+        "exit_code": 0,
+        "soffice_version": "LibreOffice 24.2.3.2",
+    }
