@@ -94,6 +94,7 @@
         variant="tonal"
         color="primary"
         prepend-icon="mdi-pencil-outline"
+        title="แก้ไขบล็อกที่เลือก"
         @click="$emit('toggle:editMode')"
       >
         แก้ไข
@@ -105,6 +106,7 @@
           variant="tonal"
           color="success"
           prepend-icon="mdi-content-save-outline"
+          title="บันทึกการแก้ไข"
           @click="$emit('action', 'saveActiveBlock')"
         >
           บันทึก
@@ -113,6 +115,7 @@
           size="small"
           variant="outlined"
           prepend-icon="mdi-close"
+          title="ยกเลิกการแก้ไข"
           @click="$emit('action', 'cancelActiveBlock')"
         >
           ยกเลิก
