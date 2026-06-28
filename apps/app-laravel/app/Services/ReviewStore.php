@@ -3,16 +3,18 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\File;
 use RuntimeException;
 
 class ReviewStore
 {
     private string $basePath;
 
-    public function __construct(private readonly DocumentHtmlService $documentHtmlService)
+    public function __construct(
+        private readonly DocumentHtmlService $documentHtmlService,
+        ?string $basePath = null,
+    )
     {
-        $this->basePath = storage_path('app/poc');
+        $this->basePath = $basePath ?? storage_path('app/poc');
         $this->ensureDirectories();
     }
 
@@ -45,13 +47,18 @@ class ReviewStore
         return $this->basePath.'/'.str_replace('\\', '/', ltrim($relativePath, '/'));
     }
 
+    public function absoluteUploadPath(string $relativePath): string
+    {
+        return $this->absolutePath($relativePath);
+    }
+
     /**
      * @param array<string, mixed> $status
      */
     public function setStatus(string $documentId, array $status): void
     {
         $path = $this->statusPath($documentId);
-        File::ensureDirectoryExists(dirname($path));
+        $this->ensureDirectoryExists(dirname($path));
 
         $this->withLockedFile($path, function (array &$current) use ($documentId, $status): void {
             if ($current === []) {
@@ -71,7 +78,7 @@ class ReviewStore
     {
         $path = $this->statusPath($documentId);
 
-        if (! File::exists($path)) {
+        if (! is_file($path)) {
             return null;
         }
 
@@ -86,7 +93,7 @@ class ReviewStore
         $this->syncDocumentReview($document);
 
         $path = $this->intermediatePath($documentId);
-        File::ensureDirectoryExists(dirname($path));
+        $this->ensureDirectoryExists(dirname($path));
         $this->atomicWrite($path, $document);
     }
 
@@ -97,7 +104,7 @@ class ReviewStore
     {
         $path = $this->intermediatePath($documentId);
 
-        if (! File::exists($path)) {
+        if (! is_file($path)) {
             throw new RuntimeException('Review document not found.');
         }
 
@@ -395,7 +402,7 @@ class ReviewStore
     private function ensureDirectories(): void
     {
         foreach (['uploads', 'pages', 'intermediate', 'exports', 'ingested', 'status'] as $dir) {
-            File::ensureDirectoryExists($this->basePath.'/'.$dir);
+            $this->ensureDirectoryExists($this->basePath.'/'.$dir);
         }
     }
 
@@ -421,7 +428,7 @@ class ReviewStore
      */
     private function withLockedFile(string $path, callable $callback): void
     {
-        File::ensureDirectoryExists(dirname($path));
+        $this->ensureDirectoryExists(dirname($path));
 
         $fp = fopen($path, 'c+');
         if ($fp === false) {
@@ -450,6 +457,42 @@ class ReviewStore
     }
 
     /**
+     * Reorder blocks across all pages and renumber their reading_order.
+     *
+     * @param array<string> $blockIds
+     */
+    public function reorderBlocks(string $documentId, array $blockIds): void
+    {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($blockIds): void {
+            // Collect all blocks by ID for fast lookup
+            $blockMap = [];
+            foreach (($document['pages'] ?? []) as &$page) {
+                foreach (($page['blocks'] ?? []) as &$block) {
+                    $blockId = (string) ($block['block_id'] ?? '');
+                    if ($blockId !== '') {
+                        $blockMap[$blockId] = &$block;
+                    }
+                }
+            }
+
+            // Validate all requested block IDs exist
+            foreach ($blockIds as $id) {
+                if (! isset($blockMap[$id])) {
+                    throw new RuntimeException("Block not found: {$id}");
+                }
+            }
+
+            // Assign reading_order according to the new sequence
+            foreach ($blockIds as $idx => $blockId) {
+                $blockMap[$blockId]['reading_order'] = $idx + 1;
+            }
+
+            $this->markOutOfSync($document);
+            $this->recalculateSummary($document);
+        });
+    }
+
+    /**
      * Write a complete document to disk in one atomic operation.
      * Used when we already have the full document in memory and only need to persist it.
      *
@@ -457,6 +500,7 @@ class ReviewStore
      */
     private function atomicWrite(string $path, array $data): void
     {
+        $this->ensureDirectoryExists(dirname($path));
         $tmp = $path.'.tmp.'.getmypid();
         file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
         rename($tmp, $path);
@@ -537,7 +581,12 @@ class ReviewStore
     private function readJson(string $path): array
     {
         /** @var array<string, mixed> $data */
-        $data = json_decode((string) File::get($path), true, 512, JSON_THROW_ON_ERROR);
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            throw new RuntimeException("Unable to read JSON file: {$path}");
+        }
+
+        $data = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
         return $data;
     }
@@ -547,8 +596,19 @@ class ReviewStore
      */
     private function writeJson(string $path, array $data): void
     {
-        File::ensureDirectoryExists(dirname($path));
-        File::put($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        $this->ensureDirectoryExists(dirname($path));
+        file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    }
+
+    private function ensureDirectoryExists(string $path): void
+    {
+        if (is_dir($path)) {
+            return;
+        }
+
+        if (! @mkdir($path, 0777, true) && ! is_dir($path)) {
+            throw new RuntimeException("Unable to create directory: {$path}");
+        }
     }
 
     /**
@@ -609,12 +669,122 @@ class ReviewStore
 
     private function sanitizeHtml(string $html): string
     {
-        $allowed = '<p><br><strong><em><u><s><h1><h2><h3><h4><h5><h6><ul><ol><li><blockquote><table><thead><tbody><tr><th><td><span><div><sub><sup>';
-        $clean = strip_tags($html, $allowed);
-        $clean = preg_replace('/\s*on\w+\s*=\s*"[^"]*"/i', '', $clean) ?? $clean;
-        $clean = preg_replace('/\s*on\w+\s*=\s*\'[^\']*\'/i', '', $clean) ?? $clean;
+        if (trim($html) === '') {
+            return '';
+        }
 
-        return $clean;
+        $dom = new \DOMDocument();
+        $prevLibxmlErrors = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8"><html><body>' . $html . '</body></html>');
+        libxml_clear_errors();
+        libxml_use_internal_errors($prevLibxmlErrors);
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+        if (!$body) {
+            return '';
+        }
+
+        static::cleanNode($body);
+
+        $out = '';
+        foreach ($body->childNodes as $child) {
+            $out .= $dom->saveHTML($child);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Recursively clean nodes: remove disallowed tags (hoisting their content),
+     * filter attributes, and sanitize inline styles.
+     *
+     * @param \DOMNode $node
+     */
+    private static function cleanNode(\DOMNode $node): void
+    {
+        /** @var string[] $allowed */
+        static $allowed = ['p','br','strong','em','u','s','h1','h2','h3','h4','h5','h6',
+                           'ul','ol','li','blockquote','table','thead','tbody','tr','th','td',
+                           'span','div','sub','sup'];
+        /** @var string[] $allowedStyleProps */
+        static $allowedStyleProps = ['margin-left','text-indent','text-align'];
+
+        $toReplace = [];
+        $children = [];
+        foreach ($node->childNodes as $child) {
+            $children[] = $child;
+        }
+        foreach ($children as $child) {
+            if ($child->nodeType !== \XML_ELEMENT_NODE) {
+                continue;
+            }
+            $tag = strtolower($child->nodeName);
+            if (!in_array($tag, $allowed, true)) {
+                $toReplace[] = $child;
+                continue;
+            }
+            if ($child instanceof \DOMElement) {
+                $attrsToRemove = [];
+                foreach ($child->attributes as $attr) {
+                    $name = strtolower($attr->name);
+                    if ($name === 'style') {
+                        $safe = static::filterStyle($attr->value, $allowedStyleProps);
+                        if ($safe === '') {
+                            $attrsToRemove[] = 'style';
+                        } else {
+                            $attr->value = $safe;
+                        }
+                    } elseif (!in_array($name, ['class','colspan','rowspan'], true)) {
+                        $attrsToRemove[] = $attr->name;
+                    }
+                }
+                foreach ($attrsToRemove as $a) {
+                    $child->removeAttribute($a);
+                }
+            }
+            static::cleanNode($child);
+        }
+
+        foreach ($toReplace as $child) {
+            while ($child->firstChild) {
+                $node->insertBefore($child->firstChild, $child);
+            }
+            $node->removeChild($child);
+        }
+        // Re-clean hoisted children (they were not previously processed)
+        if ($toReplace !== []) {
+            static::cleanNode($node);
+        }
+    }
+
+    /**
+     * Filter CSS declaration string to only include allowed properties.
+     *
+     * @param string $style
+     * @param string[] $allowedProps
+     */
+    private static function filterStyle(string $style, array $allowedProps): string
+    {
+        $safe = [];
+        foreach (array_filter(array_map('trim', explode(';', $style))) as $decl) {
+            if (($colon = strpos($decl, ':')) === false) {
+                continue;
+            }
+            $prop = strtolower(trim(substr($decl, 0, $colon)));
+            if (!in_array($prop, $allowedProps, true)) {
+                continue;
+            }
+            $value = trim(substr($decl, $colon + 1));
+            if ($value === '') {
+                continue;
+            }
+            // Only allow safe CSS values: numbers with units, or alignment keywords
+            if (!preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
+                continue;
+            }
+            $safe[] = $prop . ': ' . $value;
+        }
+        return implode('; ', $safe);
     }
 
     private function normalizeHtmlForCompare(string $html): string
