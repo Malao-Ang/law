@@ -69,6 +69,7 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import { IndentExtension } from '../extensions/IndentExtension';
 import { patchBlock } from '../api/client';
 import ResizableImage from './ResizableImage.vue';
 import type { DocumentBlock, ThaiFont } from '../types/document';
@@ -132,6 +133,7 @@ const editor = useEditor({
     StarterKit,
     Underline,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    IndentExtension,
   ],
   content: '<p></p>',
   editable: false,
@@ -351,8 +353,8 @@ function applyToolbarCommand(command: ToolbarCommand | null): void {
   else if (command.type === 'underline') chain.toggleUnderline().run();
   else if (command.type === 'bulletList') chain.toggleBulletList().run();
   else if (command.type === 'orderedList') chain.toggleOrderedList().run();
-  else if (command.type === 'indent') chain.sinkListItem('listItem').run();
-  else if (command.type === 'outdent') chain.liftListItem('listItem').run();
+  else if (command.type === 'indent') chain.increaseIndent().run();
+  else if (command.type === 'outdent') chain.decreaseIndent().run();
   else if (command.type === 'setAlignment' && command.value) {
     chain.setTextAlign(command.value).run();
   }
