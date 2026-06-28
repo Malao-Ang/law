@@ -1685,12 +1685,6 @@ textarea {
   scroll-behavior: auto;
 }
 
-.compose-paper {
-  max-width: 1020px;
-  gap: 14px;
-}
-
-
 @media (max-width: 960px) {
   .document-compose-shell {
     padding: 8px;
