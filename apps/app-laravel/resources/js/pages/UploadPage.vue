@@ -1,12 +1,12 @@
-﻿<template>
-  <HeaderComponent 
+<template>
+  <HeaderComponent
     title="อัปโหลดเอกสาร"
     :breadcrumbs="[
       { text: 'หน้าแรก', to: '/' },
       { text: 'อัปโหลดเอกสาร' }
     ]"
   />
-  
+
   <v-main>
     <v-container class="py-8">
       <v-row>
@@ -23,7 +23,7 @@
               <v-chip :color="getStatusColor(status.status)" class="mb-4">
                 {{ getStatusText(status.status) }}
               </v-chip>
-              
+
               <v-progress-linear
                 v-if="['queued', 'processing', 'ingesting'].includes(status.status)"
                 indeterminate
@@ -40,25 +40,12 @@
               <p v-if="status.extraction_path?.length" class="text-body-2 mb-1">
                 Extraction path: {{ status.extraction_path.join(' -> ') }}
               </p>
+              <p v-if="status.conversion" class="text-body-2 mb-1">
+                Converted from .doc via {{ status.conversion.tool }} ({{ formatDuration(status.conversion.duration_ms) }})
+              </p>
               <p v-if="status.timings" class="text-body-2 mb-4">
                 Timings: {{ formatTimings(status.timings) }}
               </p>
-
-              <div v-if="canOpenReview" class="upload-actions">
-                <v-btn
-                  color="success"
-                  @click="goToReview"
-                >
-                  ตรวจสอบเอกสาร
-                </v-btn>
-                <v-btn
-                  color="primary"
-                  variant="tonal"
-                  @click="goToCompose"
-                >
-                  เปิด Compose Editor
-                </v-btn>
-              </div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -68,9 +55,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import UploadForm from '../components/UploadForm.vue';
+import HeaderComponent from '../components/HeaderComponent.vue';
 import { fetchStatus } from '../api/client';
 import type { DocumentStatus } from '../types/document';
 
@@ -79,51 +67,35 @@ const documentId = ref<string | null>(null);
 const status = ref<DocumentStatus | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-const canOpenReview = computed(() => {
-  return ['done', 'exported', 'ingesting', 'ingested'].includes(status.value?.status ?? '');
-});
-
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'done':
-    case 'exported':
-    case 'ingested':
-      return 'success';
-    case 'processing':
-    case 'ingesting':
-      return 'warning';
-    case 'queued':
-      return 'info';
-    default:
-      return 'error';
+function getStatusColor(s: string): string {
+  switch (s) {
+    case 'done': case 'exported': case 'ingested': return 'success';
+    case 'processing': case 'ingesting': return 'warning';
+    case 'queued': return 'info';
+    default: return 'error';
   }
 }
 
-function getStatusText(status: string): string {
-  switch (status) {
-    case 'queued':
-      return 'รอดำเนินการ';
-    case 'processing':
-      return 'กำลังประมวลผล';
-    case 'ingesting':
-      return 'กำลังนำเข้าระบบ';
-    case 'done':
-      return 'เสร็จสิ้น';
-    case 'exported':
-      return 'ส่งออกแล้ว';
-    case 'ingested':
-      return 'นำเข้าระบบแล้ว';
-    case 'failed':
-      return 'ล้มเหลว';
-    default:
-      return status;
+function getStatusText(s: string): string {
+  switch (s) {
+    case 'queued': return 'รอดำเนินการ';
+    case 'processing': return 'กำลังประมวลผล';
+    case 'ingesting': return 'กำลังนำเข้าระบบ';
+    case 'done': return 'เสร็จสิ้น';
+    case 'exported': return 'ส่งออกแล้ว';
+    case 'ingested': return 'นำเข้าระบบแล้ว';
+    case 'failed': return 'ล้มเหลว';
+    default: return s;
   }
 }
 
 function formatTimings(timings: Record<string, number>): string {
-  return Object.entries(timings)
-    .map(([stage, ms]) => `${stage}=${ms}ms`)
-    .join(', ');
+  return Object.entries(timings).map(([k, v]) => `${k}=${v}ms`).join(', ');
+}
+
+function formatDuration(ms?: number | null): string {
+  if (!ms || ms <= 0) return '-';
+  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function onUploaded(id: string): void {
@@ -134,33 +106,15 @@ function onUploaded(id: string): void {
 
 async function pollStatus(): Promise<void> {
   if (!documentId.value) return;
-
   try {
     status.value = await fetchStatus(documentId.value);
-
     if (['queued', 'processing', 'ingesting'].includes(status.value.status)) {
       pollTimer = setTimeout(pollStatus, 1500);
+    } else if (['done', 'exported', 'ingested'].includes(status.value.status)) {
+      router.push(`/documents/${documentId.value}/review`);
     }
   } catch {
     pollTimer = setTimeout(pollStatus, 2000);
   }
 }
-
-function goToReview(): void {
-  if (!documentId.value) return;
-  router.push(`/documents/${documentId.value}/review`);
-}
-
-function goToCompose(): void {
-  if (!documentId.value) return;
-  router.push(`/documents/${documentId.value}/compose`);
-}
 </script>
-
-<style scoped>
-.upload-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-</style>
