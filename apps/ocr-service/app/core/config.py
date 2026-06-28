@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     landingai_base_url: str = "https://api.va.landing.ai"
     landingai_parse_model: str = "dpt-2-latest"
     landingai_timeout_seconds: int = 60
+    doc_conversion_timeout_seconds: int = 60
+    soffice_binary: str = "soffice"
 
 
 @lru_cache(maxsize=1)
