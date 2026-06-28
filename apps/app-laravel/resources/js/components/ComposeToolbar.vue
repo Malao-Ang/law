@@ -53,6 +53,18 @@
       <v-divider vertical class="compose-toolbar-divider" />
 
       <v-btn
+        :disabled="props.correctionInProgress"
+        prepend-icon="mdi-download-outline"
+        size="small"
+        variant="tonal"
+        color="primary"
+        :title="props.correctionInProgress ? 'รอ AI correction เสร็จ' : 'ส่งออก RAG JSON'"
+        @click="$emit('action', 'export')"
+      >
+        Export
+      </v-btn>
+
+      <v-btn
         :to="alternateRoute"
         :text="alternateRouteLabel"
         prepend-icon="mdi-swap-horizontal"
@@ -73,6 +85,39 @@
         variant="text"
         @click="$emit('toggle:details')"
       />
+
+      <v-divider vertical class="compose-toolbar-divider" />
+
+      <v-btn
+        v-if="!props.editorState.active"
+        size="small"
+        variant="tonal"
+        color="primary"
+        prepend-icon="mdi-pencil-outline"
+        @click="$emit('toggle:editMode')"
+      >
+        แก้ไข
+      </v-btn>
+
+      <template v-else>
+        <v-btn
+          size="small"
+          variant="tonal"
+          color="success"
+          prepend-icon="mdi-content-save-outline"
+          @click="$emit('action', 'saveActiveBlock')"
+        >
+          บันทึก
+        </v-btn>
+        <v-btn
+          size="small"
+          variant="outlined"
+          prepend-icon="mdi-close"
+          @click="$emit('action', 'cancelActiveBlock')"
+        >
+          ยกเลิก
+        </v-btn>
+      </template>
     </div>
   </v-toolbar>
 </template>
@@ -92,7 +137,7 @@ interface EditorStateSnapshot {
   isOrderedList: boolean;
 }
 
-type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList';
+type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveActiveBlock' | 'cancelActiveBlock';
 
 const props = defineProps<{
   title: string;
@@ -104,6 +149,7 @@ const props = defineProps<{
   autoSaveLabel: string;
   alternateRouteLabel: string;
   alternateRoute: string;
+  correctionInProgress?: boolean;
 }>();
 
 defineEmits<{
@@ -111,6 +157,7 @@ defineEmits<{
   action: [ToolbarAction];
   'toggle:navigator': [];
   'toggle:details': [];
+  'toggle:editMode': [];
   'update:font': [ThaiFont];
   'update:fontSize': [number];
 }>();
@@ -141,6 +188,7 @@ const statusColor = computed(() => {
 });
 
 function isButtonActive(action: ToolbarAction): boolean {
+  if (action === 'export') return false;
   if (action === 'bold') return props.editorState.isBold;
   if (action === 'italic') return props.editorState.isItalic;
   if (action === 'underline') return props.editorState.isUnderline;
@@ -150,6 +198,7 @@ function isButtonActive(action: ToolbarAction): boolean {
 }
 
 function isDisabled(action: ToolbarAction): boolean {
+  if (action === 'export') return !!props.correctionInProgress;
   if (action === 'undo') return !props.editorState.active || !props.editorState.canUndo;
   if (action === 'redo') return !props.editorState.active || !props.editorState.canRedo;
   return !props.editorState.active;
