@@ -1,5 +1,6 @@
 ﻿import type {
   ComposeState,
+  DocumentBlock,
   DocumentStatus,
   ExportResponse,
   LayoutPatch,
@@ -10,21 +11,27 @@
   UploadResponse,
 } from '../types/document';
 
-async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
   const response = await fetch(input, {
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers: isFormData
+      ? {
+          Accept: 'application/json',
+          ...(init?.headers ?? {}),
+        }
+      : {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(init?.headers ?? {}),
+        },
     ...init,
   });
 
   if (!response.ok) {
     const fallback = `HTTP ${response.status}`;
     try {
-      const payload = (await response.json()) as { message?: string };
-      throw new Error(payload.message ?? fallback);
+      const payload = (await response.json()) as { message?: string; error?: string };
+      throw new Error(payload.message ?? payload.error ?? fallback);
     } catch {
       throw new Error(fallback);
     }
@@ -33,25 +40,20 @@ async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T
   return (await response.json()) as T;
 }
 
-export async function uploadDocument(file: File, scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto'): Promise<UploadResponse> {
+export async function uploadDocument(
+  file: File,
+  scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto',
+  extractionEngine: 'standard' | 'fast' = 'standard',
+): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
   form.append('scan_extraction_mode', scanExtractionMode);
+  form.append('extraction_engine', extractionEngine);
 
-  const response = await fetch('/api/documents', {
+  return jsonRequest<UploadResponse>('/api/documents', {
     method: 'POST',
     body: form,
-    headers: {
-      Accept: 'application/json',
-    },
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Upload failed (${response.status})`);
-  }
-
-  return (await response.json()) as UploadResponse;
 }
 
 export function fetchStatus(documentId: string): Promise<DocumentStatus> {
@@ -146,5 +148,72 @@ export function reprocessPageWithLandingAI(
   return jsonRequest(`/api/documents/${documentId}/pages/${pageNo}/reprocess`, {
     method: 'POST',
     body: JSON.stringify({ page_no: pageNo, scan_extraction_mode: scanExtractionMode }),
+  });
+}
+
+export function reorderBlocks(
+  documentId: string,
+  blockIds: string[],
+): Promise<{ document_id: string; status: string; reordered_block_ids: string[] }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ block_ids: blockIds }),
+  });
+}
+
+export function deleteBlock(
+  documentId: string,
+  blockId: string,
+  pageNo: number,
+): Promise<{ status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}?page_no=${pageNo}`, {
+    method: 'DELETE',
+  });
+}
+
+export function mergeBlocks(
+  documentId: string,
+  blockIds: string[],
+): Promise<{ status: string; block: DocumentBlock }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/merge`, {
+    method: 'POST',
+    body: JSON.stringify({ block_ids: blockIds }),
+  });
+}
+
+export function splitBlock(
+  documentId: string,
+  blockId: string,
+  payload: {
+    page_no: number;
+    before_text: string;
+    before_html: string;
+    after_text: string;
+    after_html: string;
+  },
+): Promise<{
+  status: string;
+  first: DocumentBlock;
+  second: DocumentBlock;
+}> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}/split`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createBlock(
+  documentId: string,
+  payload: {
+    page_no: number;
+    after_block_id?: string | null;
+    type?: string;
+    approved_text?: string;
+    reviewed_html?: string;
+  },
+): Promise<{ status: string; block: DocumentBlock }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
