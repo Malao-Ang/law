@@ -67,12 +67,14 @@ import DOMPurify from 'dompurify';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
 import { patchBlock } from '../api/client';
 import type { DocumentBlock, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel' | 'indent' | 'outdent' | 'setAlignment';
+  value?: string;
 }
 
 interface BlockItem {
@@ -94,6 +96,7 @@ interface EditorStateSnapshot {
   isUnderline: boolean;
   isBulletList: boolean;
   isOrderedList: boolean;
+  alignment: 'left' | 'center' | 'right' | 'justify';
 }
 
 const props = defineProps<{
@@ -123,7 +126,11 @@ const errorMessage = ref('');
 const visibleEntries = new Map<string, { offset: number; ratio: number }>();
 
 const editor = useEditor({
-  extensions: [StarterKit, Underline],
+  extensions: [
+    StarterKit,
+    Underline,
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  ],
   content: '<p></p>',
   editable: false,
   onUpdate: emitEditorState,
@@ -234,6 +241,11 @@ function scrollToBlock(blockId: string): void {
 
 function emitEditorState(): void {
   const active = Boolean(editingBlockId.value && editor.value);
+  const alignment: EditorStateSnapshot['alignment'] = active ? (
+    editor.value?.isActive({ textAlign: 'center' }) ? 'center' :
+    editor.value?.isActive({ textAlign: 'right' })  ? 'right'  :
+    editor.value?.isActive({ textAlign: 'justify' }) ? 'justify' : 'left'
+  ) : 'left';
   emit('editorState', {
     active,
     canUndo: active ? editor.value?.can().undo() ?? false : false,
@@ -243,6 +255,7 @@ function emitEditorState(): void {
     isUnderline: active ? editor.value?.isActive('underline') ?? false : false,
     isBulletList: active ? editor.value?.isActive('bulletList') ?? false : false,
     isOrderedList: active ? editor.value?.isActive('orderedList') ?? false : false,
+    alignment,
   });
 }
 
@@ -336,6 +349,11 @@ function applyToolbarCommand(command: ToolbarCommand | null): void {
   else if (command.type === 'underline') chain.toggleUnderline().run();
   else if (command.type === 'bulletList') chain.toggleBulletList().run();
   else if (command.type === 'orderedList') chain.toggleOrderedList().run();
+  else if (command.type === 'indent') chain.sinkListItem('listItem').run();
+  else if (command.type === 'outdent') chain.liftListItem('listItem').run();
+  else if (command.type === 'setAlignment' && command.value) {
+    chain.setTextAlign(command.value).run();
+  }
 
   emitEditorState();
 }
