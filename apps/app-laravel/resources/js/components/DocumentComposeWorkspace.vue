@@ -171,6 +171,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let correctionPollTimer: ReturnType<typeof setTimeout> | null = null;
 let toolbarCommandId = 0;
 let scrollRequestId = 0;
+let mounted = true;
 
 const isCompact = computed(() => mdAndDown.value);
 const correctionInProgress = computed(() =>
@@ -245,6 +246,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  mounted = false;
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
@@ -259,7 +261,9 @@ async function reloadReview(): Promise<void> {
   const currentSelected = selectedBlockId.value;
 
   try {
-    review.value = await fetchReview(props.documentId);
+    const data = await fetchReview(props.documentId);
+    if (!mounted) return;
+    review.value = data;
     applyComposeState(review.value.compose_state);
 
     const availableIds = new Set(
@@ -332,11 +336,13 @@ function dispatchToolbarAction(type: string, value?: string): void {
     return;
   }
 
+  const commandType = type as ToolbarCommand['type'];
   toolbarCommandId += 1;
-  toolbarCommand.value = { id: toolbarCommandId, type: type as ToolbarCommand['type'], value };
+  toolbarCommand.value = { id: toolbarCommandId, type: commandType, value };
 }
 
 function handleToggleEditMode(): void {
+  if (editMode.value) return;
   editMode.value = true;
 }
 
