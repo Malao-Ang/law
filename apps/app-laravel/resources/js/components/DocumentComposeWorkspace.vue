@@ -66,6 +66,7 @@
           :alternate-route-label="alternateRouteLabel"
           :alternate-route="alternateRoute"
           :correction-in-progress="correctionInProgress || correctionFailed"
+          :edit-mode="editMode"
           @action="dispatchToolbarAction"
           @reload="reloadReview"
           @toggle:navigator="leftDrawer = !leftDrawer"
@@ -87,7 +88,7 @@
           :mode="mode"
           @select-block="selectedBlockId = $event"
           @visible-block-change="selectedBlockId = $event"
-          @block-saved="onBlockSaved"
+          @all-blocks-saved="onAllBlocksSaved"
           @edit-cancelled="handleEditCancelled"
           @editor-state="editorState = $event"
         />
@@ -108,7 +109,7 @@ import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, Th
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'startEdit' | 'save' | 'cancel' | 'indent' | 'outdent' | 'setAlignment';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
   value?: string;
 }
 
@@ -319,15 +320,15 @@ function dispatchToolbarAction(type: string, value?: string): void {
     return;
   }
 
-  if (type === 'saveActiveBlock') {
+  if (type === 'saveAll') {
     toolbarCommandId += 1;
-    toolbarCommand.value = { id: toolbarCommandId, type: 'save' };
+    toolbarCommand.value = { id: toolbarCommandId, type: 'saveAll' };
     return;
   }
 
-  if (type === 'cancelActiveBlock') {
+  if (type === 'cancelAll') {
     toolbarCommandId += 1;
-    toolbarCommand.value = { id: toolbarCommandId, type: 'cancel' };
+    toolbarCommand.value = { id: toolbarCommandId, type: 'cancelAll' };
     return;
   }
 
@@ -337,17 +338,15 @@ function dispatchToolbarAction(type: string, value?: string): void {
 
 function handleToggleEditMode(): void {
   editMode.value = true;
-  toolbarCommandId += 1;
-  toolbarCommand.value = { id: toolbarCommandId, type: 'startEdit' };
 }
 
 function handleEditCancelled(): void {
   editMode.value = false;
+  void reloadReview();
 }
 
-function onBlockSaved(blockId: string): void {
-  editMode.value = false;
-  void reloadReview();
+function onAllBlocksSaved(): void {
+  // Stay in edit mode — user can keep editing without a reload
 }
 
 async function pollCorrectionStatus(): Promise<void> {
