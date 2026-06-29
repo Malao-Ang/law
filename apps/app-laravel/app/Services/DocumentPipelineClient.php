@@ -69,6 +69,38 @@ class DocumentPipelineClient
         return $json;
     }
 
+    /**
+     * Stateless CPU-only normalize + spell auto-correct for a batch of blocks.
+     *
+     * @param  array<int, array{block_id: string, text: string}>  $blocks
+     * @return array<string, mixed>
+     */
+    public function normalize(string $documentId, array $blocks, float $autocorrectMinConfidence = 1.0): array
+    {
+        $response = $this->request(120)->post('/pipeline/normalize', [
+            'document_id' => $documentId,
+            'blocks' => array_values($blocks),
+            'autocorrect_min_confidence' => $autocorrectMinConfidence,
+        ])->throw();
+
+        /** @var array<string, mixed> $json */
+        $json = $response->json();
+
+        return $json;
+    }
+
+    public function correct(
+        string $documentId,
+        string $callbackUrl,
+        bool $enableAiCorrection = false,
+    ): void {
+        $this->request(30)->post('/pipeline/correct', [
+            'document_id' => $documentId,
+            'callback_url' => $callbackUrl,
+            'enable_ai_correction' => $enableAiCorrection,
+        ])->throw();
+    }
+
     private function request(int $timeout = 30): PendingRequest
     {
         return $this->http->baseUrl((string) config('services.ocr.base_url'))
