@@ -17,7 +17,7 @@ export const useDocumentStore = defineStore('document', () => {
     error.value = '';
     try {
       review.value = await fetchReview(id);
-    } catch (e) {
+    } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'ไม่สามารถโหลดเอกสาร';
     } finally {
       loading.value = false;
@@ -38,7 +38,7 @@ export const useDocumentStore = defineStore('document', () => {
         review.value.document_review = res.document_review;
       }
       return res.document_review;
-    } catch (e) {
+    } catch (e: unknown) {
       saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ';
       return null;
     } finally {
