@@ -83,7 +83,7 @@ class NormalizeRequest(BaseModel):
 
 
 class NormalizeBlockResult(BaseModel):
-    block_id: str
+    block_id: str = Field(min_length=1)
     normalized_text: str
     approved_text: str
     auto_corrected: bool
@@ -92,7 +92,7 @@ class NormalizeBlockResult(BaseModel):
 
 
 class NormalizeResponse(BaseModel):
-    document_id: str
+    document_id: str = Field(min_length=1)
     results: list[NormalizeBlockResult]
 
 
