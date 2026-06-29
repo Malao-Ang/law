@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\CorrectDocumentJob;
 use App\Jobs\ExtractDocumentJob;
+use App\Jobs\NormalizeDocumentJob;
 use App\Services\DocumentPipelineClient;
 use App\Services\Fast\FastExtractionPipeline;
 use App\Services\ReviewStore;
@@ -53,7 +53,7 @@ class FastExtractionTest extends TestCase
 
     public function test_fast_job_runs_pipeline_and_dispatches_correction(): void
     {
-        Queue::fake([CorrectDocumentJob::class]);
+        Queue::fake([NormalizeDocumentJob::class]);
 
         $store = app(ReviewStore::class);
         $documentId = $store->generateDocumentId();
@@ -92,7 +92,7 @@ class FastExtractionTest extends TestCase
         $this->assertSame($documentId, $review['document_id']);
         $this->assertSame('docx', $review['source_type']);
 
-        Queue::assertPushed(CorrectDocumentJob::class, function (CorrectDocumentJob $job) use ($documentId): bool {
+        Queue::assertPushed(NormalizeDocumentJob::class, function (NormalizeDocumentJob $job) use ($documentId): bool {
             return $job->documentId === $documentId;
         });
 
