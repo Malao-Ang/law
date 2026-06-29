@@ -83,7 +83,7 @@ import type { DocumentBlock, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment' | 'splitBlock';
   value?: string;
 }
 

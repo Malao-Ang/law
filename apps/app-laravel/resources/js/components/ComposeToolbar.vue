@@ -166,6 +166,16 @@
         </v-btn>
         <v-btn
           size="small"
+          variant="tonal"
+          prepend-icon="mdi-scissors-cutting"
+          title="แยก block ที่ตำแหน่ง cursor"
+          :disabled="!props.editorState.active"
+          @click="emit('action', 'splitBlock')"
+        >
+          แยกบล็อก
+        </v-btn>
+        <v-btn
+          size="small"
           variant="outlined"
           prepend-icon="mdi-close"
           title="ออกจากโหมดแก้ไข"
@@ -194,7 +204,7 @@ interface EditorStateSnapshot {
   alignment: 'left' | 'center' | 'right' | 'justify';
 }
 
-type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
+type ToolbarAction = 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'export' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment' | 'splitBlock';
 
 const props = defineProps<{
   title: string;

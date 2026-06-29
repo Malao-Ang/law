@@ -118,12 +118,12 @@ import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, updateComposeState } from '../api/client';
+import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, splitBlock, updateComposeState } from '../api/client';
 import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
 
 interface ToolbarCommand {
   id: number;
-  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment';
+  type: 'undo' | 'redo' | 'bold' | 'italic' | 'underline' | 'bulletList' | 'orderedList' | 'saveAll' | 'cancelAll' | 'indent' | 'outdent' | 'setAlignment' | 'splitBlock';
   value?: string;
 }
 
@@ -345,6 +345,11 @@ function dispatchToolbarAction(type: string, value?: string): void {
     return;
   }
 
+  if (type === 'splitBlock') {
+    sectionEditor.value?.executeSplitAtCursor();
+    return;
+  }
+
   if (type === 'saveAll') {
     toolbarCommandId += 1;
     toolbarCommand.value = { id: toolbarCommandId, type: 'saveAll' };
@@ -372,7 +377,7 @@ function handleEditCancelled(): void {
   void reloadReview();
 }
 
-async function handleSplitBlock(_payload: {
+async function handleSplitBlock(payload: {
   blockId: string;
   pageNo: number;
   beforeText: string;
@@ -380,7 +385,22 @@ async function handleSplitBlock(_payload: {
   afterText: string;
   afterHtml: string;
 }): Promise<void> {
-  // Task 6 implements this — stub to satisfy the emit handler
+  if (blockOpBusy.value) return;
+  blockOpBusy.value = true;
+  try {
+    await splitBlock(props.documentId, payload.blockId, {
+      page_no: payload.pageNo,
+      before_text: payload.beforeText,
+      before_html: payload.beforeHtml,
+      after_text: payload.afterText,
+      after_html: payload.afterHtml,
+    });
+    await reloadReview();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'แยกบล็อกไม่สำเร็จ';
+  } finally {
+    blockOpBusy.value = false;
+  }
 }
 
 async function handleMergeSelected(): Promise<void> {
