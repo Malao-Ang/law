@@ -733,7 +733,9 @@ class ReviewStore
                     $block['ai_suggested_text'] = $approved;
                     $block['flags'] = $result['flags'] ?? ($block['flags'] ?? []);
                     $block['needs_review'] = false;
-                    $block['meta']['spell_suggestions'] = $result['spell_suggestions'] ?? [];
+                    $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+                    $existingMeta['spell_suggestions'] = $result['spell_suggestions'] ?? [];
+                    $block['meta'] = $existingMeta;
 
                     $doc['pages'][$pageIndex]['blocks'][$blockIndex] = $block;
                 }
