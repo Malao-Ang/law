@@ -14,9 +14,11 @@ class UploadController extends Controller
 
     public function store(StoreDocumentRequest $request): JsonResponse
     {
+        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'auto');
+        $extractionEngine = (string) ($request->validated('extraction_engine') ?? 'standard');
+
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
-        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'auto');
 
         $this->reviewStore->setStatus($documentId, [
             'status' => 'queued',
@@ -25,6 +27,8 @@ class UploadController extends Controller
             'source_file' => $storedFile['source_file'],
             'source_path' => $storedFile['relative_path'],
             'scan_extraction_mode_requested' => $scanExtractionMode,
+            'extraction_engine' => $extractionEngine,
+            'correction_status' => $extractionEngine === 'fast' ? 'pending' : 'not_required',
         ]);
 
         ExtractDocumentJob::dispatch(
@@ -32,6 +36,7 @@ class UploadController extends Controller
             relativeFilePath: $storedFile['relative_path'],
             enableAiCorrection: (bool) config('services.ocr.enable_ai_correction', true),
             scanExtractionMode: $scanExtractionMode,
+            extractionEngine: $extractionEngine,
         );
 
         return response()->json([

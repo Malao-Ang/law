@@ -67,7 +67,7 @@ class ExportService
      * - Each chunk carries a chunk_context field with the nearest preceding
      *   section_header text so retrieval has structural context.
      *
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      * @return array{document_title: string|null, chunks: array<int, array<string, mixed>>}
      */
     private function buildChunksFromBlocks(string $documentId, array $document): array
@@ -111,6 +111,7 @@ class ExportService
                 if (in_array($type, self::SOLO_TYPES, true)) {
                     ($flush)();
                     $chunks[] = $this->buildSoloChunk($documentId, $counter++, $block, $pageNo, $sectionContext);
+
                     continue;
                 }
 
@@ -143,7 +144,7 @@ class ExportService
     /**
      * Build a chunk from a window of one or more consecutive blocks.
      *
-     * @param array<int, array{block: array<string, mixed>, page_no: int}> $windowBlocks
+     * @param  array<int, array{block: array<string, mixed>, page_no: int}>  $windowBlocks
      * @return array<string, mixed>
      */
     private function buildWindowChunk(string $documentId, int $counter, array $windowBlocks, ?string $sectionContext): array
@@ -187,7 +188,7 @@ class ExportService
     /**
      * Build a single-block chunk for table and image blocks.
      *
-     * @param array<string, mixed> $block
+     * @param  array<string, mixed>  $block
      * @return array<string, mixed>
      */
     private function buildSoloChunk(string $documentId, int $counter, array $block, int $pageNo, ?string $sectionContext): array

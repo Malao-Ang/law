@@ -12,8 +12,7 @@ class ReviewStore
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
         ?string $basePath = null,
-    )
-    {
+    ) {
         $this->basePath = $basePath ?? storage_path('app/poc');
         $this->ensureDirectories();
     }
@@ -53,7 +52,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $status
+     * @param  array<string, mixed>  $status
      */
     public function setStatus(string $documentId, array $status): void
     {
@@ -86,7 +85,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      */
     public function writeReviewDocument(string $documentId, array $document): void
     {
@@ -122,7 +121,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      * @return array<string, mixed>
      */
     public function patchApprovedBlock(string $documentId, int $pageNo, string $blockId, array $patch): array
@@ -184,7 +183,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $result
+     * @param  array<string, mixed>  $result
      * @return array<string, mixed>
      */
     public function applyReprocessResult(string $documentId, array $result): array
@@ -220,7 +219,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     public function updateDocumentReview(string $documentId, array $payload): array
@@ -299,7 +298,7 @@ class ReviewStore
      * Supported keys include indent level, marker level, alignment,
      * explicit DOCX-style indent fields, and tab stops.
      *
-     * @param array<string, mixed> $patch
+     * @param  array<string, mixed>  $patch
      * @return array<string, mixed>
      */
     public function patchBlockLayout(string $documentId, int $pageNo, string $blockId, array $patch): array
@@ -331,12 +330,12 @@ class ReviewStore
             if (array_key_exists('tabs', $patch)) {
                 $tabs = [];
                 foreach ((array) $patch['tabs'] as $tab) {
-                    if (!is_array($tab)) {
+                    if (! is_array($tab)) {
                         continue;
                     }
                     $tabs[] = [
                         'position' => max(0, min(14400, (int) ($tab['position'] ?? 0))),
-                        'type'     => (string) ($tab['type'] ?? 'left'),
+                        'type' => (string) ($tab['type'] ?? 'left'),
                     ];
                 }
                 $existingLayout['tabs'] = $tabs;
@@ -361,7 +360,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $exportData
+     * @param  array<string, mixed>  $exportData
      */
     public function writeExport(string $documentId, array $exportData): string
     {
@@ -373,7 +372,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $ingestData
+     * @param  array<string, mixed>  $ingestData
      */
     public function writeIngest(string $documentId, array $ingestData): string
     {
@@ -424,7 +423,7 @@ class ReviewStore
      * All read-modify-write operations on state files must go through this method
      * to prevent concurrent queue workers from corrupting the same document.
      *
-     * @param callable(array<string,mixed> &): void $callback
+     * @param  callable(array<string,mixed> &): void  $callback
      */
     private function withLockedFile(string $path, callable $callback): void
     {
@@ -459,7 +458,7 @@ class ReviewStore
     /**
      * Reorder blocks across all pages and renumber their reading_order.
      *
-     * @param array<string> $blockIds
+     * @param  array<string>  $blockIds
      */
     public function reorderBlocks(string $documentId, array $blockIds): void
     {
@@ -511,7 +510,7 @@ class ReviewStore
                     $deleted = true;
                 }
             }
-            if (!$deleted) {
+            if (! $deleted) {
                 throw new RuntimeException("Block not found: {$blockId}");
             }
             $this->recalculateSummary($document);
@@ -520,7 +519,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string> $blockIds
+     * @param  array<string>  $blockIds
      * @return array<string, mixed>
      */
     public function mergeBlocks(string $documentId, array $blockIds): array
@@ -571,7 +570,7 @@ class ReviewStore
                 unset($block);
                 $page['blocks'] = array_values(array_filter(
                     $page['blocks'],
-                    static fn (array $b): bool => !in_array((string) ($b['block_id'] ?? ''), $toRemove, true),
+                    static fn (array $b): bool => ! in_array((string) ($b['block_id'] ?? ''), $toRemove, true),
                 ));
             }
             unset($page);
@@ -615,7 +614,7 @@ class ReviewStore
                         $block['needs_review'] = false;
                         $newBlocks[] = $block;
 
-                        $newId = $documentId . '_split_' . substr(bin2hex(random_bytes(3)), 0, 6);
+                        $newId = $documentId.'_split_'.substr(bin2hex(random_bytes(3)), 0, 6);
                         $second = $block;
                         $second['block_id'] = $newId;
                         $second['approved_text'] = $afterText;
@@ -647,27 +646,27 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     public function createBlock(string $documentId, int $pageNo, ?string $afterBlockId, array $data): array
     {
-        $newBlockId = $documentId . '_new_' . substr(bin2hex(random_bytes(3)), 0, 6);
+        $newBlockId = $documentId.'_new_'.substr(bin2hex(random_bytes(3)), 0, 6);
         $newBlock = [
-            'block_id'          => $newBlockId,
-            'type'              => (string) ($data['type'] ?? 'paragraph'),
-            'bbox'              => null,
-            'reading_order'     => 0,
-            'raw_text'          => (string) ($data['approved_text'] ?? ''),
-            'normalized_text'   => (string) ($data['approved_text'] ?? ''),
+            'block_id' => $newBlockId,
+            'type' => (string) ($data['type'] ?? 'paragraph'),
+            'bbox' => null,
+            'reading_order' => 0,
+            'raw_text' => (string) ($data['approved_text'] ?? ''),
+            'normalized_text' => (string) ($data['approved_text'] ?? ''),
             'ai_suggested_text' => '',
-            'approved_text'     => (string) ($data['approved_text'] ?? ''),
-            'confidence'        => 1.0,
-            'needs_review'      => false,
-            'flags'             => [],
-            'meta'              => [
+            'approved_text' => (string) ($data['approved_text'] ?? ''),
+            'confidence' => 1.0,
+            'needs_review' => false,
+            'flags' => [],
+            'meta' => [
                 'reviewed_html' => $this->sanitizeHtml((string) ($data['reviewed_html'] ?? '<p></p>')),
-                'layout'        => is_array($data['layout'] ?? null) ? $data['layout'] : [],
+                'layout' => is_array($data['layout'] ?? null) ? $data['layout'] : [],
             ],
         ];
 
@@ -757,7 +756,7 @@ class ReviewStore
      * Write a complete document to disk in one atomic operation.
      * Used when we already have the full document in memory and only need to persist it.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function atomicWrite(string $path, array $data): void
     {
@@ -768,7 +767,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      * @return array<string, mixed>
      */
     private function &findBlockReference(array &$document, int $pageNo, string $blockId): array
@@ -797,7 +796,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      */
     private function recalculateSummary(array &$document): void
     {
@@ -825,7 +824,7 @@ class ReviewStore
      * Mark the document's generated HTML as out of sync with the current block states.
      * The HTML will be lazily rebuilt the next time getReviewDocument is called.
      *
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      */
     private function markOutOfSync(array &$document): void
     {
@@ -853,7 +852,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function writeJson(string $path, array $data): void
     {
@@ -873,7 +872,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      */
     private function syncDocumentReview(array &$document): void
     {
@@ -900,7 +899,7 @@ class ReviewStore
     }
 
     /**
-     * @param array<string, mixed> $document
+     * @param  array<string, mixed>  $document
      */
     private function ensureComposeStateDefaults(array &$document): void
     {
@@ -934,14 +933,14 @@ class ReviewStore
             return '';
         }
 
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         $prevLibxmlErrors = libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="UTF-8"><html><body>' . $html . '</body></html>');
+        $dom->loadHTML('<?xml encoding="UTF-8"><html><body>'.$html.'</body></html>');
         libxml_clear_errors();
         libxml_use_internal_errors($prevLibxmlErrors);
 
         $body = $dom->getElementsByTagName('body')->item(0);
-        if (!$body) {
+        if (! $body) {
             return '';
         }
 
@@ -958,17 +957,15 @@ class ReviewStore
     /**
      * Recursively clean nodes: remove disallowed tags (hoisting their content),
      * filter attributes, and sanitize inline styles.
-     *
-     * @param \DOMNode $node
      */
     private static function cleanNode(\DOMNode $node): void
     {
         /** @var string[] $allowed */
-        static $allowed = ['p','br','strong','em','u','s','h1','h2','h3','h4','h5','h6',
-                           'ul','ol','li','blockquote','table','thead','tbody','tr','th','td',
-                           'span','div','sub','sup'];
+        static $allowed = ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+            'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+            'span', 'div', 'sub', 'sup'];
         /** @var string[] $allowedStyleProps */
-        static $allowedStyleProps = ['margin-left','text-indent','text-align'];
+        static $allowedStyleProps = ['margin-left', 'text-indent', 'text-align'];
 
         $toReplace = [];
         $children = [];
@@ -980,8 +977,9 @@ class ReviewStore
                 continue;
             }
             $tag = strtolower($child->nodeName);
-            if (!in_array($tag, $allowed, true)) {
+            if (! in_array($tag, $allowed, true)) {
                 $toReplace[] = $child;
+
                 continue;
             }
             if ($child instanceof \DOMElement) {
@@ -995,7 +993,7 @@ class ReviewStore
                         } else {
                             $attr->value = $safe;
                         }
-                    } elseif (!in_array($name, ['class','colspan','rowspan'], true)) {
+                    } elseif (! in_array($name, ['class', 'colspan', 'rowspan'], true)) {
                         $attrsToRemove[] = $attr->name;
                     }
                 }
@@ -1021,8 +1019,7 @@ class ReviewStore
     /**
      * Filter CSS declaration string to only include allowed properties.
      *
-     * @param string $style
-     * @param string[] $allowedProps
+     * @param  string[]  $allowedProps
      */
     private static function filterStyle(string $style, array $allowedProps): string
     {
@@ -1032,7 +1029,7 @@ class ReviewStore
                 continue;
             }
             $prop = strtolower(trim(substr($decl, 0, $colon)));
-            if (!in_array($prop, $allowedProps, true)) {
+            if (! in_array($prop, $allowedProps, true)) {
                 continue;
             }
             $value = trim(substr($decl, $colon + 1));
@@ -1040,11 +1037,12 @@ class ReviewStore
                 continue;
             }
             // Only allow safe CSS values: numbers with units, or alignment keywords
-            if (!preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
+            if (! preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
                 continue;
             }
-            $safe[] = $prop . ': ' . $value;
+            $safe[] = $prop.': '.$value;
         }
+
         return implode('; ', $safe);
     }
 
@@ -1054,7 +1052,6 @@ class ReviewStore
     }
 
     /**
-     * @param mixed $bbox
      * @return array<int, float>|null
      */
     private function normalizeBbox(mixed $bbox): ?array
@@ -1081,10 +1078,10 @@ class ReviewStore
      * an HTTP round-trip back to the Python service. Falls back to buildBlockHtml
      * for tables and blocks without layout_css.
      *
-     * @param array<string, mixed> $block
-     * @param array<string, mixed>|null $table
-     * @param array<string, mixed> $layout
-     * @param array<string, mixed> $existingMeta
+     * @param  array<string, mixed>  $block
+     * @param  array<string, mixed>|null  $table
+     * @param  array<string, mixed>  $layout
+     * @param  array<string, mixed>  $existingMeta
      */
     private function rebuildBlockHtml(array $block, ?array $table, array $layout, array $existingMeta): string
     {
@@ -1097,11 +1094,11 @@ class ReviewStore
 
         if ($type !== 'table' && $type !== 'image' && $layoutCss !== '') {
             $classMap = [
-                'list_item'      => 'doc-paragraph doc-list-item',
-                'title'          => 'doc-paragraph doc-title',
+                'list_item' => 'doc-paragraph doc-list-item',
+                'title' => 'doc-paragraph doc-title',
                 'section_header' => 'doc-paragraph doc-section-header',
                 'figure_caption' => 'doc-paragraph doc-figure-caption',
-                'footnote'       => 'doc-paragraph doc-footnote',
+                'footnote' => 'doc-paragraph doc-footnote',
             ];
             $classes = $classMap[$type] ?? 'doc-paragraph';
             $escaped = e(str_replace(["\r\n", "\r", "\n"], '<br>', $text));

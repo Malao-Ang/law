@@ -57,7 +57,7 @@ class ReviewController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $review
+     * @param  array<string, mixed>  $review
      * @return array<string, mixed>
      */
     private function decorateReviewPayload(string $documentId, array $review): array
@@ -244,11 +244,11 @@ class ReviewController extends Controller
     public function mergeBlocks(Request $request, string $documentId): JsonResponse
     {
         $blockIds = $request->input('block_ids', []);
-        if (!is_array($blockIds) || count($blockIds) < 2) {
+        if (! is_array($blockIds) || count($blockIds) < 2) {
             return response()->json(['message' => 'block_ids must contain at least 2 IDs'], 422);
         }
         foreach ($blockIds as $id) {
-            if (!is_string($id) || trim($id) === '') {
+            if (! is_string($id) || trim($id) === '') {
                 return response()->json(['message' => 'Each block_id must be a non-empty string'], 422);
             }
         }
@@ -265,11 +265,11 @@ class ReviewController extends Controller
     public function splitBlock(Request $request, string $documentId, string $blockId): JsonResponse
     {
         $validated = $request->validate([
-            'page_no'     => 'required|integer|min:1',
+            'page_no' => 'required|integer|min:1',
             'before_text' => 'required|string',
             'before_html' => 'required|string',
-            'after_text'  => 'required|string',
-            'after_html'  => 'required|string',
+            'after_text' => 'required|string',
+            'after_html' => 'required|string',
         ]);
 
         try {
@@ -288,21 +288,21 @@ class ReviewController extends Controller
 
         return response()->json([
             'document_id' => $documentId,
-            'status'      => 'split',
-            'first'       => $result['first'],
-            'second'      => $result['second'],
+            'status' => 'split',
+            'first' => $result['first'],
+            'second' => $result['second'],
         ]);
     }
 
     public function createBlock(Request $request, string $documentId): JsonResponse
     {
         $validated = $request->validate([
-            'page_no'        => 'required|integer|min:1',
+            'page_no' => 'required|integer|min:1',
             'after_block_id' => 'nullable|string',
-            'type'           => 'string|in:paragraph,list_item,section_header,title,footnote',
-            'approved_text'  => 'string',
-            'reviewed_html'  => 'string',
-            'layout'         => 'array',
+            'type' => 'string|in:paragraph,list_item,section_header,title,footnote',
+            'approved_text' => 'string',
+            'reviewed_html' => 'string',
+            'layout' => 'array',
         ]);
 
         try {

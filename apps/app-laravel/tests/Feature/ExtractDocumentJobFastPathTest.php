@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\CorrectDocumentJob;
 use App\Jobs\ExtractDocumentJob;
 use App\Jobs\NormalizeDocumentJob;
+use App\Services\DocumentPipelineClient;
 use App\Services\Fast\FastExtractionPipeline;
 use App\Services\ReviewStore;
 use Illuminate\Support\Facades\Bus;
@@ -37,7 +38,7 @@ class ExtractDocumentJobFastPathTest extends TestCase
         );
 
         $job->handle(
-            app(\App\Services\DocumentPipelineClient::class),
+            app(DocumentPipelineClient::class),
             $store,
             $pipeline,
         );

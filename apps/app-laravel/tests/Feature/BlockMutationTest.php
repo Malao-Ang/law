@@ -8,6 +8,7 @@ use Tests\TestCase;
 class BlockMutationTest extends TestCase
 {
     private ReviewStore $store;
+
     private string $docId;
 
     protected function setUp(): void
@@ -26,17 +27,17 @@ class BlockMutationTest extends TestCase
                 'image_path' => null,
                 'blocks' => [
                     ['block_id' => 'b1', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 1,
-                     'raw_text' => 'Block one', 'normalized_text' => 'Block one', 'ai_suggested_text' => '',
-                     'approved_text' => 'Block one', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
-                     'meta' => ['reviewed_html' => '<p>Block one</p>']],
+                        'raw_text' => 'Block one', 'normalized_text' => 'Block one', 'ai_suggested_text' => '',
+                        'approved_text' => 'Block one', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '<p>Block one</p>']],
                     ['block_id' => 'b2', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 2,
-                     'raw_text' => 'Block two', 'normalized_text' => 'Block two', 'ai_suggested_text' => '',
-                     'approved_text' => 'Block two', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
-                     'meta' => ['reviewed_html' => '<p>Block two</p>']],
+                        'raw_text' => 'Block two', 'normalized_text' => 'Block two', 'ai_suggested_text' => '',
+                        'approved_text' => 'Block two', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '<p>Block two</p>']],
                     ['block_id' => 'b3', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 3,
-                     'raw_text' => 'Block three', 'normalized_text' => 'Block three', 'ai_suggested_text' => '',
-                     'approved_text' => 'Block three', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
-                     'meta' => ['reviewed_html' => '<p>Block three</p>']],
+                        'raw_text' => 'Block three', 'normalized_text' => 'Block three', 'ai_suggested_text' => '',
+                        'approved_text' => 'Block three', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '<p>Block three</p>']],
                 ],
             ]],
             'summary' => ['page_count' => 1, 'block_count' => 3, 'review_required_count' => 0],

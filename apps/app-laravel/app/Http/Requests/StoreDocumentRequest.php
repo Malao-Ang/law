@@ -23,4 +23,3 @@ class StoreDocumentRequest extends FormRequest
         ];
     }
 }
-

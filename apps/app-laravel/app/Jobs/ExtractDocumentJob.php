@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Jobs\NormalizeDocumentJob;
 use App\Services\DocumentPipelineClient;
 use App\Services\Fast\FastExtractionPipeline;
 use App\Services\Fast\FastPathUnsupportedException;
@@ -19,6 +18,7 @@ class ExtractDocumentJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1;
+
     public int $timeout = 1800;
 
     public function __construct(
@@ -33,12 +33,12 @@ class ExtractDocumentJob implements ShouldQueue
         DocumentPipelineClient $pipelineClient,
         ReviewStore $reviewStore,
         FastExtractionPipeline $fastPipeline,
-    ): void
-    {
+    ): void {
         $callbackUrl = config('services.ocr.internal_callback_url') ?: route('pipeline.callback');
 
         if ($this->extractionEngine === 'fast') {
             $this->runFast($fastPipeline, $reviewStore, $callbackUrl, $pipelineClient);
+
             return;
         }
 

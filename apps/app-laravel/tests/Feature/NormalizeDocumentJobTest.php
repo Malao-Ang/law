@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\NormalizeDocumentJob;
+use App\Services\DocumentPipelineClient;
 use App\Services\ReviewStore;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -56,7 +57,7 @@ class NormalizeDocumentJobTest extends TestCase
         ]);
 
         (new NormalizeDocumentJob($documentId))->handle(
-            app(\App\Services\DocumentPipelineClient::class),
+            app(DocumentPipelineClient::class),
             $store,
         );
 
@@ -91,7 +92,7 @@ class NormalizeDocumentJobTest extends TestCase
         Http::fake(['*/pipeline/normalize' => Http::response(['document_id' => $documentId, 'results' => []], 200)]);
 
         (new NormalizeDocumentJob($documentId))->handle(
-            app(\App\Services\DocumentPipelineClient::class),
+            app(DocumentPipelineClient::class),
             $store,
         );
 

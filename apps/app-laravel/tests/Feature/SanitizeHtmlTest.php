@@ -12,6 +12,7 @@ class SanitizeHtmlTest extends TestCase
         $store = app(ReviewStore::class);
         $ref = new \ReflectionMethod($store, 'sanitizeHtml');
         $ref->setAccessible(true);
+
         return $ref->invoke($store, $html);
     }
 

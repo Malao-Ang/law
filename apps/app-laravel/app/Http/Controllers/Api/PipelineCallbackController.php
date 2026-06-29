@@ -33,7 +33,34 @@ class PipelineCallbackController
             return response()->json(['status' => 'failure_received']);
         }
 
-        // Handle success callbacks
+        if ($status === 'correction_done') {
+            $output = $request->input('output');
+            if (is_array($output)) {
+                $reviewStore->writeReviewDocument($documentId, $output);
+            }
+
+            $reviewStore->setStatus($documentId, [
+                'status' => 'done',
+                'progress' => 100,
+                'current_step' => 'correction_done',
+                'correction_status' => 'done',
+            ]);
+
+            return response()->json(['status' => 'correction_received']);
+        }
+
+        if ($status === 'correction_failed') {
+            $reviewStore->setStatus($documentId, [
+                'status' => 'done',
+                'progress' => 100,
+                'current_step' => 'correction_failed',
+                'correction_status' => 'failed',
+                'error' => (string) $request->input('error', 'Correction failed'),
+            ]);
+
+            return response()->json(['status' => 'correction_failure_received']);
+        }
+
         $output = $request->input('output');
         if (! is_array($output)) {
             return response()->json(['error' => 'Invalid callback payload: missing output'], 422);
@@ -50,7 +77,9 @@ class PipelineCallbackController
             'scan_extraction_mode_requested' => $extraction['scan_extraction_mode_requested'] ?? null,
             'scan_extraction_mode_effective' => $extraction['scan_extraction_mode_effective'] ?? null,
             'extraction_path' => $extraction['path'] ?? null,
+            'conversion' => $extraction['conversion'] ?? null,
             'timings' => $output['timings'] ?? null,
+            'correction_status' => $request->input('correction_status', 'not_required'),
         ]);
 
         return response()->json(['status' => 'received']);

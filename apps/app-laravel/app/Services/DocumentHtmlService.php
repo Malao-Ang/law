@@ -5,7 +5,6 @@ namespace App\Services;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use DOMNodeList;
 use DOMXPath;
 
 class DocumentHtmlService
@@ -76,6 +75,7 @@ class DocumentHtmlService
             if ($blockId !== '') {
                 return preg_replace('/<table/i', '<table data-block-id="'.e($blockId).'"', $tableHtml, 1) ?? $tableHtml;
             }
+
             return $tableHtml;
         }
 
@@ -95,6 +95,7 @@ class DocumentHtmlService
                     $caption !== '' ? sprintf('<figcaption>%s</figcaption>', e($caption)) : '',
                 );
             }
+
             return sprintf('<figure data-block-id="%s" class="doc-image doc-image--missing"></figure>', e($blockId));
         }
 
@@ -428,7 +429,7 @@ class DocumentHtmlService
         // When indent_level is set, indent comes from the doc-indent-N CSS
         // class (added in buildBlockHtml). Avoid emitting an inline margin-left
         // too, or the two indent sources would compound.
-        if (is_numeric($indentLeft) && !is_int($indentLevel)) {
+        if (is_numeric($indentLeft) && ! is_int($indentLevel)) {
             // Word stores indent in twips (1/20 point), convert to points.
             // Clamp to 200pt — values beyond that are almost always parsing
             // artefacts (e.g. a paragraph styled with a deeply-nested list
@@ -490,7 +491,7 @@ class DocumentHtmlService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $row
+     * @param  array<int, array<string, mixed>>  $row
      * @return array<int, string>
      */
     private function flattenRow(array $row): array
@@ -504,7 +505,7 @@ class DocumentHtmlService
     }
 
     /**
-     * @param array<int, array<int, array<string, mixed>>> $rows
+     * @param  array<int, array<int, array<string, mixed>>>  $rows
      */
     private function buildTableHtml(array $rows): string
     {

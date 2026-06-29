@@ -20,8 +20,7 @@ class DocumentPipelineClient
         bool $enableAiCorrection,
         string $callbackUrl,
         string $scanExtractionMode = 'auto',
-    ): void
-    {
+    ): void {
         $this->request(5)->post('/pipeline/extract', [
             'document_id' => $documentId,
             'file_path' => $this->toSharedPath($relativeInputPath),

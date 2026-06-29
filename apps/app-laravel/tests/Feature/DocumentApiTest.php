@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ExtractDocumentJob;
+use App\Jobs\IngestRagJob;
 use App\Services\ReviewStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
@@ -52,6 +53,86 @@ class DocumentApiTest extends TestCase
         $this->getJson('/api/documents/'.$documentId)
             ->assertOk()
             ->assertJsonPath('scan_extraction_mode_requested', 'landingai');
+    }
+
+    public function test_upload_accepts_local_scan_extraction_mode_and_passes_it_to_job(): void
+    {
+        Queue::fake();
+
+        $response = $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
+            'scan_extraction_mode' => 'local',
+        ]);
+
+        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
+        $documentId = (string) $response->json('document_id');
+
+        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
+            return $job->scanExtractionMode === 'local';
+        });
+
+        $this->getJson('/api/documents/'.$documentId)
+            ->assertOk()
+            ->assertJsonPath('scan_extraction_mode_requested', 'local');
+    }
+
+    public function test_upload_accepts_legacy_doc_files(): void
+    {
+        Queue::fake();
+
+        $response = $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create('legacy.doc', 64, 'application/msword'),
+        ]);
+
+        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
+
+        Queue::assertPushed(ExtractDocumentJob::class);
+    }
+
+    public function test_pipeline_callback_persists_conversion_metadata_in_status(): void
+    {
+        $documentId = 'doc_test_conversion_status';
+
+        $response = $this->postJson('/api/internal/pipeline-callback', [
+            'document_id' => $documentId,
+            'status' => 'success',
+            'output' => [
+                'document_id' => $documentId,
+                'source_file' => 'legacy.doc',
+                'source_type' => 'docx',
+                'language' => 'th',
+                'summary' => [
+                    'page_count' => 1,
+                    'block_count' => 0,
+                    'review_required_count' => 0,
+                ],
+                'pages' => [],
+                'timings' => [
+                    'convert' => 4823,
+                    'extract' => 1500,
+                ],
+                'extraction' => [
+                    'scan_extraction_mode_requested' => 'auto',
+                    'scan_extraction_mode_effective' => 'auto',
+                    'path' => ['doc_to_docx_conversion', 'docling_docx'],
+                    'conversion' => [
+                        'tool' => 'libreoffice',
+                        'duration_ms' => 4823,
+                        'exit_code' => 0,
+                        'soffice_version' => 'LibreOffice 24.2.3.2',
+                    ],
+                ],
+            ],
+        ]);
+
+        $response->assertOk()->assertJson(['status' => 'received']);
+
+        $this->getJson('/api/documents/'.$documentId)
+            ->assertOk()
+            ->assertJsonPath('conversion.tool', 'libreoffice')
+            ->assertJsonPath('conversion.duration_ms', 4823)
+            ->assertJsonPath('extraction_path.0', 'doc_to_docx_conversion')
+            ->assertJsonPath('extraction_path.1', 'docling_docx');
     }
 
     public function test_generated_html_preserves_docx_layout_and_tables(): void
@@ -202,8 +283,11 @@ class DocumentApiTest extends TestCase
         $this->assertStringContainsString('Legacy 1', $generatedHtml);
         $this->assertStringContainsString('Value 2', $generatedHtml);
     }
+
     public function test_document_html_review_is_saved_and_used_for_export_and_ingest(): void
     {
+        Queue::fake([IngestRagJob::class]);
+
         /** @var ReviewStore $store */
         $store = app(ReviewStore::class);
 
@@ -277,12 +361,13 @@ class DocumentApiTest extends TestCase
         $this->assertSame('section_header', $exportJson['chunks'][0]['meta']['type']);
         $this->assertStringContainsString('final reviewed document text', $exportJson['document_html']);
 
-        $ingestFile = $store->absolutePath($store->ingestRelativePath($documentId));
-        $this->assertFileExists($ingestFile);
+        Queue::assertPushed(IngestRagJob::class, function (IngestRagJob $job) use ($documentId): bool {
+            return $job->documentId === $documentId;
+        });
 
         $status = $store->getStatus($documentId);
-        $this->assertSame('ingested', $status['status']);
-        $this->assertSame(1, $status['ingested_chunk_count']);
+        $this->assertSame('ingesting', $status['status']);
+        $this->assertSame('rag_ingest_queued', $status['current_step']);
     }
 
     public function test_compose_state_is_saved_without_requiring_draft_html(): void
@@ -406,5 +491,71 @@ class DocumentApiTest extends TestCase
         $this->get('/api/documents/'.$documentId.'/pages/1/image')
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_blocks_can_be_reordered_and_persist_reading_order(): void
+    {
+        /** @var ReviewStore $store */
+        $store = app(ReviewStore::class);
+
+        $documentId = 'doc_test_reorder';
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'source_file' => 'reorder.pdf',
+            'source_type' => 'pdf_text',
+            'language' => 'th',
+            'summary' => [
+                'page_count' => 1,
+                'block_count' => 2,
+                'review_required_count' => 0,
+            ],
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => null,
+                'blocks' => [
+                    [
+                        'block_id' => '1-1',
+                        'type' => 'section_header',
+                        'bbox' => [10, 10, 200, 40],
+                        'reading_order' => 1,
+                        'raw_text' => 'มาตรา 1',
+                        'normalized_text' => 'มาตรา 1',
+                        'ai_suggested_text' => 'มาตรา 1',
+                        'approved_text' => 'มาตรา 1',
+                        'confidence' => 0.98,
+                        'needs_review' => false,
+                        'flags' => [],
+                        'meta' => [],
+                    ],
+                    [
+                        'block_id' => '1-2',
+                        'type' => 'paragraph',
+                        'bbox' => [10, 60, 200, 110],
+                        'reading_order' => 2,
+                        'raw_text' => 'เนื้อหาตัวอย่าง',
+                        'normalized_text' => 'เนื้อหาตัวอย่าง',
+                        'ai_suggested_text' => 'เนื้อหาตัวอย่าง',
+                        'approved_text' => 'เนื้อหาตัวอย่าง',
+                        'confidence' => 0.98,
+                        'needs_review' => false,
+                        'flags' => [],
+                        'meta' => [],
+                    ],
+                ],
+            ]],
+        ]);
+
+        $this->postJson('/api/documents/'.$documentId.'/blocks/reorder', [
+            'block_ids' => ['1-2', '1-1'],
+        ])->assertOk()
+            ->assertJsonPath('status', 'updated');
+
+        $review = $store->getReviewDocument($documentId);
+        $blocks = $review['pages'][0]['blocks'];
+
+        $this->assertSame('1-2', $blocks[0]['block_id']);
+        $this->assertSame(1, $blocks[0]['reading_order']);
+        $this->assertSame('1-1', $blocks[1]['block_id']);
+        $this->assertSame(2, $blocks[1]['reading_order']);
     }
 }
