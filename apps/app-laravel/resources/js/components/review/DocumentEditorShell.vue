@@ -83,8 +83,8 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { reorderBlocks, saveDocumentReview } from '../api/client';
-import type { ReviewDocument } from '../types/document';
+import { reorderBlocks, saveDocumentReview } from '../../api/client';
+import type { ReviewDocument } from '../../types/document';
 
 const props = defineProps<{
   review: ReviewDocument;

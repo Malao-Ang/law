@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { DocumentBlock, DocumentPage } from '../types/document';
+import type { DocumentBlock, DocumentPage } from '../../types/document';
 
 const props = defineProps<{
   page: DocumentPage | null;

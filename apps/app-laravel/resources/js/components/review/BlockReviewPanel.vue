@@ -115,8 +115,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { patchBlock, reprocessBlock } from '../api/client';
-import type { BlockLayout, BlockType, DocumentBlock, ReviewedTable, ReviewedTableCell } from '../types/document';
+import { patchBlock, reprocessBlock } from '../../api/client';
+import type { BlockLayout, BlockType, DocumentBlock, ReviewedTable, ReviewedTableCell } from '../../types/document';
 
 const blockTypes: BlockType[] = [
   'title',

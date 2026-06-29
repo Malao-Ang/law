@@ -190,7 +190,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ThaiFont } from '../types/document';
+import type { ThaiFont } from '../../types/document';
 
 interface EditorStateSnapshot {
   active: boolean;

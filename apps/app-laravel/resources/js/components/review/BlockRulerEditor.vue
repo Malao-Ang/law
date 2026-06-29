@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { LayoutPatch, TabStop, BlockLayout } from '../types/document';
+import type { LayoutPatch, TabStop, BlockLayout } from '../../types/document';
 
 const props = withDefaults(defineProps<{
   layout: BlockLayout | null;

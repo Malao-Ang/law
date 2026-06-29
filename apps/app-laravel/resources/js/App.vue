@@ -1,8 +1,7 @@
 <template>
   <v-app>
-    <HeaderComponent v-if="!isFullScreenRoute" />
-    <v-main :class="{ 'review-main': isFullScreenRoute }">
-      <v-container v-if="!isFullScreenRoute">
+    <v-main :class="{ 'review-main': isBareLayout }">
+      <v-container v-if="!isBareLayout">
         <RouterView />
       </v-container>
       <RouterView v-else />
@@ -13,8 +12,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
-import HeaderComponent from './components/HeaderComponent.vue';
 
 const route = useRoute();
-const isFullScreenRoute = computed(() => ['review', 'compose'].includes(String(route.name ?? '')));
+const isBareLayout = computed(() => Boolean(route.meta.bareLayout));
 </script>

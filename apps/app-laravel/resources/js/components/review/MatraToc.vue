@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { DocumentBlock, DocumentPage } from '../types/document';
+import type { DocumentBlock, DocumentPage } from '../../types/document';
 
 interface TocItem {
   page_no: number;

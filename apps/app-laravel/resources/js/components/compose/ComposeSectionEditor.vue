@@ -76,10 +76,10 @@ import { EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { patchBlock } from '../api/client';
-import { IndentExtension } from '../extensions/IndentExtension';
-import ResizableImage from './ResizableImage.vue';
-import type { DocumentBlock, ThaiFont } from '../types/document';
+import { patchBlock } from '../../api/client';
+import { IndentExtension } from '../../extensions/IndentExtension';
+import ResizableImage from '../shared/ResizableImage.vue';
+import type { DocumentBlock, ThaiFont } from '../../types/document';
 
 interface ToolbarCommand {
   id: number;

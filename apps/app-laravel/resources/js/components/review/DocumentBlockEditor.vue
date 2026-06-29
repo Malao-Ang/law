@@ -256,9 +256,9 @@ import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { patchBlock, patchBlockLayout } from '../api/client';
+import { patchBlock, patchBlockLayout } from '../../api/client';
 import BlockRulerEditor from './BlockRulerEditor.vue';
-import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../types/document';
+import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../../types/document';
 
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {

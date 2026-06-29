@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { BlockType } from '../types/document';
+import type { BlockType } from '../../types/document';
 
 interface NavigatorItem {
   blockId: string;

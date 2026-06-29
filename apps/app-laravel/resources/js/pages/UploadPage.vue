@@ -58,8 +58,8 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import UploadForm from '../components/UploadForm.vue';
-import HeaderComponent from '../components/HeaderComponent.vue';
+import UploadForm from '../components/shared/UploadForm.vue';
+import HeaderComponent from '../components/shared/HeaderComponent.vue';
 import { fetchStatus } from '../api/client';
 import type { DocumentStatus } from '../types/document';
 

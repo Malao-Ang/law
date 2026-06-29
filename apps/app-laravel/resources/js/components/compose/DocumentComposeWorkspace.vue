@@ -105,6 +105,15 @@
           @selected-blocks-change="selectedBlockIds = $event"
           @split-block="handleSplitBlock"
         />
+
+        <ComposeFooterBar
+          :saving="autoSaveState === 'saving'"
+          :has-unsaved="hasUnsaved"
+          :save-label="autoSaveLabel"
+          :preview-href="`/documents/${documentId}/preview`"
+          @save="handleFooterSave"
+          @preview="handleFooterPreview"
+        />
       </section>
     </v-main>
   </v-layout>
@@ -112,14 +121,16 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
 import ComposeBlockSelectionBar from './ComposeBlockSelectionBar.vue';
+import ComposeFooterBar from './ComposeFooterBar.vue';
 import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, splitBlock, updateComposeState } from '../api/client';
-import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
+import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, splitBlock, updateComposeState } from '../../api/client';
+import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../../types/document';
 
 interface ToolbarCommand {
   id: number;
@@ -152,6 +163,7 @@ const props = withDefaults(defineProps<{
 });
 
 const { mdAndDown } = useDisplay();
+const vueRouter = useRouter();
 const loading = ref(true);
 const error = ref('');
 const review = ref<ReviewDocument | null>(null);
@@ -245,6 +257,8 @@ const autoSaveLabel = computed(() => {
   if (autoSaveState.value === 'error') return autoSaveMessage.value;
   return autoSaveMessage.value;
 });
+
+const hasUnsaved = computed(() => autoSaveMessage.value === 'รอบันทึกการเปลี่ยนแปลง');
 
 watch(isCompact, (next) => {
   leftDrawer.value = !next;
@@ -463,6 +477,15 @@ async function handleCreateAfterSelected(): Promise<void> {
 
 function onAllBlocksSaved(): void {
   // Stay in edit mode — user can keep editing without a reload
+}
+
+function handleFooterSave(): void {
+  toolbarCommandId += 1;
+  toolbarCommand.value = { id: toolbarCommandId, type: 'saveAll' };
+}
+
+function handleFooterPreview(): void {
+  void vueRouter.push(`/documents/${props.documentId}/preview`);
 }
 
 async function pollCorrectionStatus(): Promise<void> {

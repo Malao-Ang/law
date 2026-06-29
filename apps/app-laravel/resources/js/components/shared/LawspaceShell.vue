@@ -12,7 +12,7 @@
       </div>
 
       <div
-        v-for="group in navGroups"
+        v-for="group in resolvedNavGroups"
         :key="group.label"
         class="lawspace-nav-group"
       >
@@ -22,7 +22,8 @@
           :key="item.label"
           type="button"
           class="lawspace-nav-item"
-          :class="{ 'is-active': item.active }"
+          :class="{ 'is-active': isActive(item) }"
+          @click="item.to ? router.push(item.to) : undefined"
         >
           <i class="mdi lawspace-nav-item__icon" :class="item.icon"></i>
           <span>{{ item.label }}</span>
@@ -80,34 +81,60 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+interface NavItem {
+  label: string;
+  icon: string;
+  to?: string;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const props = defineProps<{
   breadcrumbs: string[];
   title: string;
   subtitle?: string;
+  navGroups?: NavGroup[];
 }>();
 
-const navGroups = [
+const router = useRouter();
+const route = useRoute();
+
+const defaultNavGroups: NavGroup[] = [
   {
     label: 'เมนูหลัก',
     items: [
-      { label: 'หน้าแรก', icon: 'mdi-home-outline', active: false },
-      { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline', active: false },
+      { label: 'หน้าแรก', icon: 'mdi-home-outline', to: '/admin' },
+      { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline' },
     ],
   },
   {
     label: 'การจัดการข้อมูล',
     items: [
-      { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', active: true },
-      { label: 'การจัดการเอกสารเก่า', icon: 'mdi-archive-outline', active: false },
-      { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline', active: false },
+      { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
+      { label: 'การจัดการเอกสารเก่า', icon: 'mdi-archive-outline' },
+      { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline' },
     ],
   },
   {
     label: 'พื้นที่งาน',
     items: [
-      { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline', active: false },
-      { label: 'ตั้งค่า', icon: 'mdi-cog-outline', active: false },
+      { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
+      { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
 ];
+
+const resolvedNavGroups = computed(() => props.navGroups ?? defaultNavGroups);
+
+function isActive(item: NavItem): boolean {
+  if (!item.to) return false;
+  if (item.to === '/admin') return route.path === item.to;
+  return route.path === item.to || route.path.startsWith(`${item.to}/`);
+}
 </script>

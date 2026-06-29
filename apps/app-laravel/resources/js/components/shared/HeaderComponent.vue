@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import logoUrl from '../assets/Buu-logo11.png'
+import logoUrl from '../../assets/Buu-logo11.png'
 
 const router = useRouter()
 
