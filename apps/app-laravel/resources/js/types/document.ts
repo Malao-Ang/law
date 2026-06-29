@@ -38,7 +38,7 @@ export interface ReviewedTableCell {
   text: string;
   colspan: number;
   rowspan: number;
-  alignment?: 'left' | 'center' | 'right' | 'justify' | string | null;
+  alignment?: 'left' | 'center' | 'right' | 'justify' | null;
 }
 
 export interface TabStop {
@@ -56,7 +56,7 @@ export interface ReviewedTable {
 export interface BlockLayout {
   bbox: [number, number, number, number] | null;
   reading_order: number | null;
-  alignment?: 'left' | 'center' | 'right' | 'justify' | string | null;
+  alignment?: 'left' | 'center' | 'right' | 'justify' | null;
   indent_left?: number | null;
   indent_first_line?: number | null;
   indent_hanging?: number | null;
@@ -79,6 +79,23 @@ export interface LayoutPatch {
   tabs?: TabStop[] | null;
 }
 
+export interface SpellSuggestion {
+  original: string;
+  suggestions: string[];
+}
+
+export interface BlockFormatting {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
+export interface BlockReviewMeta {
+  approved_by?: string | null;
+  notes?: string | null;
+  updated_at?: string | null;
+}
+
 export interface BlockMeta {
   section_path?: string | null;
   table_html?: string | null;
@@ -89,12 +106,9 @@ export interface BlockMeta {
   list_marker?: ListMarker | null;
   image?: BlockImage | null;
   table?: ReviewedTable | null;
-  review?: {
-    approved_by?: string | null;
-    notes?: string | null;
-    updated_at?: string | null;
-  };
-  [key: string]: unknown;
+  spell_suggestions?: SpellSuggestion[];
+  formatting?: BlockFormatting;
+  review?: BlockReviewMeta;
 }
 
 export interface DocumentBlock {
@@ -172,6 +186,12 @@ export interface ReviewDocument {
     scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
     scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
     path?: string[];
+    conversion?: {
+      tool: string;
+      duration_ms?: number | null;
+      exit_code?: number | null;
+      soffice_version?: string | null;
+    } | null;
     landingai?: {
       status_code?: number | null;
       filename?: string | null;
@@ -199,6 +219,15 @@ export interface DocumentStatus {
   scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
   scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
   extraction_path?: string[] | null;
+  conversion?: {
+    tool: string;
+    duration_ms?: number | null;
+    exit_code?: number | null;
+    soffice_version?: string | null;
+  } | null;
+  extraction_engine?: 'standard' | 'fast';
+  correction_status?: 'not_required' | 'pending' | 'in_progress' | 'done' | 'failed';
+  fast_fallback_reason?: string;
   timings?: Record<string, number> | null;
   error?: string;
 }
