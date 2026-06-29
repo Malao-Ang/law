@@ -148,6 +148,33 @@ def test_landingai_mode_skips_local_ocr_pipeline_for_scan_pdf(tmp_path: Path) ->
     mock_get_ocr_pipeline.assert_not_called()
 
 
+def test_local_mode_uses_local_ocr_pipeline_for_scan_pdf(tmp_path: Path) -> None:
+    payload = _make_payload(tmp_path) | {"scan_extraction_mode": "local"}
+    local_pages = [{"page_no": 1, "blocks": []}]
+
+    with (
+        patch("app.api.routes.detect_file_type", return_value={"mode": "pdf_scan", "pages": {}}),
+        patch("app.api.routes.get_ocr_pipeline") as mock_get_ocr_pipeline,
+        patch("app.api.routes.LandingAiAdeParser.parse_pdf") as mock_parse_pdf,
+        patch(
+            "app.api.routes.build_document_output",
+            return_value={"document_id": DOCUMENT_ID, "pages": [], "extraction": {}},
+        ),
+        patch("app.api.routes._post_callback"),
+    ):
+        mock_pipeline = MagicMock()
+        mock_pipeline.extract_scanned_pdf.return_value = local_pages
+        mock_get_ocr_pipeline.return_value = mock_pipeline
+
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.post("/pipeline/extract", json=payload)
+
+    assert response.status_code == 202
+    mock_get_ocr_pipeline.assert_called_once()
+    mock_pipeline.extract_scanned_pdf.assert_called_once()
+    mock_parse_pdf.assert_not_called()
+
+
 def test_extract_doc_routes_through_converter(tmp_path: Path) -> None:
     source = tmp_path / "sample.doc"
     source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"legacy-doc")
@@ -199,3 +226,58 @@ def test_extract_doc_routes_through_converter(tmp_path: Path) -> None:
         "exit_code": 0,
         "soffice_version": "LibreOffice 24.2.3.2",
     }
+
+
+def test_normalize_applies_high_confidence_correction():
+    """A single-candidate (confidence 1.0) suggestion is auto-applied to approved_text."""
+    payload = {
+        "document_id": "doc_test",
+        "blocks": [{"block_id": "b1", "text": "ราชการง"}],
+        "autocorrect_min_confidence": 1.0,
+    }
+
+    class _FakeChecker:
+        def bulk_check(self, texts):
+            return [[{"token": "ราชการง", "suggestion": "ราชการ", "confidence": 1.0, "offset": 0}]]
+
+    with (
+        patch("app.api.routes.normalize_text", side_effect=lambda t: {"text": t, "flags": []}),
+        patch("app.api.routes.get_spell_checker", return_value=_FakeChecker()),
+    ):
+        client = TestClient(app)
+        response = client.post("/pipeline/normalize", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    result = data["results"][0]
+    assert result["block_id"] == "b1"
+    assert result["approved_text"] == "ราชการ"
+    assert result["auto_corrected"] is True
+    assert "auto_corrected" in result["flags"]
+    assert result["spell_suggestions"] == []
+
+
+def test_normalize_skips_low_confidence_suggestion():
+    """A suggestion below the threshold is NOT applied; text is left normalized-only."""
+    payload = {
+        "document_id": "doc_test",
+        "blocks": [{"block_id": "b1", "text": "ราชการง"}],
+        "autocorrect_min_confidence": 1.0,
+    }
+
+    class _FakeChecker:
+        def bulk_check(self, texts):
+            return [[{"token": "ราชการง", "suggestion": "ราชการ", "confidence": 0.5, "offset": 0}]]
+
+    with (
+        patch("app.api.routes.normalize_text", side_effect=lambda t: {"text": t, "flags": []}),
+        patch("app.api.routes.get_spell_checker", return_value=_FakeChecker()),
+    ):
+        client = TestClient(app)
+        response = client.post("/pipeline/normalize", json=payload)
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["approved_text"] == "ราชการง"
+    assert result["auto_corrected"] is False
+    assert result["spell_suggestions"] == []

@@ -12,6 +12,9 @@ from app.api.schemas import (
     CorrectRequest,
     ExtractRequest,
     HealthResponse,
+    NormalizeBlockResult,
+    NormalizeRequest,
+    NormalizeResponse,
     ReprocessBlockRequest,
     ReprocessPageRequest,
     intermediate_output_path,
@@ -26,6 +29,7 @@ from app.services.docling_service import DoclingService
 from app.services.landingai_parser import LandingAiAdeParser
 from app.services.ocr_pipeline import get_ocr_pipeline
 from app.services.thai_normalizer import normalize_text
+from app.services.thai_spellchecker import get_spell_checker
 from app.utils.file_type import detect_file_type
 
 router = APIRouter()
@@ -519,3 +523,56 @@ def reprocess_block(payload: ReprocessBlockRequest) -> BlockPatchResponse:
         confidence=ai["confidence"],
         flags=target_block["flags"],
     )
+
+
+@router.post("/pipeline/normalize", response_model=NormalizeResponse)
+def normalize_blocks(payload: NormalizeRequest) -> NormalizeResponse:
+    """Stateless CPU-only Thai normalize + spell auto-correct for a batch of blocks.
+
+    No AI model and no GPU are used. High-confidence spell suggestions
+    (confidence >= autocorrect_min_confidence) are applied silently to
+    approved_text; lower-confidence suggestions are dropped.
+    """
+    normalized_texts: list[str] = []
+    normalized_flags: list[list[str]] = []
+    for block in payload.blocks:
+        norm = normalize_text(block.text or "")
+        normalized_texts.append(norm["text"])
+        normalized_flags.append(list(norm.get("flags", [])))
+
+    suggestions_per_block = get_spell_checker().bulk_check(normalized_texts)
+
+    results: list[NormalizeBlockResult] = []
+    for block, ntext, nflags, suggestions in zip(
+        payload.blocks, normalized_texts, normalized_flags, suggestions_per_block
+    ):
+        applied = ntext
+        auto_corrected = False
+        confident = [
+            s
+            for s in suggestions
+            if float(s.get("confidence", 0.0)) >= payload.autocorrect_min_confidence
+            and s.get("suggestion")
+            and s.get("suggestion") != s.get("token")
+        ]
+        for s in sorted(confident, key=lambda x: int(x.get("offset", 0)), reverse=True):
+            offset = int(s["offset"])
+            token = str(s["token"])
+            suggestion = str(s["suggestion"])
+            if applied[offset : offset + len(token)] == token:
+                applied = applied[:offset] + suggestion + applied[offset + len(token) :]
+                auto_corrected = True
+
+        flags = sorted(set(nflags + (["auto_corrected"] if auto_corrected else [])))
+        results.append(
+            NormalizeBlockResult(
+                block_id=block.block_id,
+                normalized_text=ntext,
+                approved_text=applied,
+                auto_corrected=auto_corrected,
+                flags=flags,
+                spell_suggestions=[],
+            )
+        )
+
+    return NormalizeResponse(document_id=payload.document_id, results=results)
