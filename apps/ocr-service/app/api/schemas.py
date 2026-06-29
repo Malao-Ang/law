@@ -16,6 +16,12 @@ class ExtractRequest(BaseModel):
     scan_extraction_mode: ScanExtractionMode = "auto"
 
 
+class CorrectRequest(BaseModel):
+    document_id: str = Field(min_length=1)
+    callback_url: str | None = None
+    enable_ai_correction: bool = False
+
+
 class ReprocessBlockRequest(BaseModel):
     document_id: str = Field(min_length=1)
     page_no: int = Field(ge=1)
@@ -63,6 +69,31 @@ class PageDraft(BaseModel):
     page_no: int
     image_path: str | None = None
     blocks: list[BlockDraft]
+
+
+class NormalizeBlock(BaseModel):
+    block_id: str = Field(min_length=1)
+    text: str = ""
+
+
+class NormalizeRequest(BaseModel):
+    document_id: str = Field(min_length=1)
+    blocks: list[NormalizeBlock]
+    autocorrect_min_confidence: float = Field(default=1.0, ge=0, le=1)
+
+
+class NormalizeBlockResult(BaseModel):
+    block_id: str
+    normalized_text: str
+    approved_text: str
+    auto_corrected: bool
+    flags: list[str]
+    spell_suggestions: list[dict]
+
+
+class NormalizeResponse(BaseModel):
+    document_id: str
+    results: list[NormalizeBlockResult]
 
 
 def intermediate_output_path(data_root: Path, document_id: str) -> Path:
