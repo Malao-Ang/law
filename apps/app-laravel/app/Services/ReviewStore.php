@@ -702,6 +702,56 @@ class ReviewStore
     }
 
     /**
+     * Apply Python normalize results onto the stored review document.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<string, mixed>
+     */
+    public function applyNormalizationResults(string $documentId, array $results): array
+    {
+        $doc = $this->getReviewDocument($documentId);
+
+        $byId = [];
+        foreach ($results as $result) {
+            $blockId = $result['block_id'] ?? null;
+            if (is_string($blockId) && $blockId !== '') {
+                $byId[$blockId] = $result;
+            }
+        }
+
+        $reviewCount = 0;
+        foreach ($doc['pages'] ?? [] as $pageIndex => $page) {
+            foreach ($page['blocks'] ?? [] as $blockIndex => $block) {
+                $blockId = $block['block_id'] ?? null;
+
+                if (is_string($blockId) && isset($byId[$blockId])) {
+                    $result = $byId[$blockId];
+                    $approved = (string) ($result['approved_text'] ?? ($block['approved_text'] ?? ''));
+
+                    $block['normalized_text'] = (string) ($result['normalized_text'] ?? ($block['normalized_text'] ?? ''));
+                    $block['approved_text'] = $approved;
+                    $block['ai_suggested_text'] = $approved;
+                    $block['flags'] = $result['flags'] ?? ($block['flags'] ?? []);
+                    $block['needs_review'] = false;
+                    $block['meta']['spell_suggestions'] = $result['spell_suggestions'] ?? [];
+
+                    $doc['pages'][$pageIndex]['blocks'][$blockIndex] = $block;
+                }
+
+                if (($doc['pages'][$pageIndex]['blocks'][$blockIndex]['needs_review'] ?? false) === true) {
+                    $reviewCount++;
+                }
+            }
+        }
+
+        $doc['summary']['review_required_count'] = $reviewCount;
+
+        $this->writeReviewDocument($documentId, $doc);
+
+        return $doc;
+    }
+
+    /**
      * Write a complete document to disk in one atomic operation.
      * Used when we already have the full document in memory and only need to persist it.
      *
