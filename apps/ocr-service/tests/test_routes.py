@@ -281,3 +281,29 @@ def test_normalize_skips_low_confidence_suggestion():
     assert result["approved_text"] == "ราชการง"
     assert result["auto_corrected"] is False
     assert result["spell_suggestions"] == []
+
+
+def test_normalize_falls_back_gracefully_when_spellchecker_raises():
+    """If the spell checker raises, the endpoint returns normalized text without crashing."""
+    payload = {
+        "document_id": "doc_test",
+        "blocks": [{"block_id": "b1", "text": "ราชการ"}],
+        "autocorrect_min_confidence": 1.0,
+    }
+
+    class _FailingChecker:
+        def bulk_check(self, texts):
+            raise RuntimeError("spell checker unavailable")
+
+    with (
+        patch("app.api.routes.normalize_text", side_effect=lambda t: {"text": t, "flags": []}),
+        patch("app.api.routes.get_spell_checker", return_value=_FailingChecker()),
+    ):
+        client = TestClient(app)
+        response = client.post("/pipeline/normalize", json=payload)
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["approved_text"] == "ราชการ"
+    assert result["auto_corrected"] is False
+    assert result["spell_suggestions"] == []

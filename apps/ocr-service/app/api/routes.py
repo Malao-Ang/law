@@ -540,7 +540,12 @@ def normalize_blocks(payload: NormalizeRequest) -> NormalizeResponse:
         normalized_texts.append(norm["text"])
         normalized_flags.append(list(norm.get("flags", [])))
 
-    suggestions_per_block = get_spell_checker().bulk_check(normalized_texts)
+    try:
+        suggestions_per_block = get_spell_checker().bulk_check(normalized_texts)
+        if len(suggestions_per_block) != len(normalized_texts):
+            suggestions_per_block = [[] for _ in normalized_texts]
+    except Exception:
+        suggestions_per_block = [[] for _ in normalized_texts]
 
     results: list[NormalizeBlockResult] = []
     for block, ntext, nflags, suggestions in zip(
