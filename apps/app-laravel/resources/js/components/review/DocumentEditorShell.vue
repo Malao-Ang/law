@@ -69,7 +69,7 @@
       <v-btn
         size="x-small"
         variant="text"
-        @click="documentStore.saveError = ''; switchModeError = ''"
+        @click="documentStore.clearSaveError(); switchModeError = ''"
       >
         ปิด
       </v-btn>
@@ -91,17 +91,14 @@ const props = defineProps<{
   documentId: string;
 }>();
 
-defineEmits<{
-  reload: [];
-}>();
-
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
 const router = useRouter();
 const switchModeError = ref('');
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-const initialHtml = documentStore.review?.document_review.draft_html ?? '';
+// reviewUiStore.review is guaranteed non-null here — parent renders this only via v-else-if="documentStore.review"
+const initialHtml = documentStore.review!.document_review.draft_html;
 
 const editor = useEditor({
   extensions: [StarterKit, Underline],

@@ -13,7 +13,6 @@
   <DocumentEditorShell
     v-else-if="documentStore.review"
     :document-id="documentId"
-    @reload="reload"
   />
 </template>
 

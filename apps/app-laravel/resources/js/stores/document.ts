@@ -46,6 +46,10 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
+  function clearSaveError(): void {
+    saveError.value = '';
+  }
+
   function reset(): void {
     documentId.value = '';
     review.value = null;
@@ -55,5 +59,5 @@ export const useDocumentStore = defineStore('document', () => {
     saveError.value = '';
   }
 
-  return { documentId, review, loading, error, saving, saveError, fetch, saveReview, reset };
+  return { documentId, review, loading, error, saving, saveError, fetch, saveReview, clearSaveError, reset };
 });
