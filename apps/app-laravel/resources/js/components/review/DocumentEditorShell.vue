@@ -97,7 +97,7 @@ const router = useRouter();
 const switchModeError = ref('');
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-// reviewUiStore.review is guaranteed non-null here — parent renders this only via v-else-if="documentStore.review"
+// documentStore.review is guaranteed non-null here — parent renders this only via v-else-if="documentStore.review"
 const initialHtml = documentStore.review!.document_review.draft_html;
 
 const editor = useEditor({
