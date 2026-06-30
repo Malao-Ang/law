@@ -6,6 +6,7 @@ import UploadPage from '../pages/UploadPage.vue';
 import ReviewPage from '../pages/review/ReviewPage.vue';
 import ComposePage from '../pages/compose/ComposePage.vue';
 import PreviewPage from '../pages/preview/PreviewPage.vue';
+import RagPage from '../pages/rag/RagPage.vue';
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
@@ -14,6 +15,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/upload', name: 'upload-legacy', component: UploadPage },
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/compose', name: 'compose', component: ComposePage, props: true, meta: { bareLayout: true } },
+  { path: '/documents/:documentId/rag', name: 'rag', component: RagPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/preview', name: 'preview', component: PreviewPage, props: true, meta: { bareLayout: true } },
 ];
 
