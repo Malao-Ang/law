@@ -15,38 +15,38 @@
         </v-col>
       </v-row>
 
-      <v-row v-if="status">
+      <v-row v-if="uploadStore.status">
         <v-col cols="12">
           <v-card>
             <v-card-title>สถานะการประมวลผลเอกสาร</v-card-title>
             <v-card-text>
-              <v-chip :color="getStatusColor(status.status)" class="mb-4">
-                {{ getStatusText(status.status) }}
+              <v-chip :color="getStatusColor(uploadStore.status.status)" class="mb-4">
+                {{ getStatusText(uploadStore.status.status) }}
               </v-chip>
 
               <v-progress-linear
-                v-if="['queued', 'processing', 'ingesting'].includes(status.status)"
+                v-if="['queued', 'processing', 'ingesting'].includes(uploadStore.status.status)"
                 indeterminate
                 color="primary"
                 class="mb-4"
               ></v-progress-linear>
 
-              <p v-if="status.scan_extraction_mode_requested" class="text-body-2 mb-1">
-                Scan mode requested: {{ status.scan_extraction_mode_requested }}
+              <p v-if="uploadStore.status.scan_extraction_mode_requested" class="text-body-2 mb-1">
+                Scan mode requested: {{ uploadStore.status.scan_extraction_mode_requested }}
               </p>
-              <p v-if="status.scan_extraction_mode_effective" class="text-body-2 mb-4">
-                Scan mode effective: {{ status.scan_extraction_mode_effective }}
+              <p v-if="uploadStore.status.scan_extraction_mode_effective" class="text-body-2 mb-4">
+                Scan mode effective: {{ uploadStore.status.scan_extraction_mode_effective }}
               </p>
-              <p v-if="status.extraction_path?.length" class="text-body-2 mb-1">
-                Extraction path: {{ status.extraction_path.join(' -> ') }}
+              <p v-if="uploadStore.status.extraction_path?.length" class="text-body-2 mb-1">
+                Extraction path: {{ uploadStore.status.extraction_path.join(' -> ') }}
               </p>
-              <p v-if="status.conversion" class="text-body-2 mb-1">
-                Converted from .doc via {{ status.conversion.tool }} ({{ formatDuration(status.conversion.duration_ms) }})
+              <p v-if="uploadStore.status.conversion" class="text-body-2 mb-1">
+                Converted from .doc via {{ uploadStore.status.conversion.tool }} ({{ formatDuration(uploadStore.status.conversion.duration_ms) }})
               </p>
-              <p v-if="status.timings" class="text-body-2 mb-4">
-                Timings: {{ formatTimings(status.timings) }}
+              <p v-if="uploadStore.status.timings" class="text-body-2 mb-4">
+                Timings: {{ formatTimings(uploadStore.status.timings) }}
               </p>
-              <v-alert v-if="pollError" type="error" class="mt-4">{{ pollError }}</v-alert>
+              <v-alert v-if="uploadStore.pollError" type="error" class="mt-4">{{ uploadStore.pollError }}</v-alert>
             </v-card-text>
           </v-card>
         </v-col>
@@ -60,21 +60,21 @@ import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import UploadForm from '../components/shared/UploadForm.vue';
 import HeaderComponent from '../components/shared/HeaderComponent.vue';
-import { fetchStatus } from '../api/client';
+import { useUploadStore } from '../stores/upload';
 import type { DocumentStatus } from '../types/document';
 
 const router = useRouter();
+const uploadStore = useUploadStore();
 const documentId = ref<string | null>(null);
-const status = ref<DocumentStatus | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let errorRetryCount = 0;
-const pollError = ref<string | null>(null);
 
 onUnmounted(() => {
   if (pollTimer !== null) {
     clearTimeout(pollTimer);
     pollTimer = null;
   }
+  uploadStore.reset();
 });
 
 function getStatusColor(s: DocumentStatus['status']): string {
@@ -114,25 +114,24 @@ function onUploaded(id: string): void {
     pollTimer = null;
   }
   errorRetryCount = 0;
-  pollError.value = null;
+  uploadStore.reset();
   documentId.value = id;
-  status.value = null;
   pollStatus();
 }
 
 async function pollStatus(): Promise<void> {
   if (!documentId.value) return;
-  try {
-    status.value = await fetchStatus(documentId.value);
-    if (['queued', 'processing', 'ingesting'].includes(status.value.status)) {
+  const result = await uploadStore.pollOnce(documentId.value);
+  if (result) {
+    errorRetryCount = 0;
+    if (['queued', 'processing', 'ingesting'].includes(result.status)) {
       pollTimer = setTimeout(pollStatus, 1500);
-    } else if (['done', 'exported', 'ingested'].includes(status.value.status)) {
+    } else if (['done', 'exported', 'ingested'].includes(result.status)) {
       router.push(`/documents/${documentId.value}/review`);
     }
-  } catch {
+  } else {
     errorRetryCount++;
     if (errorRetryCount >= 10) {
-      pollError.value = 'ไม่สามารถตรวจสอบสถานะได้ กรุณารีเฟรชหน้า';
       return;
     }
     pollTimer = setTimeout(pollStatus, 2000);

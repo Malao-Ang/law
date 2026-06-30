@@ -4,6 +4,7 @@
   DocumentStatus,
   ExportResponse,
   LayoutPatch,
+  PreviewData,
   ReprocessResponse,
   ReviewDocument,
   ReviewedTable,
@@ -62,6 +63,10 @@ export function fetchStatus(documentId: string): Promise<DocumentStatus> {
 
 export function fetchReview(documentId: string): Promise<ReviewDocument> {
   return jsonRequest<ReviewDocument>(`/api/documents/${documentId}/review`);
+}
+
+export function fetchPreview(documentId: string): Promise<PreviewData> {
+  return jsonRequest<PreviewData>(`/api/documents/${documentId}/preview`);
 }
 
 export function saveDocumentReview(

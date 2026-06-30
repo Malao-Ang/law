@@ -61,11 +61,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { uploadDocument } from '../../api/client';
+import { useUploadStore } from '../../stores/upload';
 
 const emit = defineEmits<{
   uploaded: [documentId: string];
 }>();
+
+const uploadStore = useUploadStore();
 
 const selectedFile = ref<File | null>(null);
 const extractionEngine = ref<'standard' | 'fast'>('standard');
@@ -97,12 +99,12 @@ async function submitUpload(): Promise<void> {
   error.value = null;
 
   try {
-    const response = await uploadDocument(
+    const documentId = await uploadStore.upload(
       selectedFile.value,
       scanExtractionMode.value,
       extractionEngine.value,
     );
-    emit('uploaded', response.document_id);
+    emit('uploaded', documentId);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Upload failed';
   } finally {

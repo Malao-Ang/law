@@ -16,12 +16,12 @@
         </div>
 
         <transition name="fade">
-          <div v-if="status" class="admin-upload__status-card">
+          <div v-if="uploadStore.status" class="admin-upload__status-card">
             <div class="admin-upload__status-header">
               <span class="mdi mdi-file-document-outline"></span>
-              <span class="admin-upload__status-filename">{{ status.source_file ?? 'เอกสาร' }}</span>
-              <span class="admin-upload__status-chip" :class="`admin-upload__status-chip--${status.status}`">
-                {{ statusLabel(status.status) }}
+              <span class="admin-upload__status-filename">{{ uploadStore.status.source_file ?? 'เอกสาร' }}</span>
+              <span class="admin-upload__status-chip" :class="`admin-upload__status-chip--${uploadStore.status.status}`">
+                {{ statusLabel(uploadStore.status.status) }}
               </span>
             </div>
 
@@ -32,9 +32,9 @@
               class="admin-upload__progress"
             />
 
-            <p v-if="status.current_step" class="admin-upload__step-label">{{ status.current_step }}</p>
-            <p v-if="status.conversion" class="admin-upload__step-label">
-              Converted from .doc via {{ status.conversion.tool }} ({{ formatDuration(status.conversion.duration_ms) }})
+            <p v-if="uploadStore.status.current_step" class="admin-upload__step-label">{{ uploadStore.status.current_step }}</p>
+            <p v-if="uploadStore.status.conversion" class="admin-upload__step-label">
+              Converted from .doc via {{ uploadStore.status.conversion.tool }} ({{ formatDuration(uploadStore.status.conversion.duration_ms) }})
             </p>
 
             <div v-if="isDone" class="admin-upload__actions">
@@ -84,28 +84,28 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { fetchStatus } from '../../api/client';
+import { useUploadStore } from '../../stores/upload';
 import LawspaceShell from '../../components/shared/LawspaceShell.vue';
 import UploadForm from '../../components/shared/UploadForm.vue';
-import type { DocumentStatus } from '../../types/document';
 
 const router = useRouter();
+const uploadStore = useUploadStore();
 const documentId = ref<string | null>(null);
-const status = ref<DocumentStatus | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const isProcessing = computed(() =>
-  ['queued', 'processing', 'ingesting'].includes(status.value?.status ?? ''),
+  ['queued', 'processing', 'ingesting'].includes(uploadStore.status?.status ?? ''),
 );
 
 const isDone = computed(() =>
-  ['done', 'exported', 'ingesting', 'ingested'].includes(status.value?.status ?? ''),
+  ['done', 'exported', 'ingesting', 'ingested'].includes(uploadStore.status?.status ?? ''),
 );
 
 onBeforeUnmount(() => {
   if (pollTimer) {
     clearTimeout(pollTimer);
   }
+  uploadStore.reset();
 });
 
 function statusLabel(nextStatus: string): string {
@@ -131,19 +131,16 @@ function formatDuration(durationMs?: number | null): string {
 
 function onUploaded(id: string): void {
   documentId.value = id;
-  status.value = null;
+  uploadStore.reset();
   pollStatus();
 }
 
 async function pollStatus(): Promise<void> {
   if (!documentId.value) return;
-
-  try {
-    status.value = await fetchStatus(documentId.value);
-    if (['queued', 'processing', 'ingesting'].includes(status.value.status)) {
-      pollTimer = setTimeout(pollStatus, 1500);
-    }
-  } catch {
+  const result = await uploadStore.pollOnce(documentId.value);
+  if (result && ['queued', 'processing', 'ingesting'].includes(result.status)) {
+    pollTimer = setTimeout(pollStatus, 1500);
+  } else if (!result) {
     pollTimer = setTimeout(pollStatus, 2000);
   }
 }

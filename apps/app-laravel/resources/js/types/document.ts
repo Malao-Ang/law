@@ -257,3 +257,10 @@ export interface UpdateDocumentReviewResponse {
   document_review: DocumentReviewState;
   compose_state?: ComposeState;
 }
+
+export interface PreviewData {
+  html: string;
+  draft_html: string;
+  html_mode: 'generated' | 'manual';
+  source_file?: string | null;
+}

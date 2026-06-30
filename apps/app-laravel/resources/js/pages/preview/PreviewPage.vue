@@ -16,14 +16,14 @@
     </header>
 
     <main class="preview-main">
-      <div v-if="loading" class="preview-state">
+      <div v-if="previewStore.loading" class="preview-state">
         <v-progress-circular indeterminate color="primary" />
         <p>กำลังโหลดตัวอย่าง...</p>
       </div>
-      <div v-else-if="errorMsg" class="preview-state preview-state--error">
+      <div v-else-if="previewStore.error" class="preview-state preview-state--error">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
-        <p>{{ errorMsg }}</p>
-        <v-btn variant="outlined" @click="load">โหลดใหม่</v-btn>
+        <p>{{ previewStore.error }}</p>
+        <v-btn variant="outlined" @click="previewStore.fetch(documentId)">โหลดใหม่</v-btn>
       </div>
       <article
         v-else
@@ -35,27 +35,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import DOMPurify from 'dompurify';
-import { jsonRequest } from '../../api/client';
+import { usePreviewStore } from '../../stores/preview';
 
 const props = defineProps<{ documentId: string }>();
 
-interface PreviewData {
-  html: string;
-  draft_html: string;
-  html_mode: 'generated' | 'manual';
-  source_file?: string | null;
-}
+const previewStore = usePreviewStore();
 
-const loading = ref(true);
-const errorMsg = ref('');
-const data = ref<PreviewData | null>(null);
-
-const sourceFile = computed(() => data.value?.source_file ?? '');
+const sourceFile = computed(() => previewStore.data?.source_file ?? '');
 
 const safeHtml = computed(() => {
-  const raw = data.value?.draft_html ?? data.value?.html ?? '';
+  const raw = previewStore.data?.draft_html ?? previewStore.data?.html ?? '';
   return DOMPurify.sanitize(raw, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                    'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
@@ -64,23 +55,12 @@ const safeHtml = computed(() => {
   });
 });
 
-async function load(): Promise<void> {
-  loading.value = true;
-  errorMsg.value = '';
-  try {
-    data.value = await jsonRequest<PreviewData>(`/api/documents/${props.documentId}/preview`);
-  } catch (err) {
-    errorMsg.value = err instanceof Error ? err.message : 'โหลดตัวอย่างไม่สำเร็จ';
-  } finally {
-    loading.value = false;
-  }
-}
-
 function printPage(): void {
   window.print();
 }
 
-onMounted(load);
+onMounted(() => previewStore.fetch(props.documentId));
+onUnmounted(() => previewStore.reset());
 </script>
 
 <style scoped>
