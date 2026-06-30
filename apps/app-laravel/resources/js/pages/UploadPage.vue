@@ -60,7 +60,7 @@ import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import UploadForm from '../components/shared/UploadForm.vue';
 import HeaderComponent from '../components/shared/HeaderComponent.vue';
-import { useUploadStore } from '../stores/upload';
+import { useUploadStore } from '../stores/uploadStore';
 import type { DocumentStatus } from '../types/document';
 
 const router = useRouter();

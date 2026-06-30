@@ -84,8 +84,8 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { useDocumentStore } from '../../stores/document';
-import { useReviewUiStore } from '../../stores/reviewUi';
+import { useDocumentStore } from '../../stores/documentStore';
+import { useReviewUiStore } from '../../stores/reviewUiStore';
 
 const props = defineProps<{
   documentId: string;

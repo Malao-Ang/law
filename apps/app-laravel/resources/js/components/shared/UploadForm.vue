@@ -61,7 +61,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useUploadStore } from '../../stores/upload';
+import { useUploadStore } from '../../stores/uploadStore';
 
 const emit = defineEmits<{
   uploaded: [documentId: string];

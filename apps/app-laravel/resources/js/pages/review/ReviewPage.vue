@@ -19,8 +19,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue';
-import { useDocumentStore } from '../../stores/document';
-import { useReviewUiStore } from '../../stores/reviewUi';
+import { useDocumentStore } from '../../stores/documentStore';
+import { useReviewUiStore } from '../../stores/reviewUiStore';
 
 const props = defineProps<{
   documentId: string;

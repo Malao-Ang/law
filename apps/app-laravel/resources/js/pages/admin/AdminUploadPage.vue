@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useUploadStore } from '../../stores/upload';
+import { useUploadStore } from '../../stores/uploadStore';
 import LawspaceShell from '../../components/shared/LawspaceShell.vue';
 import UploadForm from '../../components/shared/UploadForm.vue';
 

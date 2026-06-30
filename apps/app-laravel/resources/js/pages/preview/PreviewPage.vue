@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
 import DOMPurify from 'dompurify';
-import { usePreviewStore } from '../../stores/preview';
+import { usePreviewStore } from '../../stores/previewStore';
 
 const props = defineProps<{ documentId: string }>();
 

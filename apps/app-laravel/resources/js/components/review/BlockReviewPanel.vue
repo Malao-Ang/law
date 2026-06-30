@@ -115,7 +115,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useBlockStore } from '../../stores/blocks';
+import { useBlockStore } from '../../stores/blockStore';
 import type { BlockLayout, BlockType, DocumentBlock, ReviewedTable, ReviewedTableCell } from '../../types/document';
 
 const blockStore = useBlockStore();

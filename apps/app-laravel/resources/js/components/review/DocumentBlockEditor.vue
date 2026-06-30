@@ -256,7 +256,7 @@ import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { useBlockStore } from '../../stores/blocks';
+import { useBlockStore } from '../../stores/blockStore';
 import BlockRulerEditor from './BlockRulerEditor.vue';
 
 const blockStore = useBlockStore();

@@ -76,7 +76,7 @@ import { EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { useBlockStore } from '../../stores/blocks';
+import { useBlockStore } from '../../stores/blockStore';
 import { IndentExtension } from '../../extensions/IndentExtension';
 
 const blockStore = useBlockStore();

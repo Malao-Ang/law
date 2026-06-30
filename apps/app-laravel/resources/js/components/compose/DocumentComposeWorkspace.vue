@@ -129,8 +129,8 @@ import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { useComposeStore } from '../../stores/compose';
-import { useBlockStore } from '../../stores/blocks';
+import { useComposeStore } from '../../stores/composeStore';
+import { useBlockStore } from '../../stores/blockStore';
 import type { ComposeState, DocumentMetadata, ThaiFont } from '../../types/document';
 
 interface ToolbarCommand {
