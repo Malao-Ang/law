@@ -26,6 +26,10 @@ services:
       - COMPOSER_ALLOW_SUPERUSER=1
     volumes:
       - poc_storage:/var/www/html/storage/app/poc
+      # Dev: host runs `npm run dev`, which writes public/hot. The app reads it
+      # via this mount to detect the dev server. (Containerized Vite is gone —
+      # it died with EIO i/o errors over the Windows bind mount.)
+      - ./apps/app-laravel/public:/var/www/html/public
     env_file:
       - .env
     depends_on:
@@ -33,30 +37,6 @@ services:
       - ocr-service
     ports:
       - "8000:8000"
-
-  laravel-vite:
-    profiles:
-      - dev-vite
-    image: node:20-bookworm-slim
-    container_name: thai-ocr-laravel-vite
-    working_dir: /var/www/html
-    # node_modules uses a Docker volume (not the host bind mount) so that
-    # Linux-native binaries (rollup, esbuild) are installed for the container OS.
-    # Install only when the volume is empty; avoid rescanning the bind mount on
-    # every container start.
-    command: >
-      sh -c "if [ ! -d node_modules/vite ]; then npm install; fi && npm run dev"
-    environment:
-      - HMR_HOST=localhost
-      # Native inotify watch fails with EIO over the Windows bind mount;
-      # force Vite/chokidar to poll so the dev server doesn't crash on start.
-      - CHOKIDAR_USEPOLLING=true
-    volumes:
-      - ./apps/app-laravel:/var/www/html
-      - laravel_node_modules:/var/www/html/node_modules
-      - poc_storage:/var/www/html/storage/app/poc
-    ports:
-      - "5173:5173"
 
   queue-worker:
     build:
@@ -124,4 +104,3 @@ services:
 
 volumes:
   poc_storage:
-  laravel_node_modules:

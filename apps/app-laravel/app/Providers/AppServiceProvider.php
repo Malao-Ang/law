@@ -20,6 +20,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->app->make(Vite::class)->useHotFile(storage_path('app/poc/vite.hot'));
+        // Hot file lives under public/ (bind-mounted), so a host-run Vite and the
+        // containerized Laravel app share it. (The Docker volume path only worked
+        // when Vite ran inside a container.)
+        $this->app->make(Vite::class)->useHotFile(public_path('hot'));
     }
 }

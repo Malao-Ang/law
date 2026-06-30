@@ -11,7 +11,9 @@ export default defineConfig({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/main.ts'],
-            hotFile: 'storage/app/poc/vite.hot',
+            // Host-run `npm run dev` writes this; laravel-app reads it via the
+            // public/ bind mount. Must match AppServiceProvider::boot().
+            hotFile: 'public/hot',
             refresh: [
                 'resources/views/app.blade.php',
                 'routes/web.php',
