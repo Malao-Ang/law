@@ -1,3 +1,5 @@
+// This store exists solely to enforce the api-import boundary: components and pages
+// must not import from api/client directly. It has no reactive state by design.
 import { defineStore } from 'pinia';
 import {
   createBlock,
@@ -10,42 +12,13 @@ import {
   reprocessPageWithLandingAI,
   splitBlock,
 } from '../api/client';
-import type { DocumentBlock, LayoutPatch, ReviewedTable } from '../types/document';
-
-export interface PatchBlockPayload {
-  page_no: number;
-  approved_text: string;
-  approved_by?: string;
-  notes?: string;
-  mark_uncertain: boolean;
-  type?: string;
-  reading_order?: number;
-  bbox?: [number, number, number, number] | null;
-  reviewed_html?: string;
-  table?: ReviewedTable | null;
-}
-
-export interface CreateBlockPayload {
-  page_no: number;
-  after_block_id?: string | null;
-  type?: string;
-  approved_text?: string;
-  reviewed_html?: string;
-}
-
-export interface SplitBlockPayload {
-  page_no: number;
-  before_text: string;
-  before_html: string;
-  after_text: string;
-  after_html: string;
-}
+import type { DocumentBlock, LayoutPatch } from '../types/document';
 
 export const useBlockStore = defineStore('blocks', () => {
   async function patch(
     documentId: string,
     blockId: string,
-    payload: PatchBlockPayload,
+    payload: Parameters<typeof patchBlock>[2],
   ): Promise<{ status: string }> {
     return patchBlock(documentId, blockId, payload);
   }
@@ -84,14 +57,14 @@ export const useBlockStore = defineStore('blocks', () => {
   async function split(
     documentId: string,
     blockId: string,
-    payload: SplitBlockPayload,
+    payload: Parameters<typeof splitBlock>[2],
   ): Promise<{ status: string; first: DocumentBlock; second: DocumentBlock }> {
     return splitBlock(documentId, blockId, payload);
   }
 
   async function create(
     documentId: string,
-    payload: CreateBlockPayload,
+    payload: Parameters<typeof createBlock>[1],
   ): Promise<{ status: string; block: DocumentBlock }> {
     return createBlock(documentId, payload);
   }
