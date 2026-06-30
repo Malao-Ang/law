@@ -482,8 +482,25 @@ class ReviewStore
             }
 
             // Assign reading_order according to the new sequence
+            // Note: direct index mutation because reference chain from &$page/&$block may not propagate through json_decode arrays
+            $blockIdToOrder = [];
             foreach ($blockIds as $idx => $blockId) {
-                $blockMap[$blockId]['reading_order'] = $idx + 1;
+                $blockIdToOrder[$blockId] = $idx + 1;
+            }
+            foreach ($document['pages'] as &$pageForOrder) {
+                foreach ($pageForOrder['blocks'] as &$blockForOrder) {
+                    $bid = (string) ($blockForOrder['block_id'] ?? '');
+                    if (isset($blockIdToOrder[$bid])) {
+                        $blockForOrder['reading_order'] = $blockIdToOrder[$bid];
+                    }
+                }
+                unset($blockForOrder);
+            }
+            unset($pageForOrder);
+
+            // Physically sort blocks within each page by reading_order so array iteration matches display order
+            foreach (array_keys($document['pages']) as $pi) {
+                usort($document['pages'][$pi]['blocks'], fn ($a, $b) => ($a['reading_order'] ?? 0) <=> ($b['reading_order'] ?? 0));
             }
 
             $this->markOutOfSync($document);
