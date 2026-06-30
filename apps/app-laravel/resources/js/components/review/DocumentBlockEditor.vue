@@ -256,8 +256,10 @@ import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { patchBlock, patchBlockLayout } from '../../api/client';
+import { useBlockStore } from '../../stores/blocks';
 import BlockRulerEditor from './BlockRulerEditor.vue';
+
+const blockStore = useBlockStore();
 import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../../types/document';
 
 function sanitizeHtml(html: string): string {
@@ -326,6 +328,7 @@ onMounted(() => nextTick(setupObserver));
 
 watch(() => props.pages, () => nextTick(setupObserver), { deep: false });
 
+const reprocessingPage = reactive<Record<number, boolean>>({});
 const busy = reactive<Record<string, boolean>>({});
 const errors = reactive<Record<string, string>>({});
 const showDiff = reactive<Record<string, boolean>>({});
@@ -389,6 +392,15 @@ function toggleDiff(blockId: string): void {
   showDiff[blockId] = !showDiff[blockId];
 }
 
+async function runLandingAI(pageNo: number): Promise<void> {
+  reprocessingPage[pageNo] = true;
+  try {
+    await blockStore.reprocessPage(props.documentId, pageNo, 'landingai');
+  } finally {
+    reprocessingPage[pageNo] = false;
+  }
+}
+
 async function saveBlock(pageNo: number, block: DocumentBlock): Promise<void> {
   const id = block.block_id;
   const editor = editors[id];
@@ -401,7 +413,7 @@ async function saveBlock(pageNo: number, block: DocumentBlock): Promise<void> {
   const reviewedHtml = editor.value.getHTML();
 
   try {
-    await patchBlock(props.documentId, id, {
+    await blockStore.patch(props.documentId, id, {
       page_no: pageNo,
       approved_text: approvedText,
       reviewed_html: reviewedHtml,
@@ -450,7 +462,7 @@ async function sendLayoutPatch(
   errors[id] = '';
 
   try {
-    await patchBlockLayout(props.documentId, id, { page_no: pageNo, ...patch });
+    await blockStore.patchLayout(props.documentId, id, { page_no: pageNo, ...patch });
 
     if (!block.meta.layout) block.meta.layout = { bbox: null, reading_order: null };
     if ('indent_level' in patch && patch.indent_level !== undefined) block.meta.layout.indent_level = patch.indent_level;

@@ -115,8 +115,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { patchBlock, reprocessBlock } from '../../api/client';
+import { useBlockStore } from '../../stores/blocks';
 import type { BlockLayout, BlockType, DocumentBlock, ReviewedTable, ReviewedTableCell } from '../../types/document';
+
+const blockStore = useBlockStore();
 
 const blockTypes: BlockType[] = [
   'title',
@@ -362,7 +364,7 @@ async function saveBlock(): Promise<void> {
 
   try {
     const table = parseTable();
-    await patchBlock(props.documentId, props.block.block_id, {
+    await blockStore.patch(props.documentId, props.block.block_id, {
       page_no: props.pageNo,
       approved_text: approvedText.value,
       mark_uncertain: false,
@@ -386,10 +388,7 @@ async function runReprocess(): Promise<void> {
   busy.value = true;
 
   try {
-    await reprocessBlock(props.documentId, props.block.block_id, {
-      page_no: props.pageNo,
-      mode: 'ai_correction',
-    });
+    await blockStore.reprocess(props.documentId, props.block.block_id, props.pageNo);
     message.value = 'Reprocess queued';
     emit('reprocessed');
   } catch (err) {
