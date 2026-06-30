@@ -5,6 +5,8 @@
 .claude/worktrees/
 .claude/
 .kiro/
+.codex/
+.superpowers/
 
 # OS / editor
 .DS_Store
