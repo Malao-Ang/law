@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { useDocumentStore } from './document';
+import { useDocumentStore } from './documentStore';
 import type { DocumentBlock } from '../types/document';
 
 export const useReviewUiStore = defineStore('reviewUi', () => {
