@@ -1,62 +1,35 @@
 <template>
-  <v-card class="mx-auto" max-width="600">
-    <v-card-title class="text-h5">Upload Document</v-card-title>
-    <v-card-subtitle>Supported: .doc, .docx, .pdf</v-card-subtitle>
-
-    <v-card-text>
-      <v-file-input
-        v-model="selectedFile"
-        label="Select file"
-        accept=".doc,.docx,.pdf"
-        prepend-icon="mdi-file-upload"
-        show-size
-        :error-messages="error"
-        @change="onFileChange"
-      ></v-file-input>
-
-      <v-select
-        v-model="extractionEngine"
-        label="Extraction engine"
-        :items="engineOptions"
-        item-title="title"
-        item-value="value"
-        density="comfortable"
-        hint="Fast = PHP-only for DOCX, .doc, and text-PDF. Standard = full Python pipeline."
-        persistent-hint
-      ></v-select>
-
-      <v-select
-        v-model="scanExtractionMode"
-        label="PDF parser engine (scanned pages)"
-        :items="scanModeOptions"
-        item-title="title"
-        item-value="value"
-        density="comfortable"
-        hint="Used by the Python pipeline, and when Fast mode falls back for scanned PDFs."
-        persistent-hint
-      ></v-select>
-
+  <div class="upload-form">
+    <input
+      ref="fileInput"
+      type="file"
+      accept=".doc,.docx,.pdf"
+      class="upload-form__hidden-input"
+      @change="onFileSelected"
+    />
+    <div class="upload-form__actions">
       <v-btn
-        color="primary"
+        color="#1a3673"
         size="large"
-        block
-        :disabled="!selectedFile || loading"
         :loading="loading"
-        @click="submitUpload"
+        @click="fileInput?.click()"
       >
-        {{ loading ? 'Uploading...' : 'Upload' }}
+        เลือกไฟล์จากเครื่อง
       </v-btn>
-
-      <v-chip
-        v-if="selectedFile"
-        color="info"
-        class="mt-4"
-        prepend-icon="mdi-file-check"
+      <v-btn
+        variant="outlined"
+        size="large"
+        :disabled="loading"
+        @click="reset"
       >
-        Selected: {{ selectedFile.name }}
-      </v-chip>
-    </v-card-text>
-  </v-card>
+        ยกเลิก
+      </v-btn>
+    </div>
+    <p v-if="selectedFileName" class="upload-form__filename">
+      ไฟล์ที่เลือก: {{ selectedFileName }}
+    </p>
+    <p v-if="error" class="upload-form__error">{{ error }}</p>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -69,46 +42,65 @@ const emit = defineEmits<{
 
 const uploadStore = useUploadStore();
 
-const selectedFile = ref<File | null>(null);
+// Hidden defaults — sent to API, not shown in UI
 const extractionEngine = ref<'standard' | 'fast'>('standard');
 const scanExtractionMode = ref<'auto' | 'local' | 'landingai'>('auto');
+
+const fileInput = ref<HTMLInputElement | null>(null);
+const selectedFileName = ref<string | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const engineOptions = [
-  { title: 'Standard (Python) — recommended', value: 'standard' },
-  { title: 'Fast (PHP) — immediate review page', value: 'fast' },
-];
-const scanModeOptions = [
-  { title: 'Auto (local first, fallback)', value: 'auto' },
-  { title: 'Local OCR only', value: 'local' },
-  { title: 'LandingAI Parse', value: 'landingai' },
-];
 
-function onFileChange(event: Event): void {
-  const target = event.target as HTMLInputElement;
-  selectedFile.value = target.files?.[0] ?? null;
+async function onFileSelected(event: Event): Promise<void> {
+  const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+  if (!file) return;
+  selectedFileName.value = file.name;
   error.value = null;
-}
-
-async function submitUpload(): Promise<void> {
-  if (!selectedFile.value || loading.value) {
-    return;
-  }
-
   loading.value = true;
-  error.value = null;
-
   try {
     const documentId = await uploadStore.upload(
-      selectedFile.value,
+      file,
       scanExtractionMode.value,
       extractionEngine.value,
     );
     emit('uploaded', documentId);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Upload failed';
+    error.value = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';
   } finally {
     loading.value = false;
   }
 }
+
+function reset(): void {
+  selectedFileName.value = null;
+  error.value = null;
+  if (fileInput.value) fileInput.value.value = '';
+}
 </script>
+
+<style scoped>
+.upload-form__hidden-input {
+  display: none;
+}
+
+.upload-form__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.upload-form__filename {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.upload-form__error {
+  font-size: 13px;
+  color: #ef4444;
+  margin-top: 8px;
+  text-align: center;
+}
+</style>
