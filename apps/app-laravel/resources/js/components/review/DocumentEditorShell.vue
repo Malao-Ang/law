@@ -1,14 +1,15 @@
 <template>
   <div class="editor-shell">
-    <!-- Editor/Preview Toggle Toolbar -->
     <div class="editor-shell-header">
       <div class="editor-shell-title">
         <h1>{{ modeLabel }}</h1>
-        <p v-if="isDirty" class="editor-shell-hint hint-warning">• มีการเปลี่ยนแปลงยังไม่บันทึก</p>
+        <p v-if="reviewUiStore.isDirty" class="editor-shell-hint hint-warning">
+          • มีการเปลี่ยนแปลงยังไม่บันทึก
+        </p>
       </div>
       <div class="editor-shell-actions">
         <v-btn
-          v-if="mode === 'edit'"
+          v-if="reviewUiStore.mode === 'edit'"
           size="small"
           variant="tonal"
           color="primary"
@@ -18,7 +19,7 @@
           ดูตัวอย่าง
         </v-btn>
         <v-btn
-          v-if="mode === 'preview'"
+          v-if="reviewUiStore.mode === 'preview'"
           size="small"
           variant="tonal"
           prepend-icon="mdi-pencil-outline"
@@ -29,17 +30,17 @@
         <v-btn
           size="small"
           variant="tonal"
-          :disabled="!isDirty || saving"
+          :disabled="!reviewUiStore.isDirty || documentStore.saving"
           prepend-icon="mdi-content-save-outline"
           @click="saveDocument"
         >
-          {{ saving ? 'บันทึก...' : 'บันทึก' }}
+          {{ documentStore.saving ? 'บันทึก...' : 'บันทึก' }}
         </v-btn>
         <v-btn
           size="small"
           color="primary"
-          :disabled="saving"
-          :loading="saving"
+          :disabled="documentStore.saving"
+          :loading="documentStore.saving"
           prepend-icon="mdi-arrow-right-circle-outline"
           @click="saveAndContinue"
         >
@@ -48,8 +49,7 @@
       </div>
     </div>
 
-    <!-- Main Content Area (Edit Mode) -->
-    <div v-if="mode === 'edit'" class="editor-shell-edit" @click.stop>
+    <div v-if="reviewUiStore.mode === 'edit'" class="editor-shell-edit" @click.stop>
       <EditorContent
         v-if="editor"
         :editor="editor"
@@ -57,21 +57,22 @@
       />
     </div>
 
-    <!-- Main Content Area (Preview Mode) -->
-    <div v-if="mode === 'preview'" class="editor-shell-preview" @click.stop>
+    <div v-if="reviewUiStore.mode === 'preview'" class="editor-shell-preview" @click.stop>
       <div class="preview-container">
-        <article
-          class="doc-review-document"
-          v-html="sanitizedHtml"
-        ></article>
+        <article class="doc-review-document" v-html="sanitizedHtml" />
       </div>
     </div>
 
-    <!-- Error/Status -->
-    <div v-if="error" class="editor-shell-error">
+    <div v-if="documentStore.saveError || switchModeError" class="editor-shell-error">
       <v-icon icon="mdi-alert-circle-outline" size="20" />
-      <span>{{ error }}</span>
-      <v-btn size="x-small" variant="text" @click="error = ''">ปิด</v-btn>
+      <span>{{ documentStore.saveError || switchModeError }}</span>
+      <v-btn
+        size="x-small"
+        variant="text"
+        @click="documentStore.saveError = ''; switchModeError = ''"
+      >
+        ปิด
+      </v-btn>
     </div>
   </div>
 </template>
@@ -83,42 +84,43 @@ import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
-import { reorderBlocks, saveDocumentReview } from '../../api/client';
-import type { ReviewDocument } from '../../types/document';
+import { useDocumentStore } from '../../stores/document';
+import { useReviewUiStore } from '../../stores/reviewUi';
 
 const props = defineProps<{
-  review: ReviewDocument;
   documentId: string;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   reload: [];
-  'update:mode': [string];
 }>();
 
-const mode = ref<'edit' | 'preview'>('edit');
-const isDirty = ref(false);
-const saving = ref(false);
-const error = ref('');
+const documentStore = useDocumentStore();
+const reviewUiStore = useReviewUiStore();
 const router = useRouter();
+const switchModeError = ref('');
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const initialHtml = documentStore.review?.document_review.draft_html ?? '';
 
 const editor = useEditor({
   extensions: [StarterKit, Underline],
-  content: props.review.document_review.draft_html,
-  editable: mode.value === 'edit',
+  content: initialHtml,
+  editable: reviewUiStore.mode === 'edit',
   onUpdate: () => {
-    isDirty.value = true;
+    reviewUiStore.markDirty();
     scheduleAutoSave();
   },
 });
 
-const modeLabel = computed(() => {
-  return mode.value === 'edit' ? 'ตรวจทานเนื้อหาเอกสาร (โหมดแก้ไข)' : 'ตรวจทานเนื้อหาเอกสาร (โหมดดูตัวอย่าง)';
-});
+const modeLabel = computed(() =>
+  reviewUiStore.mode === 'edit'
+    ? 'ตรวจทานเนื้อหาเอกสาร (โหมดแก้ไข)'
+    : 'ตรวจทานเนื้อหาเอกสาร (โหมดดูตัวอย่าง)',
+);
 
 const sanitizedHtml = computed(() => {
-  const html = editor.value?.getHTML() ?? props.review.document_review.draft_html;
+  const html = editor.value?.getHTML() ?? initialHtml;
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       'p', 'br', 'strong', 'em', 'u', 's',
@@ -127,15 +129,17 @@ const sanitizedHtml = computed(() => {
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
       'span', 'div', 'sub', 'sup', 'article', 'section', 'header', 'footer',
     ],
-    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan', 'data-block-id', 'data-page-no', 'data-block-type', 'data-reading-order'],
+    ALLOWED_ATTR: [
+      'class', 'style', 'colspan', 'rowspan',
+      'data-block-id', 'data-page-no', 'data-block-type', 'data-reading-order',
+    ],
   });
 });
 
 watch(
-  () => mode.value,
+  () => reviewUiStore.mode,
   (next) => {
-    if (!editor.value) return;
-    editor.value.setEditable(next === 'edit');
+    editor.value?.setEditable(next === 'edit');
   },
 );
 
@@ -145,12 +149,12 @@ onBeforeUnmount(() => {
 });
 
 function switchMode(next: 'edit' | 'preview'): void {
-  if (next === 'preview' && isDirty.value) {
-    error.value = 'บันทึกการเปลี่ยนแปลงก่อนดูตัวอย่าง';
+  if (next === 'preview' && reviewUiStore.isDirty) {
+    switchModeError.value = 'บันทึกการเปลี่ยนแปลงก่อนดูตัวอย่าง';
     return;
   }
-  mode.value = next;
-  emit('update:mode', next);
+  switchModeError.value = '';
+  reviewUiStore.setMode(next);
 }
 
 function scheduleAutoSave(): void {
@@ -159,29 +163,18 @@ function scheduleAutoSave(): void {
 }
 
 async function saveDocument(): Promise<void> {
-  if (!editor.value || !isDirty.value) return;
-
-  saving.value = true;
-  error.value = '';
-
-  try {
-    const html = editor.value.getHTML();
-    await saveDocumentReview(props.documentId, {
-      draft_html: html,
-    });
-    isDirty.value = false;
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ';
-  } finally {
-    saving.value = false;
+  if (!editor.value || !reviewUiStore.isDirty) return;
+  const html = editor.value.getHTML();
+  const result = await documentStore.saveReview({ draft_html: html });
+  if (result !== null) {
+    reviewUiStore.markClean();
   }
 }
 
 async function saveAndContinue(): Promise<void> {
-  if (saving.value) return;
-  if (!editor.value) return;
+  if (documentStore.saving) return;
   await saveDocument();
-  if (!error.value) {
+  if (!documentStore.saveError) {
     router.push(`/documents/${props.documentId}/compose`);
   }
 }
