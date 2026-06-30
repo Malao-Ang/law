@@ -234,7 +234,6 @@ class ReviewStore
         $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnPayload): void {
             $this->syncDocumentReview($document);
             $this->ensureComposeStateDefaults($document);
-            $this->ensureLawMetaDefaults($document);
 
             $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
             $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
@@ -372,6 +371,38 @@ class ReviewStore
             }
 
             $this->markOutOfSync($document);
+            $returnBlock = $block;
+        });
+
+        return $returnBlock;
+    }
+
+    /**
+     * @param  array<string, mixed>  $patch
+     * @return array<string, mixed>
+     */
+    public function patchBlockSize(string $documentId, int $pageNo, string $blockId, array $patch): array
+    {
+        $returnBlock = null;
+
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+            $block = &$this->findBlockReference($document, $pageNo, $blockId);
+
+            $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+            $widthPx = isset($patch['display_width_px']) ? (int) $patch['display_width_px'] : null;
+            $heightPx = isset($patch['display_height_px']) ? (int) $patch['display_height_px'] : null;
+            $blockType = (string) ($block['type'] ?? '');
+
+            if ($blockType === 'image') {
+                $image = is_array($existingMeta['image'] ?? null) ? $existingMeta['image'] : [];
+                $image['display_width_px'] = $widthPx;
+                $image['display_height_px'] = $heightPx;
+                $existingMeta['image'] = $image;
+            } else {
+                $existingMeta['table_display_width_px'] = $widthPx;
+            }
+
+            $block['meta'] = $existingMeta;
             $returnBlock = $block;
         });
 

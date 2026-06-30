@@ -58,6 +58,7 @@ class RelationsTest extends TestCase
         ]);
 
         $response->assertOk();
+        $response->assertJsonPath('relations.0.id', 'r1');
         $response->assertJsonPath('relations.0.type', 'repeals');
         $response->assertJsonPath('relations.0.target_section', 'มาตรา ๕');
         $response->assertJsonCount(1, 'relations');
