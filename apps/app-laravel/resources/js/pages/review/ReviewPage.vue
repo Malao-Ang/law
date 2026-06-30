@@ -1,52 +1,46 @@
 <template>
-  <div v-if="loading" class="review-page-loading">
+  <div v-if="documentStore.loading" class="review-page-loading">
     <v-progress-circular indeterminate color="primary" />
     <p>กำลังโหลดเอกสาร...</p>
   </div>
 
-  <div v-else-if="error" class="review-page-error">
+  <div v-else-if="documentStore.error" class="review-page-error">
     <v-icon icon="mdi-alert-circle-outline" size="48" />
-    <p>{{ error }}</p>
+    <p>{{ documentStore.error }}</p>
     <v-btn variant="outlined" @click="reload">ลองใหม่</v-btn>
   </div>
 
   <DocumentEditorShell
-    v-else-if="review"
-    :review="review"
+    v-else-if="documentStore.review"
     :document-id="documentId"
     @reload="reload"
   />
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue';
-import { fetchReview } from '../../api/client';
-import type { ReviewDocument } from '../../types/document';
+import { useDocumentStore } from '../../stores/document';
+import { useReviewUiStore } from '../../stores/reviewUi';
 
 const props = defineProps<{
   documentId: string;
 }>();
 
-const loading = ref(true);
-const error = ref('');
-const review = ref<ReviewDocument | null>(null);
+const documentStore = useDocumentStore();
+const reviewUiStore = useReviewUiStore();
 
 onMounted(async () => {
-  await reload();
+  await documentStore.fetch(props.documentId);
+});
+
+onUnmounted(() => {
+  documentStore.reset();
+  reviewUiStore.reset();
 });
 
 async function reload(): Promise<void> {
-  loading.value = true;
-  error.value = '';
-
-  try {
-    review.value = await fetchReview(props.documentId);
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'ไม่สามารถโหลดเอกสาร';
-  } finally {
-    loading.value = false;
-  }
+  await documentStore.fetch(props.documentId);
 }
 </script>
 
