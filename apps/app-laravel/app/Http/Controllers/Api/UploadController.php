@@ -12,10 +12,15 @@ class UploadController extends Controller
 {
     public function __construct(private readonly ReviewStore $reviewStore) {}
 
+    public function index(): JsonResponse
+    {
+        return response()->json(['documents' => $this->reviewStore->listDocuments()]);
+    }
+
     public function store(StoreDocumentRequest $request): JsonResponse
     {
         $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'auto');
-        $extractionEngine = (string) ($request->validated('extraction_engine') ?? 'standard');
+        $extractionEngine = (string) ($request->validated('extraction_engine') ?? 'fast');
 
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
@@ -28,7 +33,7 @@ class UploadController extends Controller
             'source_path' => $storedFile['relative_path'],
             'scan_extraction_mode_requested' => $scanExtractionMode,
             'extraction_engine' => $extractionEngine,
-            'correction_status' => $extractionEngine === 'fast' ? 'pending' : 'not_required',
+            'correction_status' => 'not_required',
         ]);
 
         ExtractDocumentJob::dispatch(

@@ -90,6 +90,33 @@ class ReviewStore
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocuments(): array
+    {
+        $dir = $this->basePath.'/status';
+        if (! is_dir($dir)) {
+            return [];
+        }
+
+        $documents = [];
+        foreach (glob($dir.'/*.json') ?: [] as $file) {
+            $status = $this->readJson($file);
+            $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
+            $documents[] = [
+                'document_id' => $documentId,
+                'title' => (string) ($status['source_file'] ?? $documentId),
+                'status' => (string) ($status['status'] ?? 'unknown'),
+                'updated_at' => $status['updated_at'] ?? null,
+            ];
+        }
+
+        usort($documents, static fn (array $a, array $b): int => strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? '')));
+
+        return $documents;
+    }
+
+    /**
      * @param  array<string, mixed>  $document
      */
     public function writeReviewDocument(string $documentId, array $document): void
