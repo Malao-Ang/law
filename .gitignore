@@ -5,7 +5,6 @@
 .claude/worktrees/
 .claude/
 .kiro/
-<<<<<<< HEAD
 
 # OS / editor
 .DS_Store
@@ -36,38 +35,6 @@ coverage/
 *.log
 tmp/
 temp/
-=======
-
-# OS / editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-venv/
-
-# Node / frontend
-node_modules/
-npm-debug.log*
-
-# PHP / Composer
-vendor/
-
-# Build / runtime outputs
-dist/
-build/
-coverage/
-*.log
-tmp/
-temp/
->>>>>>> 59641f9 (Stop tracking Claude local settings)
 *.env
 *.env.example
 docs/
@@ -76,3 +43,4 @@ docs/
 *.pdf
 *.docx
 *.doc
+!apps/ocr-service/tests/fixtures/sample.doc
