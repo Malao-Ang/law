@@ -42,6 +42,17 @@ final class WordXml
         return $value === '' ? null : $value;
     }
 
+    public static function wordRelAttr(?DOMElement $node, string $name): ?string
+    {
+        if ($node === null) {
+            return null;
+        }
+
+        $value = $node->getAttributeNS(self::REL_NS, $name);
+
+        return $value === '' ? null : $value;
+    }
+
     public static function packageAttr(?DOMElement $node, string $name): ?string
     {
         if ($node === null) {

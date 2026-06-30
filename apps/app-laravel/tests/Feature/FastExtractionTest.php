@@ -46,7 +46,8 @@ class FastExtractionTest extends TestCase
 
         $status = app(ReviewStore::class)->getStatus($documentId);
         $this->assertSame('fast', $status['extraction_engine']);
-        $this->assertSame('pending', $status['correction_status']);
+        // Fast mode does not gate export on correction; status starts not_required.
+        $this->assertSame('not_required', $status['correction_status']);
 
         @unlink($tmpDocx);
     }

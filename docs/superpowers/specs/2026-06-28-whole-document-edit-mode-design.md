@@ -204,8 +204,18 @@ function onEditCancelled(): void {
 
 ## Error Handling
 
-- หาก PATCH บาง block ล้มเหลว → แสดง error message, dirty set ยังคง block ที่ failed ไว้ (ผู้ใช้กด Save อีกครั้งได้)
-- ทุก block ที่ save สำเร็จก่อน error จะถูก clear ออกจาก dirty set ทีละ block (ไม่ใช่ all-or-nothing)
+ใช้ `Promise.allSettled` (ไม่ใช่ `Promise.all`) เพื่อให้ block ที่ save สำเร็จถูก clear ออกจาก dirty set แม้ block อื่น fail:
+
+```typescript
+const results = await Promise.allSettled([...dirtyBlockIds].map(blockId => ...));
+results.forEach((result, i) => {
+  if (result.status === 'fulfilled') dirtyBlockIds.delete([...dirtyBlockIds][i]);
+});
+const failed = results.filter(r => r.status === 'rejected');
+if (failed.length) errorMessage.value = `บันทึกไม่สำเร็จ ${failed.length} block`;
+```
+
+ผู้ใช้กด "บันทึกทั้งหมด" อีกครั้งเพื่อ retry เฉพาะ block ที่ยังค้าง
 
 ---
 

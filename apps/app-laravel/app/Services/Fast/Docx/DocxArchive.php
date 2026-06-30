@@ -82,6 +82,13 @@ final class DocxArchive
         return $this->zip->locateName($path) !== false;
     }
 
+    public function binary(string $path): ?string
+    {
+        $content = $this->zip->getFromName($path);
+
+        return is_string($content) ? $content : null;
+    }
+
     private function loadXml(string $path): DOMDocument
     {
         $content = $this->zip->getFromName($path);

@@ -10,16 +10,21 @@ services:
       dockerfile: Dockerfile
     container_name: thai-ocr-laravel-app
     working_dir: /var/www/html
+    # Sentinel: delete .vendor_ready before boot, recreate after.
+    # queue-worker waits for this file so it never starts with a partial vendor.
+    # Composer dependencies are baked into the image / vendor volume; do not
+    # rerun composer install on every start against an unstable bind mount.
     command: >
       sh -c "git config --global --add safe.directory '*'
-      && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+      && mkdir -p storage/app/poc
+      && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot
+      && test -f vendor/autoload.php
       && php artisan config:clear
+      && touch storage/app/poc/.vendor_ready
       && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
     volumes:
-      - ./apps/app-laravel:/var/www/html
-      - laravel_vendor:/var/www/html/vendor
       - poc_storage:/var/www/html/storage/app/poc
     env_file:
       - .env
@@ -30,19 +35,26 @@ services:
       - "8000:8000"
 
   laravel-vite:
+    profiles:
+      - dev-vite
     image: node:20-bookworm-slim
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
+    # node_modules uses a Docker volume (not the host bind mount) so that
+    # Linux-native binaries (rollup, esbuild) are installed for the container OS.
+    # Install only when the volume is empty; avoid rescanning the bind mount on
+    # every container start.
     command: >
-      sh -c "if [ ! -f node_modules/.bin/vite ]; then
-        echo 'ERROR: node_modules/.bin/vite missing. Run \"npm install\" in apps/app-laravel on the host first.' >&2;
-        exit 1;
-      fi
-      && npm run dev"
+      sh -c "if [ ! -d node_modules/vite ]; then npm install; fi && npm run dev"
     environment:
       - HMR_HOST=localhost
+      # Native inotify watch fails with EIO over the Windows bind mount;
+      # force Vite/chokidar to poll so the dev server doesn't crash on start.
+      - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_node_modules:/var/www/html/node_modules
+      - poc_storage:/var/www/html/storage/app/poc
     ports:
       - "5173:5173"
 
@@ -56,16 +68,18 @@ services:
     #   docker compose up -d --scale queue-worker=3 --no-recreate
     # Each worker processes one document concurrently; throughput scales linearly
     # up to ~3-4 workers before the GPU becomes the bottleneck.
+    #
+    # Waits for storage/app/poc/.vendor_ready written by laravel-app after boot
+    # completes — prevents starting before the app is ready.
     command: >
       sh -c "git config --global --add safe.directory '*'
-      && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+      && echo 'Waiting for vendor install to complete...'
+      && until [ -f storage/app/poc/.vendor_ready ]; do sleep 2; done
       && php artisan queue:work --tries=2 --backoff=10 --timeout=1800"
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
       - QUEUE_CONNECTION=redis
     volumes:
-      - ./apps/app-laravel:/var/www/html
-      - laravel_vendor:/var/www/html/vendor
       - poc_storage:/var/www/html/storage/app/poc
     env_file:
       - .env
@@ -110,6 +124,4 @@ services:
 
 volumes:
   poc_storage:
-  laravel_vendor:
-
-
+  laravel_node_modules:

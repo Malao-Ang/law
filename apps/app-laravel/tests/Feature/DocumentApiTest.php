@@ -274,7 +274,8 @@ class DocumentApiTest extends TestCase
         $generatedHtml = (string) $review['document_review']['generated_html'];
 
         $this->assertStringContainsString('text-align:center', $generatedHtml);
-        $this->assertStringContainsString('margin-left:36pt', $generatedHtml);
+        // indent_left:720 twips → derived doc-indent-2 class; inline margin-left is suppressed
+        $this->assertStringContainsString('doc-indent-2', $generatedHtml);
         $this->assertStringContainsString('text-indent:36pt', $generatedHtml);
         $this->assertStringContainsString('class="doc-tab"', $generatedHtml);
         $this->assertStringContainsString('width:72pt', $generatedHtml);

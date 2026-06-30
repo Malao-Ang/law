@@ -3,6 +3,7 @@
 namespace App\Services\Fast;
 
 use App\Services\Fast\Docx\DocxArchive;
+use App\Services\Fast\Docx\ImageExtractor;
 use App\Services\Fast\Docx\NumberingResolver;
 use App\Services\Fast\Docx\ParagraphParser;
 use App\Services\Fast\Docx\TableHtmlRenderer;
@@ -20,7 +21,7 @@ class FastDocxExtractor
     /**
      * @return array<string, mixed>
      */
-    public function extract(string $docxPath, string $documentId): array
+    public function extract(string $docxPath, string $documentId, ?string $imagesDir = null): array
     {
         $archive = new DocxArchive($docxPath);
         $document = $archive->documentXml();
@@ -30,6 +31,9 @@ class FastDocxExtractor
         $paragraphParser = $this->paragraphParser ?? new ParagraphParser;
         $tableParser = $this->tableParser ?? new TableParser($paragraphParser, new TableHtmlRenderer);
         $numberingResolver = new NumberingResolver($archive->numberingXml());
+        $imageExtractor = $imagesDir !== null
+            ? new ImageExtractor($archive, $documentId, $imagesDir)
+            : null;
 
         $blocks = [];
         $readingOrder = 1;
@@ -42,6 +46,15 @@ class FastDocxExtractor
 
                 $block = null;
                 if ($child->localName === 'p') {
+                    if ($imageExtractor !== null) {
+                        foreach ($imageExtractor->fromParagraph($child) as $imageMeta) {
+                            $imageBlock = $this->makeBlock('image', '', $readingOrder, [], []);
+                            $imageBlock['meta']['image'] = $imageMeta;
+                            $blocks[] = $imageBlock;
+                            $readingOrder++;
+                        }
+                    }
+
                     $paragraph = $paragraphParser->parse($child, $readingOrder, $numberingResolver);
                     if ($paragraph !== null) {
                         $block = $this->makeBlock(

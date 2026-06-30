@@ -7,6 +7,7 @@ import ReviewPage from '../pages/review/ReviewPage.vue';
 import ComposePage from '../pages/compose/ComposePage.vue';
 import PreviewPage from '../pages/preview/PreviewPage.vue';
 import RagPage from '../pages/rag/RagPage.vue';
+import LawPage from '../pages/law/LawPage.vue';
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
@@ -17,6 +18,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/documents/:documentId/compose', name: 'compose', component: ComposePage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/rag', name: 'rag', component: RagPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/preview', name: 'preview', component: PreviewPage, props: true, meta: { bareLayout: true } },
+  { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
 ];
 
 export const router = createRouter({

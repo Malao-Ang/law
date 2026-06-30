@@ -6,6 +6,7 @@ use App\Services\Fast\FastDocxExtractor;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../Fixtures/Fast/build_test_docx.php';
+require_once __DIR__.'/../Fixtures/Fast/build_raw_docx.php';
 
 class FastDocxExtractorTest extends TestCase
 {
@@ -117,5 +118,47 @@ class FastDocxExtractorTest extends TestCase
 
         $this->assertNotNull($indentedBlock, 'Indented block not found');
         $this->assertSame(720, $indentedBlock['meta']['layout']['indent_left']);
+    }
+
+    public function test_emits_image_block_when_images_dir_given(): void
+    {
+        $docx = sys_get_temp_dir().'/fast-img-'.uniqid('', true).'.docx';
+        $imagesDir = sys_get_temp_dir().'/fast-img-out-'.uniqid('', true);
+
+        $body = '<w:p><w:r><w:drawing><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            .'<a:blip r:embed="rId10" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>'
+            .'</a:graphic></w:drawing></w:r></w:p>'
+            .'<w:p><w:r><w:t>หลังรูป</w:t></w:r></w:p>';
+        buildRawDocx($docx, $body);
+
+        $zip = new \ZipArchive;
+        $zip->open($docx);
+        $zip->addFromString('word/media/image1.png', "\x89PNG\r\n\x1a\nFAKE");
+        $zip->addFromString(
+            'word/_rels/document.xml.rels',
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId10" '
+            .'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+            .'Target="media/image1.png"/></Relationships>'
+        );
+        $zip->close();
+
+        $output = (new FastDocxExtractor)->extract($docx, 'doc-img-9', $imagesDir);
+
+        $imageBlocks = array_values(array_filter(
+            $output['pages'][0]['blocks'],
+            static fn (array $block): bool => $block['type'] === 'image',
+        ));
+
+        $this->assertCount(1, $imageBlocks);
+        $this->assertSame(
+            '/api/documents/doc-img-9/images/image1.png',
+            $imageBlocks[0]['meta']['image']['src_url'],
+        );
+
+        @unlink($docx);
+        @array_map('unlink', glob($imagesDir.'/*') ?: []);
+        @rmdir($imagesDir);
     }
 }

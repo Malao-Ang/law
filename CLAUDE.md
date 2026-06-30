@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-POC for extracting Thai legal/government documents (DOCX, text PDF, scanned PDF) into structured, reviewable JSON ready for RAG. The pipeline is **Docling + EasyOCR + PyThaiNLP** (local) or **LandingAI Vision Agent** (cloud), with a Laravel API orchestrating async jobs and a Vue 3 / TipTap frontend for human review. No persistent database — state lives in `storage/app/poc` (Laravel) and `/data/poc` (Python), shared via a Docker volume (`poc_storage`).
+POC for extracting Thai legal/government documents (DOCX, .doc, text PDF, scanned PDF) into structured, reviewable JSON ready for RAG. Two extraction engines:
+- **Fast (default)** — PHP-only `FastExtractionPipeline` handles DOCX/.doc/PDF-text without Python, then dispatches `NormalizeDocumentJob` (CPU-only Thai normalize + spellcheck via Python).
+- **Standard** — full Python pipeline: Docling + EasyOCR + PyThaiNLP (local) or LandingAI Vision Agent (cloud).
 
-For the deeper rationale (4-layer text model, block design, AI correction policy, Thai normalization rules), see `README.md`. For the extraction architecture (docling-parse for text + Docling TableFormer for tables + BBox merge for layout), see `docling-arch.md`.
+No persistent database — state lives in `storage/app/poc` (Laravel) and `/data/poc` (Python), shared via Docker volume `poc_storage`.
+
+For the block design rationale and Thai normalization rules see `README.md`. For the docling-parse + TableFormer extraction architecture see `docling-arch.md`.
 
 ## Starting for development
 
@@ -15,7 +19,7 @@ For the deeper rationale (4-layer text model, block design, AI correction policy
 ```bash
 # 1. Copy and fill in secrets (APP_KEY is required; LANDINGAI_API_KEY for cloud OCR)
 cp .env.example .env
-# Generate APP_KEY:  docker run --rm php:8.3-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+# Generate APP_KEY: docker run --rm php:8.3-cli php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
 
 # 2. Install frontend deps on the HOST (the Vite container mounts this dir)
 cd apps/app-laravel && npm install && cd ../..
@@ -24,7 +28,7 @@ cd apps/app-laravel && npm install && cd ../..
 docker-compose up -d
 ```
 
-After first start the Python service is **not immediately ready** — EasyOCR downloads ~2 GB of model weights in a background thread. Poll `GET http://localhost:8010/health` until `ocr_ready: true`.
+After first start the Python service is **not immediately ready** — EasyOCR downloads ~2 GB of model weights in a background thread. Poll `GET http://localhost:8010/health` until `ocr_ready: true`. Fast-path uploads work immediately without waiting.
 
 Hot-reload works out of the box:
 - **PHP** — `apps/app-laravel/` is bind-mounted; changes are picked up immediately.
@@ -68,11 +72,11 @@ docker-compose up -d
 
 ### Python OCR service (`apps/ocr-service`)
 ```bash
-docker compose exec ocr-service pytest                                                      # full suite
-docker compose exec ocr-service pytest tests/test_thai_normalizer.py -k name               # single test
-docker compose exec ocr-service pytest tests/test_landingai_parser.py                      # LandingAI adapter tests
-docker compose exec ocr-service pytest tests/test_semantic_indent_resolver.py              # Thai legal indent tests
-docker compose exec ocr-service python scripts/regenerate-goldens.py                       # regenerate all golden fixtures
+docker compose exec ocr-service pytest                                                       # full suite
+docker compose exec ocr-service pytest tests/test_thai_normalizer.py -k name                # single test
+docker compose exec ocr-service pytest tests/test_landingai_parser.py                       # LandingAI adapter tests
+docker compose exec ocr-service pytest tests/test_semantic_indent_resolver.py               # Thai legal indent tests
+docker compose exec ocr-service python scripts/regenerate-goldens.py                        # regenerate all golden fixtures
 docker compose exec ocr-service python scripts/regenerate-goldens.py --fixture prakat_1.pdf.golden.json
 ```
 
@@ -81,7 +85,8 @@ Root-level `test_*.py` files (`test_indent_fix.py`, `test_numbering.py`, `test_s
 ### Laravel (`apps/app-laravel`)
 ```bash
 docker compose exec laravel-app php artisan test
-docker compose exec laravel-app php artisan test --filter=ReviewLayoutPatchTest
+docker compose exec laravel-app php artisan test --filter=FastExtractionTest
+docker compose exec laravel-app php artisan test --filter=NormalizeDocumentJobTest
 docker compose exec laravel-app vendor/bin/pint            # PHP formatter
 docker compose exec laravel-app php artisan queue:work     # one-shot worker (dev)
 ```
@@ -96,76 +101,140 @@ npm run build        # production bundle
 
 ## Architecture
 
-### Request flow
-1. **Upload** — `POST /api/documents` (with `scan_extraction_mode`: `auto` / `local` / `landingai`) → `UploadController` stores file under `storage/app/poc/uploads/{document_id}/`, writes initial status via `ReviewStore`, dispatches `ExtractDocumentJob` on Redis queue.
-2. **Job** — `ExtractDocumentJob` (in `queue-worker`) calls `DocumentPipelineClient::extract()` → `POST http://ocr-service:8010/pipeline/extract`. Python returns 202 immediately and processes in `BackgroundTasks`.
-3. **Extraction** (`apps/ocr-service/app/api/routes.py::_run_extraction`):
-   - `detect_file_type()` classifies as `docx` / `pdf_text` / `pdf_scan` / `mixed`.
-   - `DoclingService` handles DOCX and PDF-text; `OcrPipeline` (EasyOCR) or `LandingAIParser` handles scans based on `scan_extraction_mode`.
-   - `LandingAIParser` quality gate: if `mean_confidence < 0.78` or `uncertain_ratio > 0.50`, auto mode falls back to EasyOCR.
-   - `LayoutInferrer` clusters x-positions doc-wide to assign `indent_level`. `SemanticIndentResolver` applies Thai legal rules (มาตรา anchors top-level, ข้อ/วรรค promote levels, continuation text inherits). `NumberingTokenizer` annotates `list_marker` (มาตรา / ข้อ / วรรค / (ก) / ๑.๑).
-   - `build_document_output()` runs Thai normalization + spellcheck (if `needs_review`) + mock AI correction, writes `{document_id}.review.json` to `intermediate/`.
-4. **Callback** — Python `POST`s result to `INTERNAL_CALLBACK_URL` (`PipelineCallbackController`), which updates status in `ReviewStore`. LandingAI metadata (`job_id`, `duration_ms`, `credit_usage`, `failed_pages`) is stored in the document status.
-5. **Review** — Vue calls `GET /api/documents/{id}/review`, user edits per-block with TipTap inline editor. `PATCH /blocks/{blockId}` saves text (including `reviewed_html`); `PATCH /blocks/{blockId}/layout` saves indent/alignment/tab layout; `POST /blocks/{blockId}/reprocess` re-runs AI; `POST /pages/{pageNo}/reprocess` re-extracts a single page via LandingAI.
-6. **Export** — `POST /api/documents/{id}/export` (`ExportController` → `ExportService`) emits RAG-ready JSON.
+### End-to-end flow
+
+**Admin flow (primary):**
+1. `/admin` → `/admin/upload` — drag-and-drop upload, polls status, auto-redirects when done.
+2. `/documents/:id/review` — `DocumentEditorShell`: whole-document TipTap editor with 3-row toolbar (headings, font size/format, paragraph alignment/indent). Save → `/documents/:id/rag`.
+3. `/documents/:id/rag` — `RagManageWorkspace`: read-only block list, select/merge/delete blocks, "บันทึกและเผยแพร่" → export.
+4. `/law/:id` — `LawDocumentView`: public read-only view with section TOC sidebar.
+
+**Upload → extraction branching (`ExtractDocumentJob`):**
+- `extraction_engine = 'fast'` (default): `FastExtractionPipeline::run()` → writes review JSON directly → marks status `done` → dispatches `NormalizeDocumentJob`. Falls back to standard pipeline via `FastPathUnsupportedException` for unsupported types.
+- `extraction_engine = 'standard'`: calls `DocumentPipelineClient::extract()` → Python `/pipeline/extract` (202 async) → callback → status `done`.
+
+**`NormalizeDocumentJob`** (fast path only, non-fatal if Python is down): reads review JSON, sends all non-table/image blocks to `POST /pipeline/normalize`, writes normalized text back via `ReviewStore::applyNormalizationResults()`. No AI, CPU-only.
+
+### Request flow (standard engine)
+1. **Upload** — `POST /api/documents` → `UploadController` stores file, dispatches `ExtractDocumentJob`.
+2. **Job** — `ExtractDocumentJob` calls `DocumentPipelineClient::extract()` → `POST :8010/pipeline/extract`. Python returns 202.
+3. **Extraction** (`apps/ocr-service/app/api/routes.py::_run_extraction`): `detect_file_type()` → `DoclingService` (DOCX/PDF-text) or `OcrPipeline`/`LandingAiAdeParser` (scans) → `LayoutInferrer` + `SemanticIndentResolver` + `NumberingTokenizer` → `build_document_output()` writes `{id}.review.json` to `intermediate/`.
+4. **Callback** — Python `POST`s to `INTERNAL_CALLBACK_URL` (`PipelineCallbackController`), updates `ReviewStore`.
+5. **Review/RAG/Export** — see Admin flow above.
+
+### PHP Fast path (`apps/app-laravel/app/Services/Fast/`)
+- `FastExtractionPipeline.php` — entry point; dispatches to DOCX/PDF extractor by file extension; handles `.doc` via `LibreOfficeConverter`.
+- `FastDocxExtractor.php` — unzips DOCX via `DocxArchive`, runs `ParagraphParser` + `NumberingResolver` + `TableParser` → block list.
+- `FastPdfTextExtractor.php` — PDF text layer → blocks (no OCR).
+- `LibreOfficeConverter.php` — converts `.doc` → `.docx` via soffice binary.
+- `FastPathUnsupportedException.php` — thrown for unsupported types; caught by `ExtractDocumentJob` to trigger standard fallback.
+- `Docx/` — `DocxArchive` (unzip), `ParagraphParser` (paragraph XML → block), `NumberingResolver` (list markers from `numbering.xml`), `TableParser` (table XML → block), `TableHtmlRenderer`, `WordXml` (XML helpers).
 
 ### Python service layout (`apps/ocr-service/app/`)
-- `api/routes.py` — `/health`, `/pipeline/extract` (async 202), `/pipeline/reprocess-page` (async 202), `/pipeline/reprocess-block` (sync).
-- `core/config.py` — `Settings` (pydantic-settings). Tunable knobs: `THAI_REVIEW_THRESHOLD`, `bbox_overlap_threshold`, `indent_cluster_step`, `tab_gap_threshold`, `pdf_header_top_fraction`, `pdf_header_min_font_pt`, `ocr_gpu_concurrency`, `landingai_api_key`, `landingai_base_url`, `landingai_parse_model`, `landingai_timeout_seconds`.
-- `services/docling_service.py` — DOCX/PDF-text extraction. `docling_parse_extractor.py` gets bbox-accurate text; `docx_parser.py` handles `.docx` XML directly.
-- `services/ocr_pipeline.py` — EasyOCR wrapper (lazy-loaded; model warmed in background thread on startup).
-- `services/landingai_parser.py` — LandingAI ADE Parse adapter. Converts Markdown → blocks. In `auto` mode tries LandingAI first and falls back to EasyOCR on quality gate failure. Tracks `job_id`, `duration_ms`, `credit_usage`, `failed_pages`.
-- `services/block_builder.py` — assembles the 4-layer block and applies `needs_review` / spellcheck flags.
+- `api/routes.py` — `/health`, `/pipeline/extract` (async 202), `/pipeline/normalize` (sync, batch), `/pipeline/correct` (async 202), `/pipeline/reprocess-page` (async 202), `/pipeline/reprocess-block` (sync).
+- `core/config.py` — `Settings` (pydantic-settings). Tunable knobs: `THAI_REVIEW_THRESHOLD`, `bbox_overlap_threshold`, `indent_cluster_step`, `tab_gap_threshold`, `pdf_header_top_fraction`, `pdf_header_min_font_pt`, `ocr_gpu_concurrency`, `landingai_api_key`, `landingai_base_url`, `landingai_parse_model`, `landingai_timeout_seconds`, `normalize_autocorrect_min_confidence`.
+- `services/docling_service.py` — DOCX/PDF-text extraction via docling-parse (bbox-accurate).
+- `services/ocr_pipeline.py` — EasyOCR wrapper (lazy-loaded; model warmed on startup).
+- `services/landingai_parser.py` — LandingAI ADE Parse adapter. `auto` mode tries LandingAI first; falls back to EasyOCR if `mean_confidence < 0.78` or `uncertain_ratio > 0.50`.
+- `services/block_builder.py` — assembles 4-layer block, runs Thai normalization + spellcheck.
 - `services/layout_inferrer.py` — doc-wide x-position clustering → `indent_level` per block.
-- `services/semantic_indent_resolver.py` — post-geometry pass applying Thai legal indent rules: มาตรา anchors level 0, ข้อ promotes to level 1, วรรค and continuation text inherit parent indent, divider lines map to โดย pattern.
-- `services/numbering_tokenizer.py` — annotates `list_marker.{type, level, text}` for Thai legal numbering patterns.
-- `services/thai_normalizer.py` — vowel reordering, tone-mark fixes, `ํา` → `ำ`, whitespace cleanup (preserves `\t` and `\n`).
-- `services/thai_spellchecker.py` — lazy singleton `ThaiSpellChecker` wrapping `NorvigSpellChecker` + `resources/legal_terms.txt`. Only runs on blocks with `needs_review=True`.
+- `services/semantic_indent_resolver.py` — post-geometry pass: มาตรา anchors level 0, ข้อ → level 1, วรรค/continuation text inherits parent.
+- `services/numbering_tokenizer.py` — annotates `list_marker.{type, level, text}` (มาตรา/ข้อ/วรรค/(ก)/๑.๑).
+- `services/thai_normalizer.py` — vowel reordering, tone-mark fixes, `ํา` → `ำ`, whitespace cleanup.
+- `services/thai_spellchecker.py` — lazy singleton `ThaiSpellChecker` (Norvig + `resources/legal_terms.txt`); only runs on `needs_review=True` blocks.
+- `services/correction_service.py` — runs spellcheck + mock AI correction on already-extracted review JSON.
 - `services/ai_corrector.py` — `MockAICorrector`; real provider plugs in here.
 - `services/table_extractor.py` — Docling TableFormer (`do_cell_matching=True`); falls back to PyMuPDF fitz.
-- `services/table_text_merger.py` — assigns BBox word cells into TableFormer cells by centroid/overlap.
-- `services/image_extractor.py`, `services/html_renderer.py` — image cropping and HTML rendering.
 
 ### Laravel layout (`apps/app-laravel/app/`)
-- `Http/Controllers/Api/` — `UploadController`, `ReviewController` (show / preview / update / updateLayout / reprocess / reprocessPage / updateDocumentReview), `ExportController`, `PipelineCallbackController`, `HealthController`, `ImageController` (serves images from `poc/images/{documentId}/` and page thumbnails from `poc/pages/{documentId}/`).
-- `Http/Requests/` — `StoreDocumentRequest` (file + `scan_extraction_mode`), `UpdateBlockRequest`, `UpdateBlockLayoutRequest` (validates `indent_level`, `indent_left`, `indent_first_line`, `indent_hanging`, `alignment`, `tabs[]`).
-- `Jobs/` — `ExtractDocumentJob`, `ReprocessBlockJob`, `IngestRagJob`.
-- `Services/DocumentPipelineClient.php` — typed HTTP client for the Python service; path translation via `toSharedPath()`. Methods: `extract()`, `reprocessPage()`, `reprocessBlock()`.
-- `Services/ReviewStore.php` — file-backed status + review state (JSON files under `storage/app/poc/`).
-- `Services/DocumentHtmlService.php` — always recomputes HTML from structured block fields (never prefers a stale `reviewed_html`).
+- `Http/Controllers/Api/` — `UploadController` (store/show + `extraction_engine` field), `ReviewController` (show / preview / update / updateLayout / reprocess / reprocessPage / updateDocumentReview / mergeBlocks / deleteBlock / splitBlock / createBlock / reorderBlocks), `ExportController` (store + retryCorrection), `PipelineCallbackController`, `HealthController`, `ImageController`.
+- `Http/Requests/` — `StoreDocumentRequest` (file + `scan_extraction_mode` + `extraction_engine`), `UpdateBlockRequest`, `UpdateBlockLayoutRequest`.
+- `Jobs/` — `ExtractDocumentJob` (fast/standard branching), `NormalizeDocumentJob` (fast path post-extract), `CorrectDocumentJob` (standard path legacy), `ReprocessBlockJob`, `IngestRagJob`.
+- `Services/Fast/` — see PHP Fast path section above.
+- `Services/DocumentPipelineClient.php` — typed HTTP client; methods: `extract()`, `reprocessPage()`, `reprocessBlock()`, `normalize()`, `correct()`. Path translation: `toSharedPath()`.
+- `Services/ReviewStore.php` — file-backed state; key write methods: `writeReviewDocument`, `patchApprovedBlock`, `patchBlockLayout`, `applyNormalizationResults`, `reorderBlocks`, `deleteBlock`, `mergeBlocks`.
+- `Services/DocumentHtmlService.php` — always recomputes HTML from blocks (never uses stale `reviewed_html`).
 
 ### Vue frontend (`apps/app-laravel/resources/js/`)
-- `pages/UploadPage.vue` — file upload with scan mode selector (`auto` / `local` / `landingai`).
-- `pages/ReviewPage.vue` — main review interface: `MatraToc` sidebar + `DocumentBlockEditor` center + `BlockReviewPanel` right panel. Displays LandingAI extraction metadata (job_id, duration, credits, failed pages) when present.
-- `components/DocumentBlockEditor.vue` — block list with TipTap inline editor (double-click to edit). Formatting toolbar: Bold/Italic/Underline, H1/H2. Spell suggestions as amber chips. Layout controls (indent +/−) when not editing. Page thumbnails shown above each page boundary with a toggle button.
-- `components/BlockRulerEditor.vue` — visual ruler for indent, tab stops (left/center/right/decimal), and paragraph alignment. Mirrors Word-style paragraph formatting controls.
-- `components/MatraToc.vue` — collapsible sidebar Table of Contents listing มาตรา sections as sticky pills for quick navigation.
-- `components/BlockReviewPanel.vue` — right panel: block metadata, image/table span controls, per-page LandingAI reprocess button, block reprocess button.
-- `components/DocumentHtmlEditor.vue` — document-level HTML draft editor.
-- `api/client.ts` — typed wrappers for all API endpoints: `patchBlockLayout()`, `reprocessPageWithLandingAI()`, etc.
-- `types/document.ts` — canonical TS types: `DocumentBlock`, `BlockMeta` (with `layout`, `list_marker`, `image`, `spell_suggestions`, `formatting`), `BlockLayout` (with `indent_left`, `indent_first_line`, `indent_hanging`, `tabs: TabStop[]`), `TabStop` (position in twips + type), `DocumentStatus` (with `scan_extraction_mode_requested`, `scan_extraction_mode_effective`, `extraction_path[]`, `extraction.landingai`).
+
+**Pages** (all under `pages/`, organized by feature subdirectory):
+- `admin/AdminDashboardPage.vue` — dashboard with stats cards.
+- `admin/AdminUploadPage.vue` — drag-and-drop upload with real-time status polling; auto-redirects to `/review` when done. Uses `LawspaceShell`.
+- `review/ReviewPage.vue` → `components/review/DocumentEditorShell.vue` — whole-document TipTap editor, 3-row toolbar (history/headings, font size/format, alignment/indent). Loaded by `useDocumentStore`.
+- `rag/RagPage.vue` → `components/rag/RagManageWorkspace.vue` — read-only block list with selection; merge/delete; "บันทึกและเผยแพร่". Uses `useComposeStore`.
+- `preview/PreviewPage.vue` — rendered preview. Uses `usePreviewStore`.
+- `law/LawPage.vue` → `components/law/LawDocumentView.vue` — public read-only view with section TOC sidebar (anchored to block IDs). Uses `useDocumentStore`.
+- `compose/ComposePage.vue` → `components/compose/DocumentComposeWorkspace.vue` — legacy per-block compose view (not part of primary flow).
+- `UploadPage.vue` — legacy upload page (kept for backward compatibility).
+
+**Component subdirectories:**
+- `components/review/` — `DocumentEditorShell`, `DocumentBlockEditor`, `BlockReviewPanel`, `BlockRulerEditor` (Word-style ruler: indent + tab stops), `MatraToc`, `DocumentHtmlEditor`, `DocumentViewer`, `DiffViewer`.
+- `components/compose/` — `DocumentComposeWorkspace`, `ComposeSectionEditor`, `ComposeToolbar`, `ComposeBlockSelectionBar`, `ComposeFooterBar`, `ComposeMetadataPanel`, `ComposeSectionNavigator`.
+- `components/rag/` — `RagManageWorkspace`.
+- `components/law/` — `LawDocumentView`.
+- `components/admin/` — `AdminStatCard`.
+- `components/shared/` — `LawspaceShell` (shell nav used by admin/rag pages), `UploadForm`, `ELawNavbar`, `ELawHeroSearch`, `ELawLawCard`, `HeaderComponent`, `SectionActionBar`, `ResizableImage`.
+
+**Stores** (`stores/`):
+- `documentStore.ts` — `fetch(id)`, `saveReview()`, `reset()`. Used by ReviewPage and LawPage.
+- `blockStore.ts` — stateless async ops: `patch`, `patchLayout`, `reprocess`, `merge`, `remove`, `split`, `create`, `reorderBlocks`, `reprocessPage`.
+- `composeStore.ts` — RAG page: `fetch`, `triggerExport`, `pollStatus`.
+- `reviewUiStore.ts` — UI state: `mode`, `isDirty`, `selectedBlockId`, `editing`.
+- `uploadStore.ts` — `upload(file, scanMode, engine)`, `pollOnce`.
+- `previewStore.ts` — `fetch(id)` → GET /preview HTML.
+
+**Types** (`types/document.ts`): `DocumentBlock` (4 text layers + `meta.layout` / `meta.list_marker` / `meta.image` / `meta.spell_suggestions`), `BlockLayout` (indent in twips + `tabs: TabStop[]`), `DocumentStatus` (includes `extraction_engine`, `fast_fallback_reason`, `timings`).
+
+### API routes
+
+**Laravel API (`/api/...`):**
+- `POST /documents` — upload (params: `file`, `scan_extraction_mode`, `extraction_engine`)
+- `GET /documents/{id}` — poll status
+- `GET /documents/{id}/review` — full review JSON
+- `GET /documents/{id}/preview` — generated HTML
+- `PUT /documents/{id}/document-review` — save whole-doc draft_html
+- `PATCH /documents/{id}/blocks/{blockId}` — update block text
+- `PATCH /documents/{id}/blocks/{blockId}/layout` — update indent/alignment/tabs
+- `POST /documents/{id}/blocks` — create block
+- `POST /documents/{id}/blocks/reorder` — reorder blocks (array of IDs)
+- `POST /documents/{id}/blocks/merge` — merge selected block IDs → 1 block
+- `DELETE /documents/{id}/blocks/{blockId}` — delete block
+- `POST /documents/{id}/blocks/{blockId}/split` — split block at cursor
+- `POST /documents/{id}/blocks/{blockId}/reprocess` — re-extract via Python
+- `POST /documents/{id}/pages/{pageNo}/reprocess` — re-extract page via LandingAI
+- `POST /documents/{id}/export` — export RAG JSON
+- `POST /documents/{id}/retry-correction` — re-run spellcheck/correction
+- `POST /internal/pipeline-callback` — Python → Laravel callback
+
+**Python service (`/pipeline/...`):**
+- `GET /health` — `{ocr_ready, device, ...}`
+- `POST /pipeline/extract` — async 202
+- `POST /pipeline/normalize` — sync; `{document_id, blocks[], autocorrect_min_confidence}` → `{results: [{block_id, normalized_text, changes}]}`
+- `POST /pipeline/correct` — async 202 (legacy standard path)
+- `POST /pipeline/reprocess-page` — async 202
+- `POST /pipeline/reprocess-block` — sync
 
 ### Canonical contracts
-- `schemas/document-output.schema.json` — Python → Laravel intermediate format (per-block 4-layer text + bbox + flags + `meta.layout` / `meta.list_marker` / `meta.image` / `meta.spell_suggestions`).
+- `schemas/document-output.schema.json` — Python → Laravel intermediate format.
 - `schemas/review-patch.schema.json` — UI → Laravel block updates.
 - `schemas/export-rag.schema.json` — final RAG export.
 
 ## Conventions and gotchas
 
-- **Every block carries 4 text layers** (`raw_text`, `normalized_text`, `ai_suggested_text`, `approved_text`). Preserve this for all new block types.
-- **AI correction is opt-in per block**, gated by `THAI_REVIEW_THRESHOLD` (default 0.90). Only flag low-confidence or reviewer-requested blocks.
+- **Two extraction engines**: `fast` (PHP-only, default) and `standard` (Python). `ExtractDocumentJob` branches on `$this->extractionEngine`. `FastPathUnsupportedException` triggers automatic fallback to standard.
+- **Every block carries 4 text layers** (`raw_text`, `normalized_text`, `ai_suggested_text`, `approved_text`). Preserve this for all new block types including Fast path.
+- **`NormalizeDocumentJob` is non-fatal** — if Python is down, it catches `ConnectionException` and silently skips. The document is already marked `done` before normalize runs.
+- **`normalize_autocorrect_min_confidence`** defaults to `1.0` (effectively disabled auto-correct). Lower it via `.env` to enable automatic spelling fixes. Tunable per-deploy without code changes.
 - **Path translation is one-way**: Laravel relative paths → Python absolute paths via `DocumentPipelineClient::toSharedPath()`. Never construct these inline.
 - **Docling OCR is off** — we use docling-parse for text, EasyOCR/LandingAI for scans, and Docling TableFormer only for table structure.
-- **LandingAI scan mode**: `auto` tries LandingAI then falls back to EasyOCR if quality gate fails (`mean_confidence < 0.78` or `uncertain_ratio > 0.50`). `local` forces EasyOCR. `landingai` forces LandingAI with no fallback. The effective mode used is stored in `DocumentStatus.scan_extraction_mode_effective`.
-- **`SemanticIndentResolver` runs after `LayoutInferrer`** — never skip this pass on legal PDFs; it corrects geometry-based indent assignments using มาตรา/ข้อ/วรรค section rules.
-- **Rich HTML persistence**: blocks store both `approved_text` (plain) and `reviewed_html` (HTML with bold/italic/underline). The editor sends both on save. `reviewed_html` is sanitized server-side with `strip_tags` allowlist; client-side with DOMPurify before display.
-- **DOCX numbered items use a single space after the marker** in the active `DoclingService` path; do not reintroduce a structural `\t` between marker and body text.
-- **First Python service start is slow** — EasyOCR downloads ~2 GB of weights. `/health` returns `ocr_ready: false` until complete.
-- **Failure handling in `_run_extraction`**: errors are written to intermediate JSON *and* posted to the callback (dual-write). Keep both paths — the file is the local inspection surface.
-- **Image serving**: images at `/data/poc/images/{documentId}/{filename}`, served at `GET /api/documents/{documentId}/images/{filename}`. Page thumbnails at `/data/poc/pages/{documentId}/{pageNo}.jpg`, served at `GET /api/documents/{documentId}/pages/{pageNo}/image`. The `_build_image_meta()` helper sets `src_url` and optionally embeds `data_uri` for images ≤ 200 KB.
-- **`DocumentHtmlService` always recomputes HTML from blocks** — it never falls back to a stale `reviewed_html` field. Calling `markOutOfSync()` on `ReviewStore` signals the UI to prompt a regenerate.
-- **PDF review pages use a sheet-of-paper layout** in the Laravel CSS; preserve visible per-page boundaries and non-sticky page headers.
-- **OCR table detection requires both horizontal and vertical structure** and can be disabled with `enable_ocr_table_detection`; do not relax it without fixture validation.
-- **Ghost-tone recovery exists in `docling_service.py`** and is tuned by `GHOST_TONE_MAX_WIDTH_PT`; prefer threshold tuning and targeted dictionary fixes over broad spell-repair heuristics.
-- **Golden fixture tests** (`tests/test_golden_fixtures.py::TestGoldenAccuracy`) skip automatically when the golden file or source document is absent. Regenerate with `scripts/regenerate-goldens.py`; hand-edit the `.golden.json` files before committing. Synthetic fixtures (`multi_level_list.docx`, `table_with_merges.docx`) must be created manually.
-- Sample documents (`ประกาศ (1).pdf`, `ประกาศ (3).docx`) live in the **repo root**, not in `samples/`.
+- **LandingAI scan mode**: `auto` tries LandingAI first; falls back to EasyOCR if `mean_confidence < 0.78` or `uncertain_ratio > 0.50`. `local` forces EasyOCR. `landingai` forces LandingAI with no fallback.
+- **`SemanticIndentResolver` runs after `LayoutInferrer`** — never skip on legal PDFs.
+- **Rich HTML persistence**: blocks store both `approved_text` (plain) and `reviewed_html` (bold/italic/underline). `reviewed_html` is sanitized server-side with `strip_tags` allowlist; client-side with DOMPurify before display.
+- **`ReviewStore::reorderBlocks`** builds `$blockMap` via `foreach ($document['pages'] as &$page)` — NOT `foreach (($document['pages'] ?? []) as &$page)`. The `?? []` expression creates a temporary copy that breaks PHP reference propagation.
+- **`DocumentHtmlService` always recomputes HTML from blocks** — never falls back to a stale `reviewed_html` field. `markOutOfSync()` is a transient trigger consumed by `getReviewDocument()`'s lazy-sync; after sync in 'generated' mode it is always `false`.
+- **Failure handling in `_run_extraction`**: errors are written to intermediate JSON *and* posted to the callback (dual-write). Keep both paths.
+- **Image serving**: images at `/data/poc/images/{documentId}/{filename}`, thumbnails at `/data/poc/pages/{documentId}/{pageNo}.jpg`. `_build_image_meta()` embeds `data_uri` for images ≤ 200 KB.
+- **Golden fixture tests** (`tests/test_golden_fixtures.py`) skip when golden file or source doc is absent. Regenerate with `scripts/regenerate-goldens.py`. Sample documents (`ประกาศ (1).pdf`, `ประกาศ (3).docx`) live in the **repo root**.
+- **Ghost-tone recovery** in `docling_service.py` tuned by `GHOST_TONE_MAX_WIDTH_PT`; prefer threshold tuning over broad spell-repair.
+- **DOCX numbered items use a single space** after the marker in the DoclingService path; do not reintroduce a structural `\t`.
+- **First Python service start is slow** — EasyOCR downloads ~2 GB of weights; fast-path uploads work immediately.

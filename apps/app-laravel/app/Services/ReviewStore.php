@@ -258,7 +258,10 @@ class ReviewStore
     {
         $returnPayload = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnPayload): void {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($documentId, $payload, &$returnPayload): void {
+            if (array_key_exists('draft_html', $payload) && is_string($payload['draft_html'])) {
+                $this->applyDraftHtmlToBlocksInPlace($document, $documentId, $payload['draft_html']);
+            }
             $this->syncDocumentReview($document);
             $this->ensureComposeStateDefaults($document);
 
@@ -915,6 +918,59 @@ class ReviewStore
     }
 
     /**
+     * Map edited draft_html back onto document blocks by data-block-id, so the
+     * RAG and /law screens (which render from blocks) reflect review edits.
+     * v1: 1:1 block_id match only — structural edits (split/merge/new/delete)
+     * are not reconciled, matching the buildChunksFromHtml/export limitation.
+     *
+     * @param  array<string, mixed>  $document
+     */
+    private function applyDraftHtmlToBlocksInPlace(array &$document, string $documentId, string $html): void
+    {
+        if (trim($html) === '') {
+            return;
+        }
+
+        $parsed = $this->documentHtmlService->buildChunksFromHtml($documentId, $html);
+        $byId = [];
+        foreach (($parsed['chunks'] ?? []) as $chunk) {
+            foreach (($chunk['block_ids'] ?? []) as $bid) {
+                if (is_string($bid) && $bid !== '') {
+                    $byId[$bid] = $chunk;
+                }
+            }
+        }
+        if ($byId === []) {
+            return;
+        }
+
+        // ponytail: no ?? [] on foreach with references — PHP copies the rvalue, breaking mutation
+        foreach (array_keys($document['pages'] ?? []) as $pi) {
+            foreach (array_keys($document['pages'][$pi]['blocks'] ?? []) as $bi) {
+                $block = &$document['pages'][$pi]['blocks'][$bi];
+                $bid = (string) ($block['block_id'] ?? '');
+                if ($bid === '' || ! isset($byId[$bid])) {
+                    continue;
+                }
+                $type = (string) ($block['type'] ?? '');
+                if (in_array($type, ['table', 'image'], true)) {
+                    continue;
+                }
+                $text = trim((string) ($byId[$bid]['text'] ?? ''));
+                if ($text === '') {
+                    continue;
+                }
+                $block['approved_text'] = $text;
+                $block['normalized_text'] = $text;
+                $meta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+                $meta['reviewed_html'] = (string) ($byId[$bid]['meta']['html'] ?? '');
+                $block['meta'] = $meta;
+                unset($block);
+            }
+        }
+    }
+
+    /**
      * Mark the document's generated HTML as out of sync with the current block states.
      * The HTML will be lazily rebuilt the next time getReviewDocument is called.
      *
@@ -1046,7 +1102,7 @@ class ReviewStore
             $clean[] = [
                 'id' => (string) ($entry['id'] ?? bin2hex(random_bytes(6))),
                 'scope' => $scope,
-                'block_id' => $scope === 'section' ? (string) ($entry['block_id'] ?? '') : null,
+                'block_id' => $scope === 'section' ? (((string) ($entry['block_id'] ?? '')) ?: null) : null,
                 'type' => $type,
                 'target_document_id' => isset($entry['target_document_id']) && $entry['target_document_id'] !== ''
                     ? (string) $entry['target_document_id'] : null,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReprocessBlockRequest;
 use App\Http\Requests\UpdateBlockLayoutRequest;
+use App\Http\Requests\UpdateBlockSizeRequest;
 use App\Http\Requests\UpdateBlockRequest;
 use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
@@ -127,6 +128,27 @@ class ReviewController extends Controller
     {
         try {
             $updatedBlock = $this->reviewStore->patchBlockLayout(
+                documentId: $documentId,
+                pageNo: (int) $request->validated('page_no'),
+                blockId: $blockId,
+                patch: $request->validated(),
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'block_id' => $blockId,
+            'status' => 'updated',
+            'block' => $updatedBlock,
+        ]);
+    }
+
+    public function updateBlockSize(UpdateBlockSizeRequest $request, string $documentId, string $blockId): JsonResponse
+    {
+        try {
+            $updatedBlock = $this->reviewStore->patchBlockSize(
                 documentId: $documentId,
                 pageNo: (int) $request->validated('page_no'),
                 blockId: $blockId,

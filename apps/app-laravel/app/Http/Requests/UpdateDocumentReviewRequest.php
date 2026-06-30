@@ -62,7 +62,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.target_title' => ['nullable', 'string', 'max:255'],
             'relations.*.target_section' => ['nullable', 'string', 'max:120'],
             'relations.*.note' => ['nullable', 'string', 'max:500'],
-            'relations.*.url' => ['nullable', 'string', 'max:500'],
+            'relations.*.url' => ['nullable', 'url', 'max:500'],
         ];
     }
 }

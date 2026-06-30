@@ -36,15 +36,16 @@
 import { ref } from 'vue';
 import { useUploadStore } from '../../stores/uploadStore';
 
+
 const emit = defineEmits<{
   uploaded: [documentId: string];
 }>();
 
 const uploadStore = useUploadStore();
 
-// Hidden defaults — sent to API, not shown in UI
-const extractionEngine = ref<'standard' | 'fast'>('standard');
-const scanExtractionMode = ref<'auto' | 'local' | 'landingai'>('auto');
+// Hidden defaults — sent to API, not shown in UI; fast = PHP-side extraction, falls back to Python for scans
+const extractionEngine: 'standard' | 'fast' = 'fast';
+const scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto';
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFileName = ref<string | null>(null);
@@ -60,8 +61,8 @@ async function onFileSelected(event: Event): Promise<void> {
   try {
     const documentId = await uploadStore.upload(
       file,
-      scanExtractionMode.value,
-      extractionEngine.value,
+      scanExtractionMode,
+      extractionEngine,
     );
     emit('uploaded', documentId);
   } catch (err) {

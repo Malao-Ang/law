@@ -1,5 +1,5 @@
 <template>
-  <div class="block-editor">
+  <div class="block-editor" @click.self="deselectAll">
     <div v-if="pages.length === 0" class="block-editor__empty">
       <p class="hint">No blocks to display.</p>
     </div>
@@ -54,12 +54,23 @@
         <!-- Image block -->
         <template v-if="block.type === 'image'">
           <figure class="block-editor__image">
-            <img
-              v-if="block.meta.image?.src_url"
-              :src="block.meta.image.src_url"
-              :alt="block.meta.image.caption ?? 'embedded image'"
-              class="block-editor__image-img"
-            />
+            <ResizableDragBlock
+              v-if="block.meta.image?.src_url || block.meta.image?.data_uri"
+              :initial-width="block.meta.image?.display_width_px ?? block.meta.image?.width ?? null"
+              :initial-height="block.meta.image?.display_height_px ?? block.meta.image?.height ?? null"
+              :selected="dragSelectedBlockId === block.block_id"
+              :lock-aspect-ratio="true"
+              @update:selected="selectResizableBlock(page.page_no, block, $event)"
+              @resize="({ widthPx, heightPx }) => saveBlockSize(page.page_no, block, widthPx, heightPx)"
+            >
+              <img
+                :src="block.meta.image?.src_url ?? block.meta.image?.data_uri ?? ''"
+                :alt="block.meta.image?.caption ?? ''"
+                class="block-editor__image-img"
+                draggable="false"
+                style="display: block; width: 100%; height: auto;"
+              />
+            </ResizableDragBlock>
             <div v-else class="block-editor__image-missing hint">
               [Image — no URL: {{ block.meta.image?.src_path ?? 'unknown' }}]
             </div>
@@ -71,8 +82,23 @@
 
         <!-- Table block -->
         <template v-else-if="block.type === 'table'">
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div v-html="sanitizeHtml(block.meta.table_html ?? '')" class="block-editor__table-html" />
+          <div class="block-editor__table-wrap">
+            <ResizableDragBlock
+              :initial-width="block.meta.table_display_width_px ?? null"
+              :initial-height="null"
+              :selected="dragSelectedBlockId === block.block_id"
+              :lock-aspect-ratio="false"
+              @update:selected="selectResizableBlock(page.page_no, block, $event)"
+              @resize="({ widthPx }) => saveBlockSize(page.page_no, block, widthPx, null)"
+            >
+              <!-- eslint-disable-next-line vue/no-v-html -->
+              <div
+                v-html="sanitizeHtml(block.meta.table_html ?? '')"
+                class="block-editor__table-html"
+                style="overflow-x: auto;"
+              />
+            </ResizableDragBlock>
+          </div>
         </template>
 
         <!-- Text block — TipTap inline editor when selected, plain text otherwise -->
@@ -256,8 +282,10 @@ import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import DOMPurify from 'dompurify';
+import { patchBlockSize } from '../../api/client';
 import { useBlockStore } from '../../stores/blockStore';
 import BlockRulerEditor from './BlockRulerEditor.vue';
+import ResizableDragBlock from '../shared/ResizableDragBlock.vue';
 
 const blockStore = useBlockStore();
 import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../../types/document';
@@ -337,8 +365,21 @@ const showDiff = reactive<Record<string, boolean>>({});
 const editors = reactive<Record<string, ReturnType<typeof useEditor>>>({});
 const editingBlockId = ref<string | null>(null);
 const editingPageNo = ref<number>(1);
+const dragSelectedBlockId = ref<string | null>(null);
+
+function deselectAll(): void {
+  dragSelectedBlockId.value = null;
+}
 
 function selectBlock(pageNo: number, block: DocumentBlock): void {
+  dragSelectedBlockId.value = block.type === 'image' || block.type === 'table'
+    ? block.block_id
+    : null;
+  emit('select-block', pageNo, block);
+}
+
+function selectResizableBlock(pageNo: number, block: DocumentBlock, selected: boolean): void {
+  dragSelectedBlockId.value = selected ? block.block_id : null;
   emit('select-block', pageNo, block);
 }
 
@@ -432,6 +473,33 @@ async function saveBlock(pageNo: number, block: DocumentBlock): Promise<void> {
     errors[id] = err instanceof Error ? err.message : 'Save failed';
   } finally {
     busy[id] = false;
+  }
+}
+
+async function saveBlockSize(
+  pageNo: number,
+  block: DocumentBlock,
+  widthPx: number,
+  heightPx: number | null,
+): Promise<void> {
+  if (!props.documentId) return;
+
+  try {
+    await patchBlockSize(props.documentId, block.block_id, {
+      page_no: pageNo,
+      display_width_px: widthPx,
+      display_height_px: heightPx,
+    });
+
+    if (block.type === 'image' && block.meta.image) {
+      block.meta.image.display_width_px = widthPx;
+      block.meta.image.display_height_px = heightPx;
+      return;
+    }
+
+    block.meta.table_display_width_px = widthPx;
+  } catch {
+    // Non-fatal.
   }
 }
 
@@ -596,6 +664,11 @@ onBeforeUnmount(() => {
   padding: 1rem;
   background: #f3f4f6;
   border: 1px dashed #d1d5db;
+}
+
+.block-editor__table-wrap {
+  display: flex;
+  justify-content: center;
 }
 
 .block-editor__table-html {

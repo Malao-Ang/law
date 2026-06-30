@@ -1,9 +1,12 @@
 ﻿import type {
   ComposeState,
   DocumentBlock,
+  DocumentListItem,
   DocumentStatus,
   ExportResponse,
   LayoutPatch,
+  LawMeta,
+  LawRelation,
   PreviewData,
   ReprocessResponse,
   ReviewDocument,
@@ -76,6 +79,8 @@ export function saveDocumentReview(
     approved_by?: string;
     notes?: string;
     reset_to_generated?: boolean;
+    law_meta?: Partial<LawMeta>;
+    relations?: LawRelation[];
   },
 ): Promise<UpdateDocumentReviewResponse> {
   return jsonRequest<UpdateDocumentReviewResponse>(`/api/documents/${documentId}/document-review`, {
@@ -133,6 +138,21 @@ export function patchBlockLayout(
   payload: LayoutPatch,
 ): Promise<{ status: string }> {
   return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}/layout`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchBlockSize(
+  documentId: string,
+  blockId: string,
+  payload: {
+    page_no: number;
+    display_width_px: number | null;
+    display_height_px: number | null;
+  },
+): Promise<{ status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}/size`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -221,4 +241,8 @@ export function createBlock(
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export function listDocuments(): Promise<{ documents: DocumentListItem[] }> {
+  return jsonRequest('/api/documents');
 }

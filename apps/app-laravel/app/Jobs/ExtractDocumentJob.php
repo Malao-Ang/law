@@ -83,7 +83,7 @@ class ExtractDocumentJob implements ShouldQueue
             'progress' => 60,
             'current_step' => 'fast_extract_done',
             'review_path' => 'storage/app/poc/'.$store->reviewRelativePath($this->documentId),
-            'correction_status' => 'pending',
+            'correction_status' => 'not_required',
             'timings' => $output['timings'] ?? null,
             'extraction_path' => $extraction['path'] ?? null,
             'conversion' => $extraction['conversion'] ?? null,

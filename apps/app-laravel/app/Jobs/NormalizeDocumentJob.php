@@ -7,9 +7,9 @@ use App\Services\ReviewStore;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 
 class NormalizeDocumentJob implements ShouldQueue
 {
@@ -27,11 +27,6 @@ class NormalizeDocumentJob implements ShouldQueue
 
     public function handle(DocumentPipelineClient $client, ReviewStore $store): void
     {
-        $store->setStatus($this->documentId, [
-            'correction_status' => 'in_progress',
-            'current_step' => 'normalize',
-        ]);
-
         $doc = $store->getReviewDocument($this->documentId);
 
         $blocks = [];
@@ -49,24 +44,18 @@ class NormalizeDocumentJob implements ShouldQueue
         }
 
         if ($blocks !== []) {
-            $minConfidence = (float) config('services.ocr.normalize_autocorrect_min_confidence', 1.0);
-            $response = $client->normalize($this->documentId, $blocks, $minConfidence);
-            $store->applyNormalizationResults($this->documentId, $response['results'] ?? []);
+            try {
+                $minConfidence = (float) config('services.ocr.normalize_autocorrect_min_confidence', 1.0);
+                $response = $client->normalize($this->documentId, $blocks, $minConfidence);
+                $store->applyNormalizationResults($this->documentId, $response['results'] ?? []);
+            } catch (ConnectionException) {
+                // ponytail: skip normalize when Python service is down; extraction is already marked done
+            }
         }
-
-        $store->setStatus($this->documentId, [
-            'status' => 'done',
-            'progress' => 100,
-            'current_step' => 'normalize_done',
-            'correction_status' => 'done',
-        ]);
     }
 
     public function failed(Throwable $exception): void
     {
-        app(ReviewStore::class)->setStatus($this->documentId, [
-            'correction_status' => 'failed',
-            'error' => $exception->getMessage(),
-        ]);
+        // normalization failure is non-fatal — document is already marked done
     }
 }

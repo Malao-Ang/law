@@ -32,6 +32,8 @@ export interface BlockImage {
   width?: number | null;
   height?: number | null;
   caption?: string | null;
+  display_width_px?: number | null;
+  display_height_px?: number | null;
 }
 
 export interface ReviewedTableCell {
@@ -99,6 +101,7 @@ export interface BlockReviewMeta {
 export interface BlockMeta {
   section_path?: string | null;
   table_html?: string | null;
+  table_display_width_px?: number | null;
   reviewed_html?: string | null;
   table_confidence?: number | null;
   table_detection_reason?: string | null;
@@ -172,6 +175,40 @@ export interface ComposeState {
   metadata: DocumentMetadata;
 }
 
+export interface LawMeta {
+  status: string;
+  law_type: string;
+  law_group: string;
+  agency: string;
+  promulgation_date: string;
+  effective_date: string;
+  gazette_reference: string;
+  royal_command: string;
+  repealed_laws: string[];
+}
+
+export type RelationType = 'related' | 'repeals';
+export type RelationScope = 'document' | 'section';
+
+export interface LawRelation {
+  id: string;
+  scope: RelationScope;
+  block_id: string | null;
+  type: RelationType;
+  target_document_id: string | null;
+  target_title: string;
+  target_section: string | null;
+  note: string | null;
+  url: string | null;
+}
+
+export interface DocumentListItem {
+  document_id: string;
+  title: string;
+  status: string;
+  updated_at?: string | null;
+}
+
 export interface ReviewDocument {
   document_id: string;
   source_file: string;
@@ -181,6 +218,8 @@ export interface ReviewDocument {
   pages: DocumentPage[];
   document_review: DocumentReviewState;
   compose_state?: ComposeState;
+  law_meta?: LawMeta;
+  relations?: LawRelation[];
   timings?: Record<string, number> | null;
   extraction?: {
     scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
@@ -256,6 +295,8 @@ export interface UpdateDocumentReviewResponse {
   status: 'updated';
   document_review: DocumentReviewState;
   compose_state?: ComposeState;
+  law_meta?: LawMeta;
+  relations?: LawRelation[];
 }
 
 export interface PreviewData {

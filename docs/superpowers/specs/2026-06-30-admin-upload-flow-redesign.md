@@ -110,7 +110,7 @@ These are still passed to `uploadStore.upload()` — just not user-visible.
 
 Install:
 ```bash
-npm install @tiptap/extension-heading @tiptap/extension-text-align @tiptap/extension-highlight @tiptap/extension-font-family @tiptap/extension-text-style @tiptap/extension-color @tiptap/extension-character-count
+npm install @tiptap/extension-heading @tiptap/extension-text-align @tiptap/extension-highlight @tiptap/extension-text-style
 ```
 
 Note: `Strike`, `BulletList`, `OrderedList` are already in `StarterKit`. `Underline` is already installed.
@@ -164,7 +164,7 @@ const FontSize = TextStyle.extend({
   ```
 - 3-row toolbar (see below)
 - Footer bar (see below)
-- Char count computed from `editor.value?.storage.characterCount?.characters() ?? 0`
+- Char count: `editor.value?.state.doc.textContent.length ?? 0` (no extension needed)
 
 **TipTap editor setup:**
 ```ts
@@ -175,11 +175,8 @@ const editor = useEditor({
     Heading.configure({ levels: [1, 2, 3] }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Highlight.configure({ multicolor: false }),
-    FontFamily,
-    TextStyle,               // required peer for FontFamily + FontSize + Color
-    FontSize,                // custom extension (see above)
-    Color,
-    CharacterCount,          // for footer char count
+    TextStyle,               // required peer for FontSize
+    FontSize,                // custom extension (see above); ponytail: skip FontFamily until second font needed
     IndentExtension,         // reuse existing extensions/IndentExtension.ts
   ],
   content: initialHtml,
@@ -198,10 +195,11 @@ Row 1 — History + Heading:
 [ย้อนกลับ label] [Undo btn] [Redo btn] | [หัวข้อ label] [Heading dropdown: ย่อหน้า/หัวข้อ 1/2/3]
 ```
 
-Row 2 — Font + Format:
+Row 2 — Font size + Format:
 ```
-[ฟอนต์ label] [FontFamily dropdown: Sarabun] [FontSize dropdown: 12/14/16/18/20] | [รูปแบบ label] [B] [I] [U] [S] [Highlight]
+[ขนาด label] [FontSize dropdown: 12/14/16/18/20] | [รูปแบบ label] [B] [I] [U] [S] [Highlight]
 ```
+FontFamily (Sarabun) is set globally in `.ProseMirror` CSS — no picker needed.
 
 Row 3 — Alignment + Lists + Auto-save:
 ```

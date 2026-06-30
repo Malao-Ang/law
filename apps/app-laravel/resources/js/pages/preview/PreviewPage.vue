@@ -50,8 +50,10 @@ const safeHtml = computed(() => {
   return DOMPurify.sanitize(raw, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                    'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-                   'span', 'div', 'sub', 'sup'],
-    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan'],
+                   'span', 'div', 'section', 'header', 'article', 'sub', 'sup',
+                   'img', 'figure', 'figcaption'],
+    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan', 'src', 'alt', 'width', 'height',
+                   'data-block-id', 'data-block-type', 'data-page-no', 'data-reading-order'],
   });
 });
 

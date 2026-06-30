@@ -9,5 +9,10 @@ Route::get('/health', fn () => response()->json([
 ]));
 
 Route::view('/', 'app');
+Route::view('/admin', 'app');
+Route::view('/admin/upload', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/compose', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/documents/{documentId}/preview', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/documents/{documentId}/rag', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/law/{documentId}', 'app')->where('documentId', '[A-Za-z0-9_\-]+');

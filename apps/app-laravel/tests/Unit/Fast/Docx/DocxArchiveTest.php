@@ -42,4 +42,21 @@ class DocxArchiveTest extends TestCase
 
         @unlink($out);
     }
+
+    public function test_binary_returns_media_bytes_and_null_for_missing(): void
+    {
+        $path = sys_get_temp_dir().'/docx-bin-'.uniqid('', true).'.docx';
+        buildRawDocx($path, '<w:p><w:r><w:t>hi</w:t></w:r></w:p>');
+
+        $zip = new \ZipArchive;
+        $zip->open($path);
+        $zip->addFromString('word/media/image1.png', "\x89PNG\r\n\x1a\nFAKE");
+        $zip->close();
+
+        $archive = new DocxArchive($path);
+        $this->assertSame("\x89PNG\r\n\x1a\nFAKE", $archive->binary('word/media/image1.png'));
+        $this->assertNull($archive->binary('word/media/missing.png'));
+
+        @unlink($path);
+    }
 }

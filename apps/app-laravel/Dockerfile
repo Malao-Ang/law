@@ -1,3 +1,17 @@
+FROM node:20-bookworm-slim AS frontend
+
+WORKDIR /var/www/html
+
+COPY .npmrc package.json package-lock.json ./
+
+RUN npm ci && rm -f .npmrc
+
+COPY resources ./resources
+COPY public ./public
+COPY vite.config.js tsconfig.json ./
+
+RUN npm run build
+
 FROM php:8.4-cli
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -7,11 +21,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     unzip \
     zip \
     curl \
+    libreoffice-core \
+    libreoffice-writer \
+    imagemagick \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
     libzip-dev \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    && docker-php-ext-install mbstring zip pcntl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd mbstring zip pcntl \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/*
@@ -22,6 +42,8 @@ WORKDIR /var/www/html
 
 # Copy application code first
 COPY . .
+
+COPY --from=frontend /var/www/html/public/build ./public/build
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,target=/tmp/composer-cache \

@@ -24,9 +24,20 @@ export const IndentExtension = Extension.create({
             default: 0,
             parseHTML: (element) => {
               const raw = element.style.marginLeft;
-              if (!raw) return 0;
-              const px = parseInt(raw, 10);
-              return Number.isNaN(px) ? 0 : Math.round(px / INDENT_STEP);
+              if (raw) {
+                if (raw.endsWith('px')) {
+                  const px = parseInt(raw, 10);
+                  return Number.isNaN(px) ? 0 : Math.round(px / INDENT_STEP);
+                }
+                if (raw.endsWith('pt')) {
+                  // 18pt per indent level ≈ INDENT_STEP (24px) at 96 dpi
+                  const pt = parseFloat(raw);
+                  return Number.isNaN(pt) ? 0 : Math.round(pt / 18);
+                }
+              }
+              // generated_html uses doc-indent-N class
+              const m = element.className.match(/\bdoc-indent-(\d+)\b/);
+              return m ? parseInt(m[1], 10) : 0;
             },
             renderHTML: (attributes) => {
               if (!attributes.indent) return {};

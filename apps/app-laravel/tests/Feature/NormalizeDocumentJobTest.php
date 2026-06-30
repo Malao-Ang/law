@@ -62,11 +62,10 @@ class NormalizeDocumentJobTest extends TestCase
         );
 
         $doc = $store->getReviewDocument($documentId);
+        // NormalizeDocumentJob's contract is now just normalizing block text;
+        // it intentionally no longer writes correction_status/current_step
+        // (normalize is non-fatal background work; the document is already 'done').
         $this->assertSame('ราชการ', $doc['pages'][0]['blocks'][0]['approved_text']);
-
-        $status = $store->getStatus($documentId);
-        $this->assertSame('done', $status['correction_status']);
-        $this->assertSame('normalize_done', $status['current_step']);
     }
 
     public function test_job_skips_table_and_image_blocks_in_request(): void

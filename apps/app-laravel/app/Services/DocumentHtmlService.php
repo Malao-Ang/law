@@ -34,7 +34,7 @@ class DocumentHtmlService
                 // Always recompute HTML from structured block fields (approved_text,
                 // meta.layout, meta.table, meta.image). reviewed_html is kept on disk
                 // as a legacy field but is no longer the rendering source of truth.
-                $inner = $this->buildBlockHtml($block);
+                $inner = $this->buildBlockHtml($block, $pageNo);
 
                 $formatting = is_array($block['meta']['formatting'] ?? null) ? $block['meta']['formatting'] : [];
                 $blockClasses = 'doc-block doc-block-'.e($type);
@@ -64,7 +64,7 @@ class DocumentHtmlService
         return '<article class="doc-review-document">'.implode('', $sections).'</article>';
     }
 
-    public function buildBlockHtml(array $block): string
+    public function buildBlockHtml(array $block, int $pageNo = 0): string
     {
         $type = (string) ($block['type'] ?? 'paragraph');
         $blockId = (string) ($block['block_id'] ?? '');
@@ -73,7 +73,9 @@ class DocumentHtmlService
         if ($type === 'table' && $table !== null) {
             $tableHtml = (string) ($table['html'] ?? '');
             if ($blockId !== '') {
-                return preg_replace('/<table/i', '<table data-block-id="'.e($blockId).'"', $tableHtml, 1) ?? $tableHtml;
+                $attrs = 'data-block-id="'.e($blockId).'" data-page-no="'.$pageNo.'"';
+
+                return preg_replace('/<table/i', '<table '.$attrs, $tableHtml, 1) ?? $tableHtml;
             }
 
             return $tableHtml;
@@ -84,14 +86,22 @@ class DocumentHtmlService
             $imgMeta = is_array($block['meta']['image'] ?? null) ? $block['meta']['image'] : null;
             $srcUrl = trim((string) ($imgMeta['src_url'] ?? $imgMeta['data_uri'] ?? $block['meta']['image_path'] ?? ''));
             $caption = trim((string) ($imgMeta['caption'] ?? ''));
+            $displayWidth = isset($imgMeta['display_width_px']) ? (int) $imgMeta['display_width_px'] : 0;
             if ($srcUrl !== '') {
+                $imgStyle = $displayWidth > 0
+                    ? sprintf('width:%dpx;height:auto;display:block;margin:0 auto;', $displayWidth)
+                    : 'max-width:100%;height:auto;display:block;margin:0 auto;';
+
                 return sprintf(
                     '<figure data-block-id="%s" class="doc-image" style="text-align:center;margin:1rem 0;">'.
-                    '<img src="%s" alt="%s" style="max-width:100%%;height:auto;display:block;margin:0 auto;"/>'.
+                    '<img src="%s" alt="%s" data-block-id="%s" data-page-no="%d" style="%s"/>'.
                     '%s</figure>',
                     e($blockId),
                     e($srcUrl),
                     e($caption ?: 'embedded image'),
+                    e($blockId),
+                    $pageNo,
+                    $imgStyle,
                     $caption !== '' ? sprintf('<figcaption>%s</figcaption>', e($caption)) : '',
                 );
             }
@@ -121,6 +131,18 @@ class DocumentHtmlService
         }
 
         $indentLevel = $layout['indent_level'] ?? null;
+        $indentLeft  = $layout['indent_left']  ?? null;
+
+        // When indent_level is not set but indent_left (twips) is, derive a level.
+        // This ensures TipTap—which strips inline styles from <p> tags—sees a
+        // doc-indent-N CSS class it can preserve. Setting it on $layout also
+        // suppresses the duplicate inline margin-left in buildLayoutStyleAttribute.
+        // 360 twips ≈ 18pt ≈ one standard indent stop.
+        if (! is_int($indentLevel) && is_numeric($indentLeft) && (float) $indentLeft > 0) {
+            $indentLevel = max(1, min(10, (int) round((float) $indentLeft / 360)));
+            $layout['indent_level'] = $indentLevel;
+        }
+
         if (is_int($indentLevel) && $indentLevel >= 0) {
             $classNames[] = 'doc-indent-'.max(0, min(10, $indentLevel));
         }
@@ -133,12 +155,16 @@ class DocumentHtmlService
             $attributes .= ' data-block-id="'.e($blockId).'"';
         }
 
+        $inner = $this->renderTextWithLayout($text, $layout);
+        $formatting = is_array($block['meta']['formatting'] ?? null) ? $block['meta']['formatting'] : [];
+        $inner = $this->applyFormatting($inner, $formatting);
+
         return sprintf(
             '<%1$s%5$s class="%2$s"%3$s>%4$s</%1$s>',
             $tag,
             e(implode(' ', $classNames)),
             $this->buildLayoutStyleAttribute($layout),
-            $this->renderTextWithLayout($text, $layout),
+            $inner,
             $attributes,
         );
     }
@@ -485,6 +511,24 @@ class DocumentHtmlService
             }
             $width = $tabs[$index] ?? 18.0;
             $html .= '<span class="doc-tab" style="display:inline-block; width:'.$width.'pt;"></span>';
+        }
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $formatting
+     */
+    private function applyFormatting(string $html, array $formatting): string
+    {
+        if (($formatting['underline'] ?? false) === true) {
+            $html = '<u>'.$html.'</u>';
+        }
+        if (($formatting['italic'] ?? false) === true) {
+            $html = '<em>'.$html.'</em>';
+        }
+        if (($formatting['bold'] ?? false) === true) {
+            $html = '<strong>'.$html.'</strong>';
         }
 
         return $html;

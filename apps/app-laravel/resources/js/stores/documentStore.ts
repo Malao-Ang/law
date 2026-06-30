@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { fetchReview, saveDocumentReview } from '../api/client';
-import type { DocumentReviewState, ReviewDocument } from '../types/document';
+import type { DocumentReviewState, LawMeta, LawRelation, ReviewDocument } from '../types/document';
 
 export const useDocumentStore = defineStore('document', () => {
   const documentId = ref('');
@@ -46,6 +46,40 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
+  async function saveLawMeta(payload: Partial<LawMeta>): Promise<boolean> {
+    saving.value = true;
+    saveError.value = '';
+    try {
+      const res = await saveDocumentReview(documentId.value, { law_meta: payload });
+      if (review.value && res.law_meta) {
+        review.value.law_meta = res.law_meta;
+      }
+      return true;
+    } catch (e: unknown) {
+      saveError.value = e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ';
+      return false;
+    } finally {
+      saving.value = false;
+    }
+  }
+
+  async function saveRelations(relations: LawRelation[]): Promise<boolean> {
+    saving.value = true;
+    saveError.value = '';
+    try {
+      const res = await saveDocumentReview(documentId.value, { relations });
+      if (review.value && res.relations) {
+        review.value.relations = res.relations;
+      }
+      return true;
+    } catch (e: unknown) {
+      saveError.value = e instanceof Error ? e.message : 'บันทึกความสัมพันธ์ไม่สำเร็จ';
+      return false;
+    } finally {
+      saving.value = false;
+    }
+  }
+
   function setSaveError(msg = ''): void {
     saveError.value = msg;
   }
@@ -59,5 +93,5 @@ export const useDocumentStore = defineStore('document', () => {
     saveError.value = '';
   }
 
-  return { documentId, review, loading, error, saving, saveError, fetch, saveReview, setSaveError, reset };
+  return { documentId, review, loading, error, saving, saveError, fetch, saveReview, saveLawMeta, saveRelations, setSaveError, reset };
 });

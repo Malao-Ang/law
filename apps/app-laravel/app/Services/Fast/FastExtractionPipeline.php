@@ -28,7 +28,11 @@ class FastExtractionPipeline
         $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
 
         $output = match ($ext) {
-            'docx' => $this->docxExtractor->extract($absolutePath, $documentId),
+            'docx' => $this->docxExtractor->extract(
+                $absolutePath,
+                $documentId,
+                $this->reviewStore->absoluteImagesDir($documentId),
+            ),
             'doc' => $this->extractLegacyDoc($absolutePath, $documentId),
             'pdf' => $this->pdfExtractor->extract($absolutePath, $documentId),
             default => throw new FastPathUnsupportedException(
@@ -55,7 +59,11 @@ class FastExtractionPipeline
         $convertedDocx = $this->libreOffice->convertToDocx($docPath);
 
         try {
-            $output = $this->docxExtractor->extract($convertedDocx, $documentId);
+            $output = $this->docxExtractor->extract(
+                $convertedDocx,
+                $documentId,
+                $this->reviewStore->absoluteImagesDir($documentId),
+            );
             $output['extraction']['path'] = ['fast:php:doc->docx', 'fast:php:docx'];
 
             return $output;
