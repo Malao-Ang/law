@@ -60,12 +60,8 @@ export const useComposeStore = defineStore('compose', () => {
     }
   }
 
-  function setError(msg: string): void {
+  function setError(msg = ''): void {
     error.value = msg;
-  }
-
-  function clearError(): void {
-    error.value = '';
   }
 
   function reset(): void {
@@ -76,5 +72,5 @@ export const useComposeStore = defineStore('compose', () => {
     exporting.value = false;
   }
 
-  return { review, loading, error, docStatus, exporting, fetch, pollStatus, triggerExport, saveComposeState, setError, clearError, reset };
+  return { review, loading, error, docStatus, exporting, fetch, pollStatus, triggerExport, saveComposeState, setError, reset };
 });

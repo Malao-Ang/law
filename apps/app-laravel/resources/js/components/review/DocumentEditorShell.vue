@@ -69,7 +69,7 @@
       <v-btn
         size="x-small"
         variant="text"
-        @click="documentStore.clearSaveError(); switchModeError = ''"
+        @click="documentStore.setSaveError(); switchModeError = ''"
       >
         ปิด
       </v-btn>
@@ -104,7 +104,7 @@ const editor = useEditor({
   content: initialHtml,
   editable: reviewUiStore.mode === 'edit',
   onUpdate: () => {
-    reviewUiStore.markDirty();
+    reviewUiStore.setDirty(true);
     scheduleAutoSave();
   },
 });
@@ -163,7 +163,7 @@ async function saveDocument(): Promise<void> {
   const html = editor.value.getHTML();
   const result = await documentStore.saveReview({ draft_html: html });
   if (result !== null) {
-    reviewUiStore.markClean();
+    reviewUiStore.setDirty(false);
   }
 }
 

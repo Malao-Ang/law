@@ -39,12 +39,8 @@ export const useReviewUiStore = defineStore('reviewUi', () => {
     mode.value = next;
   }
 
-  function markDirty(): void {
-    isDirty.value = true;
-  }
-
-  function markClean(): void {
-    isDirty.value = false;
+  function setDirty(v: boolean): void {
+    isDirty.value = v;
   }
 
   function reset(): void {
@@ -66,8 +62,7 @@ export const useReviewUiStore = defineStore('reviewUi', () => {
     clearSelection,
     setEditing,
     setMode,
-    markDirty,
-    markClean,
+    setDirty,
     reset,
   };
 });
