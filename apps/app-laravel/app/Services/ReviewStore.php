@@ -51,6 +51,11 @@ class ReviewStore
         return $this->absolutePath($relativePath);
     }
 
+    public function absoluteImagesDir(string $documentId): string
+    {
+        return $this->basePath.'/images/'.basename($documentId);
+    }
+
     /**
      * @param  array<string, mixed>  $status
      */
@@ -229,6 +234,7 @@ class ReviewStore
         $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($payload, &$returnPayload): void {
             $this->syncDocumentReview($document);
             $this->ensureComposeStateDefaults($document);
+            $this->ensureLawMetaDefaults($document);
 
             $generatedHtml = (string) ($document['document_review']['generated_html'] ?? '');
             $resetToGenerated = (bool) ($payload['reset_to_generated'] ?? false);
@@ -283,9 +289,22 @@ class ReviewStore
                 );
             }
 
+            if (array_key_exists('law_meta', $payload) && is_array($payload['law_meta'])) {
+                $this->ensureLawMetaDefaults($document);
+                $document['law_meta'] = array_merge($document['law_meta'], $payload['law_meta']);
+                $this->ensureLawMetaDefaults($document);
+            }
+
+            if (array_key_exists('relations', $payload) && is_array($payload['relations'])) {
+                $document['relations'] = $payload['relations'];
+                $this->ensureRelationsDefaults($document);
+            }
+
             $returnPayload = [
                 'document_review' => $document['document_review'],
                 'compose_state' => $document['compose_state'],
+                'law_meta' => $document['law_meta'] ?? [],
+                'relations' => $document['relations'] ?? [],
             ];
         });
 
@@ -894,6 +913,8 @@ class ReviewStore
     private function syncDocumentReview(array &$document): void
     {
         $this->ensureComposeStateDefaults($document);
+        $this->ensureLawMetaDefaults($document);
+        $this->ensureRelationsDefaults($document);
 
         $generatedHtml = $this->documentHtmlService->buildGeneratedHtml($document);
         $existing = is_array($document['document_review'] ?? null) ? $document['document_review'] : [];
@@ -941,6 +962,72 @@ class ReviewStore
                 'signatory_name' => '',
                 'signatory_position' => '',
             ], $metadata),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     */
+    private function ensureRelationsDefaults(array &$document): void
+    {
+        $raw = is_array($document['relations'] ?? null) ? $document['relations'] : [];
+        $clean = [];
+
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $title = trim((string) ($entry['target_title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $type = ($entry['type'] ?? 'related') === 'repeals' ? 'repeals' : 'related';
+            $scope = ($entry['scope'] ?? 'document') === 'section' ? 'section' : 'document';
+
+            $clean[] = [
+                'id' => (string) ($entry['id'] ?? bin2hex(random_bytes(6))),
+                'scope' => $scope,
+                'block_id' => $scope === 'section' ? (string) ($entry['block_id'] ?? '') : null,
+                'type' => $type,
+                'target_document_id' => isset($entry['target_document_id']) && $entry['target_document_id'] !== ''
+                    ? (string) $entry['target_document_id'] : null,
+                'target_title' => $title,
+                'target_section' => trim((string) ($entry['target_section'] ?? '')) ?: null,
+                'note' => trim((string) ($entry['note'] ?? '')) ?: null,
+                'url' => trim((string) ($entry['url'] ?? '')) ?: null,
+            ];
+        }
+
+        $document['relations'] = $clean;
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     */
+    private function ensureLawMetaDefaults(array &$document): void
+    {
+        $meta = is_array($document['law_meta'] ?? null) ? $document['law_meta'] : [];
+
+        $repealed = [];
+        foreach (($meta['repealed_laws'] ?? []) as $entry) {
+            $text = trim((string) $entry);
+            if ($text !== '') {
+                $repealed[] = $text;
+            }
+        }
+
+        $document['law_meta'] = array_merge([
+            'status' => '',
+            'law_type' => '',
+            'law_group' => '',
+            'agency' => '',
+            'promulgation_date' => '',
+            'effective_date' => '',
+            'gazette_reference' => '',
+            'royal_command' => '',
+        ], $meta, [
+            'repealed_laws' => $repealed,
         ]);
     }
 

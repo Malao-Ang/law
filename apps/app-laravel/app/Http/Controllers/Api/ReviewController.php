@@ -118,6 +118,8 @@ class ReviewController extends Controller
             'status' => 'updated',
             'document_review' => $payload['document_review'],
             'compose_state' => $payload['compose_state'],
+            'law_meta' => $payload['law_meta'] ?? [],
+            'relations' => $payload['relations'] ?? [],
         ]);
     }
 
