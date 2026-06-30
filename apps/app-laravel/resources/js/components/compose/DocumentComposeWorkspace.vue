@@ -22,11 +22,11 @@
     >
       <ComposeMetadataPanel
         :model-value="metadata"
-        :review="review"
+        :review="composeStore.review"
         :document-id="documentId"
         :save-message="autoSaveLabel"
-        :correction-status="docStatus?.correction_status ?? null"
-        :export-busy="exporting"
+        :correction-status="composeStore.docStatus?.correction_status ?? null"
+        :export-busy="composeStore.exporting"
         @update:model-value="onMetadataUpdate"
         @export="triggerExport"
         @reload="reloadReview"
@@ -34,18 +34,18 @@
     </v-navigation-drawer>
 
     <v-main class="document-compose-main">
-      <div v-if="loading" class="compose-state-card">
+      <div v-if="composeStore.loading" class="compose-state-card">
         <v-progress-circular indeterminate color="primary" />
         <p>กำลังโหลดเอกสารสำหรับจัดรูปแบบ...</p>
       </div>
 
-      <div v-else-if="error" class="compose-state-card compose-state-card--error">
+      <div v-else-if="composeStore.error" class="compose-state-card compose-state-card--error">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
-        <p>{{ error }}</p>
+        <p>{{ composeStore.error }}</p>
         <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="reloadReview">รีโหลดข้อมูล</v-btn>
       </div>
 
-      <section v-else-if="review" class="document-compose-shell">
+      <section v-else-if="composeStore.review" class="document-compose-shell">
         <div v-if="correctionInProgress" class="compose-correction-banner">
           <v-progress-circular indeterminate size="18" color="primary" />
           <span>กำลังปรับปรุงด้วย AI ระบบจะรีเฟรชอัตโนมัติเมื่อเสร็จ</span>
@@ -129,8 +129,9 @@ import ComposeMetadataPanel from './ComposeMetadataPanel.vue';
 import ComposeSectionEditor from './ComposeSectionEditor.vue';
 import ComposeSectionNavigator from './ComposeSectionNavigator.vue';
 import ComposeToolbar from './ComposeToolbar.vue';
-import { createBlock, deleteBlock, exportDocument, fetchReview, fetchStatus, mergeBlocks, splitBlock, updateComposeState } from '../../api/client';
-import type { ComposeState, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../../types/document';
+import { useComposeStore } from '../../stores/compose';
+import { useBlockStore } from '../../stores/blocks';
+import type { ComposeState, DocumentMetadata, ThaiFont } from '../../types/document';
 
 interface ToolbarCommand {
   id: number;
@@ -164,10 +165,9 @@ const props = withDefaults(defineProps<{
 
 const { mdAndDown } = useDisplay();
 const vueRouter = useRouter();
-const loading = ref(true);
-const error = ref('');
-const review = ref<ReviewDocument | null>(null);
-const docStatus = ref<DocumentStatus | null>(null);
+const composeStore = useComposeStore();
+const blockStore = useBlockStore();
+
 const selectedBlockId = ref<string | null>(null);
 const scrollTarget = ref<ScrollTarget | null>(null);
 const font = ref<ThaiFont>('sarabun');
@@ -194,7 +194,6 @@ const editorState = ref<EditorStateSnapshot>({
 });
 const leftDrawer = ref(true);
 const rightDrawer = ref(true);
-const exporting = ref(false);
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let correctionPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -204,10 +203,10 @@ let mounted = true;
 
 const isCompact = computed(() => mdAndDown.value);
 const correctionInProgress = computed(() =>
-  ['pending', 'in_progress'].includes(docStatus.value?.correction_status ?? ''),
+  ['pending', 'in_progress'].includes(composeStore.docStatus?.correction_status ?? ''),
 );
 const correctionFailed = computed(() =>
-  docStatus.value?.correction_status === 'failed',
+  composeStore.docStatus?.correction_status === 'failed',
 );
 
 const pageTitle = computed(() => (
@@ -215,15 +214,11 @@ const pageTitle = computed(() => (
 ));
 
 const pageSubtitle = computed(() => {
-  if (!review.value) {
-    return 'กำลังโหลดข้อมูลเอกสาร';
-  }
-
-  const status = review.value.summary.review_required_count > 0
-    ? `${review.value.summary.review_required_count} รายการรอตรวจทาน`
+  if (!composeStore.review) return 'กำลังโหลดข้อมูลเอกสาร';
+  const status = composeStore.review.summary.review_required_count > 0
+    ? `${composeStore.review.summary.review_required_count} รายการรอตรวจทาน`
     : 'ตรวจทานครบแล้ว';
-
-  return `${review.value.source_file} · ${review.value.summary.block_count} บล็อก · ${status}`;
+  return `${composeStore.review.source_file} · ${composeStore.review.summary.block_count} บล็อก · ${status}`;
 });
 
 const alternateRouteLabel = computed(() => (
@@ -237,7 +232,7 @@ const alternateRoute = computed(() => (
 ));
 
 const flatBlocks = computed(() =>
-  review.value?.pages.flatMap((page) => page.blocks.map((block) => ({ page_no: page.page_no, block }))) ?? [],
+  composeStore.review?.pages.flatMap((page) => page.blocks.map((block) => ({ page_no: page.page_no, block }))) ?? [],
 );
 
 const navigatorItems = computed(() =>
@@ -253,8 +248,6 @@ const navigatorItems = computed(() =>
 
 const autoSaveLabel = computed(() => {
   if (autoSaveState.value === 'saving') return 'กำลังบันทึกอัตโนมัติ...';
-  if (autoSaveState.value === 'saved') return autoSaveMessage.value;
-  if (autoSaveState.value === 'error') return autoSaveMessage.value;
   return autoSaveMessage.value;
 });
 
@@ -266,7 +259,7 @@ watch(isCompact, (next) => {
 }, { immediate: true });
 
 watch([font, fontSize], () => {
-  if (!hydrating.value && review.value) {
+  if (!hydrating.value && composeStore.review) {
     scheduleComposeSave();
   }
 });
@@ -278,45 +271,25 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   mounted = false;
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-  }
-  if (correctionPollTimer) {
-    clearTimeout(correctionPollTimer);
-  }
+  if (saveTimer) clearTimeout(saveTimer);
+  if (correctionPollTimer) clearTimeout(correctionPollTimer);
+  composeStore.reset();
 });
 
 async function reloadReview(): Promise<void> {
-  loading.value = true;
-  error.value = '';
   const currentSelected = selectedBlockId.value;
+  await composeStore.fetch(props.documentId);
+  if (!mounted || !composeStore.review) return;
+  applyComposeState(composeStore.review.compose_state);
 
-  try {
-    const data = await fetchReview(props.documentId);
-    if (!mounted) return;
-    review.value = data;
-    applyComposeState(review.value.compose_state);
-
-    const availableIds = new Set(
-      review.value.pages.flatMap((page) => page.blocks.map((block) => block.block_id)),
-    );
-
-    selectedBlockIds.value = new Set(
-      [...selectedBlockIds.value].filter((id) => availableIds.has(id)),
-    );
-
-    selectedBlockId.value = currentSelected && availableIds.has(currentSelected)
-      ? currentSelected
-      : review.value.pages.flatMap((page) => page.blocks)[0]?.block_id ?? null;
-
-    if (selectedBlockId.value) {
-      requestScrollToBlock(selectedBlockId.value);
-    }
-  } catch (nextError) {
-    error.value = nextError instanceof Error ? nextError.message : 'Failed to load compose editor';
-  } finally {
-    loading.value = false;
-  }
+  const availableIds = new Set(
+    composeStore.review.pages.flatMap((page) => page.blocks.map((block) => block.block_id)),
+  );
+  selectedBlockIds.value = new Set([...selectedBlockIds.value].filter((id) => availableIds.has(id)));
+  selectedBlockId.value = currentSelected && availableIds.has(currentSelected)
+    ? currentSelected
+    : composeStore.review.pages.flatMap((page) => page.blocks)[0]?.block_id ?? null;
+  if (selectedBlockId.value) requestScrollToBlock(selectedBlockId.value);
 }
 
 function applyComposeState(state?: ComposeState): void {
@@ -326,7 +299,6 @@ function applyComposeState(state?: ComposeState): void {
   metadata.value = { ...defaultMetadata(), ...(state?.metadata ?? {}) };
   autoSaveState.value = 'idle';
   autoSaveMessage.value = 'พร้อมบันทึกอัตโนมัติ';
-
   queueMicrotask(() => {
     hydrating.value = false;
   });
@@ -335,10 +307,7 @@ function applyComposeState(state?: ComposeState): void {
 function selectBlockFromNavigator(blockId: string): void {
   selectedBlockId.value = blockId;
   requestScrollToBlock(blockId);
-
-  if (isCompact.value) {
-    leftDrawer.value = false;
-  }
+  if (isCompact.value) leftDrawer.value = false;
 }
 
 function requestScrollToBlock(blockId: string): void {
@@ -348,34 +317,22 @@ function requestScrollToBlock(blockId: string): void {
 
 function onMetadataUpdate(next: DocumentMetadata): void {
   metadata.value = next;
-  if (!hydrating.value && review.value) {
-    scheduleComposeSave();
-  }
+  if (!hydrating.value && composeStore.review) scheduleComposeSave();
 }
 
 function dispatchToolbarAction(type: string, value?: string): void {
-  if (type === 'export') {
-    void triggerExport();
-    return;
-  }
-
-  if (type === 'splitBlock') {
-    sectionEditor.value?.executeSplitAtCursor();
-    return;
-  }
-
+  if (type === 'export') { void triggerExport(); return; }
+  if (type === 'splitBlock') { sectionEditor.value?.executeSplitAtCursor(); return; }
   if (type === 'saveAll') {
     toolbarCommandId += 1;
     toolbarCommand.value = { id: toolbarCommandId, type: 'saveAll' };
     return;
   }
-
   if (type === 'cancelAll') {
     toolbarCommandId += 1;
     toolbarCommand.value = { id: toolbarCommandId, type: 'cancelAll' };
     return;
   }
-
   const commandType = type as ToolbarCommand['type'];
   toolbarCommandId += 1;
   toolbarCommand.value = { id: toolbarCommandId, type: commandType, value };
@@ -402,7 +359,7 @@ async function handleSplitBlock(payload: {
   if (blockOpBusy.value) return;
   blockOpBusy.value = true;
   try {
-    await splitBlock(props.documentId, payload.blockId, {
+    await blockStore.split(props.documentId, payload.blockId, {
       page_no: payload.pageNo,
       before_text: payload.beforeText,
       before_html: payload.beforeHtml,
@@ -411,7 +368,7 @@ async function handleSplitBlock(payload: {
     });
     await reloadReview();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'แยกบล็อกไม่สำเร็จ';
+    composeStore.setError(err instanceof Error ? err.message : 'แยกบล็อกไม่สำเร็จ');
   } finally {
     blockOpBusy.value = false;
   }
@@ -424,11 +381,11 @@ async function handleMergeSelected(): Promise<void> {
     const ordered = flatBlocks.value
       .filter((item) => selectedBlockIds.value.has(item.block.block_id))
       .map((item) => item.block.block_id);
-    await mergeBlocks(props.documentId, ordered);
+    await blockStore.merge(props.documentId, ordered);
     selectedBlockIds.value = new Set();
     await reloadReview();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'รวมบล็อกไม่สำเร็จ';
+    composeStore.setError(err instanceof Error ? err.message : 'รวมบล็อกไม่สำเร็จ');
   } finally {
     blockOpBusy.value = false;
   }
@@ -440,13 +397,13 @@ async function handleDeleteSelected(): Promise<void> {
   try {
     for (const item of flatBlocks.value) {
       if (selectedBlockIds.value.has(item.block.block_id)) {
-        await deleteBlock(props.documentId, item.block.block_id, item.page_no);
+        await blockStore.remove(props.documentId, item.block.block_id, item.page_no);
       }
     }
     selectedBlockIds.value = new Set();
     await reloadReview();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'ลบบล็อกไม่สำเร็จ';
+    composeStore.setError(err instanceof Error ? err.message : 'ลบบล็อกไม่สำเร็จ');
   } finally {
     blockOpBusy.value = false;
   }
@@ -459,7 +416,7 @@ async function handleCreateAfterSelected(): Promise<void> {
   if (!lastSelected) return;
   blockOpBusy.value = true;
   try {
-    await createBlock(props.documentId, {
+    await blockStore.create(props.documentId, {
       page_no: lastSelected.page_no,
       after_block_id: lastSelected.block.block_id,
       type: 'paragraph',
@@ -469,7 +426,7 @@ async function handleCreateAfterSelected(): Promise<void> {
     selectedBlockIds.value = new Set();
     await reloadReview();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'เพิ่มบล็อกไม่สำเร็จ';
+    composeStore.setError(err instanceof Error ? err.message : 'เพิ่มบล็อกไม่สำเร็จ');
   } finally {
     blockOpBusy.value = false;
   }
@@ -489,77 +446,44 @@ function handleFooterPreview(): void {
 }
 
 async function pollCorrectionStatus(): Promise<void> {
-  try {
-    docStatus.value = await fetchStatus(props.documentId);
-  } catch {
-    correctionPollTimer = setTimeout(() => {
-      void pollCorrectionStatus();
-    }, 2500);
+  const ok = await composeStore.pollStatus(props.documentId);
+  if (!ok) {
+    correctionPollTimer = setTimeout(() => void pollCorrectionStatus(), 2500);
     return;
   }
-
   if (correctionInProgress.value) {
-    correctionPollTimer = setTimeout(() => {
-      void pollCorrectionStatus();
-    }, 2500);
-  } else if (docStatus.value?.correction_status === 'done') {
+    correctionPollTimer = setTimeout(() => void pollCorrectionStatus(), 2500);
+  } else if (composeStore.docStatus?.correction_status === 'done') {
     await reloadReview();
   }
 }
 
 async function triggerExport(): Promise<void> {
-  if (exporting.value || correctionInProgress.value || correctionFailed.value) {
-    return;
-  }
-
-  exporting.value = true;
-
-  try {
-    await exportDocument(props.documentId);
-    docStatus.value = await fetchStatus(props.documentId);
-  } catch (nextError) {
-    error.value = nextError instanceof Error ? nextError.message : 'Export failed';
-  } finally {
-    exporting.value = false;
-  }
+  if (composeStore.exporting || correctionInProgress.value || correctionFailed.value) return;
+  await composeStore.triggerExport(props.documentId);
 }
 
 function scheduleComposeSave(): void {
   autoSaveState.value = 'idle';
   autoSaveMessage.value = 'รอบันทึกการเปลี่ยนแปลง';
-
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-  }
-
-  saveTimer = setTimeout(() => {
-    void persistComposeState();
-  }, 600);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => void persistComposeState(), 600);
 }
 
 async function persistComposeState(): Promise<void> {
-  if (!review.value) {
-    return;
-  }
-
+  if (!composeStore.review) return;
   autoSaveState.value = 'saving';
-
-  try {
-    const response = await updateComposeState(props.documentId, {
-      font_family: font.value,
-      font_size_pt: fontSize.value,
-      metadata: metadata.value,
-    });
-
-    if (response.compose_state) {
-      review.value.compose_state = response.compose_state;
-    }
-
+  const { saved, errorMessage } = await composeStore.saveComposeState(props.documentId, {
+    font_family: font.value,
+    font_size_pt: fontSize.value,
+    metadata: metadata.value,
+  });
+  if (saved) {
     autoSaveState.value = 'saved';
     autoSaveMessage.value = 'บันทึกอัตโนมัติแล้ว';
-  } catch (nextError) {
+  } else {
     autoSaveState.value = 'error';
-    autoSaveMessage.value = nextError instanceof Error ? nextError.message : 'บันทึกอัตโนมัติไม่สำเร็จ';
+    autoSaveMessage.value = errorMessage;
   }
 }
 

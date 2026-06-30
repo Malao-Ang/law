@@ -76,8 +76,10 @@ import { EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import { patchBlock } from '../../api/client';
+import { useBlockStore } from '../../stores/blocks';
 import { IndentExtension } from '../../extensions/IndentExtension';
+
+const blockStore = useBlockStore();
 import ResizableImage from '../shared/ResizableImage.vue';
 import type { DocumentBlock, ThaiFont } from '../../types/document';
 
@@ -331,7 +333,7 @@ async function saveAllBlocks(): Promise<void> {
       const item = props.blocks.find((b) => b.block.block_id === blockId);
       const ed = editors.value[blockId];
       if (!item || !ed) return Promise.resolve();
-      return patchBlock(props.documentId, blockId, {
+      return blockStore.patch(props.documentId, blockId, {
         page_no: item.page_no,
         approved_text: ed.getText({ blockSeparator: '\n' }),
         reviewed_html: ed.getHTML(),
