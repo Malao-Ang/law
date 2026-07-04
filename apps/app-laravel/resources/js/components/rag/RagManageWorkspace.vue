@@ -119,9 +119,6 @@
         <div class="rag-block-list">
           <div v-for="section in sections" :key="section.id" class="rag-sec">
             <div class="rag-sec__head">
-              <v-chip size="x-small" :color="section.isChapter ? 'indigo' : 'success'" variant="tonal">
-                {{ section.badge }}
-              </v-chip>
               <div class="rag-sec__actions">
                 <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
                   @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
@@ -137,7 +134,33 @@
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
-                <BlockFlow :block="section.headBlock" :override-text="section.headBodyText" />
+                <v-menu location="bottom start" :close-on-content-click="true">
+                  <template #activator="{ props: menuProps }">
+                    <v-chip
+                      v-bind="menuProps"
+                      size="x-small"
+                      :color="section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[section.headBlock.meta.chunk_type as ChunkType] : undefined"
+                      :variant="section.headBlock.meta.chunk_type ? 'tonal' : 'outlined'"
+                      class="rag-blockrow__typechip"
+                      @click.prevent.stop>
+                      {{ section.headBlock.meta.chunk_type ? CHUNK_TYPE_LABELS[section.headBlock.meta.chunk_type as ChunkType] : 'ประเภท...' }}
+                      <v-icon icon="mdi-chevron-down" size="10" class="ml-1" />
+                    </v-chip>
+                  </template>
+                  <v-list density="compact" :min-width="140">
+                    <v-list-item
+                      v-for="ct in CHUNK_TYPES"
+                      :key="ct"
+                      :title="CHUNK_TYPE_LABELS[ct]"
+                      :active="section.headBlock.meta.chunk_type === ct"
+                      @click="setChunkType(section.headBlock, ct)"
+                    />
+                  </v-list>
+                </v-menu>
+                <BlockFlow
+                  :block="section.headBlock"
+                  :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
+                />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
                   @click.prevent.stop="openSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
@@ -150,6 +173,29 @@
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
+                <v-menu location="bottom start" :close-on-content-click="true">
+                  <template #activator="{ props: menuProps }">
+                    <v-chip
+                      v-bind="menuProps"
+                      size="x-small"
+                      :color="child.meta.chunk_type ? CHUNK_TYPE_COLORS[child.meta.chunk_type as ChunkType] : undefined"
+                      :variant="child.meta.chunk_type ? 'tonal' : 'outlined'"
+                      class="rag-blockrow__typechip"
+                      @click.prevent.stop>
+                      {{ child.meta.chunk_type ? CHUNK_TYPE_LABELS[child.meta.chunk_type as ChunkType] : 'ประเภท...' }}
+                      <v-icon icon="mdi-chevron-down" size="10" class="ml-1" />
+                    </v-chip>
+                  </template>
+                  <v-list density="compact" :min-width="140">
+                    <v-list-item
+                      v-for="ct in CHUNK_TYPES"
+                      :key="ct"
+                      :title="CHUNK_TYPE_LABELS[ct]"
+                      :active="child.meta.chunk_type === ct"
+                      @click="setChunkType(child, ct)"
+                    />
+                  </v-list>
+                </v-menu>
                 <BlockFlow :block="child" />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
                   @click.prevent.stop="openSplit(child)">
@@ -214,6 +260,8 @@ import AppShell from '../shared/AppShell.vue';
 import { buildSections, relationsForSection, documentRelations, type LawSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
+import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
+import type { ChunkType } from '../../types/chunkType';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -383,6 +431,17 @@ function openSplitFromSelection(): void {
   if (!blockId) return;
   const block = allBlocks.value.find(b => b.block_id === blockId);
   if (block) openSplit(block);
+}
+
+async function setChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
+  if (blockBusy.value) return;
+  const pageNo = blockPage.value.get(block.block_id) ?? 1;
+  try {
+    await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
+    await reloadBlocks();
+  } catch (e) {
+    documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+  }
 }
 
 function onSplitCaret(event: Event): void {
@@ -607,7 +666,7 @@ onBeforeUnmount(() => {
 /* ponytail: custom checkbox grid layout — no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
-  grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(28px, 10%) auto minmax(0, 1fr) 32px;
   align-items: start;
   gap: 10px;
   padding: 8px 10px;
@@ -686,6 +745,12 @@ onBeforeUnmount(() => {
 
 .rag-blockrow__split:hover {
   color: #1a3673;
+}
+
+.rag-blockrow__typechip {
+  align-self: start;
+  margin-top: 2px;
+  cursor: pointer;
 }
 
 /* ponytail: native textarea inside v-dialog — kept for @select event support */
