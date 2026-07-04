@@ -37,6 +37,10 @@
             prepend-icon="mdi-delete-outline"
             style="background:rgba(220,38,38,0.85);color:#fff"
             @click="deleteSelected">ลบ</v-btn>
+          <v-btn size="small" :disabled="selectedBlockIds.size !== 1 || blockBusy"
+            prepend-icon="mdi-call-split"
+            style="background:rgba(5,150,105,0.85);color:#fff"
+            @click="openSplitFromSelection">แบ่ง</v-btn>
           <v-btn size="small" :disabled="blockBusy"
             style="background:rgba(255,255,255,0.14);color:#fff"
             @click="clearSelection">ยกเลิกการเลือก</v-btn>
@@ -235,6 +239,9 @@ const EMPTY_LAW_META: LawMeta = {
 const lawMetaForm = ref<LawMeta>({ ...EMPTY_LAW_META });
 
 const sections = computed(() => buildSections(composeStore.review));
+const allBlocks = computed<DocumentBlock[]>(() =>
+  sections.value.flatMap(s => [s.headBlock, ...s.children]),
+);
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
@@ -369,6 +376,13 @@ function openSplit(block: DocumentBlock): void {
     selectionStart: 0,
     selectionEnd: 0,
   };
+}
+
+function openSplitFromSelection(): void {
+  const [blockId] = [...selectedBlockIds.value];
+  if (!blockId) return;
+  const block = allBlocks.value.find(b => b.block_id === blockId);
+  if (block) openSplit(block);
 }
 
 function onSplitCaret(event: Event): void {
