@@ -1,15 +1,15 @@
 <template>
-  <section class="panel viewer-panel">
-    <div class="viewer-header">
+  <v-card flat border rounded="lg" class="viewer-panel">
+    <div class="viewer-header pa-3 pb-0">
       <div>
-        <h3>Page Review</h3>
-        <p v-if="page" class="hint">Page {{ page.page_no }} · {{ page.source_kind ?? 'unknown' }} · {{ modeLabel }}</p>
+        <p class="text-subtitle-2 font-weight-bold mb-0">Page Review</p>
+        <p v-if="page" class="hint mb-0">Page {{ page.page_no }} · {{ page.source_kind ?? 'unknown' }} · {{ modeLabel }}</p>
       </div>
     </div>
 
-    <div v-if="!page" class="preview-fallback">Select a block to preview.</div>
+    <div v-if="!page" class="preview-fallback ma-3">Select a block to preview.</div>
 
-    <div v-else-if="mode === 'html'" class="page-preview-shell">
+    <div v-else-if="mode === 'html'" class="page-preview-shell ma-3">
       <div class="page-stage page-stage--paper" :style="pageStageStyle">
         <article
           v-for="overlayBlock in positionedBlocks"
@@ -28,7 +28,7 @@
       </div>
     </div>
 
-    <div v-else-if="page.image_url" class="page-preview-shell">
+    <div v-else-if="page.image_url" class="page-preview-shell ma-3">
       <div class="page-stage">
         <img
           :src="page.image_url"
@@ -55,16 +55,16 @@
       </div>
     </div>
 
-    <div v-else class="preview-fallback">
+    <div v-else class="preview-fallback ma-3">
       No page image is available for this page. Switch to Extracted HTML to review OCR output.
     </div>
 
-    <div v-if="block" class="meta">
+    <div v-if="block" class="meta pa-3 pt-0">
       <p><strong>Block:</strong> {{ block.block_id }}</p>
       <p><strong>Type:</strong> {{ block.type }}</p>
       <p><strong>Confidence:</strong> {{ block.confidence.toFixed(2) }}</p>
     </div>
-  </section>
+  </v-card>
 </template>
 
 <script setup lang="ts">
