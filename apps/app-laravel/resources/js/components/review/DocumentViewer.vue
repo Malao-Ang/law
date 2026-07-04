@@ -3,7 +3,7 @@
     <div class="viewer-header pa-3 pb-0">
       <div>
         <p class="text-subtitle-2 font-weight-bold mb-0">Page Review</p>
-        <p v-if="page" class="hint mb-0">Page {{ page.page_no }} · {{ page.source_kind ?? 'unknown' }} · {{ modeLabel }}</p>
+        <p v-if="page" class="text-caption text-medium-emphasis mb-0">Page {{ page.page_no }} · {{ page.source_kind ?? 'unknown' }} · {{ modeLabel }}</p>
       </div>
     </div>
 

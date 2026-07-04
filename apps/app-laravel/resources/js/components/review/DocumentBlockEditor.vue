@@ -6,7 +6,7 @@
 
     <div v-for="page in uniquePages" :key="page.page_no" class="block-editor__page">
       <div class="block-editor__page-header">
-        <span class="hint">Page {{ page.page_no }}</span>
+        <span class="text-caption text-medium-emphasis">Page {{ page.page_no }}</span>
         <v-btn
           v-if="page.image_url"
           size="x-small"

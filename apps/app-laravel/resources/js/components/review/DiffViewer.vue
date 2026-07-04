@@ -3,11 +3,11 @@
     <p class="text-subtitle-2 font-weight-bold mb-2">Diff</p>
     <div class="diff-grid">
       <div>
-        <p class="hint">Before</p>
+        <p class="text-caption text-medium-emphasis">Before</p>
         <pre class="code">{{ before }}</pre>
       </div>
       <div>
-        <p class="hint">After</p>
+        <p class="text-caption text-medium-emphasis">After</p>
         <pre class="code">{{ after }}</pre>
       </div>
     </div>

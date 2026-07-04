@@ -11,89 +11,118 @@
     </template>
 
     <!-- Loading -->
-    <div v-if="composeStore.loading" class="rag-state">
+    <div v-if="composeStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
       <v-progress-circular indeterminate color="primary" />
-      <p>กำลังโหลดบล็อก...</p>
+      <span>กำลังโหลดบล็อก...</span>
     </div>
 
     <!-- Error -->
-    <div v-else-if="composeStore.error" class="rag-state">
+    <div v-else-if="composeStore.error" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
       <v-icon icon="mdi-alert-circle-outline" size="32" color="error" />
-      <p>{{ composeStore.error }}</p>
+      <span>{{ composeStore.error }}</span>
       <v-btn variant="outlined" size="small" @click="composeStore.setError()">ปิด</v-btn>
     </div>
 
     <template v-else>
       <div class="rag-content-area">
-        <div v-if="selectedBlockIds.size > 0" class="rag-actionbar">
-          <span class="rag-actionbar__count">เลือก {{ selectedBlockIds.size }} บล็อก</span>
-          <button class="rag-actionbar__btn" :disabled="selectedBlockIds.size < 2 || blockBusy" @click="mergeSelected">
-            <span class="mdi mdi-table-merge-cells" /> รวม
-          </button>
-          <button class="rag-actionbar__btn rag-actionbar__btn--danger" :disabled="blockBusy" @click="deleteSelected">
-            <span class="mdi mdi-delete-outline" /> ลบ
-          </button>
-          <button class="rag-actionbar__btn" :disabled="blockBusy" @click="clearSelection">
-            ยกเลิกการเลือก
-          </button>
+        <!-- Selection action bar -->
+        <div v-if="selectedBlockIds.size > 0" class="d-flex align-center ga-2 px-3 py-2 rounded-lg"
+          style="position:sticky;top:0;z-index:5;background:#1a3673;color:#fff">
+          <span class="text-body-2 font-weight-bold mr-auto">เลือก {{ selectedBlockIds.size }} บล็อก</span>
+          <v-btn size="small" :disabled="selectedBlockIds.size < 2 || blockBusy"
+            prepend-icon="mdi-table-merge-cells"
+            style="background:rgba(255,255,255,0.14);color:#fff"
+            @click="mergeSelected">รวม</v-btn>
+          <v-btn size="small" :disabled="blockBusy"
+            prepend-icon="mdi-delete-outline"
+            style="background:rgba(220,38,38,0.85);color:#fff"
+            @click="deleteSelected">ลบ</v-btn>
+          <v-btn size="small" :disabled="blockBusy"
+            style="background:rgba(255,255,255,0.14);color:#fff"
+            @click="clearSelection">ยกเลิกการเลือก</v-btn>
         </div>
-        <div v-if="documentStore.saveError" class="rag-save-error">
-          <span class="mdi mdi-alert-circle-outline" /> {{ documentStore.saveError }}
-          <button class="rag-save-error__x" @click="documentStore.setSaveError()">✕</button>
-        </div>
-        <details class="lawmeta-panel">
-          <summary class="lawmeta-panel__summary">
-            <span class="mdi mdi-information-outline" /> ข้อมูลกฎหมาย (หัวเอกสาร)
-          </summary>
-          <div class="lawmeta-grid">
-            <label>สถานะ<input v-model="lawMetaForm.status" type="text" placeholder="มีผลใช้บังคับ"></label>
-            <label>ประเภท<input v-model="lawMetaForm.law_type" type="text" placeholder="พระราชบัญญัติ"></label>
-            <label>กลุ่มกฎหมาย<input v-model="lawMetaForm.law_group" type="text" placeholder="ด้านวิชาการ"></label>
-            <label>หน่วยงาน<input v-model="lawMetaForm.agency" type="text" placeholder="มหาวิทยาลัยบูรพา"></label>
-            <label>วันที่ประกาศ<input v-model="lawMetaForm.promulgation_date" type="text"
-                placeholder="9 มกราคม 2551"></label>
-            <label>วันที่มีผลบังคับ<input v-model="lawMetaForm.effective_date" type="text"></label>
-            <label>ราชกิจจานุเบกษา<input v-model="lawMetaForm.gazette_reference" type="text"
-                placeholder="เล่ม 125 ตอนที่ 5 ก"></label>
-            <label>พระบรมราชโองการ<input v-model="lawMetaForm.royal_command" type="text"
-                placeholder="ภูมิพลอดุลยเดช ปร."></label>
-            <label class="lawmeta-grid__full">กฎหมายที่ถูกยกเลิก (บรรทัดละ 1 รายการ)
-              <textarea v-model="repealedText" rows="3" />
-            </label>
-          </div>
-          <div class="lawmeta-rels">
-            <div class="lawmeta-rels__head">
-              <span>ความสัมพันธ์ระดับเอกสาร</span>
-              <button class="rag-sec__btn" @click="openRelationDialog('document', null, 'related')">
-                <span class="mdi mdi-plus" /> เพิ่ม
-              </button>
-            </div>
-            <span v-for="rel in documentRelations(relations)" :key="rel.id" class="rag-rel-chip"
-              :class="{ 'rag-rel-chip--repeal': rel.type === 'repeals' }">
-              <span class="mdi" :class="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'" />
-              {{ rel.target_title }}
-              <button class="rag-rel-chip__x" @click="removeRelation(rel.id)"><span class="mdi mdi-close" /></button>
-            </span>
-          </div>
-          <button class="lawmeta-save" :disabled="documentStore.saving" @click="saveLawMeta">
-            <span class="mdi mdi-content-save-outline" /> บันทึกข้อมูลกฎหมาย
-          </button>
-        </details>
+
+        <!-- Save error -->
+        <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable
+          @click:close="documentStore.setSaveError()">
+          {{ documentStore.saveError }}
+        </v-alert>
+
+        <!-- Law metadata panel -->
+        <v-expansion-panels variant="accordion">
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon icon="mdi-information-outline" size="16" class="mr-2" />
+              ข้อมูลกฎหมาย (หัวเอกสาร)
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-row dense>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.status" label="สถานะ" placeholder="มีผลใช้บังคับ" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.law_type" label="ประเภท" placeholder="พระราชบัญญัติ" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.law_group" label="กลุ่มกฎหมาย" placeholder="ด้านวิชาการ" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.agency" label="หน่วยงาน" placeholder="มหาวิทยาลัยบูรพา" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.promulgation_date" label="วันที่ประกาศ" placeholder="9 มกราคม 2551" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.effective_date" label="วันที่มีผลบังคับ" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.gazette_reference" label="ราชกิจจานุเบกษา" placeholder="เล่ม 125 ตอนที่ 5 ก" />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-text-field v-model="lawMetaForm.royal_command" label="พระบรมราชโองการ" placeholder="ภูมิพลอดุลยเดช ปร." />
+                </v-col>
+                <v-col cols="12">
+                  <v-textarea v-model="repealedText" label="กฎหมายที่ถูกยกเลิก (บรรทัดละ 1 รายการ)" rows="3" />
+                </v-col>
+              </v-row>
+
+              <div class="mt-3">
+                <div class="d-flex align-center justify-space-between text-body-2 font-weight-bold mb-2"
+                  style="color:#1a3673">
+                  <span>ความสัมพันธ์ระดับเอกสาร</span>
+                  <v-btn size="x-small" variant="outlined" prepend-icon="mdi-plus"
+                    @click="openRelationDialog('document', null, 'related')">เพิ่ม</v-btn>
+                </div>
+                <div class="d-flex flex-wrap ga-2">
+                  <v-chip v-for="rel in documentRelations(relations)" :key="rel.id" size="small" closable
+                    :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
+                    :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
+                    @click:close="removeRelation(rel.id)">
+                    {{ rel.target_title }}
+                  </v-chip>
+                </div>
+              </div>
+
+              <v-btn color="primary" class="mt-3" prepend-icon="mdi-content-save-outline"
+                :disabled="documentStore.saving" @click="saveLawMeta">
+                บันทึกข้อมูลกฎหมาย
+              </v-btn>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
 
         <!-- Section list (e-Law style) -->
         <div class="rag-block-list">
           <div v-for="section in sections" :key="section.id" class="rag-sec">
             <div class="rag-sec__head">
-              <span class="rag-sec__badge" :class="{ 'rag-sec__badge--chapter': section.isChapter }">{{ section.badge
-              }}</span>
+              <v-chip size="x-small" :color="section.isChapter ? 'indigo' : 'success'" variant="tonal">
+                {{ section.badge }}
+              </v-chip>
               <div class="rag-sec__actions">
-                <button class="rag-sec__btn" @click="openRelationDialog('section', section.id, 'related')">
-                  <span class="mdi mdi-link-variant" /> เพิ่มความสัมพันธ์
-                </button>
-                <button class="rag-sec__btn rag-sec__btn--danger"
-                  @click="openRelationDialog('section', section.id, 'repeals')">
-                  <span class="mdi mdi-cancel" /> ยกเลิกมาตรา
-                </button>
+                <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
+                  @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
+                <v-btn size="x-small" variant="outlined" color="error" prepend-icon="mdi-cancel"
+                  @click="openRelationDialog('section', section.id, 'repeals')">ยกเลิกมาตรา</v-btn>
               </div>
             </div>
             <div class="rag-sec__flow">
@@ -125,43 +154,46 @@
               </label>
             </div>
 
-            <button class="rag-sec__addblock" :disabled="blockBusy" @click="createBlockAfter(lastBlockId(section))">
-              <span class="mdi mdi-plus" /> เพิ่มบล็อกใต้หัวข้อนี้
-            </button>
+            <v-btn size="x-small" variant="outlined" class="mt-2" prepend-icon="mdi-plus"
+              :disabled="blockBusy" @click="createBlockAfter(lastBlockId(section))">
+              เพิ่มบล็อกใต้หัวข้อนี้
+            </v-btn>
 
             <div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
-              <span v-for="rel in sectionRelations(section.id)" :key="rel.id" class="rag-rel-chip"
-                :class="{ 'rag-rel-chip--repeal': rel.type === 'repeals' }">
-                <span class="mdi" :class="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'" />
+              <v-chip v-for="rel in sectionRelations(section.id)" :key="rel.id" size="small" closable
+                :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
+                :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
+                @click:close="removeRelation(rel.id)">
                 {{ rel.target_title }}{{ rel.target_section ? ' · ' + rel.target_section : '' }}
-                <button class="rag-rel-chip__x" @click="removeRelation(rel.id)"><span class="mdi mdi-close" /></button>
-              </span>
+              </v-chip>
             </div>
           </div>
 
-          <div v-if="sections.length === 0" class="rag-state">
-            <p>ไม่พบบล็อกเนื้อหา</p>
+          <div v-if="sections.length === 0" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
+            <span>ไม่พบบล็อกเนื้อหา</span>
           </div>
         </div>
 
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
           @close="dialog = null" @save="onRelationSaved" />
-      <div v-if="splitting" class="rag-splitmodal" @click.self="splitting = null">
-        <div class="rag-splitmodal__card">
-          <p class="rag-splitmodal__title">วางเคอร์เซอร์เพื่อแบ่ง หรือเลือกข้อความเพื่อแยกออกเป็นบล็อกใหม่</p>
-          <textarea class="rag-splitmodal__text" :value="splitting.text" rows="6" @keyup="onSplitCaret"
+
+        <!-- Split modal -->
+        <v-dialog v-model="splitDialogOpen" max-width="560">
+          <v-card v-if="splitting" class="pa-4">
+            <div class="text-body-1 font-weight-bold mb-3" style="color:#1a3673">
+              วางเคอร์เซอร์เพื่อแบ่ง หรือเลือกข้อความเพื่อแยกออกเป็นบล็อกใหม่
+            </div>
+            <textarea class="rag-splitmodal__text" :value="splitting.text" rows="6" @keyup="onSplitCaret"
               @mouseup="onSplitCaret" @click="onSplitCaret" @select="onSplitCaret" />
-          <p class="rag-splitmodal__hint">
-            {{ splitSelectionLabel }}
-          </p>
-          <div class="rag-splitmodal__actions">
-            <button class="rag-sec__btn" @click="splitting = null">ยกเลิก</button>
-            <button class="lawmeta-save" :disabled="blockBusy" @click="confirmSplit">
-              {{ hasSplitSelection ? 'แยกข้อความที่เลือก' : 'แบ่งบล็อก' }}
-            </button>
-          </div>
-        </div>
-      </div>
+            <div class="text-caption text-medium-emphasis mt-1">{{ splitSelectionLabel }}</div>
+            <div class="d-flex justify-end ga-2 mt-3">
+              <v-btn variant="outlined" @click="splitting = null">ยกเลิก</v-btn>
+              <v-btn color="primary" :disabled="blockBusy" @click="confirmSplit">
+                {{ hasSplitSelection ? 'แยกข้อความที่เลือก' : 'แบ่งบล็อก' }}
+              </v-btn>
+            </div>
+          </v-card>
+        </v-dialog>
       </div>
     </template>
   </AppShell>
@@ -209,6 +241,11 @@ const blockBusy = ref(false);
 const splitting = ref<{ blockId: string; pageNo: number; text: string; selectionStart: number; selectionEnd: number } | null>(null);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
+
+const splitDialogOpen = computed({
+  get: () => splitting.value !== null,
+  set: (v) => { if (!v) splitting.value = null; },
+});
 
 const hasSplitSelection = computed(() => {
   if (!splitting.value) return false;
@@ -489,6 +526,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ponytail: rag-content-area height calc + rag-block-list scroll container — no Vuetify equivalent */
 .rag-content-area {
   display: flex;
   flex-direction: column;
@@ -497,152 +535,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   gap: 12px;
   overflow: hidden;
-}
-
-.rag-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  gap: 12px;
-  color: #64748b;
-}
-
-.rag-save-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.rag-save-error__x {
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 13px;
-}
-
-.rag-actionbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #1a3673;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-}
-
-.rag-actionbar__count {
-  font-size: 13px;
-  font-weight: 600;
-  margin-right: auto;
-}
-
-.rag-actionbar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: 6px 12px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.rag-actionbar__btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.rag-actionbar__btn--danger {
-  background: rgba(220, 38, 38, 0.85);
-}
-
-.lawmeta-panel {
-  background: #fff;
-  border: 1px solid #dbe6f4;
-  border-radius: 10px;
-  padding: 10px 14px 14px;
-}
-
-.lawmeta-panel__summary {
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
-.lawmeta-panel__summary::-webkit-details-marker {
-  display: none;
-}
-
-.lawmeta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
-  margin-top: 14px;
-}
-
-.lawmeta-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.lawmeta-grid input,
-.lawmeta-grid textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: inherit;
-  background: #fff;
-  color: #1e293b;
-}
-
-.lawmeta-grid__full {
-  grid-column: 1 / -1;
-}
-
-.lawmeta-save {
-  margin-top: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #1a3673;
-  color: #fff;
-  padding: 9px 14px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.lawmeta-save:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .rag-block-list {
@@ -656,7 +548,6 @@ onBeforeUnmount(() => {
   padding-right: 4px;
   overscroll-behavior: contain;
 }
-
 
 .rag-sec {
   background: #fff;
@@ -674,43 +565,10 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-.rag-sec__badge {
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 8px;
-}
-
-.rag-sec__badge--chapter {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
 .rag-sec__actions {
   margin-left: auto;
   display: flex;
   gap: 6px;
-}
-
-.rag-sec__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  color: #334155;
-}
-
-.rag-sec__btn--danger {
-  color: #dc2626;
-  border-color: #fecaca;
 }
 
 .rag-sec__flow {
@@ -720,26 +578,6 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.rag-sec__addblock {
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px dashed #cbd5e1;
-  background: #fff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  color: #475569;
-}
-
-.rag-sec__addblock:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .rag-sec__rels {
   display: flex;
   flex-wrap: wrap;
@@ -747,32 +585,7 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
-.rag-rel-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
-.rag-rel-chip--repeal {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.rag-rel-chip__x {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 13px;
-  line-height: 1;
-  padding: 0;
-}
-
+/* ponytail: custom checkbox grid layout — no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
   grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;
@@ -856,33 +669,7 @@ onBeforeUnmount(() => {
   color: #1a3673;
 }
 
-.rag-splitmodal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.rag-splitmodal__card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px;
-  width: min(560px, 92vw);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.rag-splitmodal__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
+/* ponytail: native textarea inside v-dialog — kept for @select event support */
 .rag-splitmodal__text {
   width: 100%;
   border: 1px solid #cbd5e1;
@@ -891,39 +678,5 @@ onBeforeUnmount(() => {
   font: inherit;
   line-height: 1.7;
   resize: vertical;
-}
-
-.rag-splitmodal__hint {
-  margin: -4px 0 0;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.rag-splitmodal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.lawmeta-rels {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.lawmeta-rels__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
-@media (max-width: 800px) {
-  .lawmeta-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
