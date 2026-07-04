@@ -63,6 +63,8 @@ export interface BlockLayout {
   indent_first_line?: number | null;
   indent_hanging?: number | null;
   indent_level?: number | null;
+  line_height?: string | null;
+  line_spacing?: number | null;
   indent_unit_pt?: number | null;
   indent_source?: string | null;
   indent_reason?: string | null;
@@ -112,6 +114,7 @@ export interface BlockMeta {
   spell_suggestions?: SpellSuggestion[];
   formatting?: BlockFormatting;
   review?: BlockReviewMeta;
+  chunk_type?: string | null;
 }
 
 export interface DocumentBlock {

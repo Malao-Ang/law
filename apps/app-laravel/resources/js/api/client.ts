@@ -113,6 +113,7 @@ export function patchBlock(
     bbox?: [number, number, number, number] | null;
     reviewed_html?: string;
     table?: ReviewedTable | null;
+    chunk_type?: string | null;
   },
 ): Promise<{ status: string }> {
   return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}`, {
