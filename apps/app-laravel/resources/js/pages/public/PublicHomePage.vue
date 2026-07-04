@@ -1,6 +1,7 @@
 <template>
   <div class="public-home">
     <ELawNavbar @go-admin="router.push('/admin')" />
+    <v-main>
     <ELawHeroSearch @search="onSearch" />
 
     <div class="public-home__body">
@@ -59,6 +60,7 @@
         <p>© 2567 ระบบฐานข้อมูลกฎหมาย — มหาวิทยาลัยบูรพา</p>
       </div>
     </footer>
+    </v-main>
   </div>
 </template>
 
