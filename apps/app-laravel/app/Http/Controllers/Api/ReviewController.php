@@ -290,10 +290,10 @@ class ReviewController extends Controller
     {
         $validated = $request->validate([
             'page_no' => 'required|integer|min:1',
-            'before_text' => 'required|string',
-            'before_html' => 'required|string',
-            'after_text' => 'required|string',
-            'after_html' => 'required|string',
+            'before_text' => 'nullable|string',
+            'before_html' => 'nullable|string',
+            'after_text' => 'nullable|string',
+            'after_html' => 'nullable|string',
         ]);
 
         try {
@@ -301,10 +301,10 @@ class ReviewController extends Controller
                 $documentId,
                 (int) $validated['page_no'],
                 $blockId,
-                $validated['before_text'],
-                $validated['before_html'],
-                $validated['after_text'],
-                $validated['after_html'],
+                (string) ($validated['before_text'] ?? ''),
+                (string) ($validated['before_html'] ?? ''),
+                (string) ($validated['after_text'] ?? ''),
+                (string) ($validated['after_html'] ?? ''),
             );
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);

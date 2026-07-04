@@ -228,19 +228,19 @@
           @close="dialog = null" @save="onRelationSaved" />
 
         <!-- Split modal -->
-        <v-dialog v-model="splitDialogOpen" max-width="560">
-          <v-card v-if="splitting" class="pa-4">
-            <div class="text-body-1 font-weight-bold mb-3" style="color:#1a3673">
-              วางเคอร์เซอร์เพื่อแบ่ง หรือเลือกข้อความเพื่อแยกออกเป็นบล็อกใหม่
+        <v-dialog v-model="splitDialogOpen" max-width="360">
+          <v-card v-if="splitting" class="pa-5">
+            <div class="text-body-1 font-weight-bold mb-4" style="color:#1a3673">
+              เพิ่มบล็อกใหม่ที่ใด?
             </div>
-            <textarea class="rag-splitmodal__text" :value="splitting.text" rows="6" @keyup="onSplitCaret"
-              @mouseup="onSplitCaret" @click="onSplitCaret" @select="onSplitCaret" />
-            <div class="text-caption text-medium-emphasis mt-1">{{ splitSelectionLabel }}</div>
-            <div class="d-flex justify-end ga-2 mt-3">
-              <v-btn variant="outlined" @click="splitting = null">ยกเลิก</v-btn>
-              <v-btn color="primary" :disabled="blockBusy" @click="confirmSplit">
-                {{ hasSplitSelection ? 'แยกข้อความที่เลือก' : 'แบ่งบล็อก' }}
-              </v-btn>
+            <div class="d-flex ga-3 mb-4">
+              <v-btn prepend-icon="mdi-arrow-up-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
+                @click="addBlock('above')">ด้านบน</v-btn>
+              <v-btn prepend-icon="mdi-arrow-down-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
+                @click="addBlock('below')">ด้านล่าง</v-btn>
+            </div>
+            <div class="d-flex justify-end">
+              <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
             </div>
           </v-card>
         </v-dialog>
@@ -293,7 +293,7 @@ const allBlocks = computed<DocumentBlock[]>(() =>
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
-const splitting = ref<{ blockId: string; pageNo: number; text: string; selectionStart: number; selectionEnd: number } | null>(null);
+const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
@@ -302,20 +302,6 @@ const splitDialogOpen = computed({
   set: (v) => { if (!v) splitting.value = null; },
 });
 
-const hasSplitSelection = computed(() => {
-  if (!splitting.value) return false;
-  return splitting.value.selectionEnd > splitting.value.selectionStart;
-});
-
-const splitSelectionLabel = computed(() => {
-  if (!splitting.value) return '';
-  if (hasSplitSelection.value) {
-    const length = splitting.value.selectionEnd - splitting.value.selectionStart;
-    return `เลือกข้อความ ${length} ตัวอักษร: ระบบจะแยกข้อความนี้ออกเป็นบล็อกใหม่`;
-  }
-
-  return 'ยังไม่ได้เลือกข้อความ: ระบบจะแบ่งบล็อกตามตำแหน่งเคอร์เซอร์';
-});
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -421,8 +407,6 @@ function openSplit(block: DocumentBlock): void {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
     text: block.approved_text || block.normalized_text || block.raw_text || '',
-    selectionStart: 0,
-    selectionEnd: 0,
   };
 }
 
@@ -444,17 +428,6 @@ async function setChunkType(block: DocumentBlock, chunkType: string | null): Pro
   }
 }
 
-function onSplitCaret(event: Event): void {
-  const el = event.target as HTMLTextAreaElement;
-  if (!splitting.value) return;
-
-  splitting.value = {
-    ...splitting.value,
-    selectionStart: el.selectionStart ?? 0,
-    selectionEnd: el.selectionEnd ?? el.selectionStart ?? 0,
-  };
-}
-
 function escapeForHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -462,36 +435,10 @@ function escapeForHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function confirmSplit(): Promise<void> {
+async function addBlock(where: 'above' | 'below'): Promise<void> {
   if (!splitting.value || blockBusy.value) return;
   const { blockId, pageNo, text } = splitting.value;
-  const start = Math.min(Math.max(splitting.value.selectionStart, 0), text.length);
-  const end = Math.min(Math.max(splitting.value.selectionEnd, start), text.length);
-  const before = text.slice(0, start);
-  const selected = text.slice(start, end);
-  const after = text.slice(end);
-
-  if (start === end) {
-    if (before.trim() === '' || after.trim() === '') {
-      documentStore.setSaveError('วางเคอร์เซอร์ตรงกลางข้อความเพื่อแบ่งบล็อก');
-      return;
-    }
-
-    await splitBlockInto(blockId, pageNo, before, after);
-    return;
-  }
-
-  if (selected.trim() === '') {
-    documentStore.setSaveError('เลือกข้อความที่ต้องการแยกออกเป็นบล็อกใหม่');
-    return;
-  }
-
-  if (before.trim() === '' && after.trim() === '') {
-    documentStore.setSaveError('เลือกเฉพาะบางส่วนของบล็อกเพื่อแยกออก');
-    return;
-  }
-
-  await splitSelectedTextOut(blockId, pageNo, before, selected, after);
+  await splitBlockInto(blockId, pageNo, where === 'above' ? '' : text, where === 'above' ? text : '');
 }
 
 async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
@@ -513,47 +460,6 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
   }
 }
 
-async function splitSelectedTextOut(
-  blockId: string,
-  pageNo: number,
-  before: string,
-  selected: string,
-  after: string,
-): Promise<void> {
-  blockBusy.value = true;
-  try {
-    if (before.trim() === '') {
-      await callSplit(blockId, pageNo, selected, after);
-    } else if (after.trim() === '') {
-      await callSplit(blockId, pageNo, before, selected);
-    } else {
-      const firstResult = await callSplit(blockId, pageNo, `${before}${selected}`, after);
-      await callSplit(firstResult.first.block_id, pageNo, before, selected);
-    }
-
-    splitting.value = null;
-    await reloadBlocks();
-  } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'แยกข้อความที่เลือกไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
-  }
-}
-
-async function callSplit(
-  blockId: string,
-  pageNo: number,
-  before: string,
-  after: string,
-): Promise<{ status: string; first: DocumentBlock; second: DocumentBlock }> {
-  return blockStore.split(props.documentId, blockId, {
-    page_no: pageNo,
-    before_text: before,
-    before_html: `<p>${escapeForHtml(before)}</p>`,
-    after_text: after,
-    after_html: `<p>${escapeForHtml(after)}</p>`,
-  });
-}
 
 watch(() => documentStore.review?.law_meta, (meta) => {
   const nextMeta = {
