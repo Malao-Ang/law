@@ -1551,34 +1551,3 @@ textarea {
   }
 }
 
-.elaw-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 20px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.elaw-badge--rabiap {
-  color: var(--badge-rabiap);
-  background: var(--badge-rabiap-bg);
-}
-
-.elaw-badge--kho-bangkhab {
-  color: var(--badge-kho-bangkhab);
-  background: var(--badge-kho-bangkhab-bg);
-}
-
-.elaw-badge--prakat {
-  color: var(--badge-prakat);
-  background: var(--badge-prakat-bg);
-}
-
-.elaw-badge--kotmai-krung {
-  color: var(--badge-kotmai-krung);
-  background: var(--badge-kotmai-krung-bg);
-}
-

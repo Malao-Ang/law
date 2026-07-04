@@ -1,65 +1,83 @@
 <template>
-  <div class="public-home">
+  <div class="d-flex flex-column" style="min-height:100vh">
     <ELawNavbar @go-admin="router.push('/admin')" />
     <v-main>
-    <ELawHeroSearch @search="onSearch" />
+      <ELawHeroSearch @search="onSearch" />
 
-    <div class="public-home__body">
-      <div class="public-home__inner">
-        <section class="public-home__section">
-          <div class="public-home__section-header">
-            <h2 class="public-home__section-title">กฎหมายล่าสุด</h2>
-            <a class="public-home__section-link" href="#">ดูทั้งหมด →</a>
+      <v-container class="d-flex flex-column ga-10">
+        <section>
+          <div class="d-flex justify-space-between align-baseline mb-4">
+            <h2 class="text-h6 font-weight-bold">กฎหมายล่าสุด</h2>
+            <a href="#">ดูทั้งหมด →</a>
           </div>
-          <div class="public-home__cards">
-            <ELawLawCard
+          <v-row>
+            <v-col
               v-for="doc in sampleDocs"
               :key="doc.id"
-              :title="doc.title"
-              :doc-type="doc.docType"
-              :doc-number="doc.number"
-              :department="doc.department"
-              :date="doc.date"
-              :status="doc.status"
-            />
-          </div>
+              cols="12"
+              sm="6"
+              md="3"
+            >
+              <ELawLawCard
+                :title="doc.title"
+                :doc-type="doc.docType"
+                :doc-number="doc.number"
+                :department="doc.department"
+                :date="doc.date"
+                :status="doc.status"
+              />
+            </v-col>
+          </v-row>
         </section>
 
-        <div class="public-home__two-col">
-          <section class="public-home__section">
-            <div class="public-home__section-header">
-              <h2 class="public-home__section-title">ระเบียบ</h2>
-              <a class="public-home__section-link" href="#">ดูทั้งหมด →</a>
-            </div>
-            <div class="public-home__list">
-              <a v-for="item in sampleRabiap" :key="item.id" class="public-home__list-item" href="#">
-                <span class="elaw-badge elaw-badge--rabiap public-home__list-badge">ระเบียบ</span>
-                <span class="public-home__list-title">{{ item.title }}</span>
-              </a>
-            </div>
-          </section>
+        <v-row>
+          <v-col cols="12" md="6">
+            <section>
+              <div class="d-flex justify-space-between align-baseline mb-4">
+                <h2 class="text-h6 font-weight-bold">ระเบียบ</h2>
+                <a href="#">ดูทั้งหมด →</a>
+              </div>
+              <v-list>
+                <v-list-item
+                  v-for="item in sampleRabiap"
+                  :key="item.id"
+                  href="#"
+                  :title="item.title"
+                >
+                  <template #prepend>
+                    <v-chip size="x-small" color="success">ระเบียบ</v-chip>
+                  </template>
+                </v-list-item>
+              </v-list>
+            </section>
+          </v-col>
 
-          <section class="public-home__section">
-            <div class="public-home__section-header">
-              <h2 class="public-home__section-title">ประกาศ</h2>
-              <a class="public-home__section-link" href="#">ดูทั้งหมด →</a>
-            </div>
-            <div class="public-home__list">
-              <a v-for="item in samplePrakat" :key="item.id" class="public-home__list-item" href="#">
-                <span class="elaw-badge elaw-badge--prakat public-home__list-badge">ประกาศ</span>
-                <span class="public-home__list-title">{{ item.title }}</span>
-              </a>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
+          <v-col cols="12" md="6">
+            <section>
+              <div class="d-flex justify-space-between align-baseline mb-4">
+                <h2 class="text-h6 font-weight-bold">ประกาศ</h2>
+                <a href="#">ดูทั้งหมด →</a>
+              </div>
+              <v-list>
+                <v-list-item
+                  v-for="item in samplePrakat"
+                  :key="item.id"
+                  href="#"
+                  :title="item.title"
+                >
+                  <template #prepend>
+                    <v-chip size="x-small" color="warning">ประกาศ</v-chip>
+                  </template>
+                </v-list-item>
+              </v-list>
+            </section>
+          </v-col>
+        </v-row>
+      </v-container>
 
-    <footer class="public-home__footer">
-      <div class="public-home__inner">
+      <v-footer color="elaw-navy" class="justify-center">
         <p>© 2567 ระบบฐานข้อมูลกฎหมาย — มหาวิทยาลัยบูรพา</p>
-      </div>
-    </footer>
+      </v-footer>
     </v-main>
   </div>
 </template>
@@ -97,112 +115,3 @@ const samplePrakat = [
   { id: 'p4', title: 'ประกาศ เรื่อง ปฏิทินวิชาการ ปีการศึกษา 2567' },
 ];
 </script>
-
-<style scoped>
-.public-home {
-  min-height: 100vh;
-  background: var(--elaw-bg);
-  display: flex;
-  flex-direction: column;
-}
-
-.public-home__body {
-  flex: 1;
-  padding: 40px 24px;
-}
-
-.public-home__inner {
-  max-width: 1280px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-}
-
-.public-home__section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.public-home__section-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.public-home__section-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--elaw-navy);
-  margin: 0;
-}
-
-.public-home__section-link {
-  font-size: 13px;
-  color: var(--law-primary);
-  text-decoration: none;
-}
-
-.public-home__section-link:hover {
-  text-decoration: underline;
-}
-
-.public-home__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.public-home__two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px;
-}
-
-.public-home__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.public-home__list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  text-decoration: none;
-  color: var(--elaw-text);
-  font-size: 14px;
-  transition: background 0.12s;
-}
-
-.public-home__list-item:hover {
-  background: var(--elaw-cream);
-}
-
-.public-home__list-badge {
-  flex-shrink: 0;
-}
-
-.public-home__list-title {
-  line-height: 1.45;
-}
-
-.public-home__footer {
-  background: var(--elaw-navy);
-  color: rgba(255, 255, 255, 0.6);
-  padding: 20px 24px;
-  font-size: 13px;
-  text-align: center;
-}
-
-@media (max-width: 720px) {
-  .public-home__two-col,
-  .public-home__cards {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
