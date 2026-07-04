@@ -468,8 +468,8 @@ async function splitSelectedTextOut(
     } else if (after.trim() === '') {
       await callSplit(blockId, pageNo, before, selected);
     } else {
-      await callSplit(blockId, pageNo, `${before}${selected}`, after);
-      await callSplit(blockId, pageNo, before, selected);
+      const firstResult = await callSplit(blockId, pageNo, `${before}${selected}`, after);
+      await callSplit(firstResult.first.block_id, pageNo, before, selected);
     }
 
     splitting.value = null;
@@ -481,8 +481,13 @@ async function splitSelectedTextOut(
   }
 }
 
-async function callSplit(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
-  await blockStore.split(props.documentId, blockId, {
+async function callSplit(
+  blockId: string,
+  pageNo: number,
+  before: string,
+  after: string,
+): Promise<{ status: string; first: DocumentBlock; second: DocumentBlock }> {
+  return blockStore.split(props.documentId, blockId, {
     page_no: pageNo,
     before_text: before,
     before_html: `<p>${escapeForHtml(before)}</p>`,
