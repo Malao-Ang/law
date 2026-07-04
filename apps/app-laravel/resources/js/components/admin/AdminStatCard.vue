@@ -5,7 +5,7 @@
         <v-icon :icon="icon" :color="iconColor" size="22" />
       </v-avatar>
       <div>
-        <div class="text-h5 font-weight-bold">{{ number }}</div>
+        <div class="text-h5 font-weight-bold">{{ number.toLocaleString('th-TH') }}</div>
         <div class="text-caption text-medium-emphasis">{{ label }}</div>
       </div>
     </v-card-text>
