@@ -204,12 +204,8 @@
               </label>
             </div>
 
-            <v-btn size="x-small" variant="outlined" class="mt-2" prepend-icon="mdi-plus"
-              :disabled="blockBusy" @click="createBlockAfter(lastBlockId(section))">
-              เพิ่มบล็อกใต้หัวข้อนี้
-            </v-btn>
 
-            <div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
+<div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
               <v-chip v-for="rel in sectionRelations(section.id)" :key="rel.id" size="small" closable
                 :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
                 :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
