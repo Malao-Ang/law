@@ -1,5 +1,5 @@
 <template>
-  <LawspaceShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
     subtitle="จัดการความสัมพันธ์และข้อมูลกฎหมายก่อนเผยแพร่">
     <template #actions>
       <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
@@ -164,7 +164,7 @@
       </div>
       </div>
     </template>
-  </LawspaceShell>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
@@ -174,7 +174,7 @@ import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, LawRelation, RelationScope, RelationType } from '../../types/document';
-import LawspaceShell from '../shared/LawspaceShell.vue';
+import AppShell from '../shared/AppShell.vue';
 import { buildSections, relationsForSection, documentRelations, type LawSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
