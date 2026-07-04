@@ -224,19 +224,17 @@
           @close="dialog = null" @save="onRelationSaved" />
 
         <!-- Split modal -->
-        <v-dialog v-model="splitDialogOpen" max-width="360">
-          <v-card v-if="splitting" class="pa-5">
-            <div class="text-body-1 font-weight-bold mb-4" style="color:#1a3673">
-              เพิ่มบล็อกใหม่ที่ใด?
+        <v-dialog v-model="splitDialogOpen" max-width="560">
+          <v-card v-if="splitting" class="pa-4">
+            <div class="text-body-1 font-weight-bold mb-3" style="color:#1a3673">
+              แบ่งบล็อก — คลิกตำแหน่งในข้อความที่ต้องการแบ่ง
             </div>
-            <div class="d-flex ga-3 mb-4">
-              <v-btn prepend-icon="mdi-arrow-up-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
-                @click="addBlock('above')">ด้านบน</v-btn>
-              <v-btn prepend-icon="mdi-arrow-down-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
-                @click="addBlock('below')">ด้านล่าง</v-btn>
-            </div>
-            <div class="d-flex justify-end">
-              <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
+            <textarea class="rag-splitmodal__text" :value="splitting.text" rows="6"
+              @keyup="onSplitCaret" @mouseup="onSplitCaret" @click="onSplitCaret" @select="onSplitCaret" />
+            <div class="text-caption text-medium-emphasis mt-1">{{ splitPositionLabel }}</div>
+            <div class="d-flex justify-end ga-2 mt-3">
+              <v-btn variant="outlined" @click="splitting = null">ยกเลิก</v-btn>
+              <v-btn color="primary" :disabled="!canSplit || blockBusy" @click="confirmSplit">แบ่งบล็อก</v-btn>
             </div>
           </v-card>
         </v-dialog>
@@ -289,7 +287,7 @@ const allBlocks = computed<DocumentBlock[]>(() =>
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
-const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
+const splitting = ref<{ blockId: string; pageNo: number; text: string; cursorPos: number } | null>(null);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
@@ -298,6 +296,18 @@ const splitDialogOpen = computed({
   set: (v) => { if (!v) splitting.value = null; },
 });
 
+const canSplit = computed(() => {
+  if (!splitting.value) return false;
+  const { cursorPos, text } = splitting.value;
+  return cursorPos > 0 && cursorPos < text.length;
+});
+
+const splitPositionLabel = computed(() => {
+  if (!splitting.value) return '';
+  const { cursorPos, text } = splitting.value;
+  if (cursorPos === 0 || cursorPos === text.length) return 'คลิกที่ตำแหน่งในข้อความที่ต้องการแบ่ง';
+  return `แบ่งที่ตัวอักษรที่ ${cursorPos} จาก ${text.length}`;
+});
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -403,6 +413,7 @@ function openSplit(block: DocumentBlock): void {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
     text: block.approved_text || block.normalized_text || block.raw_text || '',
+    cursorPos: 0,
   };
 }
 
@@ -431,10 +442,16 @@ function escapeForHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function addBlock(where: 'above' | 'below'): Promise<void> {
-  if (!splitting.value || blockBusy.value) return;
-  const { blockId, pageNo, text } = splitting.value;
-  await splitBlockInto(blockId, pageNo, where === 'above' ? '' : text, where === 'above' ? text : '');
+function onSplitCaret(event: Event): void {
+  const el = event.target as HTMLTextAreaElement;
+  if (!splitting.value) return;
+  splitting.value = { ...splitting.value, cursorPos: el.selectionStart ?? 0 };
+}
+
+async function confirmSplit(): Promise<void> {
+  if (!splitting.value || blockBusy.value || !canSplit.value) return;
+  const { blockId, pageNo, text, cursorPos } = splitting.value;
+  await splitBlockInto(blockId, pageNo, text.slice(0, cursorPos), text.slice(cursorPos));
 }
 
 async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
