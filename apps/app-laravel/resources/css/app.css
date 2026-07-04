@@ -37,14 +37,6 @@
   --badge-prakat-bg: #ffedd5;
   --badge-kotmai-krung: #7c3aed;
   --badge-kotmai-krung-bg: #ede9fe;
-  --lawspace-sidebar-bg: #1e2a4a;
-  --lawspace-sidebar-text: rgba(255, 255, 255, 0.8);
-  --lawspace-sidebar-text-muted: rgba(255, 255, 255, 0.45);
-  --lawspace-sidebar-active-bg: rgba(255, 255, 255, 0.13);
-  --lawspace-sidebar-hover-bg: rgba(255, 255, 255, 0.07);
-  --lawspace-sidebar-border: rgba(255, 255, 255, 0.08);
-  --lawspace-sidebar-width: 260px;
-  --lawspace-header-height: 64px;
 }
 
 @font-face {
@@ -869,225 +861,6 @@ textarea {
   text-decoration: none;
 }
 
-.lawspace-shell {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
-  background: linear-gradient(180deg, #f7f9fc 0%, #f3f5f8 100%);
-  color: var(--text);
-  z-index: 210;
-}
-
-.lawspace-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 26px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 28px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
-}
-
-.lawspace-brand,
-.lawspace-user-card {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  border: none;
-  border-radius: 22px;
-  background: #f8fbff;
-  box-shadow: none;
-}
-
-.lawspace-brand {
-  padding: 18px 18px 18px 20px;
-}
-
-.lawspace-brand__mark,
-.lawspace-user-card__avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--law-primary) 0%, #284f97 100%);
-  color: #fff;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-
-.lawspace-user-card {
-  margin-top: auto;
-  padding: 18px;
-}
-
-.lawspace-user-card__avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.lawspace-brand__title,
-.lawspace-user-card__name {
-  margin: 0;
-  font-weight: 700;
-}
-
-.lawspace-brand__subtitle,
-.lawspace-user-card__role {
-  margin: 4px 0 0;
-  color: #6b7280;
-  font-size: 0.88rem;
-}
-
-.lawspace-nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.lawspace-nav-group__label {
-  margin: 0;
-  padding: 0 12px;
-  color: #6b7280;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.lawspace-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 18px;
-  border: 1px solid transparent;
-  border-radius: 18px;
-  background: #f8fbff;
-  color: #1f2937;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
-}
-
-.lawspace-nav-item:hover {
-  background: #eef4ff;
-}
-
-.lawspace-nav-item.is-active {
-  background: #e7efff;
-  color: var(--law-primary-deep);
-  border-color: transparent;
-  box-shadow: inset 4px 0 0 var(--law-primary);
-}
-
-.lawspace-nav-item__icon {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: #eef3ff;
-  color: var(--law-primary);
-  font-size: 1.1rem;
-}
-
-.lawspace-content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.lawspace-header {
-  padding: 22px 28px 18px;
-  border-bottom: 1px solid var(--law-border);
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px);
-}
-
-.lawspace-header__top,
-.lawspace-header__main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.lawspace-header__top {
-  margin-bottom: 16px;
-}
-
-.lawspace-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.lawspace-breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  color: #7d8798;
-  font-size: 0.92rem;
-}
-
-.lawspace-breadcrumbs__item:not(:last-child)::after {
-  content: "›";
-  margin-left: 8px;
-  color: #b0b9c7;
-}
-
-.lawspace-notify-button {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--law-border);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--law-primary);
-}
-
-.lawspace-page-title {
-  margin: 0;
-  font-size: 2rem;
-  line-height: 1.15;
-}
-
-.lawspace-page-subtitle {
-  margin: 8px 0 0;
-  color: var(--muted);
-}
-
-.lawspace-banner {
-  padding: 0 28px;
-}
-
-.lawspace-alert {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 14px 18px;
-  border: 1px solid #efd89b;
-  border-radius: 16px;
-  background: #fff8de;
-  color: #856516;
-}
-
-.lawspace-main {
-  flex: 1;
-  min-height: 0;
-  padding: 24px 28px 28px;
-  overflow: hidden;
-}
 
 .compose-state-card {
   height: 100%;
@@ -1522,14 +1295,6 @@ textarea {
 }
 
 @media (max-width: 1120px) {
-  .lawspace-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .lawspace-sidebar {
-    display: none;
-  }
-
   .compose-workspace {
     grid-template-columns: 1fr;
     overflow: auto;
@@ -1544,20 +1309,9 @@ textarea {
     order: 1;
     min-height: 720px;
   }
-
-  .lawspace-main {
-    overflow: auto;
-  }
 }
 
 @media (max-width: 720px) {
-  .lawspace-header,
-  .lawspace-main,
-  .lawspace-banner {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
   .compose-editor-surface {
     padding: 14px;
   }
@@ -1862,59 +1616,6 @@ textarea {
   flex-wrap: wrap;
 }
 
-.lawspace-shell {
-  --lawspace-sidebar-bg: #ffffff;
-}
-
-.lawspace-sidebar {
-  background: #ffffff !important;
-  color: #1f2937 !important;
-}
-
-.lawspace-sidebar .lawspace-brand {
-  background: #f8fbff !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.lawspace-sidebar .lawspace-brand__title {
-  color: #0f172a !important;
-}
-
-.lawspace-sidebar .lawspace-brand__subtitle {
-  color: #6b7280 !important;
-}
-
-.lawspace-nav-group__label {
-  color: #6b7280 !important;
-}
-
-.lawspace-nav-item {
-  color: #1f2937 !important;
-  cursor: pointer;
-}
-
-.lawspace-nav-item:hover {
-  background: #eef4ff !important;
-}
-
-.lawspace-nav-item.is-active {
-  background: #e7efff !important;
-  color: var(--law-primary-deep) !important;
-  box-shadow: inset 4px 0 0 var(--law-primary) !important;
-}
-
-.lawspace-user-card {
-  border-top: none !important;
-}
-
-.lawspace-user-card__name {
-  color: #0f172a !important;
-}
-
-.lawspace-user-card__role {
-  color: #6b7280 !important;
-}
 
 .admin-stat-card {
   background: #fff;

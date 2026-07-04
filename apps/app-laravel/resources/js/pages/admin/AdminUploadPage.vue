@@ -1,5 +1,5 @@
 <template>
-  <LawspaceShell
+  <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล']"
     title="การนำเข้าเอกสารกฎหมาย"
     subtitle="อัปโหลดไฟล์เพื่อเตรียมสกัดเนื้อหาเข้าสู่ระบบฐานข้อมูล"
@@ -36,14 +36,14 @@
         </div>
       </transition>
     </div>
-  </LawspaceShell>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUploadStore } from '../../stores/uploadStore';
-import LawspaceShell from '../../components/shared/LawspaceShell.vue';
+import AppShell from '../../components/shared/AppShell.vue';
 import UploadForm from '../../components/shared/UploadForm.vue';
 
 const router = useRouter();

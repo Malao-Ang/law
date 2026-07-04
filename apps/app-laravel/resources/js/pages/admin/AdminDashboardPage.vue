@@ -1,5 +1,5 @@
 <template>
-  <LawspaceShell :breadcrumbs="['LAWSPACE', 'หน้าแรก']" title="ภาพรวมระบบ">
+  <AppShell :breadcrumbs="['LAWSPACE', 'หน้าแรก']" title="ภาพรวมระบบ">
     <template #actions>
       <v-btn color="primary" prepend-icon="mdi-cloud-upload-outline" @click="router.push('/admin/upload')">
         นำเข้าเอกสาร
@@ -79,13 +79,13 @@
         </tbody>
       </table>
     </div>
-  </LawspaceShell>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import AdminStatCard from '../../components/admin/AdminStatCard.vue';
-import LawspaceShell from '../../components/shared/LawspaceShell.vue';
+import AppShell from '../../components/shared/AppShell.vue';
 
 const router = useRouter();
 
