@@ -25,7 +25,7 @@ class UpdateBlockRequest extends FormRequest
     {
         return [
             'page_no' => ['required', 'integer', 'min:1'],
-            'approved_text' => ['required', 'string'],
+            'approved_text' => ['nullable', 'string'],
             'approved_by' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'mark_uncertain' => ['boolean'],
