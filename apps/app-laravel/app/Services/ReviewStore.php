@@ -198,6 +198,7 @@ class ReviewStore
                 'layout' => $layout,
                 'table' => $table,
                 'table_html' => $table['html'] ?? null,
+                'chunk_type' => $patch['chunk_type'] ?? $existingMeta['chunk_type'] ?? null,
                 'review' => [
                     'approved_by' => $patch['approved_by'] ?? null,
                     'notes' => $patch['notes'] ?? null,
