@@ -1,35 +1,35 @@
 <template>
   <div class="matra-toc">
-    <div class="matra-toc__header" @click="collapsed = !collapsed">
-      <span class="matra-toc__title">มาตรา</span>
-      <span class="matra-toc__count hint">{{ items.length }}</span>
-      <span class="matra-toc__toggle">{{ collapsed ? '▶' : '▼' }}</span>
+    <div
+      class="matra-toc__header d-flex align-center ga-2 px-3 py-2"
+      @click="collapsed = !collapsed"
+    >
+      <span class="text-caption font-weight-semibold">มาตรา</span>
+      <span class="text-caption text-medium-emphasis">{{ items.length }}</span>
+      <v-spacer />
+      <v-icon :icon="collapsed ? 'mdi-chevron-right' : 'mdi-chevron-down'" size="x-small" />
     </div>
 
-    <div v-if="!collapsed" class="matra-toc__list">
-      <div
-        v-if="items.length === 0"
-        class="matra-toc__empty hint"
-      >ไม่พบมาตรา</div>
-
-      <button
-        v-for="item in items"
-        :key="item.block.block_id"
-        class="matra-toc__item"
-        :class="{ 'matra-toc__item--active': currentBlockId === item.block.block_id }"
-        :title="item.block.approved_text || item.block.normalized_text"
-        @click="emit('jump', item.block.block_id)"
-      >
-        <span class="matra-toc__marker">{{ item.block.meta.list_marker?.text ?? '' }}</span>
-        <span class="matra-toc__snippet hint">{{ snippet(item.block) }}</span>
-      </button>
+    <div v-if="!collapsed" class="matra-toc__body">
+      <div v-if="items.length === 0" class="text-caption text-medium-emphasis pa-3">ไม่พบมาตรา</div>
+      <v-list v-else nav density="compact" bg-color="transparent">
+        <v-list-item
+          v-for="item in items"
+          :key="item.block.block_id"
+          :active="currentBlockId === item.block.block_id"
+          color="success"
+          :title="item.block.meta.list_marker?.text ?? ''"
+          :subtitle="snippet(item.block)"
+          @click="emit('jump', item.block.block_id)"
+        />
+      </v-list>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { DocumentBlock, DocumentPage } from '../../types/document';
+import type { DocumentBlock } from '../../types/document';
 
 interface TocItem {
   page_no: number;
@@ -56,91 +56,26 @@ function snippet(block: DocumentBlock): string {
 </script>
 
 <style scoped>
+/* ponytail: brand green TOC palette (legal section marker theme), no Vuetify token, keep as CSS */
 .matra-toc {
-  margin-bottom: 1rem;
   border: 1px solid #d1fae5;
   border-radius: 6px;
   overflow: hidden;
   background: #f0fdf4;
+  margin-bottom: 1rem;
 }
 
 .matra-toc__header {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.6rem;
-  cursor: pointer;
   background: #d1fae5;
+  cursor: pointer;
   user-select: none;
 }
 
-.matra-toc__header:hover {
-  background: #a7f3d0;
-}
+.matra-toc__header:hover { background: #a7f3d0; }
 
-.matra-toc__title {
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.matra-toc__count {
-  font-size: 0.75rem;
-}
-
-.matra-toc__toggle {
-  margin-left: auto;
-  font-size: 0.75rem;
-}
-
-.matra-toc__list {
+/* ponytail: functional scroll constraint, keep as CSS */
+.matra-toc__body {
   max-height: 240px;
   overflow-y: auto;
-}
-
-.matra-toc__empty {
-  padding: 0.4rem 0.6rem;
-  font-size: 0.8rem;
-}
-
-.matra-toc__item {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  width: 100%;
-  text-align: left;
-  padding: 0.3rem 0.6rem;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid #d1fae5;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.8rem;
-  transition: background 0.1s;
-}
-
-.matra-toc__item:last-child {
-  border-bottom: none;
-}
-
-.matra-toc__item:hover {
-  background: #ecfdf5;
-}
-
-.matra-toc__item--active {
-  background: #6ee7b7;
-  font-weight: 600;
-}
-
-.matra-toc__marker {
-  white-space: nowrap;
-  flex-shrink: 0;
-  color: #047857;
-}
-
-.matra-toc__snippet {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.75rem;
 }
 </style>
