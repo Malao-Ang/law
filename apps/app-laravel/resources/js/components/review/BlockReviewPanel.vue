@@ -1,69 +1,57 @@
 <template>
-  <section class="panel" v-if="block">
-    <h3>Block Review</h3>
-    <p class="hint">{{ block.block_id }} · {{ block.type }}</p>
+  <v-card v-if="block" class="pa-4">
+    <div class="text-h6 font-weight-bold mb-1">Block Review</div>
+    <div class="text-caption text-medium-emphasis mb-3">{{ block.block_id }} · {{ block.type }}</div>
 
-  
+    <v-textarea v-model="approvedText" label="Block Review Approved Text" rows="4" />
 
-    <label>Block Review Approved Text</label>
-    <textarea v-model="approvedText"></textarea>
+    <v-row dense class="mt-2">
+      <v-col cols="12" sm="6">
+        <v-select v-model="selectedType" label="Block Type" :items="blockTypes" />
+      </v-col>
+      <v-col cols="12" sm="6">
+        <v-text-field v-model.number="readingOrder" label="Reading Order" type="number" min="0" />
+      </v-col>
+      <v-col cols="6" sm="3">
+        <v-text-field v-model.number="bbox[0]" label="X" type="number" min="0" />
+      </v-col>
+      <v-col cols="6" sm="3">
+        <v-text-field v-model.number="bbox[1]" label="Y" type="number" min="0" />
+      </v-col>
+      <v-col cols="6" sm="3">
+        <v-text-field v-model.number="bbox[2]" label="Width" type="number" min="0" />
+      </v-col>
+      <v-col cols="6" sm="3">
+        <v-text-field v-model.number="bbox[3]" label="Height" type="number" min="0" />
+      </v-col>
+    </v-row>
 
-    <div class="layout-grid">
-      <div>
-        <label>Block Type</label>
-        <select v-model="selectedType">
-          <option v-for="option in blockTypes" :key="option" :value="option">{{ option }}</option>
-        </select>
-      </div>
-      <div>
-        <label>Reading Order</label>
-        <input v-model.number="readingOrder" type="number" min="0" />
-      </div>
-      <div>
-        <label>X</label>
-        <input v-model.number="bbox[0]" type="number" min="0" />
-      </div>
-      <div>
-        <label>Y</label>
-        <input v-model.number="bbox[1]" type="number" min="0" />
-      </div>
-      <div>
-        <label>Width</label>
-        <input v-model.number="bbox[2]" type="number" min="0" />
-      </div>
-      <div>
-        <label>Height</label>
-        <input v-model.number="bbox[3]" type="number" min="0" />
-      </div>
-    </div>
-
-    <div v-if="block.meta.layout" class="layout-metadata">
-      <p class="hint">Alignment: {{ block.meta.layout.alignment ?? 'left' }}</p>
-      <p class="hint">Indent level: {{ block.meta.layout.indent_level ?? 0 }}</p>
-      <p class="hint">
+    <div v-if="block.meta.layout" class="mt-2">
+      <div class="text-caption text-medium-emphasis">Alignment: {{ block.meta.layout.alignment ?? 'left' }}</div>
+      <div class="text-caption text-medium-emphasis">Indent level: {{ block.meta.layout.indent_level ?? 0 }}</div>
+      <div class="text-caption text-medium-emphasis">
         Indent L/F/H: {{ block.meta.layout.indent_left ?? 0 }} / {{ block.meta.layout.indent_first_line ?? 0 }} /
         {{ block.meta.layout.indent_hanging ?? 0 }}
-      </p>
-      <p v-if="block.meta.layout.indent_source || block.meta.layout.indent_reason" class="hint">
+      </div>
+      <div v-if="block.meta.layout.indent_source || block.meta.layout.indent_reason" class="text-caption text-medium-emphasis">
         Indent rule: {{ block.meta.layout.indent_source ?? 'unknown' }} / {{ block.meta.layout.indent_reason ?? 'none' }}
-      </p>
-      <p v-if="block.meta.layout.first_line_inferred" class="hint">
+      </div>
+      <div v-if="block.meta.layout.first_line_inferred" class="text-caption text-medium-emphasis">
         First-line indent inferred: {{ block.meta.layout.first_line_inferred }}
-      </p>
-      <p class="hint">Tabs: {{ layoutTabsText }}</p>
-      <p v-if="block.meta.table_confidence != null" class="hint">
+      </div>
+      <div class="text-caption text-medium-emphasis">Tabs: {{ layoutTabsText }}</div>
+      <div v-if="block.meta.table_confidence != null" class="text-caption text-medium-emphasis">
         Table confidence: {{ Number(block.meta.table_confidence).toFixed(2) }}
-      </p>
-      <p v-if="block.meta.table_detection_reason" class="hint">
+      </div>
+      <div v-if="block.meta.table_detection_reason" class="text-caption text-medium-emphasis">
         Table reason: {{ block.meta.table_detection_reason }}
-      </p>
+      </div>
     </div>
 
-    <label>Reviewed HTML</label>
-    <textarea v-model="reviewedHtml" class="html-editor"></textarea>
+    <v-textarea v-model="reviewedHtml" label="Reviewed HTML" rows="6" class="mt-2" />
 
-    <div v-if="selectedType === 'table'" class="table-editor">
-      <label>Structured Table</label>
+    <div v-if="selectedType === 'table'" class="mt-2">
+      <div class="text-body-2 font-weight-medium mb-1">Structured Table</div>
       <table class="structured-table-editor">
         <tbody>
           <tr v-for="(row, rowIndex) in tableCells" :key="`row-${rowIndex}`">
@@ -76,14 +64,14 @@
             >
               <textarea v-model="tableCells[rowIndex][cellIndex].text" class="table-cell-input"></textarea>
               <div class="cell-span-controls">
-                <span class="hint">{{ cell.rowspan }}r × {{ cell.colspan }}c</span>
-                <button class="btn btn-tiny" title="Merge right (colspan +1)"
-                  @click="adjustSpan(rowIndex, cellIndex, 'colspan', +1)">→</button>
-                <button class="btn btn-tiny" title="Merge down (rowspan +1)"
-                  @click="adjustSpan(rowIndex, cellIndex, 'rowspan', +1)">↓</button>
-                <button class="btn btn-tiny" title="Split (reset to 1×1)"
+                <span class="text-caption">{{ cell.rowspan }}r × {{ cell.colspan }}c</span>
+                <v-btn size="x-small" variant="outlined" title="Merge right (colspan +1)"
+                  @click="adjustSpan(rowIndex, cellIndex, 'colspan', +1)">→</v-btn>
+                <v-btn size="x-small" variant="outlined" title="Merge down (rowspan +1)"
+                  @click="adjustSpan(rowIndex, cellIndex, 'rowspan', +1)">↓</v-btn>
+                <v-btn size="x-small" variant="outlined" title="Split (reset to 1×1)"
                   :disabled="cell.colspan === 1 && cell.rowspan === 1"
-                  @click="adjustSpan(rowIndex, cellIndex, 'reset', 0)">✕</button>
+                  @click="adjustSpan(rowIndex, cellIndex, 'reset', 0)">✕</v-btn>
               </div>
             </td>
           </tr>
@@ -91,26 +79,26 @@
       </table>
     </div>
 
-    <div class="actions">
-      <button class="btn" @click="approvedText = block.normalized_text">Accept Normalized</button>
-      <button class="btn" @click="approvedText = block.ai_suggested_text">Accept AI</button>
-      <button class="btn" @click="syncReviewedHtml">Sync HTML</button>
-      <button class="btn btn-primary" :disabled="busy" @click="saveBlock">Save Review</button>
-      <button class="btn" :disabled="busy" @click="runReprocess">Re-run AI</button>
+    <div class="d-flex flex-wrap ga-2 mt-3">
+      <v-btn @click="approvedText = block.normalized_text">Accept Normalized</v-btn>
+      <v-btn @click="approvedText = block.ai_suggested_text">Accept AI</v-btn>
+      <v-btn @click="syncReviewedHtml">Sync HTML</v-btn>
+      <v-btn color="primary" :disabled="busy" @click="saveBlock">Save Review</v-btn>
+      <v-btn :disabled="busy" @click="runReprocess">Re-run AI</v-btn>
     </div>
 
-    <div class="html-preview">
-      <p class="hint">HTML Preview</p>
+    <div class="mt-3">
+      <div class="text-caption text-medium-emphasis mb-1">HTML Preview</div>
       <div class="html-preview-card" v-html="reviewedHtml"></div>
     </div>
 
-    <p v-if="message" class="hint">{{ message }}</p>
-  </section>
+    <div v-if="message" class="text-caption text-medium-emphasis mt-2">{{ message }}</div>
+  </v-card>
 
-  <section class="panel" v-else>
-    <h3>Block Review</h3>
-    <p class="hint">Select a block from the list.</p>
-  </section>
+  <v-card v-else class="pa-4">
+    <div class="text-h6 font-weight-bold mb-1">Block Review</div>
+    <div class="text-caption text-medium-emphasis">Select a block from the list.</div>
+  </v-card>
 </template>
 
 <script setup lang="ts">

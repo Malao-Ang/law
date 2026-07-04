@@ -133,6 +133,7 @@ function tabGlyph(type: TabStop['type']): string {
 </script>
 
 <style scoped>
+/* ponytail: ruler & tab-stop drawing widget — no Vuetify equivalent, keep all */
 .block-ruler {
   position: relative;
   user-select: none;
