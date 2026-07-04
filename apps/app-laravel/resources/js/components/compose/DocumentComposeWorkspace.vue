@@ -34,26 +34,27 @@
     </v-navigation-drawer>
 
     <v-main class="document-compose-main">
-      <div v-if="composeStore.loading" class="compose-state-card">
+      <div v-if="composeStore.loading" class="d-flex flex-column align-center justify-center ga-3" style="height:100%; min-height:280px">
         <v-progress-circular indeterminate color="primary" />
-        <p>กำลังโหลดเอกสารสำหรับจัดรูปแบบ...</p>
+        <span class="text-medium-emphasis">กำลังโหลดเอกสารสำหรับจัดรูปแบบ...</span>
       </div>
 
-      <div v-else-if="composeStore.error" class="compose-state-card compose-state-card--error">
+      <div v-else-if="composeStore.error" class="d-flex flex-column align-center justify-center ga-3 text-error" style="height:100%; min-height:280px">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
-        <p>{{ composeStore.error }}</p>
+        <span>{{ composeStore.error }}</span>
         <v-btn variant="outlined" prepend-icon="mdi-refresh" @click="reloadReview">รีโหลดข้อมูล</v-btn>
       </div>
 
       <section v-else-if="composeStore.review" class="document-compose-shell">
-        <div v-if="correctionInProgress" class="compose-correction-banner">
-          <v-progress-circular indeterminate size="18" color="primary" />
-          <span>กำลังปรับปรุงด้วย AI ระบบจะรีเฟรชอัตโนมัติเมื่อเสร็จ</span>
-        </div>
-        <div v-else-if="correctionFailed" class="compose-correction-banner compose-correction-banner--error">
-          <v-icon icon="mdi-alert-circle-outline" size="18" />
-          <span>AI correction failed. คุณยังแก้ไขเอกสารต่อได้ แต่ Export จะถูกบล็อกไว้</span>
-        </div>
+        <v-alert v-if="correctionInProgress" type="info" variant="tonal" density="compact" class="rounded-0" style="flex-shrink:0">
+          <template #prepend>
+            <v-progress-circular indeterminate size="18" color="info" />
+          </template>
+          กำลังปรับปรุงด้วย AI ระบบจะรีเฟรชอัตโนมัติเมื่อเสร็จ
+        </v-alert>
+        <v-alert v-else-if="correctionFailed" type="error" variant="tonal" density="compact" icon="mdi-alert-circle-outline" class="rounded-0" style="flex-shrink:0">
+          AI correction failed. คุณยังแก้ไขเอกสารต่อได้ แต่ Export จะถูกบล็อกไว้
+        </v-alert>
 
         <ComposeBlockSelectionBar
           :count="selectedBlockIds.size"
@@ -504,20 +505,3 @@ function defaultMetadata(): DocumentMetadata {
 }
 </script>
 
-<style scoped>
-.compose-correction-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: var(--law-primary-soft);
-  color: var(--law-primary);
-  font-size: 13px;
-  border-bottom: 1px solid var(--law-border);
-}
-
-.compose-correction-banner--error {
-  background: #fef2f2;
-  color: var(--law-danger);
-}
-</style>
