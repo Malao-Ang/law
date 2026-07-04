@@ -4,36 +4,33 @@
     title="การนำเข้าเอกสารกฎหมาย"
     subtitle="อัปโหลดไฟล์เพื่อเตรียมสกัดเนื้อหาเข้าสู่ระบบฐานข้อมูล"
   >
-    <div class="admin-upload">
-      <div class="admin-upload__drop-card">
-        <span class="mdi mdi-cloud-upload-outline admin-upload__drop-icon"></span>
-        <h3 class="admin-upload__drop-title">ลากและวางไฟล์ข้อมูลกฎหมาย</h3>
-        <p class="admin-upload__drop-sub">รองรับไฟล์ .PDF หรือ .DOCX</p>
+    <div class="d-flex flex-column ga-5 mx-auto" style="max-width:600px">
+      <v-card class="pa-8 text-center" flat border rounded="lg" style="border-style:dashed">
+        <v-icon icon="mdi-cloud-upload-outline" size="56" color="grey" />
+        <div class="text-h6 font-weight-bold mt-2">ลากและวางไฟล์ข้อมูลกฎหมาย</div>
+        <div class="text-body-2 text-medium-emphasis mb-2">รองรับไฟล์ .PDF หรือ .DOCX</div>
         <UploadForm @uploaded="onUploaded" />
-      </div>
+      </v-card>
 
       <transition name="fade">
-        <div v-if="uploadStore.status" class="admin-upload__status-card">
-          <div class="admin-upload__status-header">
-            <span class="mdi mdi-file-document-outline"></span>
-            <span class="admin-upload__status-filename">{{ uploadStore.status.source_file ?? 'เอกสาร' }}</span>
-            <span
-              class="admin-upload__status-chip"
-              :class="`admin-upload__status-chip--${uploadStore.status.status}`"
-            >
+        <v-card v-if="uploadStore.status" class="pa-5" flat border rounded="lg">
+          <div class="d-flex align-center ga-3 font-weight-medium">
+            <v-icon icon="mdi-file-document-outline" color="primary" />
+            <span class="flex-grow-1">{{ uploadStore.status.source_file ?? 'เอกสาร' }}</span>
+            <v-chip size="small" :color="statusChipColor(uploadStore.status.status)">
               {{ statusLabel(uploadStore.status.status) }}
-            </span>
+            </v-chip>
           </div>
           <v-progress-linear
             v-if="isProcessing"
             indeterminate
             color="primary"
-            class="admin-upload__progress"
+            class="mt-3"
           />
-          <p v-if="uploadStore.status.current_step" class="admin-upload__step-label">
+          <div v-if="uploadStore.status.current_step" class="text-caption text-medium-emphasis mt-2">
             {{ uploadStore.status.current_step }}
-          </p>
-        </div>
+          </div>
+        </v-card>
       </transition>
     </div>
   </AppShell>
@@ -74,6 +71,10 @@ function statusLabel(s: string): string {
   return map[s] ?? s;
 }
 
+function statusChipColor(s: string): string {
+  return ({ done: 'success', exported: 'success', ingested: 'success', processing: 'warning', ingesting: 'warning', queued: 'info', failed: 'error' } as Record<string, string>)[s] ?? 'grey';
+}
+
 function onUploaded(id: string): void {
   documentId = id;
   uploadStore.reset();
@@ -96,107 +97,7 @@ async function pollStatus(): Promise<void> {
 </script>
 
 <style scoped>
-.admin-upload {
-  max-width: 600px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.admin-upload__drop-card {
-  border: 2px dashed var(--law-border);
-  border-radius: 12px;
-  padding: 40px 32px;
-  text-align: center;
-  background: var(--law-surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.admin-upload__drop-icon {
-  font-size: 56px;
-  color: var(--law-border);
-}
-
-.admin-upload__drop-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--elaw-navy);
-  margin: 8px 0 0;
-}
-
-.admin-upload__drop-sub {
-  font-size: 13px;
-  color: var(--elaw-muted);
-  margin: 0 0 8px;
-}
-
-.admin-upload__status-card {
-  border: 1px solid var(--law-border);
-  border-radius: 10px;
-  padding: 20px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.admin-upload__status-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-}
-
-.admin-upload__status-header .mdi {
-  font-size: 20px;
-  color: var(--law-primary);
-}
-
-.admin-upload__status-filename {
-  flex: 1;
-  font-size: 14px;
-}
-
-.admin-upload__status-chip {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.admin-upload__status-chip--done,
-.admin-upload__status-chip--exported,
-.admin-upload__status-chip--ingested {
-  color: #15803d;
-  background: #dcfce7;
-}
-
-.admin-upload__status-chip--processing,
-.admin-upload__status-chip--ingesting {
-  color: #92400e;
-  background: #fffbeb;
-}
-
-.admin-upload__status-chip--queued {
-  color: #1d4ed8;
-  background: #dbeafe;
-}
-
-.admin-upload__status-chip--failed {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
-.admin-upload__step-label {
-  font-size: 12px;
-  color: var(--elaw-muted);
-  margin: 0;
-}
-
+/* ponytail: fade transition, keep */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.25s;
