@@ -1582,39 +1582,6 @@ textarea {
   background: var(--badge-kotmai-krung-bg);
 }
 
-.elaw-law-card {
-  background: #fff;
-  border: 1px solid var(--elaw-border);
-  border-radius: var(--elaw-radius);
-  padding: 18px 20px;
-  box-shadow: var(--elaw-card-shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
-}
-
-.elaw-law-card:hover {
-  border-color: var(--elaw-warm-gold);
-  box-shadow: 0 4px 16px rgba(26, 46, 82, 0.12);
-}
-
-.elaw-law-card__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--elaw-text);
-  line-height: 1.45;
-}
-
-.elaw-law-card__meta {
-  font-size: 12px;
-  color: var(--elaw-muted);
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
 
 .section-action-bar {
   display: flex;

@@ -1,16 +1,20 @@
 <template>
-  <article class="elaw-law-card" role="button" tabindex="0" @click="$emit('click')">
-    <div class="elaw-law-card__top">
-      <span class="elaw-badge" :class="badgeClass">{{ typeLabel }}</span>
-      <span class="elaw-law-card__number">{{ docNumber }}</span>
-    </div>
-    <h3 class="elaw-law-card__title">{{ title }}</h3>
-    <div class="elaw-law-card__meta">
-      <span v-if="department">{{ department }}</span>
-      <span v-if="date">{{ date }}</span>
-      <span v-if="status" class="elaw-law-card__status" :class="statusClass">{{ status }}</span>
-    </div>
-  </article>
+  <v-card hover link @click="$emit('click')">
+    <v-card-text class="pb-0">
+      <div class="d-flex align-center ga-2">
+        <v-chip size="x-small" :color="badgeColor(docType)">{{ typeLabel }}</v-chip>
+        <span v-if="docNumber" class="text-caption text-medium-emphasis">{{ docNumber }}</span>
+      </div>
+    </v-card-text>
+    <v-card-title class="text-body-2 text-wrap">{{ title }}</v-card-title>
+    <v-card-subtitle>
+      <div class="d-flex ga-3 flex-wrap align-center">
+        <span v-if="department">{{ department }}</span>
+        <span v-if="date">{{ date }}</span>
+        <span v-if="status">{{ status }}</span>
+      </div>
+    </v-card-subtitle>
+  </v-card>
 </template>
 
 <script setup lang="ts">
@@ -38,40 +42,8 @@ const typeLabels: Record<DocType, string> = {
 };
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
-const badgeClass = computed(() => `elaw-badge--${props.docType}`);
-const statusClass = computed(() => {
-  if (props.status === 'มีผลบังคับใช้') return 'elaw-law-card__status--active';
-  if (props.status === 'ยกเลิก') return 'elaw-law-card__status--cancelled';
-  return '';
-});
+
+function badgeColor(t: string): string {
+  return ({ rabiap: 'success', prakat: 'warning', 'kho-bangkhab': 'info', 'kotmai-krung': 'purple' } as Record<string, string>)[t] ?? 'grey';
+}
 </script>
-
-<style scoped>
-.elaw-law-card__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.elaw-law-card__number {
-  font-size: 11px;
-  color: var(--elaw-muted);
-}
-
-.elaw-law-card__status {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 10px;
-}
-
-.elaw-law-card__status--active {
-  color: #15803d;
-  background: #dcfce7;
-}
-
-.elaw-law-card__status--cancelled {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-</style>
