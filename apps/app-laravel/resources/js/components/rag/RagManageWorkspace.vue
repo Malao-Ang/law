@@ -2,8 +2,8 @@
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
     subtitle="จัดการความสัมพันธ์และข้อมูลกฎหมายก่อนเผยแพร่">
     <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
-        ยกเลิก
+      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
+        ย้อนกลับ
       </v-btn>
       <v-btn color="#1a3673" :loading="composeStore.exporting" @click="handleExport">
         บันทึกและเผยแพร่
@@ -51,69 +51,6 @@
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
         </v-alert>
-
-        <!-- Law metadata panel -->
-        <v-expansion-panels variant="accordion">
-          <v-expansion-panel>
-            <v-expansion-panel-title>
-              <v-icon icon="mdi-information-outline" size="16" class="mr-2" />
-              ข้อมูลกฎหมาย (หัวเอกสาร)
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <v-row dense>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.status" label="สถานะ" placeholder="มีผลใช้บังคับ" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.law_type" label="ประเภท" placeholder="พระราชบัญญัติ" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.law_group" label="กลุ่มกฎหมาย" placeholder="ด้านวิชาการ" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.agency" label="หน่วยงาน" placeholder="มหาวิทยาลัยบูรพา" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.promulgation_date" label="วันที่ประกาศ" placeholder="9 มกราคม 2551" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.effective_date" label="วันที่มีผลบังคับ" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.gazette_reference" label="ราชกิจจานุเบกษา" placeholder="เล่ม 125 ตอนที่ 5 ก" />
-                </v-col>
-                <v-col cols="12" sm="6">
-                  <v-text-field v-model="lawMetaForm.royal_command" label="พระบรมราชโองการ" placeholder="ภูมิพลอดุลยเดช ปร." />
-                </v-col>
-                <v-col cols="12">
-                  <v-textarea v-model="repealedText" label="กฎหมายที่ถูกยกเลิก (บรรทัดละ 1 รายการ)" rows="3" />
-                </v-col>
-              </v-row>
-
-              <div class="mt-3">
-                <div class="d-flex align-center justify-space-between text-body-2 font-weight-bold mb-2"
-                  style="color:#1a3673">
-                  <span>ความสัมพันธ์ระดับเอกสาร</span>
-                  <v-btn size="x-small" variant="outlined" prepend-icon="mdi-plus"
-                    @click="openRelationDialog('document', null, 'related')">เพิ่ม</v-btn>
-                </div>
-                <div class="d-flex flex-wrap ga-2">
-                  <v-chip v-for="rel in documentRelations(relations)" :key="rel.id" size="small" closable
-                    :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
-                    :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
-                    @click:close="removeRelation(rel.id)">
-                    {{ rel.target_title }}
-                  </v-chip>
-                </div>
-              </div>
-
-              <v-btn color="primary" class="mt-3" prepend-icon="mdi-content-save-outline"
-                :disabled="documentStore.saving" @click="saveLawMeta">
-                บันทึกข้อมูลกฎหมาย
-              </v-btn>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
 
         <!-- Section list (e-Law style) -->
         <div ref="blockListEl" class="rag-block-list">
@@ -252,14 +189,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
-import type { DocumentBlock, LawMeta, LawRelation, RelationScope, RelationType } from '../../types/document';
+import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
-import { buildSections, relationsForSection, documentRelations } from '../../composables/useLawSections';
+import { buildSections, relationsForSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
@@ -271,22 +208,6 @@ const router = useRouter();
 const composeStore = useComposeStore();
 const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
-
-const repealedText = ref('');
-
-const EMPTY_LAW_META: LawMeta = {
-  status: '',
-  law_type: '',
-  law_group: '',
-  agency: '',
-  promulgation_date: '',
-  effective_date: '',
-  gazette_reference: '',
-  royal_command: '',
-  repealed_laws: [],
-};
-
-const lawMetaForm = ref<LawMeta>({ ...EMPTY_LAW_META });
 
 const sections = computed(() => buildSections(composeStore.review));
 const allBlocks = computed<DocumentBlock[]>(() =>
@@ -471,38 +392,10 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
 }
 
 
-watch(() => documentStore.review?.law_meta, (meta) => {
-  const nextMeta = {
-    ...EMPTY_LAW_META,
-    ...(meta ?? {}),
-    repealed_laws: [...(meta?.repealed_laws ?? [])],
-  };
-
-  lawMetaForm.value = nextMeta;
-  repealedText.value = nextMeta.repealed_laws.join('\n');
-}, { immediate: true });
-
 async function handleExport(): Promise<void> {
   await composeStore.triggerExport(props.documentId);
   if (!composeStore.error) {
     router.push(`/law/${props.documentId}`);
-  }
-}
-
-async function saveLawMeta(): Promise<void> {
-  const repealedLaws = repealedText.value
-    .split('\n')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  const payload: LawMeta = {
-    ...lawMetaForm.value,
-    repealed_laws: repealedLaws,
-  };
-
-  const saved = await documentStore.saveLawMeta(payload);
-  if (saved) {
-    lawMetaForm.value = payload;
   }
 }
 

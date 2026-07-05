@@ -113,6 +113,7 @@
       <span class="text-caption text-medium-emphasis">{{ charCount }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด</span>
       <div class="d-flex ga-2">
         <v-btn variant="outlined" @click="router.back()">ยกเลิก</v-btn>
+        <v-btn variant="outlined" prepend-icon="mdi-eye-outline" :loading="documentStore.saving" @click="openPreview">ดูตัวอย่าง</v-btn>
         <v-btn color="#1c398e" :loading="documentStore.saving" @click="saveAndContinue">บันทึกข้อมูล</v-btn>
       </div>
     </div>
@@ -121,7 +122,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
+import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -195,8 +196,22 @@ const activeHeadingLevel = computed<string>(() => {
   return '0';
 });
 
+onBeforeRouteLeave(async () => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+
+  if (reviewUiStore.isDirty && editor.value) {
+    await saveDocument();
+  }
+});
+
 onBeforeUnmount(() => {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    void saveDocument();
+  }
   if (tableSyncTimer) clearTimeout(tableSyncTimer);
   editor.value?.destroy();
 });
@@ -289,8 +304,17 @@ async function saveAndContinue(): Promise<void> {
   const result = await documentStore.saveReview({ draft_html: editor.value?.getHTML() ?? '' });
   if (result !== null) {
     reviewUiStore.setDirty(false);
-    router.push(`/documents/${props.documentId}/rag`);
+    router.push(`/documents/${props.documentId}/law-info`);
   }
+}
+
+async function openPreview(): Promise<void> {
+  if (reviewUiStore.isDirty && editor.value) {
+    const result = await documentStore.saveReview({ draft_html: editor.value.getHTML() });
+    if (result !== null) reviewUiStore.setDirty(false);
+  }
+
+  router.push(`/documents/${props.documentId}/preview`);
 }
 </script>
 
