@@ -56,6 +56,26 @@
         <div ref="blockListEl" class="rag-block-list">
           <div v-for="section in sections" :key="section.id" class="rag-sec">
             <div class="rag-sec__head">
+              <v-menu location="bottom start" :close-on-content-click="true">
+                <template #activator="{ props: menuProps }">
+                  <v-chip v-bind="menuProps" size="small"
+                    :color="containerTypeColor(section)"
+                    :variant="section.headBlock.meta.chunk_type ? 'tonal' : 'outlined'"
+                    class="rag-sec__typechip">
+                    {{ containerTypeLabel(section) }}
+                    <v-icon icon="mdi-chevron-down" size="12" class="ml-1" />
+                  </v-chip>
+                </template>
+                <v-list density="compact" :min-width="180">
+                  <v-list-item
+                    v-for="ct in CHUNK_TYPES"
+                    :key="ct"
+                    :title="CHUNK_TYPE_LABELS[ct]"
+                    :active="section.headBlock.meta.chunk_type === ct"
+                    @click="setChunkType(section.headBlock, ct)"
+                  />
+                </v-list>
+              </v-menu>
               <div class="rag-sec__actions">
                 <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
                   @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
@@ -71,29 +91,6 @@
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
-                <v-menu location="bottom start" :close-on-content-click="true">
-                  <template #activator="{ props: menuProps }">
-                    <v-chip
-                      v-bind="menuProps"
-                      size="x-small"
-                      :color="section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[section.headBlock.meta.chunk_type as ChunkType] : undefined"
-                      :variant="section.headBlock.meta.chunk_type ? 'tonal' : 'outlined'"
-                      class="rag-blockrow__typechip"
-                      @click.prevent.stop>
-                      {{ section.headBlock.meta.chunk_type ? CHUNK_TYPE_LABELS[section.headBlock.meta.chunk_type as ChunkType] : 'ประเภท...' }}
-                      <v-icon icon="mdi-chevron-down" size="10" class="ml-1" />
-                    </v-chip>
-                  </template>
-                  <v-list density="compact" :min-width="140">
-                    <v-list-item
-                      v-for="ct in CHUNK_TYPES"
-                      :key="ct"
-                      :title="CHUNK_TYPE_LABELS[ct]"
-                      :active="section.headBlock.meta.chunk_type === ct"
-                      @click="setChunkType(section.headBlock, ct)"
-                    />
-                  </v-list>
-                </v-menu>
                 <BlockFlow
                   :block="section.headBlock"
                   :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
@@ -110,29 +107,6 @@
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
-                <v-menu location="bottom start" :close-on-content-click="true">
-                  <template #activator="{ props: menuProps }">
-                    <v-chip
-                      v-bind="menuProps"
-                      size="x-small"
-                      :color="child.meta.chunk_type ? CHUNK_TYPE_COLORS[child.meta.chunk_type as ChunkType] : undefined"
-                      :variant="child.meta.chunk_type ? 'tonal' : 'outlined'"
-                      class="rag-blockrow__typechip"
-                      @click.prevent.stop>
-                      {{ child.meta.chunk_type ? CHUNK_TYPE_LABELS[child.meta.chunk_type as ChunkType] : 'ประเภท...' }}
-                      <v-icon icon="mdi-chevron-down" size="10" class="ml-1" />
-                    </v-chip>
-                  </template>
-                  <v-list density="compact" :min-width="140">
-                    <v-list-item
-                      v-for="ct in CHUNK_TYPES"
-                      :key="ct"
-                      :title="CHUNK_TYPE_LABELS[ct]"
-                      :active="child.meta.chunk_type === ct"
-                      @click="setChunkType(child, ct)"
-                    />
-                  </v-list>
-                </v-menu>
                 <BlockFlow :block="child" />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
                   @click.prevent.stop="openSplit(child)">
@@ -196,7 +170,7 @@ import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
-import { buildSections, relationsForSection } from '../../composables/useLawSections';
+import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
@@ -210,6 +184,24 @@ const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
 
 const sections = computed(() => buildSections(composeStore.review));
+
+function containerType(section: LawSection): ChunkType | null {
+  const stored = section.headBlock.meta.chunk_type as ChunkType | null | undefined;
+  return stored || suggestChunkType(section.headBlock);
+}
+
+function containerTypeLabel(section: LawSection): string {
+  const ct = containerType(section);
+  if (!ct) return 'เลือกประเภท...';
+  const label = CHUNK_TYPE_LABELS[ct];
+  return section.headBlock.meta.chunk_type ? label : `${label} (แนะนำ)`;
+}
+
+function containerTypeColor(section: LawSection): string | undefined {
+  const ct = containerType(section);
+  if (!ct) return undefined;
+  return section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[ct] : 'grey';
+}
 const allBlocks = computed<DocumentBlock[]>(() =>
   sections.value.flatMap(s => [s.headBlock, ...s.children]),
 );
@@ -458,6 +450,11 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
+.rag-sec__typechip {
+  cursor: pointer;
+  align-self: center;
+}
+
 .rag-sec__flow {
   display: flex;
   flex-direction: column;
@@ -475,7 +472,7 @@ onBeforeUnmount(() => {
 /* ponytail: custom checkbox grid layout — no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
-  grid-template-columns: minmax(28px, 10%) auto minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;
   align-items: start;
   gap: 10px;
   padding: 8px 10px;
@@ -556,11 +553,6 @@ onBeforeUnmount(() => {
   color: #1a3673;
 }
 
-.rag-blockrow__typechip {
-  align-self: start;
-  margin-top: 2px;
-  cursor: pointer;
-}
 
 .rag-splitlines {
   display: flex;
