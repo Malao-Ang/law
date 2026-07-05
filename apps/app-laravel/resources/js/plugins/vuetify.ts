@@ -15,8 +15,10 @@ export const vuetify = createVuetify({
     themes: {
       light: {
         colors: {
-          primary: '#123f8c',
+          primary: '#ab7f29',
+          secondary: 'rgba(52, 48, 40, 1)',
           'primary-deep': '#0f2f68',
+          'admin-primary': '#1e3a8a',
           accent: '#0f6b5d',
           warning: '#f9b74b',
           error: '#d74747',
@@ -31,7 +33,7 @@ export const vuetify = createVuetify({
   defaults: {
     VCard: { variant: 'flat', border: true, rounded: 'lg' },
     VBtn: { variant: 'flat' },
-    VTextField: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
+    VTextField: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto', rounded: 'xl' },
     VSelect: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
     VTextarea: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
   },
