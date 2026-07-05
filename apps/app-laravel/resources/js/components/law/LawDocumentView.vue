@@ -1,65 +1,41 @@
 <template>
   <div class="lawx">
-    <header class="lawx-topbar">
-      <div class="lawx-topbar__inner">
-        <div class="lawx-brand">
-          <span class="lawx-toggle">
-            <v-btn
-              :icon="navOpen ? 'mdi-close' : 'mdi-menu'"
-              size="small"
-              variant="outlined"
-              aria-label="สลับเมนูนำทาง"
-              @click="navOpen = !navOpen"
-            />
-          </span>
-          <v-icon icon="mdi-scale-balance" size="24" color="amber-darken-3" />
-          <span class="lawx-brand__name">e-Law</span>
+    <ELawNavbar @go-admin="router.push('/admin')" />
+
+    <v-main class="lawx-main">
+      <div class="lawx-subbar">
+        <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
+          @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>
+        <div class="lawx-actions">
+          <v-btn variant="outlined" size="small"
+            :prepend-icon="tocOpen ? 'mdi-eye-off-outline' : 'mdi-table-of-contents'"
+            @click="tocOpen = !tocOpen">{{ tocOpen ? 'ซ่อนสารบัญ' : 'เปิดสารบัญ' }}</v-btn>
+          <v-btn variant="outlined" size="small"
+            :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
+            @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
+          <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
+            @click="printPage()">พิมพ์</v-btn>
+          <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
+            @click="printPage()">ดาวน์โหลด PDF</v-btn>
         </div>
-        <nav class="lawx-nav" :class="{ 'is-open': navOpen }">
-          <v-btn variant="text" size="small">หน้าแรก</v-btn>
-          <v-btn variant="text" size="small">เกี่ยวกับระบบ</v-btn>
-          <v-btn variant="text" size="small" color="primary">ฐานข้อมูลกฎหมาย</v-btn>
-          <v-btn variant="text" size="small">ความรู้</v-btn>
-        </nav>
-        <v-btn prepend-icon="mdi-account-circle-outline" color="primary" size="small" class="lawx-org-btn">
-          สำหรับบุคลากรองค์กร
-        </v-btn>
       </div>
-    </header>
 
-    <div class="lawx-subbar">
-      <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
-        @click="router.push(`/documents/${props.documentId}/rag`)">ย้อนกลับ</v-btn>
-      <div class="lawx-actions">
-        <v-btn variant="outlined" size="small"
-          :prepend-icon="tocOpen ? 'mdi-eye-off-outline' : 'mdi-table-of-contents'"
-          @click="tocOpen = !tocOpen">{{ tocOpen ? 'ซ่อนสารบัญ' : 'เปิดสารบัญ' }}</v-btn>
-        <v-btn variant="outlined" size="small"
-          :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
-          @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
-        <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
-          @click="printPage()">พิมพ์</v-btn>
-        <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
-          @click="printPage()">ดาวน์โหลด PDF</v-btn>
+      <div v-if="documentStore.loading" class="d-flex align-center justify-center ga-3 pa-16 text-medium-emphasis">
+        <v-progress-circular indeterminate />
+        <span>กำลังโหลด...</span>
       </div>
-    </div>
+      <v-alert v-else-if="documentStore.error" type="error" variant="tonal" density="compact" class="ma-4">
+        {{ documentStore.error }}
+      </v-alert>
 
-    <div v-if="documentStore.loading" class="d-flex align-center justify-center ga-3 pa-16 text-medium-emphasis">
-      <v-progress-circular indeterminate />
-      <span>กำลังโหลด...</span>
-    </div>
-    <v-alert v-else-if="documentStore.error" type="error" variant="tonal" density="compact" class="ma-4">
-      {{ documentStore.error }}
-    </v-alert>
-
-    <div
-      v-else-if="documentStore.review"
-      class="lawx-grid"
-      :class="{
-        'is-toc-hidden': !tocOpen,
-        'is-info-hidden': !infoOpen,
-      }"
-    >
+      <div
+        v-else-if="documentStore.review"
+        class="lawx-grid"
+        :class="{
+          'is-toc-hidden': !tocOpen,
+          'is-info-hidden': !infoOpen,
+        }"
+      >
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
         <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญมาตรา</p>
         <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
@@ -83,7 +59,7 @@
       <main class="lawx-doc">
         <v-card tag="section" class="lawx-headcard" elevation="0">
           <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
-          <h1 class="lawx-headcard__title">{{ documentStore.review.source_file }}</h1>
+          <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ meta.promulgation_date }}</span>
             <span v-if="meta.gazette_reference"><span class="mdi mdi-book-open-variant" /> {{ meta.gazette_reference }}</span>
@@ -138,7 +114,10 @@
       <aside v-show="infoOpen" class="lawx-info">
         <LawInfoPanel :meta="meta" :article-count="articleCount" :relations="documentRelations(relations)" />
       </aside>
-    </div>
+      </div>
+
+      <ELawFooter />
+    </v-main>
   </div>
 </template>
 
@@ -150,6 +129,8 @@ import { buildSections, buildTocGroups, relationsForSection, documentRelations }
 import type { LawMeta, LawRelation } from '../../types/document';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
+import ELawFooter from '../shared/ELawFooter.vue';
+import ELawNavbar from '../shared/ELawNavbar.vue';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
@@ -181,7 +162,6 @@ const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_MET
 const articleCount = computed(() => sections.value.filter((section) => section.badge.startsWith('มาตรา')).length);
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
-const navOpen = ref(false);
 const tocOpen = ref(true);
 const infoOpen = ref(true);
 const expanded = ref<Set<string>>(new Set());
@@ -267,7 +247,6 @@ watch(sections, async (value) => {
 }, { immediate: true });
 
 watch(() => props.documentId, () => {
-  navOpen.value = false;
   tocOpen.value = true;
   infoOpen.value = true;
 });
@@ -280,42 +259,11 @@ onBeforeUnmount(() => observer?.disconnect());
   min-height: 100vh;
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   color: #1e293b;
+  background: #f6f4ef;
 }
 
-.lawx-topbar {
-  background: rgba(255, 252, 245, 0.92);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  backdrop-filter: blur(18px);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.lawx-topbar__inner {
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 0 24px;
-  min-height: 68px;
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
-.lawx-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lawx-toggle { display: none; align-items: center; }
-
-.lawx-brand__name { font-weight: 800; font-size: 19px; color: #1e2a4a; letter-spacing: 0.02em; }
-
-.lawx-nav {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  align-items: center;
+.lawx-main {
+  background: #f6f4ef;
 }
 
 .lawx-subbar {
@@ -356,7 +304,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-toc,
 .lawx-info :deep(.law-info-panel) {
-  background: #fff;
+  background: rgb(var(--v-theme-detail-surface));
   border: 1px solid rgba(226, 232, 240, 0.9);
   box-shadow: 0 18px 42px rgba(148, 163, 184, 0.12);
 }
@@ -381,7 +329,7 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 .lawx-headcard {
-  background: #fff;
+  background: rgb(var(--v-theme-detail-surface));
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-top: 5px solid #1e2a4a;
   border-radius: 22px;
@@ -397,7 +345,7 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-headcard__meta .mdi { color: #94a3b8; }
 
 .lawx-card {
-  background: #fff;
+  background: rgb(var(--v-theme-detail-surface));
   border: 1px solid rgba(226, 232, 240, 0.82);
   border-radius: 22px;
   padding: 20px 22px 10px;
@@ -438,35 +386,6 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 @media (max-width: 920px) {
-  .lawx-topbar__inner {
-    min-height: 72px;
-    flex-wrap: wrap;
-    padding: 12px 20px;
-    gap: 14px;
-  }
-
-  .lawx-toggle {
-    display: inline-flex;
-  }
-
-  .lawx-brand {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .lawx-nav {
-    display: none;
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    padding: 6px 0 2px;
-  }
-
-  .lawx-nav.is-open {
-    display: flex;
-  }
-
   .lawx-subbar {
     padding: 16px 20px 0;
     flex-direction: column;
@@ -492,7 +411,7 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 @media print {
-  .lawx-topbar, .lawx-subbar, .lawx-toc, .lawx-info { display: none !important; }
+  :deep(.v-app-bar), .lawx-subbar, .lawx-toc, .lawx-info { display: none !important; }
   .lawx-grid { grid-template-columns: 1fr; padding: 0; }
 }
 </style>
