@@ -12,7 +12,7 @@
         :key="stat.label"
         cols="12"
         sm="6"
-        md="3"
+        md="2"
       >
         <AdminStatCard
           :icon="stat.icon"
@@ -81,17 +81,17 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="doc in recentImports" :key="doc.id">
+            <tr v-for="doc in docs.slice(0, 10)" :key="doc.document_id">
               <td>{{ doc.title }}</td>
               <td>
-                <v-chip size="x-small" :color="badgeColor(doc.docType)">{{ doc.typeLabel }}</v-chip>
+                <v-chip size="x-small" color="grey">เอกสาร</v-chip>
               </td>
-              <td>{{ doc.date }}</td>
+              <td>{{ doc.updated_at ? new Date(doc.updated_at).toLocaleDateString('th-TH') : '-' }}</td>
               <td>
                 <v-chip size="x-small" :color="statusChipColor(doc.status)">{{ statusLabel(doc.status) }}</v-chip>
               </td>
               <td>
-                <v-btn size="x-small" variant="tonal" :to="`/documents/${doc.id}/compose`">
+                <v-btn size="x-small" variant="tonal" :to="`/documents/${doc.document_id}/review`">
                   แก้ไข
                 </v-btn>
               </td>
@@ -104,19 +104,72 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { listDocuments } from '../../api/client';
+import type { DocumentListItem } from '../../types/document';
 import AdminStatCard from '../../components/admin/AdminStatCard.vue';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const router = useRouter();
 
-const statCards = [
-  { icon: 'mdi-alert-circle-outline', iconColor: '#d74747', iconBg: '#fee2e2', number: 84, label: 'จุดเสี่ยงที่พบ' },
-  { icon: 'mdi-clock-edit-outline', iconColor: '#ea580c', iconBg: '#ffedd5', number: 216, label: 'รอปรับปรุง' },
-  { icon: 'mdi-text-recognition', iconColor: '#2563eb', iconBg: '#dbeafe', number: 12, label: 'คิว OCR' },
-  { icon: 'mdi-graph-outline', iconColor: '#7c3aed', iconBg: '#ede9fe', number: 12402, label: 'ความสัมพันธ์' },
-];
+// ── API state ──────────────────────────────────────────────
+const docs = ref<DocumentListItem[]>([]);
+const loading = ref(false);
 
+onMounted(async () => {
+  loading.value = true;
+  try {
+    const res = await listDocuments();
+    docs.value = res.documents ?? [];
+  } finally {
+    loading.value = false;
+  }
+});
+
+// ── Status card counts ─────────────────────────────────────
+const PUBLISHED = ['done', 'exported', 'ingested'];
+const PROCESSING = ['queued', 'processing', 'ingesting'];
+
+const statCards = computed(() => [
+  {
+    icon: 'mdi-file-document-multiple-outline',
+    iconColor: '#2563eb',
+    iconBg: '#dbeafe',
+    number: docs.value.length,
+    label: 'เอกสารทั้งหมด',
+  },
+  {
+    icon: 'mdi-check-circle-outline',
+    iconColor: '#16a34a',
+    iconBg: '#dcfce7',
+    number: docs.value.filter(d => PUBLISHED.includes(d.status)).length,
+    label: 'เผยแพร่แล้ว',
+  },
+  {
+    icon: 'mdi-file-edit-outline',
+    iconColor: '#64748b',
+    iconBg: '#f1f5f9',
+    number: docs.value.filter(d => d.status === 'failed').length,
+    label: 'ร่างเอกสาร',
+  },
+  {
+    icon: 'mdi-clock-outline',
+    iconColor: '#d97706',
+    iconBg: '#fef3c7',
+    number: docs.value.filter(d => PROCESSING.includes(d.status)).length,
+    label: 'รอตรวจสอบ',
+  },
+  {
+    icon: 'mdi-draw-pen',
+    iconColor: '#7c3aed',
+    iconBg: '#ede9fe',
+    number: 0,  // ponytail: eSign not in current API, show 0 until workflow added
+    label: 'รอลงนาม (eSign)',
+  },
+]);
+
+// ── Completeness bars (keep as-is) ─────────────────────────
 const completeness = [
   { label: 'ระเบียบ', pct: 87, color: '#16a34a' },
   { label: 'ประกาศ', pct: 74, color: '#ea580c' },
@@ -124,30 +177,22 @@ const completeness = [
   { label: 'กฎหมายหลัก', pct: 92, color: '#7c3aed' },
 ];
 
+// ── Urgent alerts (keep as-is) ──────────────────────────────
 const urgentAlerts = [
-  { id: 'a1', level: 'error', icon: 'mdi-alert-circle', title: 'ระเบียบ 12 ฉบับ หมดอายุภายใน 30 วัน', sub: 'ต้องปรับปรุงเนื้อหา' },
-  { id: 'a2', level: 'warning', icon: 'mdi-clock-alert', title: 'OCR คิวคงค้าง 12 งาน', sub: 'เอกสาร scan กำลังรอประมวลผล' },
-  { id: 'a3', level: 'info', icon: 'mdi-information', title: '5 เอกสารรอตรวจสอบ', sub: 'โดยเจ้าหน้าที่ภายใน 3 วัน' },
+  { id: 'a1', level: 'error', title: 'ระเบียบ 12 ฉบับ หมดอายุภายใน 30 วัน', sub: 'ต้องปรับปรุงเนื้อหา' },
+  { id: 'a2', level: 'warning', title: 'OCR คิวคงค้าง 12 งาน', sub: 'เอกสาร scan กำลังรอประมวลผล' },
+  { id: 'a3', level: 'info', title: '5 เอกสารรอตรวจสอบ', sub: 'โดยเจ้าหน้าที่ภายใน 3 วัน' },
 ];
 
-const recentImports = [
-  { id: 'doc-001', title: 'ระเบียบการบริหารงานบุคคล 2566', docType: 'rabiap', typeLabel: 'ระเบียบ', date: '27 มิ.ย. 2567', status: 'done' },
-  { id: 'doc-002', title: 'ประกาศค่าธรรมเนียมการศึกษา', docType: 'prakat', typeLabel: 'ประกาศ', date: '26 มิ.ย. 2567', status: 'processing' },
-  { id: 'doc-003', title: 'ข้อบังคับการสอบ', docType: 'kho-bangkhab', typeLabel: 'ข้อบังคับ', date: '25 มิ.ย. 2567', status: 'done' },
-];
-
-function statusLabel(status: string): string {
-  if (status === 'done') return 'เสร็จสิ้น';
-  if (status === 'processing') return 'กำลังประมวลผล';
-  if (status === 'queued') return 'รอดำเนินการ';
-  return status;
-}
-
+// ── Helpers ────────────────────────────────────────────────
 function badgeColor(t: string): string {
-  return ({ rabiap: 'success', prakat: 'warning', 'kho-bangkhab': 'info', 'kotmai-krung': 'purple' } as Record<string, string>)[t] ?? 'grey';
+  return ({ rabiap: 'success', prakat: 'warning', 'kho-bangkhab': 'info', 'kotmai-krung': 'deep-purple' } as Record<string, string>)[t] ?? 'grey';
 }
-
 function statusChipColor(s: string): string {
-  return ({ done: 'success', processing: 'warning', queued: 'info' } as Record<string, string>)[s] ?? 'grey';
+  return ({ done: 'success', exported: 'success', ingested: 'success', processing: 'warning', ingesting: 'warning', queued: 'info', failed: 'error' } as Record<string, string>)[s] ?? 'grey';
+}
+function statusLabel(s: string): string {
+  const m: Record<string, string> = { done: 'เสร็จสิ้น', exported: 'ส่งออกแล้ว', ingested: 'นำเข้าแล้ว', processing: 'กำลังประมวลผล', ingesting: 'กำลังนำเข้า', queued: 'รอดำเนินการ', failed: 'ล้มเหลว' };
+  return m[s] ?? s;
 }
 </script>
