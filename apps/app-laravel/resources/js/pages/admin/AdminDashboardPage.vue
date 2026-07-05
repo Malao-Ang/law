@@ -1,10 +1,10 @@
 <template>
-  <AppShell :breadcrumbs="['LAWSPACE', 'หน้าแรก']" title="ภาพรวมระบบ">
-    <template #actions>
+  <AppShell :breadcrumbs="['LAWSPACE', 'หน้าแรก']" title="ภาพรวมระบบ" hide-top-bar>
+    <!-- <template #actions>
       <v-btn color="primary" prepend-icon="mdi-cloud-upload-outline" @click="router.push('/admin/upload')">
         นำเข้าเอกสาร
       </v-btn>
-    </template>
+    </template> -->
 
     <v-row class="mb-6">
       <v-col
@@ -13,6 +13,7 @@
         cols="12"
         sm="6"
         md="2"
+        class="d-flex"
       >
         <AdminStatCard
           :icon="stat.icon"
@@ -24,72 +25,9 @@
       </v-col>
     </v-row>
 
-    <v-row class="mb-6">
-      <v-col cols="12" md="6">
-        <v-card flat border rounded="lg">
-          <v-card-title class="text-subtitle-1 font-weight-bold">ความครบถ้วนของข้อมูล</v-card-title>
-          <v-card-text>
-            <div
-              v-for="item in completeness"
-              :key="item.label"
-              class="d-flex align-center ga-3 mb-2"
-            >
-              <span class="text-body-2" style="width:80px;flex-shrink:0">{{ item.label }}</span>
-              <v-progress-linear
-                :model-value="item.pct"
-                :color="item.color"
-                height="8"
-                rounded
-                class="flex-grow-1"
-              />
-              <span class="text-caption">{{ item.pct }}%</span>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="6">
-        <v-card flat border rounded="lg">
-          <v-card-title class="text-subtitle-1 font-weight-bold">รายการเร่งด่วน</v-card-title>
-          <v-card-text>
-            <v-alert
-              v-for="alert in urgentAlerts"
-              :key="alert.id"
-              :type="alert.level === 'error' ? 'error' : alert.level === 'warning' ? 'warning' : 'info'"
-              variant="tonal"
-              density="compact"
-              :title="alert.title"
-              :text="alert.sub"
-              class="mb-2"
-            />
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Document log table -->
-    <v-card flat border rounded="lg">
-      <div class="d-flex align-center pa-4 pb-2">
-        <span class="text-subtitle-1 font-weight-bold flex-grow-1">บันทึกการนำเข้าเอกสาร</span>
-        <v-btn
-          size="small"
-          color="admin-primary"
-          prepend-icon="mdi-cloud-upload-outline"
-          @click="router.push('/admin/upload')"
-        >นำเข้าเอกสาร</v-btn>
-      </div>
-
-      <!-- Filters -->
-      <div class="d-flex flex-wrap gap-2 px-4 pb-3 align-center">
-        <v-text-field
-          v-model="filterName"
-          placeholder="ค้นหาชื่อเอกสาร"
-          prepend-inner-icon="mdi-magnify"
-          density="compact"
-          variant="outlined"
-          hide-details
-          style="max-width:260px;flex:1 1 200px"
-        />
+    <!-- Document log filters -->
+    <div class="admin-log-tools mb-3">
+      <div class="admin-log-tools__filters">
         <v-select
           v-model="filterStatus"
           :items="STATUS_OPTIONS"
@@ -99,7 +37,6 @@
           density="compact"
           variant="outlined"
           hide-details
-          style="max-width:160px"
         />
         <v-select
           v-model="filterType"
@@ -110,7 +47,6 @@
           density="compact"
           variant="outlined"
           hide-details
-          style="max-width:160px"
         />
         <v-select
           v-model="filterGroup"
@@ -121,7 +57,6 @@
           density="compact"
           variant="outlined"
           hide-details
-          style="max-width:160px"
         />
         <v-text-field
           v-model="filterDateFrom"
@@ -130,7 +65,6 @@
           density="compact"
           variant="outlined"
           hide-details
-          style="max-width:160px"
         />
         <v-text-field
           v-model="filterDateTo"
@@ -139,7 +73,6 @@
           density="compact"
           variant="outlined"
           hide-details
-          style="max-width:160px"
         />
         <v-btn
           v-if="filterName || filterStatus || filterType || filterGroup || filterDateFrom || filterDateTo"
@@ -147,13 +80,37 @@
           variant="text"
           color="grey"
           prepend-icon="mdi-close"
-          @click="filterName = ''; filterStatus = null; filterType = null; filterGroup = null; filterDateFrom = ''; filterDateTo = ''"
+          @click="clearLogFilters"
         >ล้างตัวกรอง</v-btn>
       </div>
 
-      <v-divider />
+      <v-text-field
+        v-model="filterName"
+        class="admin-log-tools__search"
+        placeholder="ค้นหาชื่อเอกสาร"
+        prepend-inner-icon="mdi-magnify"
+        density="compact"
+        variant="outlined"
+        hide-details
+      />
+    </div>
 
-      <v-table density="comfortable">
+    <!-- Document log table -->
+    <v-card flat border rounded="lg" class="admin-log-card">
+      <!-- <div class="admin-log-card__header">
+        <span class="text-subtitle-1 font-weight-bold flex-grow-1">บันทึกการนำเข้าเอกสาร</span>
+        <v-btn
+          size="small"
+          color="white"
+          variant="tonal"
+          prepend-icon="mdi-cloud-upload-outline"
+          @click="router.push('/admin/upload')"
+        >นำเข้าเอกสาร</v-btn>
+      </div>
+
+      <v-divider /> -->
+
+      <v-table density="comfortable" class="admin-log-table" :class="{ 'is-loading': loading }">
         <thead>
           <tr>
             <th>ชื่อเอกสาร</th>
@@ -165,12 +122,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="text-center pa-6">
-              <v-progress-circular indeterminate size="24" color="admin-primary" />
-            </td>
-          </tr>
-          <tr v-else-if="logRows.length === 0">
+          <tr v-if="!loading && logRows.length === 0">
             <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบเอกสารที่ตรงกับเงื่อนไข</td>
           </tr>
           <tr v-for="row in logRows" :key="row.id">
@@ -202,6 +154,13 @@
           </tr>
         </tbody>
       </v-table>
+
+      <div v-if="loading" class="admin-log-loading-overlay">
+        <div class="admin-log-loading-overlay__panel">
+          <v-progress-circular indeterminate size="28" color="admin-primary" />
+          <span class="text-body-2 font-weight-medium">กำลังโหลดข้อมูล...</span>
+        </div>
+      </div>
 
       <v-divider />
       <div class="pa-3 d-flex justify-space-between align-center">
@@ -379,8 +338,111 @@ const logRows = computed(() => {
     });
 });
 
+function clearLogFilters(): void {
+  filterName.value = '';
+  filterStatus.value = null;
+  filterType.value = null;
+  filterGroup.value = null;
+  filterDateFrom.value = '';
+  filterDateTo.value = '';
+}
+
 function formatDate(iso: string): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 </script>
+
+<style scoped>
+.admin-log-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-log-tools__filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr)) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-log-tools__search {
+  max-width: 420px;
+}
+
+.admin-log-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-log-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgb(var(--v-theme-primary));
+  color: #fff;
+}
+
+.admin-log-table :deep(thead) {
+  background: rgb(var(--v-theme-admin-primary));
+}
+
+.admin-log-table :deep(thead th) {
+  color: #fff !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+}
+
+.admin-log-table.is-loading {
+  opacity: 0.45;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.admin-log-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(1px);
+  pointer-events: none;
+}
+
+.admin-log-loading-overlay__panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(30, 58, 138, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  color: rgb(var(--v-theme-admin-primary));
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14);
+}
+
+@media (max-width: 1280px) {
+  .admin-log-tools__filters {
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-log-tools__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-log-tools__search {
+    max-width: none;
+  }
+
+  .admin-log-card__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

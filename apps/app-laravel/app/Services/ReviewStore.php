@@ -189,8 +189,19 @@ class ReviewStore
             if ($reviewedHtml !== '') {
                 $reviewedHtml = $this->sanitizeHtml($reviewedHtml);
             }
+            $derivedFormatting = $reviewedHtml !== '' ? $this->extractFormattingHints($reviewedHtml) : [];
+            $derivedAlignment = $reviewedHtml !== '' ? $this->extractAlignmentHint($reviewedHtml) : null;
             if ($reviewedHtml === '') {
                 $reviewedHtml = $this->rebuildBlockHtml($block, $table, $layout, $existingMeta);
+            }
+
+            $mergedFormatting = is_array($existingMeta['formatting'] ?? null) ? $existingMeta['formatting'] : [];
+            foreach ($derivedFormatting as $key => $value) {
+                $mergedFormatting[$key] = $value;
+            }
+
+            if ($derivedAlignment !== null) {
+                $layout['alignment'] = $derivedAlignment;
             }
 
             $block['meta'] = array_merge($existingMeta, [
@@ -198,6 +209,7 @@ class ReviewStore
                 'layout' => $layout,
                 'table' => $table,
                 'table_html' => $table['html'] ?? null,
+                'formatting' => $mergedFormatting,
                 'chunk_type' => $patch['chunk_type'] ?? $existingMeta['chunk_type'] ?? null,
                 'review' => [
                     'approved_by' => $patch['approved_by'] ?? null,
@@ -984,6 +996,16 @@ class ReviewStore
                 $block['normalized_text'] = $text;
                 $meta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
                 $meta['reviewed_html'] = (string) ($byId[$bid]['meta']['html'] ?? '');
+                $meta['formatting'] = array_merge(
+                    is_array($meta['formatting'] ?? null) ? $meta['formatting'] : [],
+                    $this->extractFormattingHints((string) $meta['reviewed_html']),
+                );
+                $derivedAlignment = $this->extractAlignmentHint((string) $meta['reviewed_html']);
+                if ($derivedAlignment !== null) {
+                    $layout = is_array($meta['layout'] ?? null) ? $meta['layout'] : [];
+                    $layout['alignment'] = $derivedAlignment;
+                    $meta['layout'] = $layout;
+                }
                 $block['meta'] = $meta;
                 unset($block);
             }
@@ -1190,6 +1212,27 @@ class ReviewStore
         }
 
         return $out;
+    }
+
+    /**
+     * @return array{bold?: bool, italic?: bool, underline?: bool}
+     */
+    private function extractFormattingHints(string $html): array
+    {
+        return [
+            'bold' => preg_match('/<(strong|b)\b/i', $html) === 1,
+            'italic' => preg_match('/<(em|i)\b/i', $html) === 1,
+            'underline' => preg_match('/<u\b/i', $html) === 1,
+        ];
+    }
+
+    private function extractAlignmentHint(string $html): ?string
+    {
+        if (preg_match('/text-align\s*:\s*(left|center|right|justify)/i', $html, $matches) === 1) {
+            return strtolower($matches[1]);
+        }
+
+        return null;
     }
 
     /**

@@ -18,15 +18,9 @@
           size="x-small"
           variant="outlined"
           :disabled="reprocessingPage[page.page_no]"
-<<<<<<< HEAD
-          :title="'Re-run page ' + page.page_no + ' with LandingAI'"
-          @click.stop="runLandingAI(page.page_no)"
-        >{{ reprocessingPage[page.page_no] ? 'Running…' : 'LandingAI ↺' }}</v-btn>
-=======
           :title="'Re-run page ' + page.page_no + ' with Gemini OCR'"
           @click.stop="runGeminiOcr(page.page_no)"
         >{{ reprocessingPage[page.page_no] ? 'Running…' : 'Gemini ↺' }}</button>
->>>>>>> 242e7a706aa7fa521f0eb2d9695e0e88b6778d60
       </div>
 
       <!-- Page image thumbnail (togglable) -->

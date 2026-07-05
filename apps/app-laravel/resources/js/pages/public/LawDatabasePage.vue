@@ -22,7 +22,7 @@
                   hide-details
                   rounded="xl"
                   class="flex-grow-1 elaw-search-input"
-                  bg-color="white"
+                  bg-color="detail-surface"
                   @keydown.enter="doSearch"
                 />
                 <v-btn color="secondary" size="large" rounded="lg" @click="doSearch">
@@ -70,7 +70,7 @@
                     closable-chips
                     size="small"
                     class="elaw-group-select flex-grow-1"
-                    bg-color="white"
+                    bg-color="detail-surface"
                   />
                 </div>
               </v-col> -->
@@ -80,16 +80,6 @@
 
       <v-container style="max-width: 1280px" class="mt-6 mb-10">
         <v-row>
-          <v-col cols="12" class="pb-2">
-            <div class="d-flex flex-wrap ga-3">
-              <v-card v-for="stat in summaryStats" :key="stat.label" flat border rounded="lg"
-                class="pa-3 d-flex flex-column align-center" style="min-width: 110px">
-                <span class="text-h6 font-weight-black" :style="`color:${stat.color}`">{{ stat.count }}</span>
-                <span class="text-caption text-medium-emphasis">{{ stat.label }}</span>
-              </v-card>
-            </div>
-          </v-col>
-
           <v-col cols="12" md="3">
             <v-card flat border rounded="lg" class="pa-4">
               <div class="d-flex justify-space-between align-center mb-3">
@@ -97,38 +87,103 @@
                 <v-btn variant="text" size="x-small" color="error" @click="clearFilters">ล้างทั้งหมด</v-btn>
               </div>
 
-              <p class="text-caption font-weight-bold text-medium-emphasis mb-1">สถานะการเปลี่ยนแปลง</p>
-              <v-checkbox v-for="status in changeStatuses" :key="status.value" v-model="selectedStatuses"
-                :value="status.value" :label="`${status.label} (${status.count})`" density="compact" hide-details
-                class="mb-n1" />
+              <v-expansion-panels v-model="filterPanels" multiple variant="accordion" class="elaw-filter-panels">
+                <v-expansion-panel value="change-status">
+                  <v-expansion-panel-title>สถานะการเปลี่ยนแปลง</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox v-for="status in changeStatuses" :key="status.value" v-model="selectedStatuses"
+                      :value="status.value" density="compact" hide-details class="mb-n1">
+                      <template #label>
+                        <span class="elaw-filter-option">
+                          <span>{{ status.label }}</span>
+                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ status.count }}</v-chip>
+                        </span>
+                      </template>
+                    </v-checkbox>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel value="use-status">
+                  <v-expansion-panel-title>สถานะการบังคับใช้</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox v-for="status in useStatuses" :key="status.value" v-model="selectedUseStatuses"
+                      :value="status.value" density="compact" hide-details class="mb-n1">
+                      <template #label>
+                        <span class="elaw-filter-option">
+                          <span>{{ status.label }}</span>
+                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ status.count }}</v-chip>
+                        </span>
+                      </template>
+                    </v-checkbox>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel value="year">
+                  <v-expansion-panel-title>ปีประกาศ</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div class="d-flex ga-2 align-center">
+                      <v-select v-model="yearFrom" :items="years" label="ปีเริ่มต้น" density="compact" hide-details />
+                      <span class="text-caption">ถึง</span>
+                      <v-select v-model="yearTo" :items="years" label="ปีสิ้นสุด" density="compact" hide-details />
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel value="agency">
+                  <v-expansion-panel-title>หน่วยงาน</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox v-for="agency in agencyFilters" :key="agency.value" v-model="selectedAgencies"
+                      :value="agency.value" density="compact" hide-details class="mb-n1">
+                      <template #label>
+                        <span class="elaw-filter-option">
+                          <span>{{ agency.label }}</span>
+                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ agency.count }}</v-chip>
+                        </span>
+                      </template>
+                    </v-checkbox>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel value="law-group">
+                  <v-expansion-panel-title>กลุ่มกฎหมาย</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox v-for="group in groupFilters" :key="group.value" v-model="selectedGroups"
+                      :value="group.value" density="compact" hide-details class="mb-n1">
+                      <template #label>
+                        <span class="elaw-filter-option">
+                          <v-tooltip :text="group.label" location="top">
+                            <template #activator="{ props: tooltipProps }">
+                              <span v-bind="tooltipProps" class="elaw-filter-option__label elaw-filter-option__label--truncate">
+                                {{ group.label }}
+                              </span>
+                            </template>
+                          </v-tooltip>
+                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ group.count }}</v-chip>
+                        </span>
+                      </template>
+                    </v-checkbox>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+
+                <v-expansion-panel value="keeper-group">
+                  <v-expansion-panel-title>กลุ่มผู้รักษาการ</v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox v-for="keeper in keeperGroupFilters" :key="keeper.value" v-model="selectedKeeperGroups"
+                      :value="keeper.value" density="compact" hide-details class="mb-n1">
+                      <template #label>
+                        <span class="elaw-filter-option">
+                          <span>{{ keeper.label }}</span>
+                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ keeper.count }}</v-chip>
+                        </span>
+                      </template>
+                    </v-checkbox>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
 
               <v-divider class="my-3" />
 
-              <p class="text-caption font-weight-bold text-medium-emphasis mb-1">สถานะการบังคับใช้</p>
-              <v-checkbox v-for="status in useStatuses" :key="status.value" v-model="selectedUseStatuses"
-                :value="status.value" :label="`${status.label} (${status.count})`" density="compact" hide-details
-                class="mb-n1" />
-
-              <v-divider class="my-3" />
-
-              <p class="text-caption font-weight-bold text-medium-emphasis mb-1">ปีประกาศ</p>
-              <div class="d-flex ga-2 align-center">
-                <v-select v-model="yearFrom" :items="years" label="จาก" variant="outlined" density="compact"
-                  hide-details />
-                <span class="text-caption">ถึง</span>
-                <v-select v-model="yearTo" :items="years" label="ถึง" variant="outlined" density="compact"
-                  hide-details />
-              </div>
-
-              <v-divider class="my-3" />
-
-              <p class="text-caption font-weight-bold text-medium-emphasis mb-1">หน่วยงาน</p>
-              <v-text-field v-model="orgSearch" placeholder="ค้นหาหน่วยงาน..." variant="outlined" density="compact"
-                hide-details />
-
-              <v-divider class="my-3" />
-
-              <v-btn color="admin-navy" block size="small" rounded="lg" @click="clearFilters">
+              <v-btn color="primary" block size="small" rounded="lg" @click="clearFilters">
                 <v-icon start icon="mdi-refresh" />
                 ล้างตัวกรอง
               </v-btn>
@@ -179,11 +234,13 @@ const selectedTypes = ref<string[]>(readTypeArray(route.query.type));
 const selectedGroups = ref<string[]>(readStringArray(route.query.group));
 const selectedStatuses = ref<string[]>([]);
 const selectedUseStatuses = ref<string[]>([]);
+const selectedAgencies = ref<string[]>([]);
+const selectedKeeperGroups = ref<string[]>([]);
 const yearFrom = ref('2560');
 const yearTo = ref('2568');
-const orgSearch = ref('');
-const sortBy = ref('relevance');
+const sortBy = ref('thai-asc');
 const page = ref(1);
+const filterPanels = ref(['change-status', 'use-status', 'year']);
 
 const breadcrumbs = [{ title: 'หน้าหลัก', disabled: false, to: '/' }, { title: 'ฐานข้อมูลกฎหมาย', disabled: true }];
 
@@ -196,18 +253,34 @@ const typeFilters = [
 ];
 
 const groupFilters = [
-  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'academic' },
-  { label: 'ด้านกิจการนิสิต', value: 'student-affairs' },
-  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'research-innovation' },
-  { label: 'ด้านบริการวิชาการ', value: 'academic-service' },
-  { label: 'ด้านการทะนุบำรุงศิลปวัฒนธรรม', value: 'arts-culture' },
-  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'organization-admin' },
-  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'hr-discipline' },
-  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'finance-assets-risk' },
-  { label: 'ด้านการพัฒนารายได้', value: 'revenue-development' },
-  { label: 'ด้านการรักษาพยาบาล', value: 'healthcare' },
-  { label: 'ด้านการบริการเฉพาะด้าน เช่น ทันตกรรม', value: 'special-service' },
-  { label: 'ด้านอื่น ๆ', value: 'other' },
+  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'academic', count: 328 },
+  { label: 'ด้านกิจการนิสิต', value: 'student-affairs', count: 86 },
+  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'research-innovation', count: 142 },
+  { label: 'ด้านบริการวิชาการ', value: 'academic-service', count: 74 },
+  { label: 'ด้านการทะนุบำรุงศิลปวัฒนธรรม', value: 'arts-culture', count: 51 },
+  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'organization-admin', count: 248 },
+  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'hr-discipline', count: 214 },
+  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'finance-assets-risk', count: 196 },
+  { label: 'ด้านการพัฒนารายได้', value: 'revenue-development', count: 39 },
+  { label: 'ด้านการรักษาพยาบาล', value: 'healthcare', count: 62 },
+  { label: 'ด้านการบริการเฉพาะด้าน เช่น ทันตกรรม', value: 'special-service', count: 28 },
+  { label: 'ด้านอื่น ๆ', value: 'other', count: 45 },
+];
+
+const agencyFilters = [
+  { label: 'มหาวิทยาลัยบูรพา', value: 'burapha-university', count: 412 },
+  { label: 'กองคลัง', value: 'finance-division', count: 168 },
+  { label: 'กองทรัพยากรบุคคล', value: 'hr-division', count: 126 },
+  { label: 'สำนักคอมพิวเตอร์', value: 'computer-center', count: 74 },
+  { label: 'สำนักงานอธิการบดี', value: 'president-office', count: 238 },
+];
+
+const keeperGroupFilters = [
+  { label: 'อธิการบดี', value: 'president', count: 302 },
+  { label: 'รองอธิการบดี', value: 'vice-president', count: 186 },
+  { label: 'คณบดี', value: 'dean', count: 94 },
+  { label: 'ผู้อำนวยการสำนัก/สถาบัน', value: 'director', count: 71 },
+  { label: 'หัวหน้าส่วนงาน', value: 'division-head', count: 43 },
 ];
 
 const changeStatuses = [
@@ -242,17 +315,9 @@ watch(
   { immediate: true },
 );
 
-const summaryStats = [
-  { label: 'กฎหมายทั้งหมด', count: '2,440', color: '#1a2547' },
-  { label: 'กฎหมายใหม่', count: '124', color: '#16a34a' },
-  { label: 'ปรับปรุง', count: '356', color: '#2563eb' },
-  { label: 'ยกเลิก', count: '42', color: '#dc2626' },
-  { label: 'กฎหมายแม่', count: '98', color: '#7c3aed' },
-  { label: 'กฎหมายลูก', count: '1,842', color: '#d97706' },
-];
-
 const sortOptions = [
-  { label: 'ลำดับศักดิ์ความสำคัญ', value: 'relevance' },
+  { label: 'เรียงลำดับตาม ก-ฮ', value: 'thai-asc' },
+  { label: 'เรียงลำดับตาม ฮ-ก', value: 'thai-desc' },
   { label: 'ล่าสุด', value: 'newest' },
   { label: 'เก่าสุด', value: 'oldest' },
 ];
@@ -411,9 +476,10 @@ function clearFilters(): void {
   selectedGroups.value = [];
   selectedStatuses.value = [];
   selectedUseStatuses.value = [];
+  selectedAgencies.value = [];
+  selectedKeeperGroups.value = [];
   yearFrom.value = '2560';
   yearTo.value = '2568';
-  orgSearch.value = '';
 }
 </script>
 
@@ -436,12 +502,89 @@ function clearFilters(): void {
   box-shadow: 0 18px 42px rgba(106, 77, 0, 0.08);
 }
 
+.elaw-db-results {
+  background: rgb(var(--v-theme-detail-surface));
+  border-radius: 18px;
+  padding: 24px !important;
+}
+
 .elaw-search-input :deep(.v-field__input) {
   min-height: 58px;
 }
 
 .elaw-search-chip {
   font-weight: 700;
+}
+
+.elaw-filter-panels {
+  border: 1px solid rgba(171, 127, 41, 0.14);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.elaw-filter-panels :deep(.v-expansion-panel) {
+  box-shadow: none !important;
+}
+
+.elaw-filter-panels :deep(.v-expansion-panel-title) {
+  min-height: 42px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.elaw-filter-panels :deep(.v-expansion-panel-text__wrapper) {
+  padding: 4px 12px 12px;
+}
+
+.elaw-filter-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.elaw-filter-panels :deep(.v-selection-control) {
+  min-width: 0;
+}
+
+.elaw-filter-panels :deep(.v-selection-control__wrapper) {
+  flex: 0 0 auto;
+}
+
+.elaw-filter-panels :deep(.v-selection-control .v-label) {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 1;
+}
+
+.elaw-filter-option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elaw-filter-option :deep(.v-chip) {
+  flex-shrink: 0;
+}
+
+.elaw-filter-option__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.elaw-filter-option__label--truncate {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .elaw-filter-row {

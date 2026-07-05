@@ -57,6 +57,10 @@ function isActive(link: NavLink): boolean {
     return activeRoutePath.value === link.activePath && route.hash === link.hash;
   }
 
+  if (link.activePath === '/database') {
+    return activeRoutePath.value === '/database' || activeRoutePath.value.startsWith('/law/');
+  }
+
   return activeRoutePath.value === link.activePath;
 }
 </script>

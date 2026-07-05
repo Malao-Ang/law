@@ -40,7 +40,6 @@
         variant="outlined"
         density="compact"
         hide-details
-        rounded="lg"
         style="max-width: 500px; flex: 1 1 300px"
       />
       <v-select

@@ -28,6 +28,7 @@ export const vuetify = createVuetify({
           error: '#d74747',
           'elaw-navy': '#1a2e52',
           'elaw-gold': '#c9a935',
+          'detail-surface': 'rgba(255, 255, 255, 1)',
           surface: '#ffffff',
           background: '#f6f4ef',
         },
@@ -37,7 +38,7 @@ export const vuetify = createVuetify({
   defaults: {
     VCard: { variant: 'flat', border: true, rounded: 'lg' },
     VBtn: { variant: 'flat' },
-    VTextField: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto', rounded: 'xl' },
+    VTextField: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
     VSelect: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
     VTextarea: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
   },

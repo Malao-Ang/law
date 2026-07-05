@@ -4,6 +4,7 @@
     border
     rounded="lg"
     hover
+    bg-color="detail-surface"
     class="document-version-card"
     :class="[
       `document-version-card--${version.metadata.documentType}`,

@@ -43,7 +43,7 @@
               hide-details
               variant="outlined"
               rounded="xl"
-              bg-color="white"
+              bg-color="detail-surface"
               append-inner-icon="mdi-magnify"
               class="elaw-search-card__query"
               @click:append-inner="emitSearch"
@@ -170,7 +170,7 @@ async function applyPopularTag(tag: string): Promise<void> {
 }
 
 .elaw-search-card {
-  background: #ffffff;
+  background: rgb(var(--v-theme-detail-surface));
   border: 1px solid #e8dcc7 !important;
   box-shadow: 0 18px 46px rgba(186, 151, 63, 0.15) !important;
 }

@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar color="surface" flat border="b">
+  <v-app-bar v-if="showTopNavigation" color="surface" flat border="b">
     <v-app-bar-nav-icon @click="drawer = !drawer" />
     <v-app-bar-title>
       <div class="d-flex flex-column">
@@ -12,7 +12,6 @@
 
     <template #append>
       <slot name="actions" />
-      <v-btn icon="mdi-bell-outline" variant="text" />
     </template>
   </v-app-bar>
 
@@ -52,11 +51,37 @@
     </template>
   </v-navigation-drawer>
 
-  <v-main>
+  <v-main class="app-shell__main" :class="{ 'app-shell__main--full-height': fullHeight }">
     <div v-if="$slots.banner" class="px-6 pt-4">
       <slot name="banner" />
     </div>
-    <v-container fluid class="pa-6">
+    <v-container fluid class="pa-6 app-shell__container" :class="{ 'app-shell__container--full-height': fullHeight }">
+      <div v-if="!showTopNavigation" class="app-shell__page-header">
+        <div class="app-shell__page-title">
+          <div class="d-flex align-center ga-3 mb-2">
+            <v-btn
+              icon="mdi-menu"
+              size="small"
+              variant="text"
+              class="app-shell__drawer-toggle"
+              @click="drawer = !drawer"
+            />
+            <v-breadcrumbs
+              v-if="breadcrumbs.length"
+              :items="breadcrumbs"
+              density="compact"
+              class="app-shell__breadcrumbs pa-0"
+            />
+          </div>
+          <h1 class="text-h5 font-weight-black mb-1">{{ title }}</h1>
+          <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
+        </div>
+
+        <div v-if="$slots.actions" class="app-shell__page-actions">
+          <slot name="actions" />
+        </div>
+      </div>
+
       <slot />
     </v-container>
   </v-main>
@@ -74,11 +99,15 @@ const props = defineProps<{
   title: string;
   subtitle?: string;
   navGroups?: NavGroup[];
+  fullHeight?: boolean;
+  hideTopBar?: boolean;
+  showTopBar?: boolean;
 }>();
 
 const router = useRouter();
 const route = useRoute();
 const drawer = ref(true);
+const showTopNavigation = computed(() => props.showTopBar === true && props.hideTopBar !== true);
 
 const defaultNavGroups: NavGroup[] = [
   {
@@ -115,3 +144,69 @@ function isActive(item: NavItem): boolean {
   return route.path === item.to || route.path.startsWith(`${item.to}/`);
 }
 </script>
+
+<style scoped>
+.app-shell__main,
+.app-shell__container {
+  background: #fff;
+}
+
+.app-shell__page-header {
+  align-items: flex-start;
+  background: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 18px 20px;
+}
+
+.app-shell__page-title {
+  min-width: 0;
+}
+
+.app-shell__breadcrumbs {
+  min-width: 0;
+}
+
+.app-shell__drawer-toggle {
+  flex: 0 0 auto;
+}
+
+.app-shell__page-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.app-shell__main--full-height {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell__container--full-height {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .app-shell__page-header {
+    flex-direction: column;
+  }
+
+  .app-shell__page-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+</style>

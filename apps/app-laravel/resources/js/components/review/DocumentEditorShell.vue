@@ -8,11 +8,6 @@
       </div>
     </div>
 
-    <!-- Warning banner -->
-    <v-alert type="warning" variant="tonal" density="compact" icon="mdi-alert-outline" class="mb-2" style="flex-shrink:0">
-      กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
-    </v-alert>
-
     <!-- Toolbar -->
     <div v-if="editor" class="d-flex flex-wrap align-center ga-1 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">
       <!-- Row 1: History + Heading -->
@@ -304,7 +299,7 @@ async function saveAndContinue(): Promise<void> {
   const result = await documentStore.saveReview({ draft_html: editor.value?.getHTML() ?? '' });
   if (result !== null) {
     reviewUiStore.setDirty(false);
-    router.push(`/documents/${props.documentId}/law-info`);
+    router.push(`/documents/${props.documentId}/rag`);
   }
 }
 
