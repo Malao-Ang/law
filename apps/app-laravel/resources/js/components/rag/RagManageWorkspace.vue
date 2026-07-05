@@ -338,6 +338,7 @@ function openSplit(block: DocumentBlock): void {
     pageNo: blockPage.value.get(block.block_id) ?? 1,
     text: fullText,
   };
+  void nextTick(() => splitTextarea.value?.focus());
 }
 
 function openSplitFromSelection(): void {
@@ -469,16 +470,34 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: rag-content-area height calc + rag-block-list scroll container — no Vuetify equivalent */
+/* ponytail: keep page scroll locked; only rag-block-list should scroll */
 .rag-content-area {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  height: 100%;
+  flex: 1 1 0;
   max-height: 100%;
   min-height: 0;
   gap: 12px;
   overflow: hidden;
+}
+
+.rag-selection-bar {
+  background: #1a3673;
+  color: #fff;
+  flex: 0 0 auto;
+  min-height: 44px;
+  opacity: 0;
+  pointer-events: none;
+  position: sticky;
+  top: 0;
+  visibility: hidden;
+  z-index: 5;
+}
+
+.rag-selection-bar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .rag-block-list {
@@ -552,16 +571,15 @@ onBeforeUnmount(() => {
   border-color: #e2e8f0;
 }
 
+.rag-blockrow:focus-visible {
+  outline: 2px solid rgba(26, 54, 115, 0.35);
+  outline-offset: 2px;
+}
+
 .rag-blockrow.is-selected {
   background: #eef2ff;
   border-color: #c7d2fe;
   box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.08);
-}
-
-.rag-blockrow__cb-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .rag-blockrow__cb {
