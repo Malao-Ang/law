@@ -104,7 +104,10 @@
           <div class="lawx-card__body">
             <span class="lawx-card__badge" :class="{ 'lawx-card__badge--chapter': section.isChapter }">{{ section.badge }}</span>
             <div class="lawx-card__content">
-              <BlockFlow :block="section.headBlock" :override-text="section.headBodyText" />
+              <BlockFlow
+                :block="section.headBlock"
+                :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
+              />
               <BlockFlow
                 v-for="child in section.children"
                 :key="child.block_id"
