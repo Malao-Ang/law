@@ -223,20 +223,26 @@
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
           @close="dialog = null" @save="onRelationSaved" />
 
-        <!-- Split modal -->
-        <v-dialog v-model="splitDialogOpen" max-width="360">
+        <!-- Split modal: pick lines to separate into a new block -->
+        <v-dialog v-model="splitDialogOpen" max-width="560">
           <v-card v-if="splitting" class="pa-5">
-            <div class="text-body-1 font-weight-bold mb-4" style="color:#1a3673">
-              เพิ่มบล็อกใหม่ที่ใด?
+            <div class="text-body-1 font-weight-bold mb-1" style="color:#1a3673">
+              เลือกบรรทัดที่จะแยกออกเป็นบล็อกใหม่
             </div>
-            <div class="d-flex ga-3 mb-4">
-              <v-btn prepend-icon="mdi-arrow-up-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
-                @click="addBlock('above')">ด้านบน</v-btn>
-              <v-btn prepend-icon="mdi-arrow-down-bold" variant="outlined" :disabled="blockBusy" class="flex-1-1"
-                @click="addBlock('below')">ด้านล่าง</v-btn>
+            <div class="text-caption text-medium-emphasis mb-3">
+              บรรทัดที่เลือกจะถูกย้ายไปเป็นบล็อกใหม่ด้านล่าง ที่เหลือจะอยู่ในบล็อกเดิม
             </div>
-            <div class="d-flex justify-end">
+            <div class="rag-splitlines">
+              <label v-for="(line, i) in splitLines" :key="i" class="rag-splitline">
+                <input type="checkbox" :checked="selectedLines.has(i)" @change="toggleLine(i)">
+                <span>{{ line || '(บรรทัดว่าง)' }}</span>
+              </label>
+            </div>
+            <div class="d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
+              <v-btn color="#059669" size="small"
+                :disabled="selectedLines.size === 0 || selectedLines.size === splitLines.length || blockBusy"
+                @click="confirmSplit">แยกออก</v-btn>
             </div>
           </v-card>
         </v-dialog>
@@ -253,7 +259,7 @@ import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, LawRelation, RelationScope, RelationType } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
-import { buildSections, relationsForSection, documentRelations, type LawSection } from '../../composables/useLawSections';
+import { buildSections, relationsForSection, documentRelations } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
@@ -291,6 +297,10 @@ const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const blockListEl = ref<HTMLElement | null>(null);
 const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
+const selectedLines = ref<Set<number>>(new Set());
+const splitLines = computed<string[]>(() =>
+  splitting.value ? splitting.value.text.split('\n') : [],
+);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
@@ -379,31 +389,9 @@ async function deleteSelected(): Promise<void> {
   }
 }
 
-async function createBlockAfter(afterBlockId: string): Promise<void> {
-  if (blockBusy.value) return;
-  blockBusy.value = true;
-  try {
-    const pageNo = blockPage.value.get(afterBlockId) ?? 1;
-    await blockStore.create(props.documentId, {
-      page_no: pageNo,
-      after_block_id: afterBlockId,
-      type: 'paragraph',
-      approved_text: '',
-    });
-    await reloadBlocks();
-  } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'สร้างบล็อกไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
-  }
-}
-
-function lastBlockId(section: LawSection): string {
-  const lastChild = section.children.at(-1);
-  return lastChild ? lastChild.block_id : section.headBlock.block_id;
-}
 
 function openSplit(block: DocumentBlock): void {
+  selectedLines.value = new Set();
   splitting.value = {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
@@ -436,10 +424,26 @@ function escapeForHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function addBlock(where: 'above' | 'below'): Promise<void> {
+function toggleLine(i: number): void {
+  const next = new Set(selectedLines.value);
+  if (next.has(i)) next.delete(i);
+  else next.add(i);
+  selectedLines.value = next;
+}
+
+async function confirmSplit(): Promise<void> {
   if (!splitting.value || blockBusy.value) return;
-  const { blockId, pageNo, text } = splitting.value;
-  await splitBlockInto(blockId, pageNo, where === 'above' ? '' : text, where === 'above' ? text : '');
+  const keep: string[] = [];
+  const move: string[] = [];
+  splitLines.value.forEach((line, i) => {
+    (selectedLines.value.has(i) ? move : keep).push(line);
+  });
+  const { blockId, pageNo } = splitting.value;
+  await splitBlockInto(blockId, pageNo, keep.join('\n'), move.join('\n'));
+}
+
+function toBlockHtml(text: string): string {
+  return `<p>${escapeForHtml(text).replaceAll('\n', '<br>')}</p>`;
 }
 
 async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
@@ -448,9 +452,9 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
     await blockStore.split(props.documentId, blockId, {
       page_no: pageNo,
       before_text: before,
-      before_html: `<p>${escapeForHtml(before)}</p>`,
+      before_html: toBlockHtml(before),
       after_text: after,
-      after_html: `<p>${escapeForHtml(after)}</p>`,
+      after_html: toBlockHtml(after),
     });
     splitting.value = null;
     await reloadBlocks();
@@ -658,6 +662,32 @@ onBeforeUnmount(() => {
   align-self: start;
   margin-top: 2px;
   cursor: pointer;
+}
+
+.rag-splitlines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.rag-splitline {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.rag-splitline:hover {
+  background: #f1f5f9;
 }
 
 /* ponytail: native textarea inside v-dialog — kept for @select event support */
