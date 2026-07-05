@@ -18,7 +18,7 @@
 
   <v-navigation-drawer v-model="drawer" width="290">
     <div class="pa-4 d-flex align-center ga-3">
-      <v-avatar color="primary" rounded="lg"><v-icon icon="mdi-bank-outline" /></v-avatar>
+      <v-avatar color="admin-primary" rounded="lg"><v-icon icon="mdi-bank-outline" /></v-avatar>
       <div>
         <p class="text-subtitle-2 font-weight-bold mb-0">LAWSPACE</p>
         <p class="text-caption text-medium-emphasis mb-0">ระบบจัดการฐานข้อมูลกฎหมาย</p>
@@ -36,7 +36,7 @@
           :prepend-icon="item.icon"
           :title="item.label"
           :active="isActive(item)"
-          color="primary"
+          color="admin-primary"
           @click="item.to ? router.push(item.to) : undefined"
         />
       </template>
@@ -66,7 +66,7 @@
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-interface NavItem { label: string; icon: string; to?: string; }
+interface NavItem { label: string; icon: string; to?: string; exact?: boolean; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 const props = defineProps<{
@@ -85,6 +85,7 @@ const defaultNavGroups: NavGroup[] = [
     label: 'เมนูหลัก',
     items: [
       { label: 'หน้าแรก', icon: 'mdi-home-outline', to: '/admin' },
+      { label: 'หน้าเว็บผู้ใช้', icon: 'mdi-open-in-new', to: '/', exact: true },
       { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline' },
     ],
   },
@@ -109,6 +110,7 @@ const resolvedNavGroups = computed(() => props.navGroups ?? defaultNavGroups);
 
 function isActive(item: NavItem): boolean {
   if (!item.to) return false;
+  if (item.exact) return route.path === item.to;
   if (item.to === '/admin') return route.path === item.to;
   return route.path === item.to || route.path.startsWith(`${item.to}/`);
 }
