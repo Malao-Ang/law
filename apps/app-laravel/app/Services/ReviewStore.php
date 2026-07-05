@@ -629,7 +629,7 @@ class ReviewStore
         $idSet = array_flip(array_map('strval', $blockIds));
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($idSet, $blockIds, &$returnBlock): void {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($idSet, &$returnBlock): void {
             // Collect selected blocks in DOCUMENT order (not the caller's click/selection order).
             $ordered = [];
             foreach (($document['pages'] ?? []) as $page) {
@@ -641,7 +641,7 @@ class ReviewStore
                 }
             }
 
-            if (count($ordered) !== count($blockIds)) {
+            if (count($ordered) !== count($idSet)) {
                 throw new RuntimeException('One or more blocks not found for merge.');
             }
 

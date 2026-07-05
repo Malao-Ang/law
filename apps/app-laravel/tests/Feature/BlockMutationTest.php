@@ -126,6 +126,22 @@ class BlockMutationTest extends TestCase
         $this->assertLessThan($threePos, $onePos); // "Block one" precedes "Block three"
     }
 
+    public function test_merge_tolerates_duplicate_block_ids(): void
+    {
+        $response = $this->postJson("/api/documents/{$this->docId}/blocks/merge", [
+            'block_ids' => ['b1', 'b2', 'b1'],
+        ]);
+        $response->assertStatus(200)->assertJsonFragment(['status' => 'merged']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $ids = array_column($doc['pages'][0]['blocks'], 'block_id');
+        $this->assertContains('b1', $ids);
+        $this->assertNotContains('b2', $ids);
+        $block = collect($doc['pages'][0]['blocks'])->firstWhere('block_id', 'b1');
+        $this->assertStringContainsString('Block one', $block['approved_text']);
+        $this->assertStringContainsString('Block two', $block['approved_text']);
+    }
+
     public function test_split_block_creates_two_blocks(): void
     {
         $response = $this->postJson("/api/documents/{$this->docId}/blocks/b1/split", [
