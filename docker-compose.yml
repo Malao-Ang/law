@@ -25,11 +25,8 @@ services:
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
     volumes:
+      - ./apps/app-laravel:/var/www/html
       - poc_storage:/var/www/html/storage/app/poc
-      # Dev: host runs `npm run dev`, which writes public/hot. The app reads it
-      # via this mount to detect the dev server. (Containerized Vite is gone —
-      # it died with EIO i/o errors over the Windows bind mount.)
-      - ./apps/app-laravel/public:/var/www/html/public
     env_file:
       - .env
     depends_on:
@@ -82,6 +79,7 @@ services:
       - COMPOSER_ALLOW_SUPERUSER=1
       - QUEUE_CONNECTION=redis
     volumes:
+      - ./apps/app-laravel:/var/www/html
       - poc_storage:/var/www/html/storage/app/poc
     env_file:
       - .env

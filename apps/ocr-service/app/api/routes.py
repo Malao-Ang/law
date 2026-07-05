@@ -26,6 +26,7 @@ from app.services.block_builder import build_document_output
 from app.services.correction_service import run_correction
 from app.services.doc_converter import DocConversionError, DocConverter
 from app.services.docling_service import DoclingService
+from app.services.gemini_vision_parser import GeminiVisionParser
 from app.services.landingai_parser import LandingAiAdeParser
 from app.services.ocr_pipeline import get_ocr_pipeline
 from app.services.thai_normalizer import normalize_text
@@ -56,6 +57,8 @@ def health() -> HealthResponse:
         device=pipeline.device,
         ocr_gpu_concurrency=settings.ocr_gpu_concurrency,
         ocr_recognizer_batch_size=settings.ocr_recognizer_batch_size,
+        gemini_configured=bool(settings.gemini_api_key),
+        landingai_configured=bool(settings.landingai_api_key),
     )
 
 
@@ -104,6 +107,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
         effective_scan_mode = requested_scan_mode
         extraction_path: list[str] = []
         landingai_metadata: dict[str, object] | None = None
+        gemini_metadata: dict[str, object] | None = None
         conversion_metadata: dict[str, object] | None = None
 
         if mode == "doc":
@@ -138,7 +142,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
             source_type = "pdf_text"
         elif mode == "pdf_scan":
             with _stage_timer(payload.document_id, "ocr", logger, timings):
-                pages, effective_scan_mode, landingai_metadata = _extract_scan_pages(
+                pages, effective_scan_mode, landingai_metadata, gemini_metadata = _extract_scan_pages(
                     file_path=file_path,
                     document_id=payload.document_id,
                     requested_mode=requested_scan_mode,
@@ -152,7 +156,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 scan_indices = set(classification["pages"].get("scan", []))
                 scan_results = None
                 if scan_indices:
-                    scan_results, effective_scan_mode, landingai_metadata = _extract_scan_pages_selective(
+                    scan_results, effective_scan_mode, landingai_metadata, gemini_metadata = _extract_scan_pages_selective(
                         file_path=file_path,
                         document_id=payload.document_id,
                         requested_mode=requested_scan_mode,
@@ -191,6 +195,8 @@ def _run_extraction(payload: ExtractRequest) -> None:
         }
         if landingai_metadata is not None:
             output["extraction"]["landingai"] = landingai_metadata
+        if gemini_metadata is not None:
+            output["extraction"]["gemini"] = gemini_metadata
         if conversion_metadata is not None:
             output["extraction"]["conversion"] = conversion_metadata
         output_path.write_text(
@@ -257,46 +263,14 @@ def _extract_scan_pages(
     document_id: str,
     requested_mode: str,
     data_root: Path,
-) -> tuple[list[dict], str, dict[str, object] | None]:
-    logger = get_logger(document_id)
-
-    if requested_mode == "local":
-        ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-        return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local", None
-
-    if requested_mode == "landingai":
-        if not get_settings().landingai_api_key:
-            raise RuntimeError("LandingAI mode selected but VISION_AGENT_API_KEY is not configured")
-        try:
-            parser = LandingAiAdeParser(data_root=data_root)
-            pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
-            return pages, "landingai", parser.last_metadata
-        except Exception as exc:
-            logger.warning(
-                "landingai mode: API call failed, falling back to local OCR",
-                extra={"error": str(exc)},
-            )
-            ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-            return ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id), "local", None
-
-    # auto: try local first; fall back to LandingAI if quality is poor and key is configured
-    ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-    local_pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
-    if _scan_quality_good(local_pages):
-        return local_pages, "local", None
-    if not get_settings().landingai_api_key:
-        logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
-        return local_pages, "local", None
-    try:
-        parser = LandingAiAdeParser(data_root=data_root)
-        pages = parser.parse_pdf(file_path=file_path, document_id=document_id)
-        return pages, "landingai", parser.last_metadata
-    except Exception as exc:
-        logger.warning(
-            "auto-mode: LandingAI API failed after quality gate, falling back to local OCR",
-            extra={"error": str(exc)},
-        )
-        return local_pages, "local", None
+) -> tuple[list[dict], str, dict[str, object] | None, dict[str, object] | None]:
+    return _extract_scan_pages_impl(
+        file_path=file_path,
+        document_id=document_id,
+        requested_mode=requested_mode,
+        data_root=data_root,
+        page_indices=None,
+    )
 
 
 def _extract_scan_pages_selective(
@@ -305,60 +279,155 @@ def _extract_scan_pages_selective(
     requested_mode: str,
     page_indices: set[int],
     data_root: Path,
-) -> tuple[list[dict], str, dict[str, object] | None]:
+) -> tuple[list[dict], str, dict[str, object] | None, dict[str, object] | None]:
+    return _extract_scan_pages_impl(
+        file_path=file_path,
+        document_id=document_id,
+        requested_mode=requested_mode,
+        data_root=data_root,
+        page_indices=page_indices,
+    )
+
+
+def _extract_scan_pages_impl(
+    file_path: Path,
+    document_id: str,
+    requested_mode: str,
+    data_root: Path,
+    page_indices: set[int] | None,
+) -> tuple[list[dict], str, dict[str, object] | None, dict[str, object] | None]:
     logger = get_logger(document_id)
 
     if requested_mode == "local":
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-        pages = ocr_pipeline.extract_scanned_pdf_selective(
-            file_path=file_path,
-            document_id=document_id,
-            page_indices=page_indices,
-        )
-        return pages, "local", None
-
-    if requested_mode == "landingai":
-        if not get_settings().landingai_api_key:
-            raise RuntimeError("LandingAI mode selected but VISION_AGENT_API_KEY is not configured")
-        try:
-            parser = LandingAiAdeParser(data_root=data_root)
-            pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
-            return pages, "landingai", parser.last_metadata
-        except Exception as exc:
-            logger.warning(
-                "landingai mode: API call failed, falling back to local OCR",
-                extra={"error": str(exc)},
-            )
-            ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+        if page_indices is None:
+            pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
+        else:
             pages = ocr_pipeline.extract_scanned_pdf_selective(
                 file_path=file_path,
                 document_id=document_id,
                 page_indices=page_indices,
             )
-            return pages, "local", None
+        return pages, "local", None, None
 
-    # auto: try local first; fall back to LandingAI if quality is poor and key is configured
+    if requested_mode == "gemini":
+        return _run_cloud_scan_mode(
+            file_path=file_path,
+            document_id=document_id,
+            data_root=data_root,
+            page_indices=page_indices,
+            provider="gemini",
+            logger=logger,
+        )
+
+    if requested_mode == "landingai":
+        return _run_cloud_scan_mode(
+            file_path=file_path,
+            document_id=document_id,
+            data_root=data_root,
+            page_indices=page_indices,
+            provider="landingai",
+            logger=logger,
+        )
+
+    # auto: try local first; fall back to Gemini then LandingAI when quality is poor
     ocr_pipeline = get_ocr_pipeline(data_root=data_root)
-    local_pages = ocr_pipeline.extract_scanned_pdf_selective(
-        file_path=file_path,
-        document_id=document_id,
-        page_indices=page_indices,
-    )
+    if page_indices is None:
+        local_pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
+    else:
+        local_pages = ocr_pipeline.extract_scanned_pdf_selective(
+            file_path=file_path,
+            document_id=document_id,
+            page_indices=page_indices,
+        )
     if _scan_quality_good(local_pages):
-        return local_pages, "local", None
-    if not get_settings().landingai_api_key:
-        logger.warning("auto-mode: local OCR quality poor but VISION_AGENT_API_KEY not set; using local result")
-        return local_pages, "local", None
+        return local_pages, "local", None, None
+
+    settings = get_settings()
+    if not settings.gemini_api_key and not settings.landingai_api_key:
+        logger.warning(
+            "auto-mode: local OCR quality poor but no cloud OCR keys configured; using local result",
+        )
+        return local_pages, "local", None, None
+
+    for provider in ("gemini", "landingai"):
+        if provider == "gemini" and not settings.gemini_api_key:
+            continue
+        if provider == "landingai" and not settings.landingai_api_key:
+            continue
+        try:
+            pages, landingai_meta, gemini_meta = _invoke_cloud_scan_parser(
+                provider=provider,
+                file_path=file_path,
+                document_id=document_id,
+                data_root=data_root,
+                page_indices=page_indices,
+            )
+            return pages, provider, landingai_meta, gemini_meta
+        except Exception as exc:
+            logger.warning(
+                "auto-mode: cloud OCR provider failed after quality gate, trying next provider",
+                extra={"provider": provider, "error": str(exc)},
+            )
+
+    return local_pages, "local", None, None
+
+
+def _run_cloud_scan_mode(
+    file_path: Path,
+    document_id: str,
+    data_root: Path,
+    page_indices: set[int] | None,
+    provider: str,
+    logger: object,
+) -> tuple[list[dict], str, dict[str, object] | None, dict[str, object] | None]:
+    settings = get_settings()
+    if provider == "gemini" and not settings.gemini_api_key:
+        raise RuntimeError("Gemini mode selected but GEMINI_API_KEY is not configured")
+    if provider == "landingai" and not settings.landingai_api_key:
+        raise RuntimeError("LandingAI mode selected but VISION_AGENT_API_KEY is not configured")
+
     try:
-        parser = LandingAiAdeParser(data_root=data_root)
-        pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
-        return pages, "landingai", parser.last_metadata
+        pages, landingai_meta, gemini_meta = _invoke_cloud_scan_parser(
+            provider=provider,
+            file_path=file_path,
+            document_id=document_id,
+            data_root=data_root,
+            page_indices=page_indices,
+        )
+        return pages, provider, landingai_meta, gemini_meta
     except Exception as exc:
         logger.warning(
-            "auto-mode: LandingAI API failed after quality gate, falling back to local OCR",
+            f"{provider} mode: API call failed, falling back to local OCR",
             extra={"error": str(exc)},
         )
-        return local_pages, "local", None
+        ocr_pipeline = get_ocr_pipeline(data_root=data_root)
+        if page_indices is None:
+            pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)
+        else:
+            pages = ocr_pipeline.extract_scanned_pdf_selective(
+                file_path=file_path,
+                document_id=document_id,
+                page_indices=page_indices,
+            )
+        return pages, "local", None, None
+
+
+def _invoke_cloud_scan_parser(
+    provider: str,
+    file_path: Path,
+    document_id: str,
+    data_root: Path,
+    page_indices: set[int] | None,
+) -> tuple[list[dict], dict[str, object] | None, dict[str, object] | None]:
+    if provider == "gemini":
+        parser = GeminiVisionParser(data_root=data_root)
+        pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+        return pages, None, parser.last_metadata
+
+    parser = LandingAiAdeParser(data_root=data_root)
+    pages = parser.parse_pdf(file_path=file_path, document_id=document_id, page_indices=page_indices)
+    return pages, parser.last_metadata, None
 
 
 def _get_ocr_pipeline_if_needed(needed: bool, data_root: Path) -> object | None:
@@ -417,7 +486,7 @@ def _run_page_reprocess(payload: ReprocessPageRequest) -> None:
     output_path = intermediate_output_path(settings.data_root, payload.document_id)
 
     try:
-        pages, effective_mode, landingai_meta = _extract_scan_pages(
+        pages, effective_mode, landingai_meta, gemini_meta = _extract_scan_pages(
             file_path=file_path,
             document_id=payload.document_id,
             requested_mode=payload.scan_extraction_mode,
@@ -459,6 +528,8 @@ def _run_page_reprocess(payload: ReprocessPageRequest) -> None:
         extraction["scan_extraction_mode_effective"] = effective_mode
         if landingai_meta:
             extraction["landingai"] = landingai_meta
+        if gemini_meta:
+            extraction["gemini"] = gemini_meta
         data["extraction"] = extraction
 
         output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

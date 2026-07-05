@@ -19,7 +19,7 @@ class UploadController extends Controller
 
     public function store(StoreDocumentRequest $request): JsonResponse
     {
-        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'auto');
+        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'gemini');
         $extractionEngine = (string) ($request->validated('extraction_engine') ?? 'fast');
 
         $documentId = $this->reviewStore->generateDocumentId();

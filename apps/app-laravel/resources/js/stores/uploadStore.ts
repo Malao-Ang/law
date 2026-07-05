@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { fetchStatus, uploadDocument } from '../api/client';
-import type { DocumentStatus } from '../types/document';
+import type { DocumentStatus, ScanExtractionMode } from '../types/document';
 
 export interface UploadHistoryEntry {
   documentId: string;
@@ -18,7 +18,7 @@ export const useUploadStore = defineStore('upload', () => {
 
   async function upload(
     file: File,
-    scanMode: 'auto' | 'local' | 'landingai',
+    scanMode: ScanExtractionMode,
     engine: 'standard' | 'fast',
   ): Promise<string> {
     const response = await uploadDocument(file, scanMode, engine);

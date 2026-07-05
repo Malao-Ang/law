@@ -12,7 +12,7 @@ import {
   reprocessPageWithLandingAI,
   splitBlock,
 } from '../api/client';
-import type { DocumentBlock, LayoutPatch } from '../types/document';
+import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
 
 export const useBlockStore = defineStore('blocks', () => {
   async function patch(
@@ -72,7 +72,7 @@ export const useBlockStore = defineStore('blocks', () => {
   async function reprocessPage(
     documentId: string,
     pageNo: number,
-    mode: 'landingai' | 'local' | 'auto' = 'landingai',
+    mode: ScanExtractionMode = 'gemini',
   ): Promise<void> {
     await reprocessPageWithLandingAI(documentId, pageNo, mode);
   }

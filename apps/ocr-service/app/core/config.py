@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     landingai_base_url: str = "https://api.va.landing.ai"
     landingai_parse_model: str = "dpt-2-latest"
     landingai_timeout_seconds: int = 60
+
+    # Google Gemini vision OCR (optional)
+    gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_timeout_seconds: int = 120
     doc_conversion_timeout_seconds: int = 60
     soffice_binary: str = "soffice"
 

@@ -11,9 +11,16 @@
   ReprocessResponse,
   ReviewDocument,
   ReviewedTable,
+  ScanExtractionMode,
   UpdateDocumentReviewResponse,
   UploadResponse,
 } from '../types/document';
+
+type ApiErrorPayload = {
+  message?: string;
+  error?: string;
+  errors?: Record<string, string[]>;
+};
 
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
@@ -33,12 +40,19 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
 
   if (!response.ok) {
     const fallback = `HTTP ${response.status}`;
+    let payload: ApiErrorPayload | null = null;
+
     try {
-      const payload = (await response.json()) as { message?: string; error?: string };
-      throw new Error(payload.message ?? payload.error ?? fallback);
+      payload = (await response.json()) as ApiErrorPayload;
     } catch {
-      throw new Error(fallback);
+      payload = null;
     }
+
+    const firstValidationError = payload?.errors
+      ? Object.values(payload.errors).flat()[0]
+      : undefined;
+
+    throw new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback);
   }
 
   return (await response.json()) as T;
@@ -46,7 +60,7 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
 
 export async function uploadDocument(
   file: File,
-  scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto',
+  scanExtractionMode: ScanExtractionMode = 'gemini',
   extractionEngine: 'standard' | 'fast' = 'standard',
 ): Promise<UploadResponse> {
   const form = new FormData();
@@ -173,7 +187,7 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
 export function reprocessPageWithLandingAI(
   documentId: string,
   pageNo: number,
-  scanExtractionMode: 'landingai' | 'local' | 'auto' = 'landingai',
+  scanExtractionMode: ScanExtractionMode = 'gemini',
 ): Promise<{ document_id: string; page_no: number; status: string }> {
   return jsonRequest(`/api/documents/${documentId}/pages/${pageNo}/reprocess`, {
     method: 'POST',

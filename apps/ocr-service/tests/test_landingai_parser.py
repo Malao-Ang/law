@@ -108,7 +108,7 @@ def test_landingai_timeout_in_auto_mode_falls_back_to_ocr(tmp_path):
         mock_pipeline.extract_scanned_pdf.return_value = [{"page_no": 1, "blocks": [{"type": "paragraph", "raw_text": "ocr fallback", "confidence": 0.95, "flags": []}]}]
         mock_pipeline_fn.return_value = mock_pipeline
 
-        pages, mode, meta = _extract_scan_pages(
+        pages, mode, landingai_meta, gemini_meta = _extract_scan_pages(
             file_path=tmp_path / "fake.pdf",
             document_id="test-doc",
             requested_mode="auto",
@@ -117,7 +117,8 @@ def test_landingai_timeout_in_auto_mode_falls_back_to_ocr(tmp_path):
 
     assert mode == "local"
     assert pages[0]["blocks"][0]["raw_text"] == "ocr fallback"
-    assert meta is None
+    assert landingai_meta is None
+    assert gemini_meta is None
 
 
 def test_landingai_http_error_in_landingai_mode_falls_back_to_ocr(tmp_path):
@@ -141,7 +142,7 @@ def test_landingai_http_error_in_landingai_mode_falls_back_to_ocr(tmp_path):
         mock_pipeline.extract_scanned_pdf.return_value = [{"page_no": 1, "blocks": [{"type": "paragraph", "raw_text": "ocr fallback", "confidence": 0.95, "flags": []}]}]
         mock_pipeline_fn.return_value = mock_pipeline
 
-        pages, mode, meta = _extract_scan_pages(
+        pages, mode, landingai_meta, gemini_meta = _extract_scan_pages(
             file_path=tmp_path / "fake.pdf",
             document_id="test-doc",
             requested_mode="landingai",
@@ -150,4 +151,5 @@ def test_landingai_http_error_in_landingai_mode_falls_back_to_ocr(tmp_path):
 
     assert mode == "local"
     assert pages[0]["blocks"][0]["raw_text"] == "ocr fallback"
-    assert meta is None
+    assert landingai_meta is None
+    assert gemini_meta is None

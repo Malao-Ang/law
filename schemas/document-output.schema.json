@@ -26,8 +26,8 @@
     "extraction": {
       "type": "object",
       "properties": {
-        "scan_extraction_mode_requested": { "type": "string", "enum": ["auto", "local", "landingai"] },
-        "scan_extraction_mode_effective": { "type": "string", "enum": ["auto", "local", "landingai"] }
+        "scan_extraction_mode_requested": { "type": "string", "enum": ["auto", "local", "landingai", "gemini"] },
+        "scan_extraction_mode_effective": { "type": "string", "enum": ["auto", "local", "landingai", "gemini"] }
       },
       "additionalProperties": true
     },

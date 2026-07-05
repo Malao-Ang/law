@@ -130,6 +130,8 @@ export interface DocumentBlock {
   meta: BlockMeta;
 }
 
+export type ScanExtractionMode = 'auto' | 'local' | 'landingai' | 'gemini';
+
 export interface DocumentPage {
   page_no: number;
   image_path: string | null;
@@ -223,8 +225,8 @@ export interface ReviewDocument {
   relations?: LawRelation[];
   timings?: Record<string, number> | null;
   extraction?: {
-    scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
-    scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
+    scan_extraction_mode_requested?: ScanExtractionMode;
+    scan_extraction_mode_effective?: ScanExtractionMode;
     path?: string[];
     conversion?: {
       tool: string;
@@ -243,6 +245,13 @@ export interface ReviewDocument {
       version?: string | null;
       failed_pages?: number[];
     } | null;
+    gemini?: {
+      source?: string | null;
+      model?: string | null;
+      page_count?: number | null;
+      duration_ms?: number | null;
+      failed_pages?: number[];
+    } | null;
   } | null;
 }
 
@@ -256,8 +265,8 @@ export interface DocumentStatus {
   export_path?: string;
   ingest_path?: string;
   ingested_chunk_count?: number;
-  scan_extraction_mode_requested?: 'auto' | 'local' | 'landingai';
-  scan_extraction_mode_effective?: 'auto' | 'local' | 'landingai';
+  scan_extraction_mode_requested?: ScanExtractionMode;
+  scan_extraction_mode_effective?: ScanExtractionMode;
   extraction_path?: string[] | null;
   conversion?: {
     tool: string;

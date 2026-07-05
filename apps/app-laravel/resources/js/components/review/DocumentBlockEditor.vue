@@ -18,9 +18,15 @@
           size="x-small"
           variant="outlined"
           :disabled="reprocessingPage[page.page_no]"
+<<<<<<< HEAD
           :title="'Re-run page ' + page.page_no + ' with LandingAI'"
           @click.stop="runLandingAI(page.page_no)"
         >{{ reprocessingPage[page.page_no] ? 'Running…' : 'LandingAI ↺' }}</v-btn>
+=======
+          :title="'Re-run page ' + page.page_no + ' with Gemini OCR'"
+          @click.stop="runGeminiOcr(page.page_no)"
+        >{{ reprocessingPage[page.page_no] ? 'Running…' : 'Gemini ↺' }}</button>
+>>>>>>> 242e7a706aa7fa521f0eb2d9695e0e88b6778d60
       </div>
 
       <!-- Page image thumbnail (togglable) -->
@@ -451,10 +457,10 @@ function toggleDiff(blockId: string): void {
   showDiff[blockId] = !showDiff[blockId];
 }
 
-async function runLandingAI(pageNo: number): Promise<void> {
+async function runGeminiOcr(pageNo: number): Promise<void> {
   reprocessingPage[pageNo] = true;
   try {
-    await blockStore.reprocessPage(props.documentId, pageNo, 'landingai');
+    await blockStore.reprocessPage(props.documentId, pageNo, 'gemini');
   } finally {
     reprocessingPage[pageNo] = false;
   }

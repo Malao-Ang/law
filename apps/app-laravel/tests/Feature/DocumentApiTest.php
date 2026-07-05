@@ -34,7 +34,7 @@ class DocumentApiTest extends TestCase
             ]);
     }
 
-    public function test_upload_accepts_scan_extraction_mode_and_passes_it_to_job(): void
+    public function test_upload_rejects_unsupported_scan_extraction_mode(): void
     {
         Queue::fake();
 
@@ -43,16 +43,8 @@ class DocumentApiTest extends TestCase
             'scan_extraction_mode' => 'landingai',
         ]);
 
-        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
-        $documentId = (string) $response->json('document_id');
-
-        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
-            return $job->scanExtractionMode === 'landingai';
-        });
-
-        $this->getJson('/api/documents/'.$documentId)
-            ->assertOk()
-            ->assertJsonPath('scan_extraction_mode_requested', 'landingai');
+        $response->assertStatus(422);
+        Queue::assertNotPushed(ExtractDocumentJob::class);
     }
 
     public function test_upload_accepts_local_scan_extraction_mode_and_passes_it_to_job(): void
@@ -74,6 +66,27 @@ class DocumentApiTest extends TestCase
         $this->getJson('/api/documents/'.$documentId)
             ->assertOk()
             ->assertJsonPath('scan_extraction_mode_requested', 'local');
+    }
+
+    public function test_upload_accepts_gemini_scan_extraction_mode_and_passes_it_to_job(): void
+    {
+        Queue::fake();
+
+        $response = $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
+            'scan_extraction_mode' => 'gemini',
+        ]);
+
+        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
+        $documentId = (string) $response->json('document_id');
+
+        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
+            return $job->scanExtractionMode === 'gemini';
+        });
+
+        $this->getJson('/api/documents/'.$documentId)
+            ->assertOk()
+            ->assertJsonPath('scan_extraction_mode_requested', 'gemini');
     }
 
     public function test_upload_accepts_legacy_doc_files(): void
