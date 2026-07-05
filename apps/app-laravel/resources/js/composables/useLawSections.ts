@@ -41,7 +41,10 @@ function isHead(block: DocumentBlock): boolean {
 function markerFor(block: DocumentBlock): string {
   const text = blockText(block);
   const match = text.match(HEAD_RE);
-  if (match) return match[1].replace(/\s+/g, ' ').trim();
+  if (match) return match[1].replace(/\s+/g, ' ').trim(); // number comes from the text
+
+  const ct = block.meta?.chunk_type;
+  if (ct && CHUNK_TYPE_LABELS[ct as ChunkType]) return CHUNK_TYPE_LABELS[ct as ChunkType];
   if (block.type === 'title') return 'คำปรารภ';
 
   return blockText(block).slice(0, 24);

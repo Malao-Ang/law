@@ -132,8 +132,6 @@
               </li>
             </ul>
           </div>
-          <v-btn variant="text" size="x-small" class="d-block ml-auto mt-1"
-            prepend-icon="mdi-content-copy" @click="copySection(section)">คัดลอก</v-btn>
         </v-card>
       </main>
 
@@ -149,7 +147,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { buildSections, buildTocGroups, relationsForSection, documentRelations } from '../../composables/useLawSections';
-import type { DocumentBlock, LawMeta, LawRelation } from '../../types/document';
+import type { LawMeta, LawRelation } from '../../types/document';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 
@@ -207,14 +205,6 @@ function safeUrl(url: string | null): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
-}
-
-function copySection(section: { headBlock: DocumentBlock; children: DocumentBlock[] }): void {
-  const text = [section.headBlock, ...section.children]
-    .map((block) => block.approved_text || block.normalized_text || block.raw_text || '')
-    .join('\n');
-
-  navigator.clipboard?.writeText(text);
 }
 
 function printPage(): void {
