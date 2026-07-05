@@ -22,7 +22,7 @@ const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะ�
 // Structural heading chunk-types: assigning one makes a block a section head,
 // so the following blocks group under it without merging text.
 const HEAD_CHUNK_TYPES = new Set<string>([
-  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'TRANSITIONAL_PROVISION',
+  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'ANNEX', 'TRANSITIONAL_PROVISION',
 ]);
 
 function blockText(block: DocumentBlock): string {
