@@ -405,10 +405,10 @@ async function handleExport(): Promise<void> {
       await reloadBlocks();
     } catch (e) {
       documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
-      blockBusy.value = false;
       return;
+    } finally {
+      blockBusy.value = false;
     }
-    blockBusy.value = false;
   }
 
   // 2. Validate: every container must now have a stored type.
