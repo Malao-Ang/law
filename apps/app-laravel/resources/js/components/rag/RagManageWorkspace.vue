@@ -587,15 +587,4 @@ onBeforeUnmount(() => {
 .rag-splitline:hover {
   background: #f1f5f9;
 }
-
-/* ponytail: native textarea inside v-dialog — kept for @select event support */
-.rag-splitmodal__text {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px;
-  font: inherit;
-  line-height: 1.7;
-  resize: vertical;
-}
 </style>
