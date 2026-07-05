@@ -626,16 +626,17 @@ class ReviewStore
             throw new \InvalidArgumentException('mergeBlocks requires at least 2 block IDs.');
         }
 
+        $idSet = array_flip(array_map('strval', $blockIds));
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($blockIds, &$returnBlock): void {
+        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($idSet, $blockIds, &$returnBlock): void {
+            // Collect selected blocks in DOCUMENT order (not the caller's click/selection order).
             $ordered = [];
-            foreach ($blockIds as $id) {
-                foreach (($document['pages'] ?? []) as $page) {
-                    foreach (($page['blocks'] ?? []) as $b) {
-                        if ((string) ($b['block_id'] ?? '') === $id) {
-                            $ordered[$id] = $b;
-                        }
+            foreach (($document['pages'] ?? []) as $page) {
+                foreach (($page['blocks'] ?? []) as $b) {
+                    $id = (string) ($b['block_id'] ?? '');
+                    if (isset($idSet[$id])) {
+                        $ordered[] = $b;
                     }
                 }
             }
@@ -644,31 +645,49 @@ class ReviewStore
                 throw new RuntimeException('One or more blocks not found for merge.');
             }
 
+            // Anchor is the topmost selected block in document order.
+            $anchorId = (string) ($ordered[0]['block_id'] ?? '');
+
             $mergedText = implode("\n", array_map(
                 static fn (array $b): string => (string) ($b['approved_text'] ?? $b['normalized_text'] ?? ''),
-                array_values($ordered),
-            ));
-            $mergedHtml = implode('', array_map(
-                static fn (array $b): string => (string) ($b['meta']['reviewed_html'] ?? ''),
-                array_values($ordered),
+                $ordered,
             ));
 
-            $firstId = $blockIds[0];
-            $toRemove = array_slice($blockIds, 1);
+            // Every block must contribute visible HTML: use its reviewed_html when present,
+            // otherwise fall back to an escaped paragraph built from its text — so no content
+            // silently disappears when a merged block has no reviewed_html.
+            $mergedHtml = implode('', array_map(
+                static function (array $b): string {
+                    $html = (string) ($b['meta']['reviewed_html'] ?? '');
+                    if (trim($html) !== '') {
+                        return $html;
+                    }
+                    $text = (string) ($b['approved_text'] ?? $b['normalized_text'] ?? $b['raw_text'] ?? '');
+
+                    return '<p>'.nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8')).'</p>';
+                },
+                $ordered,
+            ));
 
             foreach ($document['pages'] as &$page) {
                 foreach ($page['blocks'] as &$block) {
-                    if ((string) ($block['block_id'] ?? '') === $firstId) {
+                    if ((string) ($block['block_id'] ?? '') === $anchorId) {
                         $block['approved_text'] = $mergedText;
-                        $block['meta']['reviewed_html'] = $mergedHtml;
+                        $block['meta']['reviewed_html'] = $this->sanitizeHtml($mergedHtml);
                         $block['needs_review'] = false;
                         $returnBlock = $block;
                     }
                 }
                 unset($block);
+
+                // Keep the anchor; drop every other selected block.
                 $page['blocks'] = array_values(array_filter(
                     $page['blocks'],
-                    static fn (array $b): bool => ! in_array((string) ($b['block_id'] ?? ''), $toRemove, true),
+                    static function (array $b) use ($idSet, $anchorId): bool {
+                        $id = (string) ($b['block_id'] ?? '');
+
+                        return $id === $anchorId || ! isset($idSet[$id]);
+                    },
                 ));
             }
             unset($page);
@@ -678,7 +697,7 @@ class ReviewStore
         });
 
         if ($returnBlock === null) {
-            throw new RuntimeException("Merge target block '{$blockIds[0]}' could not be updated.");
+            throw new RuntimeException('Merge target block could not be updated.');
         }
 
         /** @var array<string, mixed> $returnBlock */

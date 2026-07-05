@@ -68,6 +68,64 @@ class BlockMutationTest extends TestCase
         $this->assertStringContainsString('Block two', $block['approved_text']);
     }
 
+    public function test_merge_includes_content_of_blocks_without_reviewed_html(): void
+    {
+        // b2 has approved_text but an EMPTY reviewed_html — its content must still
+        // appear in the merged block's rendered HTML.
+        $this->store->writeReviewDocument($this->docId, [
+            'document_id' => $this->docId,
+            'source_file' => 'test.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => null,
+                'blocks' => [
+                    ['block_id' => 'b1', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 1,
+                        'raw_text' => 'Alpha', 'normalized_text' => 'Alpha', 'ai_suggested_text' => '',
+                        'approved_text' => 'Alpha', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '<p>Alpha</p>']],
+                    ['block_id' => 'b2', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 2,
+                        'raw_text' => 'Beta', 'normalized_text' => 'Beta', 'ai_suggested_text' => '',
+                        'approved_text' => 'Beta', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '']],
+                ],
+            ]],
+            'summary' => ['page_count' => 1, 'block_count' => 2, 'review_required_count' => 0],
+        ]);
+
+        $response = $this->postJson("/api/documents/{$this->docId}/blocks/merge", [
+            'block_ids' => ['b1', 'b2'],
+        ]);
+        $response->assertStatus(200)->assertJsonFragment(['status' => 'merged']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $block = collect($doc['pages'][0]['blocks'])->firstWhere('block_id', 'b1');
+        $this->assertStringContainsString('Alpha', $block['meta']['reviewed_html']);
+        $this->assertStringContainsString('Beta', $block['meta']['reviewed_html']);
+    }
+
+    public function test_merge_orders_content_by_document_position_not_selection(): void
+    {
+        // Select in REVERSE document order; merged text and anchor must follow document order.
+        $response = $this->postJson("/api/documents/{$this->docId}/blocks/merge", [
+            'block_ids' => ['b3', 'b1'],
+        ]);
+        $response->assertStatus(200)->assertJsonFragment(['status' => 'merged']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $ids = array_column($doc['pages'][0]['blocks'], 'block_id');
+        $this->assertContains('b1', $ids);        // topmost selected is the anchor
+        $this->assertNotContains('b3', $ids);     // other selected block removed
+
+        $block = collect($doc['pages'][0]['blocks'])->firstWhere('block_id', 'b1');
+        $onePos = strpos($block['approved_text'], 'Block one');
+        $threePos = strpos($block['approved_text'], 'Block three');
+        $this->assertNotFalse($onePos);
+        $this->assertNotFalse($threePos);
+        $this->assertLessThan($threePos, $onePos); // "Block one" precedes "Block three"
+    }
+
     public function test_split_block_creates_two_blocks(): void
     {
         $response = $this->postJson("/api/documents/{$this->docId}/blocks/b1/split", [
