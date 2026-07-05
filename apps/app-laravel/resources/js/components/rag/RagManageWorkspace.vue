@@ -1,6 +1,6 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
-    subtitle="จัดการความสัมพันธ์และข้อมูลกฎหมายก่อนเผยแพร่">
+    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
     <template #actions>
       <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
         ย้อนกลับ

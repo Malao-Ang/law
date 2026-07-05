@@ -139,7 +139,6 @@ async function saveAndContinue(): Promise<void> {
   const payload: LawMeta = { ...lawMetaForm.value, repealed_laws: repealedLaws };
   const saved = await documentStore.saveLawMeta(payload);
   if (saved) {
-    lawMetaForm.value = payload;
     router.push(`/documents/${props.documentId}/rag`);
   }
 }
