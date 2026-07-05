@@ -25,7 +25,7 @@ elif [ "$SERVICE" = "laravel" ]; then
     docker-compose build laravel-app
 elif [ "$SERVICE" = "vite" ]; then
     echo "📦 Restarting Vite (no rebuild needed for Node image)..."
-    docker-compose restart laravel-vite
+    docker-compose up -d laravel-vite
 else
     echo "❌ Unknown service: $SERVICE"
     echo "   Usage: $0 [all|ocr|laravel|vite]"

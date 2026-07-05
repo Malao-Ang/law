@@ -1,25 +1,25 @@
 <template>
-  <div class="section-action-bar">
-    <button class="section-action-bar__btn" type="button" @click="$emit('edit')">
-      <span class="mdi mdi-pencil-outline" aria-hidden="true"></span>
+  <div class="d-flex ga-2 flex-wrap align-center py-1">
+    <v-btn size="small" variant="outlined" @click="$emit('edit')">
+      <v-icon icon="mdi-pencil-outline" />
       แก้ไขมาตรา
-    </button>
-    <button class="section-action-bar__btn" type="button" @click="$emit('history')">
-      <span class="mdi mdi-history" aria-hidden="true"></span>
+    </v-btn>
+    <v-btn size="small" variant="outlined" @click="$emit('history')">
+      <v-icon icon="mdi-history" />
       ประวัติ
-    </button>
-    <button class="section-action-bar__btn" type="button" @click="$emit('relations')">
-      <span class="mdi mdi-graph-outline" aria-hidden="true"></span>
+    </v-btn>
+    <v-btn size="small" variant="outlined" @click="$emit('relations')">
+      <v-icon icon="mdi-graph-outline" />
       ความสัมพันธ์
-    </button>
-    <button class="section-action-bar__btn" type="button" @click="$emit('copy')">
-      <span class="mdi mdi-content-copy" aria-hidden="true"></span>
+    </v-btn>
+    <v-btn size="small" variant="outlined" @click="$emit('copy')">
+      <v-icon icon="mdi-content-copy" />
       คัดลอก
-    </button>
-    <button class="section-action-bar__btn section-action-bar__btn--danger" type="button" @click="$emit('cancel')">
-      <span class="mdi mdi-cancel" aria-hidden="true"></span>
+    </v-btn>
+    <v-btn size="small" variant="outlined" color="error" @click="$emit('cancel')">
+      <v-icon icon="mdi-cancel" />
       ยกเลิกมาตรา
-    </button>
+    </v-btn>
   </div>
 </template>
 

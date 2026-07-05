@@ -1,173 +1,263 @@
 <template>
   <section class="elaw-hero">
-    <div class="elaw-hero__inner">
-      <h1 class="elaw-hero__heading">ค้นหากฎหมาย</h1>
-      <p class="elaw-hero__sub">ฐานข้อมูลกฎหมาย ระเบียบ ประกาศ และข้อบังคับ</p>
-
-      <div class="elaw-hero__search-wrap">
-        <span class="mdi mdi-magnify elaw-hero__search-icon" aria-hidden="true"></span>
-        <input v-model="query" class="elaw-hero__search-input" type="text"
-          placeholder="ค้นหาชื่อกฎหมาย หน่วยงาน หรือเลขที่..." @keydown.enter="$emit('search', query)">
-
+    <v-container class="elaw-hero__container" style="max-width: 980px">
+      <div class="d-flex justify-center">
+        <v-chip class="elaw-hero__eyebrow" size="small" rounded="pill" variant="outlined">
+          แพลตฟอร์มสืบค้นกฎหมายสำหรับทุกคน
+        </v-chip>
       </div>
-      <button class="elaw-hero__search-btn" type="button" @click="$emit('search', query)">
-        ค้นหา
-      </button>
-      <div class="elaw-hero__chips">
-        <button v-for="chip in typeChips" :key="chip.value" class="elaw-hero__chip"
-          :class="{ 'elaw-hero__chip--active': activeType === chip.value }" type="button"
-          @click="toggleType(chip.value)">
-          {{ chip.label }}
-        </button>
-      </div>
-    </div>
+
+      <h1 class="text-center font-weight-black mb-3 elaw-hero__title">
+        <span class="elaw-hero__title-accent">ค้นหาและเข้าถึงข้อมูลกฎหมาย</span>
+        <br>
+        ได้อย่างสะดวกรวดเร็ว
+      </h1>
+      <p class="text-center mb-7 elaw-hero__subtitle">
+        อัปเดตข้อมูลล่าสุด รวบรวมพระราชบัญญัติ กฎกระทรวง และประกาศต่าง ๆ ไว้ในที่เดียว
+      </p>
+
+      <v-card flat rounded="xl" class="pa-5 pa-md-6 elaw-search-card">
+        <div class="mb-4">
+          <p class="text-caption mb-2 elaw-search-card__label">ประเภทเอกสาร</p>
+          <div class="d-flex flex-wrap ga-2">
+            <v-chip
+              v-for="type in docTypes"
+              :key="type.value"
+              :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
+              rounded="pill"
+              class="elaw-search-card__type-chip"
+              @click="toggleType(type.value)"
+            >
+              {{ type.label }}
+            </v-chip>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <div class="elaw-search-card__search-row">
+            <v-text-field
+              ref="queryInput"
+              v-model="query"
+              placeholder="พิมพ์ชื่อกฎหมาย, เลขที่ประกาศ, หรือคำสำคัญ..."
+              density="comfortable"
+              hide-details
+              variant="outlined"
+              rounded="xl"
+              bg-color="white"
+              append-inner-icon="mdi-magnify"
+              class="elaw-search-card__query"
+              @click:append-inner="emitSearch"
+              @keydown.enter="emitSearch"
+            />
+          </div>
+        </div>
+
+        <div class="elaw-search-card__tags">
+          <div class="elaw-search-card__tags-label">
+            <v-icon size="14" icon="mdi-arrow-top-right" />
+            <span>คำค้นหายอดนิยม</span>
+          </div>
+          <div class="d-flex flex-wrap ga-2">
+            <v-chip
+              v-for="tag in popularTags"
+              :key="tag"
+              rounded="pill"
+              variant="outlined"
+              class="elaw-search-card__tag"
+              @click="applyPopularTag(tag)"
+            >
+              {{ tag }}
+            </v-chip>
+          </div>
+        </div>
+      </v-card>
+    </v-container>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 
-defineEmits<{ search: [string] }>();
+const emit = defineEmits<{
+  search: [query: string, types: string[]];
+}>();
 
 const query = ref('');
-const activeType = ref<string | null>(null);
+const selectedTypes = ref<string[]>(['all']);
+const queryInput = ref<{ focus?: () => void } | null>(null);
 
-const typeChips = [
+const docTypes = [
   { label: 'ทั้งหมด', value: 'all' },
-  { label: 'กฎหมายหลัก', value: 'kotmai-luang' },
-  { label: 'ระเบียบ', value: 'rabiap' },
+  { label: 'พ.ร.บ.', value: 'phrb' },
   { label: 'ข้อบังคับ', value: 'kho-bangkhab' },
+  { label: 'ระเบียบ', value: 'rabiap' },
   { label: 'ประกาศ', value: 'prakat' },
-  { label: 'คำสั่ง', value: 'kham-sang' },
-  { label: 'แนวปฏิบัติ', value: 'naeo-patibat' },
 ];
 
+const popularTags = [
+  'อัตราเบิกค่าใช้จ่ายเดินทาง',
+  'กองทุนสร้างเสริมสุขภาพ',
+  'โครงสร้างสถาบันวิจัย',
+];
+
+function isTypeSelected(value: string): boolean {
+  return selectedTypes.value.includes(value);
+}
+
 function toggleType(value: string): void {
-  activeType.value = activeType.value === value ? null : value;
+  if (value === 'all') {
+    selectedTypes.value = ['all'];
+    return;
+  }
+
+  const next = new Set(selectedTypes.value);
+  next.delete('all');
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+
+  selectedTypes.value = next.size > 0 ? Array.from(next) : ['all'];
+}
+
+function emitSearch(): void {
+  const normalizedTypes = selectedTypes.value.includes('all') ? [] : selectedTypes.value;
+  emit('search', query.value, normalizedTypes);
+}
+
+async function applyPopularTag(tag: string): Promise<void> {
+  query.value = tag;
+  await nextTick();
+  queryInput.value?.focus?.();
 }
 </script>
 
 <style scoped>
 .elaw-hero {
-  background: linear-gradient(160deg, var(--elaw-cream) 0%, var(--elaw-bg) 100%);
-  border-bottom: 1px solid var(--elaw-border);
-  padding: 56px 24px 48px;
+  background: linear-gradient(180deg, #f8f7f1 8%, #fff4b5 100%);
+  border-bottom: 1px solid #eadfcb;
+  min-height: 100vh;
+  padding: 24px 24px 40px;
 }
 
-.elaw-hero__inner {
-  max-width: 760px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.elaw-hero__heading {
-  font-size: 36px;
-  font-weight: 800;
-  color: var(--elaw-navy);
-  margin: 0 0 8px;
-}
-
-.elaw-hero__sub {
-  font-size: 15px;
-  color: var(--elaw-muted);
-  margin: 0 0 28px;
-}
-
-.elaw-hero__search-wrap {
-  position: relative;
+.elaw-hero__container {
+  min-height: calc(100vh - 48px);
   display: flex;
-  align-items: center;
-  background: #fff;
-  border: 2px solid var(--elaw-border);
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(26, 46, 82, 0.08);
-  overflow: hidden;
-  transition: border-color 0.15s;
+  flex-direction: column;
+  justify-content: start;
 }
 
-.elaw-hero__search-wrap:focus-within {
-  border-color: var(--elaw-warm-gold);
+.elaw-hero__eyebrow {
+  border-color: #d9c9ab;
+  color: rgb(var(--v-theme-primary));
+  background: rgba(255, 255, 255, 0.82);
 }
 
-.elaw-hero__search-icon {
-  position: absolute;
-  left: 16px;
-  font-size: 20px;
-  color: var(--elaw-muted);
-  pointer-events: none;
+.elaw-hero__title {
+  font-size: clamp(1.85rem, 3.2vw, 3rem);
+  line-height: 1.6;
+  color: #33302a;
 }
 
-.elaw-hero__search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  padding: 14px 14px 14px 46px;
-  font-size: 15px;
-  font-family: inherit;
-  color: var(--elaw-text);
-  background: transparent;
+.elaw-hero__title-accent {
+  color: rgb(var(--v-theme-primary));
 }
 
-.elaw-hero__search-btn {
-  padding: 0 24px;
-  min-height: 50px;
-  background: var(--elaw-navy);
-  color: #fff;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.12s;
+.elaw-hero__subtitle {
+  color: #6e685e;
+  font-size: 1.3rem;
 }
 
-.elaw-hero__search-btn:hover {
-  background: var(--law-primary-deep);
+.elaw-search-card {
+  background: #ffffff;
+  border: 1px solid #e8dcc7 !important;
+  box-shadow: 0 18px 46px rgba(186, 151, 63, 0.15) !important;
 }
 
-.elaw-hero__chips {
+.elaw-search-card__label {
+  color: #7d705a;
+}
+
+.elaw-search-card__type-chip {
+  min-height: 40px;
+  border-color: #decfb8;
+  color: #7f6440;
+  background: #fffdfa;
+}
+
+.elaw-search-card__type-chip.v-chip--variant-flat {
+  border-color: #bf9139;
+  color: #8f6718;
+  background: #fff2cf;
+}
+
+.elaw-search-card__search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.elaw-search-card__query :deep(.v-field) {
+  border-radius: 20px;
+}
+
+.elaw-search-card__query :deep(.v-field__append-inner) {
+  padding-inline-end: 10px;
+}
+
+.elaw-search-card__query :deep(.v-icon) {
+  color: rgba(52, 48, 40, 1);
+}
+
+.elaw-search-card__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 20px;
+  align-items: center;
+  gap: 12px;
+  padding-top: 18px;
 }
 
-.elaw-hero__chip {
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--elaw-border);
-  background: #fff;
-  font-size: 13px;
-  color: var(--elaw-text);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.12s;
+.elaw-search-card__tags-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9b7625;
+  font-size: 1rem;
+  white-space: nowrap;
 }
 
-.elaw-hero__chip:hover {
-  border-color: var(--elaw-warm-gold);
-  background: var(--elaw-cream);
-}
-
-.elaw-hero__chip--active {
-  background: var(--elaw-navy);
-  color: #fff;
-  border-color: var(--elaw-navy);
+.elaw-search-card__tag {
+  border-color: #e2d7c4;
+  color: #7a6551;
+  background: #fffdfa;
 }
 
 @media (max-width: 640px) {
-  .elaw-hero__heading {
-    font-size: 28px;
+  .elaw-hero {
+    min-height: auto;
+    padding: 32px 16px 32px;
   }
 
-  .elaw-hero__search-wrap {
-    flex-direction: column;
-    align-items: stretch;
+  .elaw-hero__container {
+    min-height: auto;
+    justify-content: flex-start;
   }
 
-  .elaw-hero__search-btn {
-    width: 100%;
+  .elaw-hero__title {
+    font-size: clamp(1.55rem, 7vw, 2.25rem);
+  }
+
+  .elaw-hero__subtitle {
+    font-size: 1.05rem;
+  }
+
+  .elaw-search-card__search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .elaw-search-card__tags {
+    align-items: flex-start;
   }
 }
 </style>

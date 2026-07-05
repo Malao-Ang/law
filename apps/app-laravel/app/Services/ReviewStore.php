@@ -163,7 +163,7 @@ class ReviewStore
         $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
             $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
-            $block['approved_text'] = (string) $patch['approved_text'];
+            $block['approved_text'] = (string) ($patch['approved_text'] ?? $block['approved_text'] ?? '');
             $block['needs_review'] = (bool) ($patch['mark_uncertain'] ?? false);
             $block['type'] = (string) ($patch['type'] ?? $block['type'] ?? 'paragraph');
             $block['reading_order'] = (int) ($patch['reading_order'] ?? $block['reading_order'] ?? 0);
@@ -198,6 +198,7 @@ class ReviewStore
                 'layout' => $layout,
                 'table' => $table,
                 'table_html' => $table['html'] ?? null,
+                'chunk_type' => $patch['chunk_type'] ?? $existingMeta['chunk_type'] ?? null,
                 'review' => [
                     'approved_by' => $patch['approved_by'] ?? null,
                     'notes' => $patch['notes'] ?? null,

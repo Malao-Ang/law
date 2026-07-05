@@ -134,6 +134,12 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ponytail: drag+resize positioning, keep — all rules below are load-bearing for
+   absolute handle placement, cursor feedback, tooltip positioning, and selection outline.
+   No structural chrome (no card, no toolbar, no header) exists in this component.
+   Only the hardcoded Vuetify-primary hex (#1976d2) and surface-white (#ffffff) are
+   converted to theme tokens; all positioning values are untouched. */
+
 .drag-block {
   display: inline-block;
   position: relative;
@@ -142,7 +148,7 @@ onBeforeUnmount(() => {
 }
 
 .drag-block--selected {
-  outline: 2px solid #1976d2;
+  outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
 }
 
@@ -150,8 +156,8 @@ onBeforeUnmount(() => {
   position: absolute;
   width: 8px;
   height: 8px;
-  background: #1976d2;
-  border: 1px solid #ffffff;
+  background: rgb(var(--v-theme-primary));
+  border: 1px solid rgb(var(--v-theme-surface));
   border-radius: 1px;
   z-index: 10;
 }

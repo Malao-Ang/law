@@ -44,11 +44,11 @@ const handleBack = () => {
     <div class="app-header__bg"></div>
 
     <v-container class="app-header__container" fluid>
-      <div class="app-header__row">
+      <div class="d-flex justify-space-between align-center">
 
-        <div class="app-header__left">
+        <div class="d-flex flex-column ga-1">
 
-          <div class="app-header__titleRow">
+          <div class="d-flex align-center ga-2">
             <v-btn
               v-if="showBack"
               class="app-header__backBtn"
@@ -80,8 +80,8 @@ const handleBack = () => {
 
         </div>
 
-        <div class="app-header__right">
-          <div class="app-header__rightText">
+        <div class="d-flex align-center ga-3">
+          <div class="text-end">
             <div class="app-header__rightTitle">{{ rightTitle }}</div>
             <div class="app-header__rightSubtitle">
               {{ rightSubtitle }}
@@ -105,12 +105,12 @@ const handleBack = () => {
     <template v-if="showStaffSubheader" #extension>
       <div class="app-header__subheader">
         <v-container class="app-header__subheaderInner" fluid>
-          <div class="app-header__subheaderRow">
-            <div class="app-header__staff">
+          <div class="d-flex align-center justify-end ga-3 flex-wrap">
+            <div class="d-flex align-center ga-3">
               <v-avatar class="app-header__staffAvatar" color="rgba(255,255,255,0.15)">
                 <v-icon color="white" size="14">mdi-account</v-icon>
               </v-avatar>
-              <div class="app-header__staffText">
+              <div class="d-flex flex-column ga-1 text-end">
                 <span class="app-header__staffName">{{ staffName }}</span>
                 <span class="app-header__staffMeta">
                   {{ staffRole }}
@@ -132,6 +132,7 @@ const handleBack = () => {
   overflow: hidden;
 }
 
+/* ponytail: brand gold gradient — no Vuetify token expresses this, keep as CSS */
 .app-header__bg {
   position: absolute;
   inset: 0;
@@ -145,24 +146,6 @@ const handleBack = () => {
   z-index: 1;
   padding-top: 16px;
   padding-bottom: 16px;
-}
-
-.app-header__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.app-header__left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.app-header__titleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .app-header__title {
@@ -193,16 +176,6 @@ const handleBack = () => {
   margin-right: 4px;
 }
 
-.app-header__right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.app-header__rightText {
-  text-align: right;
-}
-
 .app-header__rightTitle {
   font-size: 16px;
   font-weight: 600;
@@ -231,29 +204,6 @@ const handleBack = () => {
 .app-header__subheaderInner {
   padding-top: 8px;
   padding-bottom: 8px;
-}
-
-.app-header__subheaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.app-header__staff {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-
-.app-header__staffText {
-  text-align: right;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
 }
 
 .app-header__staffLabel {

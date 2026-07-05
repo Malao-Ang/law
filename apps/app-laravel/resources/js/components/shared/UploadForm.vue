@@ -1,21 +1,17 @@
 <template>
   <div class="upload-form">
-    <input
-      ref="fileInput"
-      type="file"
+    <v-file-input
+      v-model="fileModel"
       accept=".doc,.docx,.pdf"
-      class="upload-form__hidden-input"
-      @change="onFileSelected"
+      label="เลือกไฟล์ (.doc, .docx, .pdf)"
+      variant="outlined"
+      density="comfortable"
+      :loading="loading"
+      :disabled="loading"
+      hide-details
+      @update:model-value="onFileSelected"
     />
     <div class="upload-form__actions">
-      <v-btn
-        color="#1a3673"
-        size="large"
-        :loading="loading"
-        @click="fileInput?.click()"
-      >
-        เลือกไฟล์จากเครื่อง
-      </v-btn>
       <v-btn
         variant="outlined"
         size="large"
@@ -25,17 +21,13 @@
         ยกเลิก
       </v-btn>
     </div>
-    <p v-if="selectedFileName" class="upload-form__filename">
-      ไฟล์ที่เลือก: {{ selectedFileName }}
-    </p>
-    <p v-if="error" class="upload-form__error">{{ error }}</p>
+    <v-alert v-if="error" type="error" density="compact" class="mt-2">{{ error }}</v-alert>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useUploadStore } from '../../stores/uploadStore';
-
 
 const emit = defineEmits<{
   uploaded: [documentId: string];
@@ -47,20 +39,20 @@ const uploadStore = useUploadStore();
 const extractionEngine: 'standard' | 'fast' = 'fast';
 const scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto';
 
-const fileInput = ref<HTMLInputElement | null>(null);
-const selectedFileName = ref<string | null>(null);
+const fileModel = ref<File | File[] | null>(null);
+const selectedFileName = ref<string | null>(null); // ponytail: kept for compat; v-file-input displays selection
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-async function onFileSelected(event: Event): Promise<void> {
-  const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-  if (!file) return;
-  selectedFileName.value = file.name;
+async function onFileSelected(file: File | File[] | null): Promise<void> {
+  const f = Array.isArray(file) ? (file[0] ?? null) : file;
+  if (!f) return;
+  selectedFileName.value = f.name;
   error.value = null;
   loading.value = true;
   try {
     const documentId = await uploadStore.upload(
-      file,
+      f,
       scanExtractionMode,
       extractionEngine,
     );
@@ -73,35 +65,18 @@ async function onFileSelected(event: Event): Promise<void> {
 }
 
 function reset(): void {
+  fileModel.value = null;
   selectedFileName.value = null;
   error.value = null;
-  if (fileInput.value) fileInput.value.value = '';
 }
 </script>
 
 <style scoped>
-.upload-form__hidden-input {
-  display: none;
-}
-
 .upload-form__actions {
   display: flex;
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-}
-
-.upload-form__filename {
-  font-size: 13px;
-  color: #64748b;
   margin-top: 8px;
-  text-align: center;
-}
-
-.upload-form__error {
-  font-size: 13px;
-  color: #ef4444;
-  margin-top: 8px;
-  text-align: center;
 }
 </style>

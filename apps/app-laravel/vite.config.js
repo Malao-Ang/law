@@ -45,7 +45,7 @@ export default defineConfig({
                 '**/config/**',
                 '**/database/**',
                 '**/lang/**',
-                '**/public/**',
+                '**/public/build/**',
                 '**/storage/**',
                 '**/tests/**',
                 '**/vendor/**',

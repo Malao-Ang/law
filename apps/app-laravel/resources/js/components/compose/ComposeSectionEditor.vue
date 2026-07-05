@@ -36,7 +36,7 @@
             :alt="item.block.meta.image.caption ?? 'document image'"
             :edit-mode="editMode"
           />
-          <p v-else class="hint">ไม่พบรูปภาพสำหรับบล็อกนี้</p>
+          <div v-else class="text-caption text-medium-emphasis">ไม่พบรูปภาพสำหรับบล็อกนี้</div>
         </div>
 
         <div

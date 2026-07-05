@@ -84,5 +84,19 @@ export const useBlockStore = defineStore('blocks', () => {
     return reorderBlocks(documentId, blockIds);
   }
 
-  return { patch, reprocess, patchLayout, remove, merge, split, create, reprocessPage, reorder };
+  async function patchChunkType(
+    documentId: string,
+    block: DocumentBlock,
+    pageNo: number,
+    chunkType: string | null,
+  ): Promise<void> {
+    await patchBlock(documentId, block.block_id, {
+      page_no: pageNo,
+      approved_text: block.approved_text || block.normalized_text || block.raw_text || '',
+      mark_uncertain: block.needs_review,
+      chunk_type: chunkType,
+    });
+  }
+
+  return { patch, reprocess, patchLayout, remove, merge, split, create, reprocessPage, reorder, patchChunkType };
 });

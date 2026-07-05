@@ -1,99 +1,86 @@
 <template>
-  <LawspaceShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
-    subtitle="จัดการความสัมพันธ์และข้อมูลกฎหมายก่อนเผยแพร่">
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
+    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
     <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
-        ยกเลิก
+      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
+        ย้อนกลับ
       </v-btn>
-      <v-btn color="#1a3673" :loading="composeStore.exporting" @click="handleExport">
+      <v-btn color="#1a3673" :loading="composeStore.exporting" :disabled="composeStore.exporting || blockBusy" @click="handleExport">
         บันทึกและเผยแพร่
       </v-btn>
     </template>
 
     <!-- Loading -->
-    <div v-if="composeStore.loading" class="rag-state">
+    <div v-if="composeStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
       <v-progress-circular indeterminate color="primary" />
-      <p>กำลังโหลดบล็อก...</p>
+      <span>กำลังโหลดบล็อก...</span>
     </div>
 
     <!-- Error -->
-    <div v-else-if="composeStore.error" class="rag-state">
+    <div v-else-if="composeStore.error" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
       <v-icon icon="mdi-alert-circle-outline" size="32" color="error" />
-      <p>{{ composeStore.error }}</p>
+      <span>{{ composeStore.error }}</span>
       <v-btn variant="outlined" size="small" @click="composeStore.setError()">ปิด</v-btn>
     </div>
 
     <template v-else>
       <div class="rag-content-area">
-        <div v-if="selectedBlockIds.size > 0" class="rag-actionbar">
-          <span class="rag-actionbar__count">เลือก {{ selectedBlockIds.size }} บล็อก</span>
-          <button class="rag-actionbar__btn" :disabled="selectedBlockIds.size < 2 || blockBusy" @click="mergeSelected">
-            <span class="mdi mdi-table-merge-cells" /> รวม
-          </button>
-          <button class="rag-actionbar__btn rag-actionbar__btn--danger" :disabled="blockBusy" @click="deleteSelected">
-            <span class="mdi mdi-delete-outline" /> ลบ
-          </button>
-          <button class="rag-actionbar__btn" :disabled="blockBusy" @click="clearSelection">
-            ยกเลิกการเลือก
-          </button>
+        <!-- Selection action bar -->
+        <div v-if="selectedBlockIds.size > 0" class="d-flex align-center ga-2 px-3 py-2 rounded-lg"
+          style="position:sticky;top:0;z-index:5;background:#1a3673;color:#fff">
+          <span class="text-body-2 font-weight-bold mr-auto">เลือก {{ selectedBlockIds.size }} บล็อก</span>
+          <v-btn size="small" :disabled="selectedBlockIds.size < 2 || blockBusy"
+            prepend-icon="mdi-table-merge-cells"
+            style="background:rgba(255,255,255,0.14);color:#fff"
+            @click="mergeSelected">รวม</v-btn>
+          <v-btn size="small" :disabled="blockBusy"
+            prepend-icon="mdi-delete-outline"
+            style="background:rgba(220,38,38,0.85);color:#fff"
+            @click="deleteSelected">ลบ</v-btn>
+          <v-btn size="small" :disabled="selectedBlockIds.size !== 1 || blockBusy"
+            prepend-icon="mdi-call-split"
+            style="background:rgba(5,150,105,0.85);color:#fff"
+            @click="openSplitFromSelection">แบ่ง</v-btn>
+          <v-btn size="small" :disabled="blockBusy"
+            style="background:rgba(255,255,255,0.14);color:#fff"
+            @click="clearSelection">ยกเลิกการเลือก</v-btn>
         </div>
-        <div v-if="documentStore.saveError" class="rag-save-error">
-          <span class="mdi mdi-alert-circle-outline" /> {{ documentStore.saveError }}
-          <button class="rag-save-error__x" @click="documentStore.setSaveError()">✕</button>
-        </div>
-        <details class="lawmeta-panel">
-          <summary class="lawmeta-panel__summary">
-            <span class="mdi mdi-information-outline" /> ข้อมูลกฎหมาย (หัวเอกสาร)
-          </summary>
-          <div class="lawmeta-grid">
-            <label>สถานะ<input v-model="lawMetaForm.status" type="text" placeholder="มีผลใช้บังคับ"></label>
-            <label>ประเภท<input v-model="lawMetaForm.law_type" type="text" placeholder="พระราชบัญญัติ"></label>
-            <label>กลุ่มกฎหมาย<input v-model="lawMetaForm.law_group" type="text" placeholder="ด้านวิชาการ"></label>
-            <label>หน่วยงาน<input v-model="lawMetaForm.agency" type="text" placeholder="มหาวิทยาลัยบูรพา"></label>
-            <label>วันที่ประกาศ<input v-model="lawMetaForm.promulgation_date" type="text"
-                placeholder="9 มกราคม 2551"></label>
-            <label>วันที่มีผลบังคับ<input v-model="lawMetaForm.effective_date" type="text"></label>
-            <label>ราชกิจจานุเบกษา<input v-model="lawMetaForm.gazette_reference" type="text"
-                placeholder="เล่ม 125 ตอนที่ 5 ก"></label>
-            <label>พระบรมราชโองการ<input v-model="lawMetaForm.royal_command" type="text"
-                placeholder="ภูมิพลอดุลยเดช ปร."></label>
-            <label class="lawmeta-grid__full">กฎหมายที่ถูกยกเลิก (บรรทัดละ 1 รายการ)
-              <textarea v-model="repealedText" rows="3" />
-            </label>
-          </div>
-          <div class="lawmeta-rels">
-            <div class="lawmeta-rels__head">
-              <span>ความสัมพันธ์ระดับเอกสาร</span>
-              <button class="rag-sec__btn" @click="openRelationDialog('document', null, 'related')">
-                <span class="mdi mdi-plus" /> เพิ่ม
-              </button>
-            </div>
-            <span v-for="rel in documentRelations(relations)" :key="rel.id" class="rag-rel-chip"
-              :class="{ 'rag-rel-chip--repeal': rel.type === 'repeals' }">
-              <span class="mdi" :class="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'" />
-              {{ rel.target_title }}
-              <button class="rag-rel-chip__x" @click="removeRelation(rel.id)"><span class="mdi mdi-close" /></button>
-            </span>
-          </div>
-          <button class="lawmeta-save" :disabled="documentStore.saving" @click="saveLawMeta">
-            <span class="mdi mdi-content-save-outline" /> บันทึกข้อมูลกฎหมาย
-          </button>
-        </details>
+
+        <!-- Save error -->
+        <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable
+          @click:close="documentStore.setSaveError()">
+          {{ documentStore.saveError }}
+        </v-alert>
 
         <!-- Section list (e-Law style) -->
-        <div class="rag-block-list">
+        <div ref="blockListEl" class="rag-block-list">
           <div v-for="section in sections" :key="section.id" class="rag-sec">
             <div class="rag-sec__head">
-              <span class="rag-sec__badge" :class="{ 'rag-sec__badge--chapter': section.isChapter }">{{ section.badge
-              }}</span>
+              <v-menu location="bottom start" :close-on-content-click="true">
+                <template #activator="{ props: menuProps }">
+                  <v-chip v-bind="menuProps" size="small"
+                    :color="containerTypeColor(section)"
+                    :variant="section.headBlock.meta.chunk_type ? 'tonal' : 'outlined'"
+                    class="rag-sec__typechip">
+                    {{ containerTypeLabel(section) }}
+                    <v-icon icon="mdi-chevron-down" size="12" class="ml-1" />
+                  </v-chip>
+                </template>
+                <v-list density="compact" :min-width="180">
+                  <v-list-item
+                    v-for="ct in HEAD_CHUNK_TYPES"
+                    :key="ct"
+                    :title="CHUNK_TYPE_LABELS[ct]"
+                    :active="section.headBlock.meta.chunk_type === ct"
+                    @click="setChunkType(section.headBlock, ct)"
+                  />
+                </v-list>
+              </v-menu>
               <div class="rag-sec__actions">
-                <button class="rag-sec__btn" @click="openRelationDialog('section', section.id, 'related')">
-                  <span class="mdi mdi-link-variant" /> เพิ่มความสัมพันธ์
-                </button>
-                <button class="rag-sec__btn rag-sec__btn--danger"
-                  @click="openRelationDialog('section', section.id, 'repeals')">
-                  <span class="mdi mdi-cancel" /> ยกเลิกมาตรา
-                </button>
+                <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
+                  @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
+                <v-btn size="x-small" variant="outlined" color="error" prepend-icon="mdi-cancel"
+                  @click="openRelationDialog('section', section.id, 'repeals')">ยกเลิกมาตรา</v-btn>
               </div>
             </div>
             <div class="rag-sec__flow">
@@ -104,7 +91,10 @@
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
-                <BlockFlow :block="section.headBlock" :override-text="section.headBodyText" />
+                <BlockFlow
+                  :block="section.headBlock"
+                  :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
+                />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
                   @click.prevent.stop="openSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
@@ -125,59 +115,67 @@
               </label>
             </div>
 
-            <button class="rag-sec__addblock" :disabled="blockBusy" @click="createBlockAfter(lastBlockId(section))">
-              <span class="mdi mdi-plus" /> เพิ่มบล็อกใต้หัวข้อนี้
-            </button>
 
-            <div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
-              <span v-for="rel in sectionRelations(section.id)" :key="rel.id" class="rag-rel-chip"
-                :class="{ 'rag-rel-chip--repeal': rel.type === 'repeals' }">
-                <span class="mdi" :class="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'" />
+<div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
+              <v-chip v-for="rel in sectionRelations(section.id)" :key="rel.id" size="small" closable
+                :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
+                :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
+                @click:close="removeRelation(rel.id)">
                 {{ rel.target_title }}{{ rel.target_section ? ' · ' + rel.target_section : '' }}
-                <button class="rag-rel-chip__x" @click="removeRelation(rel.id)"><span class="mdi mdi-close" /></button>
-              </span>
+              </v-chip>
             </div>
           </div>
 
-          <div v-if="sections.length === 0" class="rag-state">
-            <p>ไม่พบบล็อกเนื้อหา</p>
+          <div v-if="sections.length === 0" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
+            <span>ไม่พบบล็อกเนื้อหา</span>
           </div>
         </div>
 
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
           @close="dialog = null" @save="onRelationSaved" />
-      <div v-if="splitting" class="rag-splitmodal" @click.self="splitting = null">
-        <div class="rag-splitmodal__card">
-          <p class="rag-splitmodal__title">วางเคอร์เซอร์เพื่อแบ่ง หรือเลือกข้อความเพื่อแยกออกเป็นบล็อกใหม่</p>
-          <textarea class="rag-splitmodal__text" :value="splitting.text" rows="6" @keyup="onSplitCaret"
-              @mouseup="onSplitCaret" @click="onSplitCaret" @select="onSplitCaret" />
-          <p class="rag-splitmodal__hint">
-            {{ splitSelectionLabel }}
-          </p>
-          <div class="rag-splitmodal__actions">
-            <button class="rag-sec__btn" @click="splitting = null">ยกเลิก</button>
-            <button class="lawmeta-save" :disabled="blockBusy" @click="confirmSplit">
-              {{ hasSplitSelection ? 'แยกข้อความที่เลือก' : 'แบ่งบล็อก' }}
-            </button>
-          </div>
-        </div>
-      </div>
+
+        <!-- Split modal: pick lines to separate into a new block -->
+        <v-dialog v-model="splitDialogOpen" max-width="560">
+          <v-card v-if="splitting" class="pa-5">
+            <div class="text-body-1 font-weight-bold mb-1" style="color:#1a3673">
+              เลือกบรรทัดที่จะแยกออกเป็นบล็อกใหม่
+            </div>
+            <div class="text-caption text-medium-emphasis mb-3">
+              บรรทัดที่เลือกจะถูกย้ายไปเป็นบล็อกใหม่ด้านล่าง ที่เหลือจะอยู่ในบล็อกเดิม
+            </div>
+            <div class="rag-splitlines">
+              <label v-for="(line, i) in splitLines" :key="i" class="rag-splitline">
+                <input type="checkbox" :checked="selectedLines.has(i)" @change="toggleLine(i)">
+                <span>{{ line || '(บรรทัดว่าง)' }}</span>
+              </label>
+            </div>
+            <div class="d-flex justify-end ga-2 mt-4">
+              <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
+              <v-btn color="#059669" size="small"
+                :disabled="selectedLines.size === 0 || selectedLines.size === splitLines.length || blockBusy"
+                @click="confirmSplit">แยกออก</v-btn>
+            </div>
+          </v-card>
+        </v-dialog>
       </div>
     </template>
-  </LawspaceShell>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
-import type { DocumentBlock, LawMeta, LawRelation, RelationScope, RelationType } from '../../types/document';
-import LawspaceShell from '../shared/LawspaceShell.vue';
-import { buildSections, relationsForSection, documentRelations, type LawSection } from '../../composables/useLawSections';
+import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
+import AppShell from '../shared/AppShell.vue';
+import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
+import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
+import type { ChunkType } from '../../types/chunkType';
+import Swal from 'sweetalert2';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -186,44 +184,49 @@ const composeStore = useComposeStore();
 const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
 
-const repealedText = ref('');
-
-const EMPTY_LAW_META: LawMeta = {
-  status: '',
-  law_type: '',
-  law_group: '',
-  agency: '',
-  promulgation_date: '',
-  effective_date: '',
-  gazette_reference: '',
-  royal_command: '',
-  repealed_laws: [],
-};
-
-const lawMetaForm = ref<LawMeta>({ ...EMPTY_LAW_META });
-
 const sections = computed(() => buildSections(composeStore.review));
+
+function containerType(section: LawSection): ChunkType | null {
+  const stored = section.headBlock.meta.chunk_type as ChunkType | null | undefined;
+  return stored ?? suggestChunkType(section.headBlock);
+}
+
+function containerTypeLabel(section: LawSection): string {
+  const ct = containerType(section);
+  if (!ct) return 'เลือกประเภท...';
+  const label = CHUNK_TYPE_LABELS[ct];
+  return section.headBlock.meta.chunk_type ? label : `${label} (แนะนำ)`;
+}
+
+function containerTypeColor(section: LawSection): string | undefined {
+  const ct = containerType(section);
+  if (!ct) return undefined;
+  return section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[ct] : 'grey';
+}
+
+const allBlocks = computed<DocumentBlock[]>(() =>
+  sections.value.flatMap(s => [s.headBlock, ...s.children]),
+);
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
-const splitting = ref<{ blockId: string; pageNo: number; text: string; selectionStart: number; selectionEnd: number } | null>(null);
+const blockListEl = ref<HTMLElement | null>(null);
+const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
+const selectedLines = ref<Set<number>>(new Set());
+const splitLines = computed<string[]>(() => {
+  if (!splitting.value) return [];
+  const lines = splitting.value.text.split('\n');
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+});
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
-const hasSplitSelection = computed(() => {
-  if (!splitting.value) return false;
-  return splitting.value.selectionEnd > splitting.value.selectionStart;
+const splitDialogOpen = computed({
+  get: () => splitting.value !== null,
+  set: (v) => { if (!v) splitting.value = null; },
 });
 
-const splitSelectionLabel = computed(() => {
-  if (!splitting.value) return '';
-  if (hasSplitSelection.value) {
-    const length = splitting.value.selectionEnd - splitting.value.selectionStart;
-    return `เลือกข้อความ ${length} ตัวอักษร: ระบบจะแยกข้อความนี้ออกเป็นบล็อกใหม่`;
-  }
-
-  return 'ยังไม่ได้เลือกข้อความ: ระบบจะแบ่งบล็อกตามตำแหน่งเคอร์เซอร์';
-});
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -262,11 +265,15 @@ function clearSelection(): void {
 }
 
 async function reloadBlocks(): Promise<void> {
+  // ponytail: Vuetify overlay focus-restore scrolls the list after DOM replace; pin scrollTop
+  const scrollTop = blockListEl.value?.scrollTop ?? 0;
   await Promise.all([
     composeStore.fetch(props.documentId),
     documentStore.fetch(props.documentId),
   ]);
   clearSelection();
+  await nextTick();
+  if (blockListEl.value) blockListEl.value.scrollTop = scrollTop;
 }
 
 async function mergeSelected(): Promise<void> {
@@ -300,49 +307,37 @@ async function deleteSelected(): Promise<void> {
   }
 }
 
-async function createBlockAfter(afterBlockId: string): Promise<void> {
-  if (blockBusy.value) return;
-  blockBusy.value = true;
-  try {
-    const pageNo = blockPage.value.get(afterBlockId) ?? 1;
-    await blockStore.create(props.documentId, {
-      page_no: pageNo,
-      after_block_id: afterBlockId,
-      type: 'paragraph',
-      approved_text: '',
-    });
-    await reloadBlocks();
-  } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'สร้างบล็อกไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
-  }
-}
-
-function lastBlockId(section: LawSection): string {
-  const lastChild = section.children.at(-1);
-  return lastChild ? lastChild.block_id : section.headBlock.block_id;
-}
 
 function openSplit(block: DocumentBlock): void {
+  const fullText = block.approved_text || block.normalized_text || block.raw_text || '';
+  if (fullText.split('\n').length < 2) return;
+  selectedLines.value = new Set();
   splitting.value = {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
-    text: block.approved_text || block.normalized_text || block.raw_text || '',
-    selectionStart: 0,
-    selectionEnd: 0,
+    text: fullText,
   };
 }
 
-function onSplitCaret(event: Event): void {
-  const el = event.target as HTMLTextAreaElement;
-  if (!splitting.value) return;
+function openSplitFromSelection(): void {
+  const [blockId] = [...selectedBlockIds.value];
+  if (!blockId) return;
+  const block = allBlocks.value.find(b => b.block_id === blockId);
+  if (block) openSplit(block);
+}
 
-  splitting.value = {
-    ...splitting.value,
-    selectionStart: el.selectionStart ?? 0,
-    selectionEnd: el.selectionEnd ?? el.selectionStart ?? 0,
-  };
+async function setChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
+  if (blockBusy.value) return;
+  blockBusy.value = true;
+  const pageNo = blockPage.value.get(block.block_id) ?? 1;
+  try {
+    await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
+    await reloadBlocks();
+  } catch (e) {
+    documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+  } finally {
+    blockBusy.value = false;
+  }
 }
 
 function escapeForHtml(text: string): string {
@@ -352,36 +347,26 @@ function escapeForHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
+function toggleLine(i: number): void {
+  const next = new Set(selectedLines.value);
+  if (next.has(i)) next.delete(i);
+  else next.add(i);
+  selectedLines.value = next;
+}
+
 async function confirmSplit(): Promise<void> {
   if (!splitting.value || blockBusy.value) return;
-  const { blockId, pageNo, text } = splitting.value;
-  const start = Math.min(Math.max(splitting.value.selectionStart, 0), text.length);
-  const end = Math.min(Math.max(splitting.value.selectionEnd, start), text.length);
-  const before = text.slice(0, start);
-  const selected = text.slice(start, end);
-  const after = text.slice(end);
+  const keep: string[] = [];
+  const move: string[] = [];
+  splitLines.value.forEach((line, i) => {
+    (selectedLines.value.has(i) ? move : keep).push(line);
+  });
+  const { blockId, pageNo } = splitting.value;
+  await splitBlockInto(blockId, pageNo, keep.join('\n'), move.join('\n'));
+}
 
-  if (start === end) {
-    if (before.trim() === '' || after.trim() === '') {
-      documentStore.setSaveError('วางเคอร์เซอร์ตรงกลางข้อความเพื่อแบ่งบล็อก');
-      return;
-    }
-
-    await splitBlockInto(blockId, pageNo, before, after);
-    return;
-  }
-
-  if (selected.trim() === '') {
-    documentStore.setSaveError('เลือกข้อความที่ต้องการแยกออกเป็นบล็อกใหม่');
-    return;
-  }
-
-  if (before.trim() === '' && after.trim() === '') {
-    documentStore.setSaveError('เลือกเฉพาะบางส่วนของบล็อกเพื่อแยกออก');
-    return;
-  }
-
-  await splitSelectedTextOut(blockId, pageNo, before, selected, after);
+function toBlockHtml(text: string): string {
+  return `<p>${escapeForHtml(text).replaceAll('\n', '<br>')}</p>`;
 }
 
 async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
@@ -390,9 +375,9 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
     await blockStore.split(props.documentId, blockId, {
       page_no: pageNo,
       before_text: before,
-      before_html: `<p>${escapeForHtml(before)}</p>`,
+      before_html: toBlockHtml(before),
       after_text: after,
-      after_html: `<p>${escapeForHtml(after)}</p>`,
+      after_html: toBlockHtml(after),
     });
     splitting.value = null;
     await reloadBlocks();
@@ -403,75 +388,51 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
   }
 }
 
-async function splitSelectedTextOut(
-  blockId: string,
-  pageNo: number,
-  before: string,
-  selected: string,
-  after: string,
-): Promise<void> {
-  blockBusy.value = true;
-  try {
-    if (before.trim() === '') {
-      await callSplit(blockId, pageNo, selected, after);
-    } else if (after.trim() === '') {
-      await callSplit(blockId, pageNo, before, selected);
-    } else {
-      await callSplit(blockId, pageNo, `${before}${selected}`, after);
-      await callSplit(blockId, pageNo, before, selected);
-    }
-
-    splitting.value = null;
-    await reloadBlocks();
-  } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'แยกข้อความที่เลือกไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
-  }
-}
-
-async function callSplit(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
-  await blockStore.split(props.documentId, blockId, {
-    page_no: pageNo,
-    before_text: before,
-    before_html: `<p>${escapeForHtml(before)}</p>`,
-    after_text: after,
-    after_html: `<p>${escapeForHtml(after)}</p>`,
-  });
-}
-
-watch(() => documentStore.review?.law_meta, (meta) => {
-  const nextMeta = {
-    ...EMPTY_LAW_META,
-    ...(meta ?? {}),
-    repealed_laws: [...(meta?.repealed_laws ?? [])],
-  };
-
-  lawMetaForm.value = nextMeta;
-  repealedText.value = nextMeta.repealed_laws.join('\n');
-}, { immediate: true });
 
 async function handleExport(): Promise<void> {
+  if (blockBusy.value) return;
+
+  // 1. Persist any accepted auto-suggestions (stored empty but suggestion exists).
+  const toPersist = sections.value.filter(
+    (s) => !s.headBlock.meta.chunk_type && suggestChunkType(s.headBlock),
+  );
+  if (toPersist.length > 0) {
+    blockBusy.value = true;
+    try {
+      await Promise.all(
+        toPersist.map((s) => {
+          const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
+          return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggestChunkType(s.headBlock));
+        }),
+      );
+      await reloadBlocks();
+    } catch (e) {
+      documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+      return;
+    } finally {
+      blockBusy.value = false;
+    }
+  }
+
+  // 2. Validate: every container must now have a stored type.
+  const missing = sections.value.filter((s) => !s.headBlock.meta.chunk_type);
+  if (missing.length > 0) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'ยังกำหนดประเภทไม่ครบ',
+      html:
+        'กรุณาเลือกประเภทให้ container ต่อไปนี้ก่อนเผยแพร่:<br><br>' +
+        missing.map((s) => `• ${escapeForHtml(s.badge)}`).join('<br>'),
+      confirmButtonText: 'ตกลง',
+      confirmButtonColor: '#1a3673',
+    });
+    return;
+  }
+
+  // 3. All typed — publish and go to the law view.
   await composeStore.triggerExport(props.documentId);
   if (!composeStore.error) {
     router.push(`/law/${props.documentId}`);
-  }
-}
-
-async function saveLawMeta(): Promise<void> {
-  const repealedLaws = repealedText.value
-    .split('\n')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  const payload: LawMeta = {
-    ...lawMetaForm.value,
-    repealed_laws: repealedLaws,
-  };
-
-  const saved = await documentStore.saveLawMeta(payload);
-  if (saved) {
-    lawMetaForm.value = payload;
   }
 }
 
@@ -489,6 +450,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ponytail: rag-content-area height calc + rag-block-list scroll container — no Vuetify equivalent */
 .rag-content-area {
   display: flex;
   flex-direction: column;
@@ -497,152 +459,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   gap: 12px;
   overflow: hidden;
-}
-
-.rag-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  gap: 12px;
-  color: #64748b;
-}
-
-.rag-save-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.rag-save-error__x {
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 13px;
-}
-
-.rag-actionbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #1a3673;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-}
-
-.rag-actionbar__count {
-  font-size: 13px;
-  font-weight: 600;
-  margin-right: auto;
-}
-
-.rag-actionbar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: 6px 12px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.rag-actionbar__btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.rag-actionbar__btn--danger {
-  background: rgba(220, 38, 38, 0.85);
-}
-
-.lawmeta-panel {
-  background: #fff;
-  border: 1px solid #dbe6f4;
-  border-radius: 10px;
-  padding: 10px 14px 14px;
-}
-
-.lawmeta-panel__summary {
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
-.lawmeta-panel__summary::-webkit-details-marker {
-  display: none;
-}
-
-.lawmeta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
-  margin-top: 14px;
-}
-
-.lawmeta-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.lawmeta-grid input,
-.lawmeta-grid textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: inherit;
-  background: #fff;
-  color: #1e293b;
-}
-
-.lawmeta-grid__full {
-  grid-column: 1 / -1;
-}
-
-.lawmeta-save {
-  margin-top: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #1a3673;
-  color: #fff;
-  padding: 9px 14px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.lawmeta-save:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .rag-block-list {
@@ -656,7 +472,6 @@ onBeforeUnmount(() => {
   padding-right: 4px;
   overscroll-behavior: contain;
 }
-
 
 .rag-sec {
   background: #fff;
@@ -674,43 +489,15 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-.rag-sec__badge {
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 8px;
-}
-
-.rag-sec__badge--chapter {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
 .rag-sec__actions {
   margin-left: auto;
   display: flex;
   gap: 6px;
 }
 
-.rag-sec__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 12px;
+.rag-sec__typechip {
   cursor: pointer;
-  color: #334155;
-}
-
-.rag-sec__btn--danger {
-  color: #dc2626;
-  border-color: #fecaca;
+  align-self: center;
 }
 
 .rag-sec__flow {
@@ -720,26 +507,6 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.rag-sec__addblock {
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px dashed #cbd5e1;
-  background: #fff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  color: #475569;
-}
-
-.rag-sec__addblock:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .rag-sec__rels {
   display: flex;
   flex-wrap: wrap;
@@ -747,32 +514,7 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
-.rag-rel-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
-.rag-rel-chip--repeal {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.rag-rel-chip__x {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  font-size: 13px;
-  line-height: 1;
-  padding: 0;
-}
-
+/* ponytail: custom checkbox grid layout — no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
   grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;
@@ -856,74 +598,30 @@ onBeforeUnmount(() => {
   color: #1a3673;
 }
 
-.rag-splitmodal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
 
-.rag-splitmodal__card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px;
-  width: min(560px, 92vw);
+.rag-splitlines {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.rag-splitmodal__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
-.rag-splitmodal__text {
-  width: 100%;
-  border: 1px solid #cbd5e1;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 10px;
-  font: inherit;
-  line-height: 1.7;
-  resize: vertical;
+  padding: 6px;
 }
 
-.rag-splitmodal__hint {
-  margin: -4px 0 0;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.rag-splitmodal__actions {
-  display: flex;
-  justify-content: flex-end;
+.rag-splitline {
+  display: grid;
+  grid-template-columns: 20px 1fr;
   gap: 8px;
+  align-items: start;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.6;
 }
 
-.lawmeta-rels {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.lawmeta-rels__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a3673;
-}
-
-@media (max-width: 800px) {
-  .lawmeta-grid {
-    grid-template-columns: 1fr;
-  }
+.rag-splitline:hover {
+  background: #f1f5f9;
 }
 </style>

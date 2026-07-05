@@ -1,24 +1,26 @@
 <template>
   <div class="block-editor" @click.self="deselectAll">
     <div v-if="pages.length === 0" class="block-editor__empty">
-      <p class="hint">No blocks to display.</p>
+      <div class="text-caption text-medium-emphasis">No blocks to display.</div>
     </div>
 
     <div v-for="page in uniquePages" :key="page.page_no" class="block-editor__page">
       <div class="block-editor__page-header">
-        <span class="hint">Page {{ page.page_no }}</span>
-        <button
+        <span class="text-caption text-medium-emphasis">Page {{ page.page_no }}</span>
+        <v-btn
           v-if="page.image_url"
-          class="btn btn-tiny block-editor__thumb-toggle"
+          size="x-small"
+          variant="outlined"
           :title="thumbVisible[page.page_no] ? 'Hide preview' : 'Show preview'"
           @click.stop="thumbVisible[page.page_no] = !thumbVisible[page.page_no]"
-        >{{ thumbVisible[page.page_no] ? '🖼 Hide' : '🖼 Preview' }}</button>
-        <button
-          class="btn btn-tiny block-editor__landingai-btn"
+        >{{ thumbVisible[page.page_no] ? '🖼 Hide' : '🖼 Preview' }}</v-btn>
+        <v-btn
+          size="x-small"
+          variant="outlined"
           :disabled="reprocessingPage[page.page_no]"
           :title="'Re-run page ' + page.page_no + ' with LandingAI'"
           @click.stop="runLandingAI(page.page_no)"
-        >{{ reprocessingPage[page.page_no] ? 'Running…' : 'LandingAI ↺' }}</button>
+        >{{ reprocessingPage[page.page_no] ? 'Running…' : 'LandingAI ↺' }}</v-btn>
       </div>
 
       <!-- Page image thumbnail (togglable) -->
@@ -71,10 +73,10 @@
                 style="display: block; width: 100%; height: auto;"
               />
             </ResizableDragBlock>
-            <div v-else class="block-editor__image-missing hint">
+            <div v-else class="block-editor__image-missing text-caption text-medium-emphasis">
               [Image — no URL: {{ block.meta.image?.src_path ?? 'unknown' }}]
             </div>
-            <figcaption v-if="block.meta.image?.caption" class="hint">
+            <figcaption v-if="block.meta.image?.caption" class="text-caption text-medium-emphasis">
               {{ block.meta.image.caption }}
             </figcaption>
           </figure>
@@ -116,82 +118,91 @@
 
             <!-- Formatting toolbar -->
             <div class="block-editor__toolbar">
-              <button
-                class="btn btn-tiny"
-                :class="{ active: editors[block.block_id]?.isActive('bold') }"
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                :color="editors[block.block_id]?.isActive('bold') ? 'primary' : undefined"
                 @mousedown.prevent="editors[block.block_id]?.chain().focus().toggleBold().run()"
                 title="Bold"
-              >B</button>
-              <button
-                class="btn btn-tiny"
-                :class="{ active: editors[block.block_id]?.isActive('italic') }"
+              >B</v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                :color="editors[block.block_id]?.isActive('italic') ? 'primary' : undefined"
                 @mousedown.prevent="editors[block.block_id]?.chain().focus().toggleItalic().run()"
                 title="Italic"
-              ><em>I</em></button>
-              <button
-                class="btn btn-tiny"
-                :class="{ active: editors[block.block_id]?.isActive('underline') }"
+              ><em>I</em></v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                :color="editors[block.block_id]?.isActive('underline') ? 'primary' : undefined"
                 @mousedown.prevent="editors[block.block_id]?.chain().focus().toggleUnderline().run()"
                 title="Underline"
-              ><u>U</u></button>
-              <span class="toolbar-separator"></span>
-              <button
-                class="btn btn-tiny"
-                :class="{ active: editors[block.block_id]?.isActive('heading', { level: 1 }) }"
+              ><u>U</u></v-btn>
+              <v-divider vertical class="mx-1" style="height:16px; align-self:center" />
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                :color="editors[block.block_id]?.isActive('heading', { level: 1 }) ? 'primary' : undefined"
                 @mousedown.prevent="editors[block.block_id]?.chain().focus().toggleHeading({ level: 1 }).run()"
-              >H1</button>
-              <button
-                class="btn btn-tiny"
-                :class="{ active: editors[block.block_id]?.isActive('heading', { level: 2 }) }"
+              >H1</v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                :color="editors[block.block_id]?.isActive('heading', { level: 2 }) ? 'primary' : undefined"
                 @mousedown.prevent="editors[block.block_id]?.chain().focus().toggleHeading({ level: 2 }).run()"
-              >H2</button>
-              <span class="toolbar-separator"></span>
+              >H2</v-btn>
+              <v-divider vertical class="mx-1" style="height:16px; align-self:center" />
               <div class="block-editor__alignment-group" role="group" aria-label="Alignment">
-                <button
-                  class="btn btn-tiny"
-                  :class="{ active: block.meta.layout?.alignment === 'left' }"
+                <v-btn
+                  size="x-small"
+                  variant="outlined"
+                  :color="block.meta.layout?.alignment === 'left' ? 'primary' : undefined"
                   @mousedown.prevent="setAlignment(page.page_no, block, 'left')"
                   title="Align left"
-                >L</button>
-                <button
-                  class="btn btn-tiny"
-                  :class="{ active: block.meta.layout?.alignment === 'center' }"
+                >L</v-btn>
+                <v-btn
+                  size="x-small"
+                  variant="outlined"
+                  :color="block.meta.layout?.alignment === 'center' ? 'primary' : undefined"
                   @mousedown.prevent="setAlignment(page.page_no, block, 'center')"
                   title="Align center"
-                >C</button>
-                <button
-                  class="btn btn-tiny"
-                  :class="{ active: block.meta.layout?.alignment === 'right' }"
+                >C</v-btn>
+                <v-btn
+                  size="x-small"
+                  variant="outlined"
+                  :color="block.meta.layout?.alignment === 'right' ? 'primary' : undefined"
                   @mousedown.prevent="setAlignment(page.page_no, block, 'right')"
                   title="Align right"
-                >R</button>
-                <button
-                  class="btn btn-tiny"
-                  :class="{ active: block.meta.layout?.alignment === 'justify' }"
+                >R</v-btn>
+                <v-btn
+                  size="x-small"
+                  variant="outlined"
+                  :color="block.meta.layout?.alignment === 'justify' ? 'primary' : undefined"
                   @mousedown.prevent="setAlignment(page.page_no, block, 'justify')"
                   title="Justify"
-                >J</button>
+                >J</v-btn>
               </div>
-              <span class="toolbar-separator"></span>
+              <v-divider vertical class="mx-1" style="height:16px; align-self:center" />
               <!-- Diff toggle -->
-              <button class="btn btn-tiny" @mousedown.prevent="toggleDiff(block.block_id)">
+              <v-btn size="x-small" variant="outlined" @mousedown.prevent="toggleDiff(block.block_id)">
                 {{ showDiff[block.block_id] ? 'Hide diff' : 'Diff' }}
-              </button>
-              <span class="toolbar-separator"></span>
-              <button class="btn btn-tiny btn-primary" :disabled="busy[block.block_id]" @mousedown.prevent="saveBlock(page.page_no, block)">
+              </v-btn>
+              <v-divider vertical class="mx-1" style="height:16px; align-self:center" />
+              <v-btn size="x-small" color="primary" :disabled="busy[block.block_id]" @mousedown.prevent="saveBlock(page.page_no, block)">
                 Save
-              </button>
-              <button class="btn btn-tiny" @mousedown.prevent="cancelEdit">Cancel</button>
+              </v-btn>
+              <v-btn size="x-small" variant="outlined" @mousedown.prevent="cancelEdit">Cancel</v-btn>
             </div>
 
             <!-- Diff viewer (raw_text vs current approved_text) -->
             <div v-if="showDiff[block.block_id]" class="block-editor__diff">
               <div class="diff-col">
-                <p class="hint">raw_text</p>
+                <div class="text-caption text-medium-emphasis">raw_text</div>
                 <pre class="code">{{ block.raw_text }}</pre>
               </div>
               <div class="diff-col">
-                <p class="hint">approved_text (before edit)</p>
+                <div class="text-caption text-medium-emphasis">approved_text (before edit)</div>
                 <pre class="code">{{ block.approved_text }}</pre>
               </div>
             </div>
@@ -200,7 +211,7 @@
               :editor="editors[block.block_id]"
               class="block-editor__tiptap-content"
             />
-            <p v-if="errors[block.block_id]" class="hint block-editor__error">{{ errors[block.block_id] }}</p>
+            <div v-if="errors[block.block_id]" class="text-caption text-error mt-1">{{ errors[block.block_id] }}</div>
           </div>
 
           <!-- Read-only view -->
@@ -208,7 +219,7 @@
             <div class="block-editor__text-row" @dblclick.stop="startEdit(page.page_no, block)">
               <span
                 v-if="block.meta.list_marker"
-                class="block-editor__marker hint"
+                class="block-editor__marker text-caption text-medium-emphasis"
                 :title="`type=${block.meta.list_marker.type} level=${block.meta.list_marker.level}`"
               >{{ block.meta.list_marker.text }}</span>
               <span class="block-editor__text">{{ block.approved_text || block.normalized_text }}</span>
@@ -219,16 +230,18 @@
               v-if="spellSuggestions(block).length > 0"
               class="block-editor__spell-row"
             >
-              <span class="hint">Spell: </span>
-              <button
+              <span class="text-caption text-medium-emphasis">Spell: </span>
+              <v-btn
                 v-for="(s, si) in spellSuggestions(block)"
                 :key="si"
-                class="btn btn-tiny block-editor__spell-btn"
+                size="x-small"
+                color="warning"
+                variant="tonal"
                 :title="`Replace '${s.token}' → '${s.suggestion}'`"
                 @click.stop="copySpellSuggestion(s)"
               >
                 {{ s.token }} → {{ s.suggestion }}
-              </button>
+              </v-btn>
             </div>
           </template>
         </template>
@@ -236,22 +249,26 @@
         <!-- Layout controls (shown for all non-editing blocks) -->
         <div v-if="editingBlockId !== block.block_id" class="block-editor__controls" @click.stop>
           <div class="block-editor__control-group">
-            <span class="hint">Indent</span>
-            <button
-              class="btn btn-tiny"
+            <span class="text-caption text-medium-emphasis">Indent</span>
+            <v-btn
+              icon
+              size="x-small"
+              variant="text"
               :disabled="(block.meta.layout?.indent_level ?? 0) <= 0 || busy[block.block_id]"
               @click="changeIndent(page.page_no, block, -1)"
-            >−</button>
+            >−</v-btn>
             <span class="block-editor__level-badge">{{ block.meta.layout?.indent_level ?? 0 }}</span>
-            <button
-              class="btn btn-tiny"
+            <v-btn
+              icon
+              size="x-small"
+              variant="text"
               :disabled="(block.meta.layout?.indent_level ?? 0) >= 10 || busy[block.block_id]"
               @click="changeIndent(page.page_no, block, +1)"
-            >+</button>
+            >+</v-btn>
           </div>
 
           <div v-if="block.meta.list_marker" class="block-editor__control-group">
-            <span class="hint">List level</span>
+            <span class="text-caption text-medium-emphasis">List level</span>
             <select
               class="block-editor__level-select"
               :value="block.meta.list_marker.level"
@@ -262,13 +279,14 @@
             </select>
           </div>
 
-          <button
+          <v-btn
             v-if="block.type !== 'image' && block.type !== 'table'"
-            class="btn btn-tiny"
+            size="x-small"
+            variant="outlined"
             @click.stop="startEdit(page.page_no, block)"
-          >Edit</button>
+          >Edit</v-btn>
 
-          <span v-if="errors[block.block_id]" class="hint block-editor__error">{{ errors[block.block_id] }}</span>
+          <span v-if="errors[block.block_id]" class="text-caption text-error">{{ errors[block.block_id] }}</span>
         </div>
       </div>
       </template>
@@ -556,6 +574,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ponytail: document canvas & TipTap inline editor — keep all */
 .block-editor__page {
   margin-bottom: 1.5rem;
 }
@@ -761,28 +780,5 @@ onBeforeUnmount(() => {
   gap: 4px;
   flex-wrap: wrap;
   margin-top: 4px;
-}
-
-.block-editor__spell-btn {
-  font-size: 0.75rem;
-  background: #fef3c7;
-  border: 1px solid #f59e0b;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 1px 6px;
-}
-
-.btn-tiny {
-  padding: 0 6px;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  min-width: 1.5rem;
-}
-
-.toolbar-separator {
-  width: 1px;
-  height: 16px;
-  background: #d1d5db;
-  margin: 0 2px;
 }
 </style>

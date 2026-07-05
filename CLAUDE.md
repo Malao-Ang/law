@@ -33,7 +33,7 @@ After first start the Python service is **not immediately ready** — EasyOCR do
 Hot-reload works out of the box:
 - **PHP** — `apps/app-laravel/` is bind-mounted; changes are picked up immediately.
 - **Python** — edit `apps/ocr-service/app/**`; the container runs uvicorn with `--reload`.
-- **Vue/TS** — Vite HMR via port 5173; the Laravel app proxies asset requests.
+- **Vue/TS** — `laravel-vite` runs Vite HMR on port 5173; install host deps with `cd apps/app-laravel && npm install` before `docker-compose up`.
 
 ## Deploying
 
@@ -66,6 +66,7 @@ The shared `poc_storage` volume mounts as `/var/www/html/storage/app/poc` (Larav
 ### Build & restart
 ```bash
 docker-compose up -d
+./scripts/compose-dev.sh               # start stack with Vite HMR
 ./scripts/fast-rebuild.sh ocr|laravel|vite   # rebuild one service
 ./scripts/fast-rebuild.sh all
 ```

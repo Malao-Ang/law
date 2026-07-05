@@ -1,10 +1,10 @@
 <template>
   <v-app>
-    <v-main :class="{ 'review-main': isBareLayout }">
-      <v-container v-if="!isBareLayout">
+    <RouterView v-if="isBareLayout" />
+    <v-main v-else>
+      <v-container>
         <RouterView />
       </v-container>
-      <RouterView v-else />
     </v-main>
   </v-app>
 </template>

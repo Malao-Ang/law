@@ -1,28 +1,28 @@
 <template>
-  <div class="preview-page">
-    <header class="preview-header">
+  <div class="d-flex flex-column" style="min-height:100vh; background:#f0f0f0">
+    <v-toolbar flat border="b" density="comfortable" class="preview-toolbar px-2">
       <v-btn
         variant="text"
         prepend-icon="mdi-arrow-left"
-        :to="`/documents/${documentId}/compose`"
+        :to="`/documents/${documentId}/review`"
       >กลับแก้ไข</v-btn>
-      <span class="preview-header__title">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
+      <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
       <v-spacer />
       <v-btn
         variant="tonal"
         prepend-icon="mdi-printer-outline"
         @click="printPage()"
       >พิมพ์</v-btn>
-    </header>
+    </v-toolbar>
 
-    <main class="preview-main">
-      <div v-if="previewStore.loading" class="preview-state">
+    <div class="flex-grow-1 pa-8 d-flex justify-center">
+      <div v-if="previewStore.loading" class="d-flex flex-column align-center ga-3 pa-12">
         <v-progress-circular indeterminate color="primary" />
         <p>กำลังโหลดตัวอย่าง...</p>
       </div>
-      <div v-else-if="previewStore.error" class="preview-state preview-state--error">
+      <div v-else-if="previewStore.error" class="d-flex flex-column align-center ga-3 pa-12">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
-        <p>{{ previewStore.error }}</p>
+        <v-alert type="error" variant="tonal">{{ previewStore.error }}</v-alert>
         <v-btn variant="outlined" @click="previewStore.fetch(documentId)">โหลดใหม่</v-btn>
       </div>
       <article
@@ -30,7 +30,7 @@
         class="preview-paper"
         v-html="safeHtml"
       />
-    </main>
+    </div>
   </div>
 </template>
 
@@ -66,40 +66,7 @@ onUnmounted(() => previewStore.reset());
 </script>
 
 <style scoped>
-.preview-page {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background: #f0f0f0;
-}
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  background: white;
-  border-bottom: 1px solid #ddd;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.preview-header__title {
-  font-size: 15px;
-  font-weight: 600;
-}
-.preview-main {
-  flex: 1;
-  padding: 32px 16px;
-  display: flex;
-  justify-content: center;
-}
-.preview-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 48px;
-}
+/* document-render container — typography CSS, do not modify */
 .preview-paper {
   background: white;
   width: 210mm;
@@ -110,8 +77,7 @@ onUnmounted(() => previewStore.reset());
   line-height: 1.8;
 }
 @media print {
-  .preview-header { display: none; }
-  .preview-main { padding: 0; }
+  .preview-toolbar { display: none; }
   .preview-paper { box-shadow: none; width: 100%; padding: 0; }
 }
 </style>

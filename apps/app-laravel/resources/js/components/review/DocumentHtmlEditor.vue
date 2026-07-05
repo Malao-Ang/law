@@ -1,38 +1,46 @@
-﻿<template>
-  <section class="panel document-editor-panel">
-    <div class="document-editor-header">
+<template>
+  <v-card flat border rounded="lg" class="document-editor-panel">
+    <div class="document-editor-header pa-3 pb-0">
       <div>
-        <h3>Document HTML Review</h3>
-        <p class="hint">แก้ไขเอกสารทั้งฉบับในรูปแบบใกล้เคียงต้นฉบับก่อนสร้าง RAG</p>
+        <p class="text-subtitle-2 font-weight-bold mb-0">Document HTML Review</p>
+        <p class="text-caption text-medium-emphasis mb-0">แก้ไขเอกสารทั้งฉบับในรูปแบบใกล้เคียงต้นฉบับก่อนสร้าง RAG</p>
       </div>
-      <div class="editor-status" :class="{ warning: outOfSync }">
+      <v-chip
+        :color="outOfSync ? 'warning' : 'success'"
+        variant="tonal"
+        size="small"
+        class="align-self-start mt-1"
+      >
         <strong>{{ modeLabel }}</strong>
-        <span class="hint">{{ outOfSync ? 'HTML draft ไม่ตรงกับ blocks ล่าสุด' : 'HTML draft พร้อมใช้งาน' }}</span>
-      </div>
+        <span class="ml-1 text-caption">{{ outOfSync ? 'HTML draft ไม่ตรงกับ blocks ล่าสุด' : 'HTML draft พร้อมใช้งาน' }}</span>
+      </v-chip>
     </div>
 
-    <div class="editor-toolbar">
-      <button class="btn" type="button" @click="format('bold')">Bold</button>
-      <button class="btn" type="button" @click="format('italic')">Italic</button>
-      <button class="btn" type="button" @click="format('underline')">Underline</button>
-      <button class="btn" type="button" @click="formatBlock('p')">P</button>
-      <button class="btn" type="button" @click="formatBlock('h1')">H1</button>
-      <button class="btn" type="button" @click="formatBlock('h2')">H2</button>
-      <button class="btn" type="button" @click="format('insertUnorderedList')">UL</button>
-      <button class="btn" type="button" @click="format('insertOrderedList')">OL</button>
-      <button class="btn" type="button" @click="format('removeFormat')">Clear</button>
+    <div class="editor-toolbar px-3 pt-2">
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('bold')">Bold</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('italic')">Italic</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('underline')">Underline</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="formatBlock('p')">P</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="formatBlock('h1')">H1</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="formatBlock('h2')">H2</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('insertUnorderedList')">UL</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('insertOrderedList')">OL</v-btn>
+      <v-btn flat size="small" class="mr-1 mb-1" @click="format('removeFormat')">Clear</v-btn>
       <span class="toolbar-separator"></span>
-      <button
-        class="btn"
-        type="button"
-        :class="{ active: isPreviewMode }"
+      <v-btn
+        flat
+        size="small"
+        class="mr-1 mb-1"
+        :color="isPreviewMode ? 'primary' : undefined"
+        :variant="isPreviewMode ? 'tonal' : 'elevated'"
         @click="togglePreview"
       >
         {{ isPreviewMode ? 'Edit' : 'Preview' }}
-      </button>
+      </v-btn>
     </div>
 
-    <div class="editor-shell">
+    <div class="editor-shell ma-3 mt-2">
+      <!-- ponytail: load-bearing for contenteditable HTML editor, keep -->
       <div
         v-show="!isPreviewMode"
         ref="editorRef"
@@ -42,13 +50,14 @@
         @input="onInput"
         @click="onClick"
       ></div>
+      <!-- ponytail: load-bearing for v-html preview render surface, keep -->
       <div
         v-show="isPreviewMode"
         class="document-rich-editor html-preview-mode"
         v-html="modelValue"
       ></div>
     </div>
-  </section>
+  </v-card>
 </template>
 
 <script setup lang="ts">

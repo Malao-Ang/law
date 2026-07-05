@@ -1,217 +1,119 @@
 <template>
-  <div class="editor-shell">
+  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:16px 24px; background:#f8fafc; box-sizing:border-box">
     <!-- Header -->
-    <div class="editor-shell-header">
+    <div class="d-flex justify-space-between align-center py-3" style="flex-shrink:0">
       <div>
-        <h1 class="editor-shell-title">ตรวจทานเนื้อหาเอกสาร</h1>
-        <p class="editor-shell-subtitle">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</p>
+        <div class="text-subtitle-1 font-weight-bold">ตรวจทานเนื้อหาเอกสาร</div>
+        <div class="text-caption text-medium-emphasis">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</div>
       </div>
     </div>
 
     <!-- Warning banner -->
-    <div class="review-warning-banner">
-      <v-icon icon="mdi-alert-outline" size="16" color="#7b3306" />
-      <span>กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด</span>
-    </div>
+    <v-alert type="warning" variant="tonal" density="compact" icon="mdi-alert-outline" class="mb-2" style="flex-shrink:0">
+      กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
+    </v-alert>
 
     <!-- Toolbar -->
-    <div v-if="editor" class="editor-toolbar">
+    <div v-if="editor" class="d-flex flex-wrap align-center ga-1 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">
       <!-- Row 1: History + Heading -->
-      <div class="toolbar-row">
-        <span class="toolbar-label">ย้อนกลับ</span>
-        <button
-          class="toolbar-btn"
-          :disabled="!editor.can().undo()"
-          title="Undo"
-          @click="editor.chain().focus().undo().run()"
-        ><i class="mdi mdi-undo" /></button>
-        <button
-          class="toolbar-btn"
-          :disabled="!editor.can().redo()"
-          title="Redo"
-          @click="editor.chain().focus().redo().run()"
-        ><i class="mdi mdi-redo" /></button>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">หัวข้อ</span>
-        <select class="toolbar-select" :value="activeHeadingLevel" @change="setHeading($event)">
-          <option value="0">ย่อหน้า</option>
-          <option value="1">หัวข้อ 1</option>
-          <option value="2">หัวข้อ 2</option>
-          <option value="3">หัวข้อ 3</option>
-        </select>
-      </div>
+      <span class="text-caption text-medium-emphasis mr-1">ย้อนกลับ</span>
+      <v-btn icon="mdi-undo" variant="text" size="small" :disabled="!editor.can().undo()" title="Undo" @click="editor.chain().focus().undo().run()" />
+      <v-btn icon="mdi-redo" variant="text" size="small" :disabled="!editor.can().redo()" title="Redo" @click="editor.chain().focus().redo().run()" />
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">หัวข้อ</span>
+      <select style="height:28px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#f8fafc; cursor:pointer; min-width:90px; max-width:150px" :value="activeHeadingLevel" @change="setHeading($event)">
+        <option value="0">ย่อหน้า</option>
+        <option value="1">หัวข้อ 1</option>
+        <option value="2">หัวข้อ 2</option>
+        <option value="3">หัวข้อ 3</option>
+      </select>
 
       <!-- Row 2: Font size + Format -->
-      <div class="toolbar-row">
-        <span class="toolbar-label">แบบอักษร</span>
-        <select class="toolbar-select" @change="setFontFamily($event)">
-          <option value="">ค่าเริ่มต้น</option>
-          <option value="'TH Sarabun New', 'Sarabun', sans-serif">TH Sarabun New</option>
-          <option value="'TH Sarabun PSK', 'Sarabun', sans-serif">TH Sarabun PSK</option>
-          <option value="'TH SarabunIT9', 'Sarabun', sans-serif">TH SarabunIT9</option>
-          <option value="'Sarabun', sans-serif">Sarabun</option>
-        </select>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">ขนาด</span>
-        <select class="toolbar-select" @change="setFontSize($event)">
-          <option v-for="s in [12, 14, 16, 18, 20]" :key="s" :value="`${s}pt`">{{ s }}</option>
-        </select>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">รูปแบบ</span>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('bold') }"
-          @click="editor.chain().focus().toggleBold().run()"
-        ><i class="mdi mdi-format-bold" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('italic') }"
-          @click="editor.chain().focus().toggleItalic().run()"
-        ><i class="mdi mdi-format-italic" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('underline') }"
-          @click="editor.chain().focus().toggleUnderline().run()"
-        ><i class="mdi mdi-format-underline" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('strike') }"
-          @click="editor.chain().focus().toggleStrike().run()"
-        ><i class="mdi mdi-format-strikethrough" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('highlight') }"
-          @click="editor.chain().focus().toggleHighlight().run()"
-        ><i class="mdi mdi-marker" /></button>
-      </div>
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">แบบอักษร</span>
+      <select style="height:28px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#f8fafc; cursor:pointer; min-width:90px; max-width:150px" @change="setFontFamily($event)">
+        <option value="">ค่าเริ่มต้น</option>
+        <option value="'TH Sarabun New', 'Sarabun', sans-serif">TH Sarabun New</option>
+        <option value="'TH Sarabun PSK', 'Sarabun', sans-serif">TH Sarabun PSK</option>
+        <option value="'TH SarabunIT9', 'Sarabun', sans-serif">TH SarabunIT9</option>
+        <option value="'Sarabun', sans-serif">Sarabun</option>
+      </select>
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">ขนาด</span>
+      <select style="height:28px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#f8fafc; cursor:pointer; min-width:90px; max-width:150px" @change="setFontSize($event)">
+        <option v-for="s in [12, 14, 16, 18, 20]" :key="s" :value="`${s}pt`">{{ s }}</option>
+      </select>
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">รูปแบบ</span>
+      <v-btn icon="mdi-format-bold" variant="text" size="small" :color="editor.isActive('bold') ? 'primary' : undefined" @click="editor.chain().focus().toggleBold().run()" />
+      <v-btn icon="mdi-format-italic" variant="text" size="small" :color="editor.isActive('italic') ? 'primary' : undefined" @click="editor.chain().focus().toggleItalic().run()" />
+      <v-btn icon="mdi-format-underline" variant="text" size="small" :color="editor.isActive('underline') ? 'primary' : undefined" @click="editor.chain().focus().toggleUnderline().run()" />
+      <v-btn icon="mdi-format-strikethrough" variant="text" size="small" :color="editor.isActive('strike') ? 'primary' : undefined" @click="editor.chain().focus().toggleStrike().run()" />
+      <v-btn icon="mdi-marker" variant="text" size="small" :color="editor.isActive('highlight') ? 'primary' : undefined" @click="editor.chain().focus().toggleHighlight().run()" />
 
       <!-- Row 3: Alignment + Lists + Auto-save indicator -->
-      <div class="toolbar-row">
-        <span class="toolbar-label">จัดข้อความ</span>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive({ textAlign: 'left' }) }"
-          @click="editor.chain().focus().setTextAlign('left').run()"
-        ><i class="mdi mdi-format-align-left" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive({ textAlign: 'center' }) }"
-          @click="editor.chain().focus().setTextAlign('center').run()"
-        ><i class="mdi mdi-format-align-center" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive({ textAlign: 'right' }) }"
-          @click="editor.chain().focus().setTextAlign('right').run()"
-        ><i class="mdi mdi-format-align-right" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive({ textAlign: 'justify' }) }"
-          @click="editor.chain().focus().setTextAlign('justify').run()"
-        ><i class="mdi mdi-format-align-justify" /></button>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">รายการ</span>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('bulletList') }"
-          @click="editor.chain().focus().toggleBulletList().run()"
-        ><i class="mdi mdi-format-list-bulleted" /></button>
-        <button
-          class="toolbar-btn"
-          :class="{ 'is-active': editor.isActive('orderedList') }"
-          @click="editor.chain().focus().toggleOrderedList().run()"
-        ><i class="mdi mdi-format-list-numbered" /></button>
-        <button
-          class="toolbar-btn"
-          @click="editor.chain().focus().increaseIndent().run()"
-        ><i class="mdi mdi-format-indent-increase" /></button>
-        <button
-          class="toolbar-btn"
-          @click="editor.chain().focus().decreaseIndent().run()"
-        ><i class="mdi mdi-format-indent-decrease" /></button>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">ระยะบรรทัด</span>
-        <select class="toolbar-select" @change="setLineHeight($event)">
-          <option value="">ปกติ</option>
-          <option value="1">1.0</option>
-          <option value="1.15">1.15</option>
-          <option value="1.5">1.5</option>
-          <option value="2">2.0</option>
-        </select>
-        <div class="toolbar-divider" />
-        <span class="toolbar-autosave">
-          <i
-            class="mdi"
-            :class="reviewUiStore.isDirty ? 'mdi-circle-medium toolbar-autosave--dirty' : 'mdi-check-circle-outline toolbar-autosave--saved'"
-          />
-          บันทึกอัตโนมัติ
-        </span>
-      </div>
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">จัดข้อความ</span>
+      <v-btn icon="mdi-format-align-left" variant="text" size="small" :color="editor.isActive({ textAlign: 'left' }) ? 'primary' : undefined" @click="editor.chain().focus().setTextAlign('left').run()" />
+      <v-btn icon="mdi-format-align-center" variant="text" size="small" :color="editor.isActive({ textAlign: 'center' }) ? 'primary' : undefined" @click="editor.chain().focus().setTextAlign('center').run()" />
+      <v-btn icon="mdi-format-align-right" variant="text" size="small" :color="editor.isActive({ textAlign: 'right' }) ? 'primary' : undefined" @click="editor.chain().focus().setTextAlign('right').run()" />
+      <v-btn icon="mdi-format-align-justify" variant="text" size="small" :color="editor.isActive({ textAlign: 'justify' }) ? 'primary' : undefined" @click="editor.chain().focus().setTextAlign('justify').run()" />
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">รายการ</span>
+      <v-btn icon="mdi-format-list-bulleted" variant="text" size="small" :color="editor.isActive('bulletList') ? 'primary' : undefined" @click="editor.chain().focus().toggleBulletList().run()" />
+      <v-btn icon="mdi-format-list-numbered" variant="text" size="small" :color="editor.isActive('orderedList') ? 'primary' : undefined" @click="editor.chain().focus().toggleOrderedList().run()" />
+      <v-btn icon="mdi-format-indent-increase" variant="text" size="small" @click="editor.chain().focus().increaseIndent().run()" />
+      <v-btn icon="mdi-format-indent-decrease" variant="text" size="small" @click="editor.chain().focus().decreaseIndent().run()" />
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">ระยะบรรทัด</span>
+      <select style="height:28px; border:1px solid #d1d5db; border-radius:8px; padding:0 8px; font-size:12px; background:#f8fafc; cursor:pointer; min-width:90px; max-width:150px" @change="setLineHeight($event)">
+        <option value="">ปกติ</option>
+        <option value="1">1.0</option>
+        <option value="1.15">1.15</option>
+        <option value="1.5">1.5</option>
+        <option value="2">2.0</option>
+      </select>
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption d-flex align-center ga-1 ml-auto" style="white-space:nowrap">
+        <v-icon :icon="reviewUiStore.isDirty ? 'mdi-circle-medium' : 'mdi-check-circle-outline'" :color="reviewUiStore.isDirty ? 'warning' : 'success'" size="16" />
+        บันทึกอัตโนมัติ
+      </span>
 
-      <div class="toolbar-row">
-        <span class="toolbar-label">ตาราง</span>
-        <button
-          class="toolbar-btn"
-          title="แทรกตาราง"
-          @click="editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run()"
-        ><i class="mdi mdi-table-plus" /></button>
-        <button
-          class="toolbar-btn"
-          title="เพิ่มแถว"
-          @click="editor.chain().focus().addRowAfter().run()"
-        ><i class="mdi mdi-table-row-plus-after" /></button>
-        <button
-          class="toolbar-btn"
-          title="ลบแถว"
-          @click="editor.chain().focus().deleteRow().run()"
-        ><i class="mdi mdi-table-row-remove" /></button>
-        <button
-          class="toolbar-btn"
-          title="เพิ่มคอลัมน์"
-          @click="editor.chain().focus().addColumnAfter().run()"
-        ><i class="mdi mdi-table-column-plus-after" /></button>
-        <button
-          class="toolbar-btn"
-          title="ลบคอลัมน์"
-          @click="editor.chain().focus().deleteColumn().run()"
-        ><i class="mdi mdi-table-column-remove" /></button>
-        <button
-          class="toolbar-btn"
-          title="ลบตาราง"
-          @click="editor.chain().focus().deleteTable().run()"
-        ><i class="mdi mdi-table-remove" /></button>
-        <button
-          class="toolbar-btn"
-          title="ผสานเซลล์"
-          @click="editor.chain().focus().mergeCells().run()"
-        ><i class="mdi mdi-table-merge-cells" /></button>
-        <button
-          class="toolbar-btn"
-          title="แยกเซลล์"
-          @click="editor.chain().focus().splitCell().run()"
-        ><i class="mdi mdi-table-split-cell" /></button>
-        <div class="toolbar-divider" />
-        <span class="toolbar-label">รูปภาพ</span>
-        <span class="toolbar-label">ลากมุมเพื่อปรับขนาด</span>
-      </div>
+      <!-- Row 4: Table + Image -->
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">ตาราง</span>
+      <v-btn icon="mdi-table-plus" variant="text" size="small" title="แทรกตาราง" @click="editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run()" />
+      <v-btn icon="mdi-table-row-plus-after" variant="text" size="small" title="เพิ่มแถว" @click="editor.chain().focus().addRowAfter().run()" />
+      <v-btn icon="mdi-table-row-remove" variant="text" size="small" title="ลบแถว" @click="editor.chain().focus().deleteRow().run()" />
+      <v-btn icon="mdi-table-column-plus-after" variant="text" size="small" title="เพิ่มคอลัมน์" @click="editor.chain().focus().addColumnAfter().run()" />
+      <v-btn icon="mdi-table-column-remove" variant="text" size="small" title="ลบคอลัมน์" @click="editor.chain().focus().deleteColumn().run()" />
+      <v-btn icon="mdi-table-remove" variant="text" size="small" title="ลบตาราง" @click="editor.chain().focus().deleteTable().run()" />
+      <v-btn icon="mdi-table-merge-cells" variant="text" size="small" title="ผสานเซลล์" @click="editor.chain().focus().mergeCells().run()" />
+      <v-btn icon="mdi-table-split-cell" variant="text" size="small" title="แยกเซลล์" @click="editor.chain().focus().splitCell().run()" />
+      <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">รูปภาพ</span>
+      <span class="text-caption text-medium-emphasis mr-1">ลากมุมเพื่อปรับขนาด</span>
     </div>
 
     <!-- Editor area -->
-    <div class="editor-shell-edit" @click.stop>
+    <div class="flex-grow-1 overflow-y-auto d-flex justify-center py-4" style="min-height:0" @click.stop>
       <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
     </div>
 
     <!-- Error bar -->
-    <div v-if="documentStore.saveError" class="editor-shell-error">
-      <v-icon icon="mdi-alert-circle-outline" size="20" />
-      <span>{{ documentStore.saveError }}</span>
-      <v-btn size="x-small" variant="text" @click="documentStore.setSaveError()">ปิด</v-btn>
-    </div>
+    <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" style="flex-shrink:0">
+      {{ documentStore.saveError }}
+      <template #append>
+        <v-btn size="x-small" variant="text" @click="documentStore.setSaveError()">ปิด</v-btn>
+      </template>
+    </v-alert>
 
     <!-- Footer -->
-    <div class="editor-shell-footer">
-      <span class="editor-shell-footer__count">{{ charCount }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด</span>
-      <div class="editor-shell-footer__actions">
+    <div class="d-flex align-center justify-space-between px-6 py-3 bg-white" style="border-top:1px solid #e2e8f0; flex-shrink:0">
+      <span class="text-caption text-medium-emphasis">{{ charCount }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด</span>
+      <div class="d-flex ga-2">
         <v-btn variant="outlined" @click="router.back()">ยกเลิก</v-btn>
+        <v-btn variant="outlined" prepend-icon="mdi-eye-outline" :loading="documentStore.saving" @click="openPreview">ดูตัวอย่าง</v-btn>
         <v-btn color="#1c398e" :loading="documentStore.saving" @click="saveAndContinue">บันทึกข้อมูล</v-btn>
       </div>
     </div>
@@ -220,7 +122,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
+import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -294,8 +196,22 @@ const activeHeadingLevel = computed<string>(() => {
   return '0';
 });
 
+onBeforeRouteLeave(async () => {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+
+  if (reviewUiStore.isDirty && editor.value) {
+    await saveDocument();
+  }
+});
+
 onBeforeUnmount(() => {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    void saveDocument();
+  }
   if (tableSyncTimer) clearTimeout(tableSyncTimer);
   editor.value?.destroy();
 });
@@ -388,171 +304,22 @@ async function saveAndContinue(): Promise<void> {
   const result = await documentStore.saveReview({ draft_html: editor.value?.getHTML() ?? '' });
   if (result !== null) {
     reviewUiStore.setDirty(false);
-    router.push(`/documents/${props.documentId}/rag`);
+    router.push(`/documents/${props.documentId}/law-info`);
   }
+}
+
+async function openPreview(): Promise<void> {
+  if (reviewUiStore.isDirty && editor.value) {
+    const result = await documentStore.saveReview({ draft_html: editor.value.getHTML() });
+    if (result !== null) reviewUiStore.setDirty(false);
+  }
+
+  router.push(`/documents/${props.documentId}/preview`);
 }
 </script>
 
 <style scoped>
-.editor-shell {
-  position: relative;
-  height: 100dvh;
-  min-height: 100dvh;
-  background: #f8fafc;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 16px 24px;
-  box-sizing: border-box;
-}
-
-.editor-shell-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  background: transparent;
-  border-bottom: none;
-  flex-shrink: 0;
-}
-
-.editor-shell-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.editor-shell-subtitle {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #64748b;
-}
-
-
-.review-warning-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 24px;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
-  font-size: 13px;
-  color: #7b3306;
-  flex-shrink: 0;
-}
-
-.editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 8px 12px;
-  margin-top: 12px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  flex-shrink: 0;
-}
-
-/* Rows flow into one compact wrapping bar (~2 lines) instead of stacked cards. */
-.toolbar-row {
-  display: contents;
-}
-
-.toolbar-row:last-child {
-  margin-bottom: 0;
-}
-
-.toolbar-label {
-  font-size: 10px;
-  color: #64748b;
-  font-weight: 500;
-  margin-right: 6px;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 18px;
-  background: #e2e8f0;
-  margin: 0 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-btn {
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  color: #475569;
-  transition: background 0.15s, transform 0.15s;
-  flex-shrink: 0;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: #f8fafc;
-  transform: translateY(-1px);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.toolbar-btn.is-active {
-  background: #e0e7ff;
-  color: #4338ca;
-}
-
-.toolbar-select {
-  height: 28px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 0 8px;
-  font-size: 12px;
-  color: #475569;
-  background: #f8fafc;
-  cursor: pointer;
-  min-width: 90px;
-  max-width: 150px;
-}
-
-.toolbar-autosave {
-  font-size: 11px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.toolbar-autosave--dirty {
-  color: #f59e0b;
-}
-
-.toolbar-autosave--saved {
-  color: #22c55e;
-}
-
-.editor-shell-edit {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  justify-content: center;
-  padding: 16px 0;
-}
-
+/* ponytail: ProseMirror/TipTap document canvas — keep all */
 .editor-shell-content {
   width: 100%;
   max-width: 820px;
@@ -694,45 +461,7 @@ async function saveAndContinue(): Promise<void> {
   border-bottom: 1px dotted rgba(25, 118, 210, 0.25);
 }
 
-.editor-shell-error {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #fef2f2;
-  color: #b91c1c;
-  border-top: 1px solid #fecaca;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-.editor-shell-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 24px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
-  flex-shrink: 0;
-}
-
-.editor-shell-footer__count {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.editor-shell-footer__actions {
-  display: flex;
-  gap: 8px;
-}
-
 @media (max-width: 760px) {
-  .editor-shell-header,
-  .editor-shell-footer {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
   .editor-shell-content :deep(.ProseMirror) {
     border-radius: 4px;
     padding: 24px 20px;

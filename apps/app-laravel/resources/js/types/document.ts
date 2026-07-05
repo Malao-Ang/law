@@ -112,6 +112,7 @@ export interface BlockMeta {
   spell_suggestions?: SpellSuggestion[];
   formatting?: BlockFormatting;
   review?: BlockReviewMeta;
+  chunk_type?: string | null;
 }
 
 export interface DocumentBlock {

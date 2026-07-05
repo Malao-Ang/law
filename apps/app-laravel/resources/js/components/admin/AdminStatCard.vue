@@ -1,13 +1,15 @@
 <template>
-  <div class="admin-stat-card">
-    <div class="admin-stat-card__icon" :style="{ background: iconBg }">
-      <span class="mdi" :class="icon" :style="{ color: iconColor }"></span>
-    </div>
-    <div>
-      <div class="admin-stat-card__number">{{ number.toLocaleString('th-TH') }}</div>
-      <div class="admin-stat-card__label">{{ label }}</div>
-    </div>
-  </div>
+  <v-card>
+    <v-card-text class="d-flex align-center ga-4">
+      <v-avatar rounded="lg" :style="{ background: iconBg }" size="48">
+        <v-icon :icon="icon" :color="iconColor" size="22" />
+      </v-avatar>
+      <div>
+        <div class="text-h5 font-weight-bold">{{ number.toLocaleString('th-TH') }}</div>
+        <div class="text-caption text-medium-emphasis">{{ label }}</div>
+      </div>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script setup lang="ts">

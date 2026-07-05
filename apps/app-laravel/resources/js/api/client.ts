@@ -60,6 +60,10 @@ export async function uploadDocument(
   });
 }
 
+export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {
+  return jsonRequest<{ documents: DocumentListItem[] }>('/api/documents');
+}
+
 export function fetchStatus(documentId: string): Promise<DocumentStatus> {
   return jsonRequest<DocumentStatus>(`/api/documents/${documentId}`);
 }
@@ -113,6 +117,7 @@ export function patchBlock(
     bbox?: [number, number, number, number] | null;
     reviewed_html?: string;
     table?: ReviewedTable | null;
+    chunk_type?: string | null;
   },
 ): Promise<{ status: string }> {
   return jsonRequest(`/api/documents/${documentId}/blocks/${blockId}`, {
