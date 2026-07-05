@@ -38,6 +38,28 @@ services:
     ports:
       - "8000:8000"
 
+  laravel-vite:
+    image: node:20-bookworm-slim
+    container_name: thai-ocr-laravel-vite
+    working_dir: /var/www/html
+    command: >
+      sh -c "test -x node_modules/.bin/vite
+      || { echo 'Missing apps/app-laravel/node_modules/.bin/vite. Run: cd apps/app-laravel && npm install'; exit 1; }
+      && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      - PORT=5173
+      - HMR_PORT=5173
+      - HMR_HOST=localhost
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_CACHE_DIR=/tmp/app-laravel-vite-cache
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - /tmp/app-laravel-vite-cache:/tmp/app-laravel-vite-cache
+    ports:
+      - "5173:5173"
+    depends_on:
+      - laravel-app
+
   queue-worker:
     build:
       context: ./apps/app-laravel
