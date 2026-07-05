@@ -298,9 +298,12 @@ const blockBusy = ref(false);
 const blockListEl = ref<HTMLElement | null>(null);
 const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
 const selectedLines = ref<Set<number>>(new Set());
-const splitLines = computed<string[]>(() =>
-  splitting.value ? splitting.value.text.split('\n') : [],
-);
+const splitLines = computed<string[]>(() => {
+  if (!splitting.value) return [];
+  const lines = splitting.value.text.split('\n');
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+});
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
@@ -391,11 +394,13 @@ async function deleteSelected(): Promise<void> {
 
 
 function openSplit(block: DocumentBlock): void {
+  const fullText = block.approved_text || block.normalized_text || block.raw_text || '';
+  if (fullText.split('\n').length < 2) return;
   selectedLines.value = new Set();
   splitting.value = {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
-    text: block.approved_text || block.normalized_text || block.raw_text || '',
+    text: fullText,
   };
 }
 
