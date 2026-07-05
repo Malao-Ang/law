@@ -33,6 +33,12 @@
           <p v-if="uploadStore.status.current_step" class="admin-upload__step-label">
             {{ uploadStore.status.current_step }}
           </p>
+          <p v-if="uploadStore.status.scan_extraction_mode_requested" class="admin-upload__step-label">
+            OCR mode: {{ uploadStore.status.scan_extraction_mode_requested }}
+            <template v-if="uploadStore.status.scan_extraction_mode_effective">
+              → {{ uploadStore.status.scan_extraction_mode_effective }}
+            </template>
+          </p>
         </div>
       </transition>
     </div>

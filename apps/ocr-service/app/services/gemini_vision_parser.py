@@ -9,6 +9,7 @@ import fitz
 import httpx
 
 from app.core.config import get_settings
+from app.core.logger import get_logger
 
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -104,6 +105,7 @@ class GeminiVisionParser:
 
     def _ocr_page(self, image_path: Path, page_no: int, model_name: str) -> tuple[list[dict], int]:
         settings = get_settings()
+        logger = get_logger("gemini-ocr")
         image_bytes = image_path.read_bytes()
         encoded = base64.b64encode(image_bytes).decode("ascii")
         mime_type = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
@@ -129,6 +131,11 @@ class GeminiVisionParser:
             response = client.post(url, params=params, json=payload)
             response.raise_for_status()
             body = response.json()
+
+        logger.info(
+            "gemini OCR page completed",
+            extra={"page_no": page_no, "model": model_name, "status_code": response.status_code},
+        )
 
         duration_ms = 0
         metadata = body.get("usageMetadata") if isinstance(body, dict) else None

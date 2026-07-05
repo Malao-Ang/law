@@ -135,12 +135,9 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 pages = docling_service.extract(file_path=file_path, source_type="docx", document_id=payload.document_id)
             extraction_path.append("docling:docx")
             source_type = "docx"
-        elif mode == "pdf_text":
-            with _stage_timer(payload.document_id, "extract", logger, timings):
-                pages = docling_service.extract(file_path=file_path, source_type="pdf_text", document_id=payload.document_id)
-            extraction_path.append("docling:pdf_text")
-            source_type = "pdf_text"
-        elif mode == "pdf_scan":
+        elif _should_force_gemini_scan(mode, requested_scan_mode) or mode == "pdf_scan":
+            if _should_force_gemini_scan(mode, requested_scan_mode):
+                extraction_path.append(f"forced:{mode}")
             with _stage_timer(payload.document_id, "ocr", logger, timings):
                 pages, effective_scan_mode, landingai_metadata, gemini_metadata = _extract_scan_pages(
                     file_path=file_path,
@@ -150,6 +147,11 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 )
             extraction_path.append(f"scan:{effective_scan_mode}")
             source_type = "pdf_scan"
+        elif mode == "pdf_text":
+            with _stage_timer(payload.document_id, "extract", logger, timings):
+                pages = docling_service.extract(file_path=file_path, source_type="pdf_text", document_id=payload.document_id)
+            extraction_path.append("docling:pdf_text")
+            source_type = "pdf_text"
         else:
             # mixed: route each page to the appropriate extractor
             with _stage_timer(payload.document_id, "extract", logger, timings):
@@ -256,6 +258,15 @@ def _post_callback(callback_url: str, document_id: str, payload: dict, logger: o
     except Exception as exc:
         logger.error("callback failed", extra={"callback_url": callback_url, "error": str(exc)})
         raise
+
+
+def _should_force_gemini_scan(classification_mode: str, requested_scan_mode: str) -> bool:
+    """When the user explicitly picks gemini, run vision OCR on every PDF page.
+
+    Without this, pdf_text / mixed documents skip Gemini and use Docling even
+    though the upload form requested cloud OCR.
+    """
+    return requested_scan_mode == "gemini" and classification_mode in {"pdf_text", "mixed"}
 
 
 def _extract_scan_pages(

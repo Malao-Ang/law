@@ -53,9 +53,17 @@ const emit = defineEmits<{
 
 const uploadStore = useUploadStore();
 
-// Hidden defaults — sent to API, not shown in UI; fast = PHP-side extraction, falls back to Python for scans
-const extractionEngine: 'standard' | 'fast' = 'fast';
 const scanExtractionMode = ref<ScanExtractionMode>('gemini');
+
+function extractionEngineFor(file: File, scanMode: ScanExtractionMode): 'standard' | 'fast' {
+  const isPdf = file.name.toLowerCase().endsWith('.pdf');
+  // PDF + explicit OCR mode must use the Python pipeline (Gemini / LandingAI / EasyOCR).
+  if (isPdf && scanMode !== 'auto') {
+    return 'standard';
+  }
+
+  return 'fast';
+}
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFileName = ref<string | null>(null);
@@ -72,7 +80,7 @@ async function onFileSelected(event: Event): Promise<void> {
     const documentId = await uploadStore.upload(
       file,
       scanExtractionMode.value,
-      extractionEngine,
+      extractionEngineFor(file, scanExtractionMode.value),
     );
     emit('uploaded', documentId);
   } catch (err) {

@@ -36,6 +36,12 @@ class ExtractDocumentJob implements ShouldQueue
     ): void {
         $callbackUrl = config('services.ocr.internal_callback_url') ?: route('pipeline.callback');
 
+        if ($this->shouldUseStandardPipeline()) {
+            $this->runStandard($pipelineClient, $reviewStore, $callbackUrl);
+
+            return;
+        }
+
         if ($this->extractionEngine === 'fast') {
             $this->runFast($fastPipeline, $reviewStore, $callbackUrl, $pipelineClient);
 
@@ -43,6 +49,23 @@ class ExtractDocumentJob implements ShouldQueue
         }
 
         $this->runStandard($pipelineClient, $reviewStore, $callbackUrl);
+    }
+
+    /**
+     * Cloud/local OCR modes require the Python pipeline. Fast PDF text extraction
+     * must not run first — it would bypass Gemini/LandingAI/EasyOCR for scans.
+     */
+    private function shouldUseStandardPipeline(): bool
+    {
+        if ($this->extractionEngine === 'standard') {
+            return true;
+        }
+
+        if (strtolower(pathinfo($this->relativeFilePath, PATHINFO_EXTENSION)) !== 'pdf') {
+            return false;
+        }
+
+        return in_array($this->scanExtractionMode, ['gemini', 'landingai', 'local'], true);
     }
 
     private function runFast(
