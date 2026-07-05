@@ -68,7 +68,7 @@
                 </template>
                 <v-list density="compact" :min-width="180">
                   <v-list-item
-                    v-for="ct in CHUNK_TYPES"
+                    v-for="ct in HEAD_CHUNK_TYPES"
                     :key="ct"
                     :title="CHUNK_TYPE_LABELS[ct]"
                     :active="section.headBlock.meta.chunk_type === ct"
@@ -173,7 +173,7 @@ import AppShell from '../shared/AppShell.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
-import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
+import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
 

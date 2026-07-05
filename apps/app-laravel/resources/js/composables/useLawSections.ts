@@ -1,5 +1,5 @@
 import type { DocumentBlock, LawRelation, ReviewDocument } from '../types/document';
-import { CHUNK_TYPE_LABELS } from '../types/chunkType';
+import { CHUNK_TYPE_LABELS, HEAD_CHUNK_TYPES } from '../types/chunkType';
 import type { ChunkType } from '../types/chunkType';
 
 export interface LawSection {
@@ -21,9 +21,7 @@ const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะ�
 
 // Structural heading chunk-types: assigning one makes a block a section head,
 // so the following blocks group under it without merging text.
-const HEAD_CHUNK_TYPES = new Set<string>([
-  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'ANNEX', 'TRANSITIONAL_PROVISION',
-]);
+const HEAD_CHUNK_TYPE_SET = new Set<string>(HEAD_CHUNK_TYPES);
 
 function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();
@@ -31,7 +29,7 @@ function blockText(block: DocumentBlock): string {
 
 function isHead(block: DocumentBlock): boolean {
   const ct = block.meta?.chunk_type;
-  if (ct) return HEAD_CHUNK_TYPES.has(ct); // explicit type wins both ways
+  if (ct) return HEAD_CHUNK_TYPE_SET.has(ct); // explicit type wins both ways
 
   if (block.type === 'title' || block.type === 'section_header') return true;
 

@@ -6,6 +6,11 @@ export const CHUNK_TYPES = [
 
 export type ChunkType = typeof CHUNK_TYPES[number];
 
+// Structural heading types — the ones isHead() treats as section heads.
+export const HEAD_CHUNK_TYPES: readonly ChunkType[] = [
+  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'ANNEX', 'TRANSITIONAL_PROVISION',
+];
+
 export const CHUNK_TYPE_LABELS: Record<ChunkType, string> = {
   TITLE: 'ชื่อกฎหมาย',
   PREAMBLE: 'คำปรารภ',
