@@ -67,38 +67,148 @@
       </v-col>
     </v-row>
 
+    <!-- Document log table -->
     <v-card flat border rounded="lg">
-      <v-card-title class="text-subtitle-1 font-weight-bold">เอกสารนำเข้าล่าสุด</v-card-title>
-      <v-card-text>
-        <v-table>
-          <thead>
-            <tr>
-              <th>ชื่อเอกสาร</th>
-              <th>ประเภท</th>
-              <th>วันที่นำเข้า</th>
-              <th>สถานะ</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="doc in docs.slice(0, 10)" :key="doc.document_id">
-              <td>{{ doc.title }}</td>
-              <td>
-                <v-chip size="x-small" color="grey">เอกสาร</v-chip>
-              </td>
-              <td>{{ doc.updated_at ? new Date(doc.updated_at).toLocaleDateString('th-TH') : '-' }}</td>
-              <td>
-                <v-chip size="x-small" :color="statusChipColor(doc.status)">{{ statusLabel(doc.status) }}</v-chip>
-              </td>
-              <td>
-                <v-btn size="x-small" variant="tonal" :to="`/documents/${doc.document_id}/review`">
-                  แก้ไข
-                </v-btn>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-card-text>
+      <div class="d-flex align-center pa-4 pb-2">
+        <span class="text-subtitle-1 font-weight-bold flex-grow-1">บันทึกการนำเข้าเอกสาร</span>
+        <v-btn
+          size="small"
+          color="admin-primary"
+          prepend-icon="mdi-cloud-upload-outline"
+          @click="router.push('/admin/upload')"
+        >นำเข้าเอกสาร</v-btn>
+      </div>
+
+      <!-- Filters -->
+      <div class="d-flex flex-wrap gap-2 px-4 pb-3 align-center">
+        <v-text-field
+          v-model="filterName"
+          placeholder="ค้นหาชื่อเอกสาร"
+          prepend-inner-icon="mdi-magnify"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:260px;flex:1 1 200px"
+        />
+        <v-select
+          v-model="filterStatus"
+          :items="STATUS_OPTIONS"
+          item-title="title"
+          item-value="value"
+          label="สถานะ"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:160px"
+        />
+        <v-select
+          v-model="filterType"
+          :items="DOC_TYPES"
+          item-title="title"
+          item-value="value"
+          label="ประเภท"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:160px"
+        />
+        <v-select
+          v-model="filterGroup"
+          :items="DOC_GROUPS"
+          item-title="title"
+          item-value="value"
+          label="หมวดหมู่"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:160px"
+        />
+        <v-text-field
+          v-model="filterDateFrom"
+          label="จากวันที่"
+          type="date"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:160px"
+        />
+        <v-text-field
+          v-model="filterDateTo"
+          label="ถึงวันที่"
+          type="date"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="max-width:160px"
+        />
+        <v-btn
+          v-if="filterName || filterStatus || filterType || filterGroup || filterDateFrom || filterDateTo"
+          size="small"
+          variant="text"
+          color="grey"
+          prepend-icon="mdi-close"
+          @click="filterName = ''; filterStatus = null; filterType = null; filterGroup = null; filterDateFrom = ''; filterDateTo = ''"
+        >ล้างตัวกรอง</v-btn>
+      </div>
+
+      <v-divider />
+
+      <v-table density="comfortable">
+        <thead>
+          <tr>
+            <th>ชื่อเอกสาร</th>
+            <th>ประเภท</th>
+            <th>หมวดหมู่</th>
+            <th>วันที่นำเข้า</th>
+            <th>สถานะ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="6" class="text-center pa-6">
+              <v-progress-circular indeterminate size="24" color="admin-primary" />
+            </td>
+          </tr>
+          <tr v-else-if="logRows.length === 0">
+            <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบเอกสารที่ตรงกับเงื่อนไข</td>
+          </tr>
+          <tr v-for="row in logRows" :key="row.id">
+            <td class="py-2" style="max-width:320px">
+              <span class="text-body-2 font-weight-medium d-block" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                {{ row.name }}
+              </span>
+            </td>
+            <td>
+              <v-chip size="x-small" :color="badgeColor(row.type)" rounded="pill">{{ typeLabel(row.type) }}</v-chip>
+            </td>
+            <td class="text-caption">{{ row.group }}</td>
+            <td class="text-caption">{{ formatDate(row.importDate) }}</td>
+            <td>
+              <v-chip size="x-small" :color="statusChipColor(row.status)" rounded="pill">
+                <v-icon start icon="mdi-circle" size="8" />
+                {{ statusLabel(row.status) }}
+              </v-chip>
+            </td>
+            <td>
+              <v-btn
+                size="x-small"
+                color="admin-primary"
+                variant="tonal"
+                prepend-icon="mdi-pencil-outline"
+                @click="router.push(`/documents/${row.id}/review`)"
+              >แก้ไข</v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+
+      <v-divider />
+      <div class="pa-3 d-flex justify-space-between align-center">
+        <span class="text-caption text-medium-emphasis">
+          แสดง {{ logRows.length }} จาก {{ docs.length }} รายการ
+        </span>
+      </div>
     </v-card>
   </AppShell>
 </template>
@@ -194,5 +304,83 @@ function statusChipColor(s: string): string {
 function statusLabel(s: string): string {
   const m: Record<string, string> = { done: 'เสร็จสิ้น', exported: 'ส่งออกแล้ว', ingested: 'นำเข้าแล้ว', processing: 'กำลังประมวลผล', ingesting: 'กำลังนำเข้า', queued: 'รอดำเนินการ', failed: 'ล้มเหลว' };
   return m[s] ?? s;
+}
+
+// ── Document log filters ────────────────────────────────────
+const filterName = ref('');
+const filterStatus = ref<string | null>(null);
+const filterType = ref<string | null>(null);
+const filterGroup = ref<string | null>(null);
+const filterDateFrom = ref('');
+const filterDateTo = ref('');
+
+const DOC_TYPES = [
+  { title: 'ทุกประเภท', value: null },
+  { title: 'ระเบียบ', value: 'rabiap' },
+  { title: 'ประกาศ', value: 'prakat' },
+  { title: 'ข้อบังคับ', value: 'kho-bangkhab' },
+  { title: 'กฎหมายหลัก', value: 'kotmai-krung' },
+];
+
+const DOC_GROUPS = [
+  { title: 'ทุกหมวด', value: null },
+  { title: 'ด้านวิชาการ', value: 'วิชาการ' },
+  { title: 'ด้านการเงิน', value: 'การเงิน' },
+  { title: 'ด้านบุคคล', value: 'บุคคล' },
+  { title: 'ด้านดิจิทัล', value: 'ดิจิทัล' },
+];
+
+const STATUS_OPTIONS = [
+  { title: 'ทุกสถานะ', value: null },
+  { title: 'เสร็จสิ้น', value: 'done' },
+  { title: 'กำลังประมวลผล', value: 'processing' },
+  { title: 'รอดำเนินการ', value: 'queued' },
+  { title: 'ล้มเหลว', value: 'failed' },
+];
+
+// ponytail: type/group inferred from title keywords until API adds metadata fields
+function inferType(title: string): string {
+  if (title.includes('ระเบียบ')) return 'rabiap';
+  if (title.includes('ประกาศ')) return 'prakat';
+  if (title.includes('ข้อบังคับ')) return 'kho-bangkhab';
+  if (title.includes('พระราช') || title.includes('กฎหมาย')) return 'kotmai-krung';
+  return 'other';
+}
+
+function inferGroup(title: string): string {
+  if (title.includes('วิชาการ') || title.includes('การสอน')) return 'วิชาการ';
+  if (title.includes('การเงิน') || title.includes('งบประมาณ')) return 'การเงิน';
+  if (title.includes('บุคลากร') || title.includes('บุคคล') || title.includes('พนักงาน')) return 'บุคคล';
+  if (title.includes('ดิจิทัล') || title.includes('สารสนเทศ') || title.includes('ข้อมูล')) return 'ดิจิทัล';
+  return 'ทั่วไป';
+}
+
+const typeLabel = (key: string): string =>
+  ({ rabiap: 'ระเบียบ', prakat: 'ประกาศ', 'kho-bangkhab': 'ข้อบังคับ', 'kotmai-krung': 'กฎหมายหลัก', other: 'อื่น ๆ' } as Record<string, string>)[key] ?? key;
+
+const logRows = computed(() => {
+  return docs.value
+    .map(d => ({
+      id: d.document_id,
+      name: d.title ?? d.document_id,
+      type: inferType(d.title ?? ''),
+      group: inferGroup(d.title ?? ''),
+      importDate: d.updated_at ?? '',
+      status: d.status,
+    }))
+    .filter(row => {
+      if (filterName.value && !row.name.toLowerCase().includes(filterName.value.toLowerCase())) return false;
+      if (filterStatus.value && row.status !== filterStatus.value) return false;
+      if (filterType.value && row.type !== filterType.value) return false;
+      if (filterGroup.value && row.group !== filterGroup.value) return false;
+      if (filterDateFrom.value && row.importDate < filterDateFrom.value) return false;
+      if (filterDateTo.value && row.importDate > filterDateTo.value + 'T23:59:59') return false;
+      return true;
+    });
+});
+
+function formatDate(iso: string): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 </script>
