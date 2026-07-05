@@ -1,6 +1,6 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
-    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
+    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่" full-height>
     <template #actions>
       <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
         ย้อนกลับ
@@ -26,8 +26,7 @@
     <template v-else>
       <div class="rag-content-area">
         <!-- Selection action bar -->
-        <div v-if="selectedBlockIds.size > 0" class="d-flex align-center ga-2 px-3 py-2 rounded-lg"
-          style="position:sticky;top:0;z-index:5;background:#1a3673;color:#fff">
+        <div class="rag-selection-bar" :class="{ 'is-empty': selectedBlockIds.size === 0 }">
           <span class="text-body-2 font-weight-bold mr-auto">เลือก {{ selectedBlockIds.size }} บล็อก</span>
           <v-btn size="small" :disabled="selectedBlockIds.size < 2 || blockBusy"
             prepend-icon="mdi-table-merge-cells"
@@ -84,10 +83,16 @@
               </div>
             </div>
             <div class="rag-sec__flow">
-              <label class="rag-blockrow" :class="{ 'is-selected': selectedBlockIds.has(section.headBlock.block_id) }">
-                <input type="checkbox" class="rag-blockrow__cb-input"
-                  :checked="selectedBlockIds.has(section.headBlock.block_id)"
-                  @change="toggleBlock(section.headBlock.block_id)">
+              <div
+                class="rag-blockrow"
+                :class="{ 'is-selected': selectedBlockIds.has(section.headBlock.block_id) }"
+                role="checkbox"
+                tabindex="0"
+                :aria-checked="selectedBlockIds.has(section.headBlock.block_id)"
+                @click="toggleBlock(section.headBlock.block_id)"
+                @keydown.enter.prevent="toggleBlock(section.headBlock.block_id)"
+                @keydown.space.prevent="toggleBlock(section.headBlock.block_id)"
+              >
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
@@ -99,11 +104,19 @@
                   @click.prevent.stop="openSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
                 </button>
-              </label>
-              <label v-for="child in section.children" :key="child.block_id" class="rag-blockrow"
-                :class="{ 'is-selected': selectedBlockIds.has(child.block_id) }">
-                <input type="checkbox" class="rag-blockrow__cb-input" :checked="selectedBlockIds.has(child.block_id)"
-                  @change="toggleBlock(child.block_id)">
+              </div>
+              <div
+                v-for="child in section.children"
+                :key="child.block_id"
+                class="rag-blockrow"
+                :class="{ 'is-selected': selectedBlockIds.has(child.block_id) }"
+                role="checkbox"
+                tabindex="0"
+                :aria-checked="selectedBlockIds.has(child.block_id)"
+                @click="toggleBlock(child.block_id)"
+                @keydown.enter.prevent="toggleBlock(child.block_id)"
+                @keydown.space.prevent="toggleBlock(child.block_id)"
+              >
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
@@ -112,7 +125,7 @@
                   @click.prevent.stop="openSplit(child)">
                   <span class="mdi mdi-call-split" />
                 </button>
-              </label>
+              </div>
             </div>
 
 
@@ -168,6 +181,7 @@ import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
+import { useSnackbarStore } from '../../stores/snackbarStore';
 import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
@@ -183,6 +197,7 @@ const router = useRouter();
 const composeStore = useComposeStore();
 const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
+const snackbar = useSnackbarStore();
 
 const sections = computed(() => buildSections(composeStore.review));
 
@@ -281,10 +296,12 @@ async function mergeSelected(): Promise<void> {
   if (ids.length < 2 || blockBusy.value) return;
   blockBusy.value = true;
   try {
-    await blockStore.merge(props.documentId, ids);
-    await reloadBlocks();
+    const { block } = await blockStore.merge(props.documentId, ids);
+    composeStore.applyMerge(block, ids.filter((id) => id !== block.block_id));
+    clearSelection();
+    snackbar.success('รวมบล็อกแล้ว');
   } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'รวมบล็อกไม่สำเร็จ');
+    snackbar.error(e instanceof Error ? e.message : 'รวมบล็อกไม่สำเร็จ');
   } finally {
     blockBusy.value = false;
   }
@@ -327,16 +344,18 @@ function openSplitFromSelection(): void {
 }
 
 async function setChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
-  if (blockBusy.value) return;
-  blockBusy.value = true;
+  const previous = block.meta.chunk_type ?? null;
+  if (previous === chunkType) return;
+
+  // Optimistic: update the chip instantly, then persist in the background.
+  block.meta.chunk_type = chunkType;
   const pageNo = blockPage.value.get(block.block_id) ?? 1;
   try {
     await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
-    await reloadBlocks();
+    snackbar.success('บันทึกประเภทแล้ว');
   } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
+    block.meta.chunk_type = previous; // revert on failure
+    snackbar.error(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
   }
 }
 
@@ -372,17 +391,18 @@ function toBlockHtml(text: string): string {
 async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
   blockBusy.value = true;
   try {
-    await blockStore.split(props.documentId, blockId, {
+    const { first, second } = await blockStore.split(props.documentId, blockId, {
       page_no: pageNo,
       before_text: before,
       before_html: toBlockHtml(before),
       after_text: after,
       after_html: toBlockHtml(after),
     });
+    composeStore.applySplit(blockId, first, second);
     splitting.value = null;
-    await reloadBlocks();
+    snackbar.success('แบ่งบล็อกแล้ว');
   } catch (e) {
-    documentStore.setSaveError(e instanceof Error ? e.message : 'แบ่งบล็อกไม่สำเร็จ');
+    snackbar.error(e instanceof Error ? e.message : 'แบ่งบล็อกไม่สำเร็จ');
   } finally {
     blockBusy.value = false;
   }
@@ -454,11 +474,33 @@ onBeforeUnmount(() => {
 .rag-content-area {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 244px);
-  max-height: calc(100vh - 244px);
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   gap: 12px;
   overflow: hidden;
+}
+
+.rag-selection-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #1a3673;
+  color: #fff;
+  transition: opacity 0.16s ease;
+}
+
+.rag-selection-bar.is-empty {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .rag-block-list {
@@ -471,6 +513,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   padding-right: 4px;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .rag-sec {
@@ -478,6 +521,7 @@ onBeforeUnmount(() => {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 14px 16px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -517,7 +561,7 @@ onBeforeUnmount(() => {
 /* ponytail: custom checkbox grid layout — no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
-  grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;
+  grid-template-columns: 28px minmax(0, 1fr) 32px;
   align-items: start;
   gap: 10px;
   padding: 8px 10px;
@@ -532,16 +576,15 @@ onBeforeUnmount(() => {
   border-color: #e2e8f0;
 }
 
+.rag-blockrow:focus-visible {
+  outline: 2px solid rgba(30, 58, 138, 0.36);
+  outline-offset: 2px;
+}
+
 .rag-blockrow.is-selected {
   background: #eef2ff;
   border-color: #c7d2fe;
   box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.08);
-}
-
-.rag-blockrow__cb-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .rag-blockrow__cb {
@@ -582,6 +625,11 @@ onBeforeUnmount(() => {
   text-indent: 0 !important;
 }
 
+.rag-blockrow .block-flow :deep(*) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .rag-blockrow__split {
   flex-shrink: 0;
   align-self: start;
@@ -598,6 +646,22 @@ onBeforeUnmount(() => {
   color: #1a3673;
 }
 
+@media (max-width: 960px) {
+  .rag-content-area {
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .rag-selection-bar {
+    position: static;
+  }
+
+  .rag-sec__actions {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+}
 
 .rag-splitlines {
   display: flex;
