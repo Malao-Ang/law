@@ -1,151 +1,239 @@
 <template>
-  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ข้อมูลกฎหมาย']" title="ข้อมูลกฎหมาย (หัวเอกสาร)"
-    subtitle="กรอกข้อมูลหัวเอกสารก่อนไปจัดการ RAG">
-    <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
-        ย้อนกลับ
-      </v-btn>
-      <v-btn color="#1a3673" :loading="documentStore.saving" @click="saveAndContinue">
-        บันทึกและไปต่อ
-      </v-btn>
-    </template>
+  <AppShell
+    :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ข้อมูลเอกสาร']"
+    title="นำเข้าเอกสารกฎหมาย"
+    subtitle="ขั้นตอนที่ 4 จาก 5: ข้อมูลเอกสาร"
+  >
+    <div class="mx-auto" style="max-width:860px">
 
-    <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
-      <v-progress-circular indeterminate color="primary" />
-      <span>กำลังโหลด...</span>
-    </div>
+      <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
+        <v-progress-circular indeterminate color="admin-primary" />
+        <span>กำลังโหลด...</span>
+      </div>
 
-    <template v-else>
-      <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-3"
-        @click:close="documentStore.setSaveError()">
-        {{ documentStore.saveError }}
-      </v-alert>
+      <template v-else>
+        <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
+          @click:close="documentStore.setSaveError()">
+          {{ documentStore.saveError }}
+        </v-alert>
 
-      <v-card class="pa-4" elevation="0" style="border:1px solid #e2e8f0;border-radius:12px">
-        <v-row dense>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.status" label="สถานะ" placeholder="มีผลใช้บังคับ" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.law_type" label="ประเภท" placeholder="พระราชบัญญัติ" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.law_group" label="กลุ่มกฎหมาย" placeholder="ด้านวิชาการ" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.agency" label="หน่วยงาน" placeholder="มหาวิทยาลัยบูรพา" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.promulgation_date" label="วันที่ประกาศ" placeholder="9 มกราคม 2551" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.effective_date" label="วันที่มีผลบังคับ" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.gazette_reference" label="ราชกิจจานุเบกษา" placeholder="เล่ม 125 ตอนที่ 5 ก" />
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field v-model="lawMetaForm.royal_command" label="พระบรมราชโองการ" placeholder="ภูมิพลอดุลยเดช ปร." />
-          </v-col>
-          <v-col cols="12">
-            <v-textarea v-model="repealedText" label="กฎหมายที่ถูกยกเลิก (บรรทัดละ 1 รายการ)" rows="3" />
-          </v-col>
-        </v-row>
-
-        <div class="mt-3">
-          <div class="d-flex align-center justify-space-between text-body-2 font-weight-bold mb-2" style="color:#1a3673">
-            <span>ความสัมพันธ์ระดับเอกสาร</span>
-            <v-btn size="x-small" variant="outlined" prepend-icon="mdi-plus"
-              @click="openRelationDialog('document', null, 'related')">เพิ่ม</v-btn>
+        <v-card flat border rounded="lg" class="pa-6">
+          <div class="d-flex align-center ga-2 mb-5">
+            <v-icon icon="mdi-file-edit-outline" color="admin-primary" size="20" />
+            <span class="text-subtitle-1 font-weight-bold">ระบุรายละเอียดพื้นฐานของกฎหมาย</span>
           </div>
-          <div class="d-flex flex-wrap ga-2">
-            <v-chip v-for="rel in documentRelations(relations)" :key="rel.id" size="small" closable
-              :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
-              :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
-              @click:close="removeRelation(rel.id)">
-              {{ rel.target_title }}
-            </v-chip>
-          </div>
+
+          <v-row dense>
+            <v-col cols="12">
+              <v-text-field
+                v-model="form.title"
+                label="ชื่อเอกสาร"
+                :rules="[v => !!v || 'จำเป็นต้องกรอก']"
+                required
+              />
+            </v-col>
+
+            <v-col cols="12">
+              <v-select
+                v-model="form.law_type"
+                :items="DOC_TYPES"
+                label="ประเภทเอกสาร"
+                placeholder="- เลือกประเภทเอกสาร -"
+                :rules="[v => !!v || 'จำเป็นต้องเลือก']"
+                required
+              />
+            </v-col>
+
+            <v-col cols="12">
+              <v-select
+                v-model="form.law_groups"
+                :items="LAW_GROUPS"
+                label="ด้านกฎหมาย / หมวดงาน"
+                placeholder="- เลือกด้านกฎหมาย / หมวดงาน -"
+                multiple
+                chips
+                closable-chips
+                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 หมวด']"
+              >
+                <template #append-inner>
+                  <v-chip v-if="form.law_groups.length" size="x-small" color="admin-primary" class="mr-1">
+                    {{ form.law_groups.length }} หมวด
+                  </v-chip>
+                </template>
+              </v-select>
+            </v-col>
+
+            <v-col cols="12">
+              <v-text-field
+                v-model.number="form.section_count"
+                label="จำนวนข้อ / มาตรา"
+                type="number"
+                min="0"
+                placeholder="กรอกตัวเลข"
+                hint="กรอกตัวเลข"
+                persistent-hint
+              />
+            </v-col>
+
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.promulgation_date"
+                label="วันที่ประกาศ"
+                type="date"
+                prepend-inner-icon="mdi-calendar"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.effective_date"
+                label="วันที่มีผลบังคับใช้"
+                type="date"
+                prepend-inner-icon="mdi-calendar"
+              />
+            </v-col>
+
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.published_date"
+                label="วันที่เผยแพร่"
+                type="date"
+                prepend-inner-icon="mdi-calendar"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.expiry_date"
+                label="วันที่สิ้นสุด"
+                type="date"
+                prepend-inner-icon="mdi-calendar"
+                :disabled="noExpiry"
+                :placeholder="noExpiry ? 'ไม่มีวันสิ้นสุด' : 'วว/ดด/ปป'"
+              />
+              <v-checkbox
+                v-model="noExpiry"
+                label="ไม่มีวันสิ้นสุด"
+                density="compact"
+                hide-details
+                class="mt-1"
+                @update:model-value="v => { if (v) form.expiry_date = null }"
+              />
+            </v-col>
+
+            <v-col cols="12">
+              <div class="d-flex align-center ga-2 mb-2">
+                <v-icon icon="mdi-office-building-outline" size="18" color="admin-primary" />
+                <span class="text-body-2 font-weight-medium">หน่วยงานที่รับผิดชอบ</span>
+                <span class="text-caption text-error">*</span>
+                <v-chip v-if="form.agencies.length === 0" size="x-small" color="error" class="ml-1">จำเป็น</v-chip>
+              </div>
+
+              <div class="d-flex flex-wrap ga-2 mb-3">
+                <v-chip
+                  v-for="(ag, idx) in form.agencies"
+                  :key="ag + idx"
+                  size="small"
+                  closable
+                  variant="tonal"
+                  color="admin-primary"
+                  prepend-icon="mdi-office-building-outline"
+                  @click:close="form.agencies.splice(idx, 1)"
+                >{{ ag }}</v-chip>
+              </div>
+
+              <div class="d-flex ga-2 align-center">
+                <v-text-field
+                  v-model="agencyInput"
+                  placeholder="+ เพิ่มหน่วยงาน"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width:320px"
+                  @keydown.enter.prevent="addAgency"
+                />
+                <v-btn size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" @click="addAgency">
+                  เพิ่มหน่วยงาน
+                </v-btn>
+              </div>
+            </v-col>
+          </v-row>
+        </v-card>
+
+        <div class="d-flex justify-space-between mt-6">
+          <v-btn variant="outlined" prepend-icon="mdi-arrow-left"
+            @click="router.push(`/documents/${props.documentId}/rag`)">
+            ย้อนกลับ
+          </v-btn>
+          <v-btn color="admin-primary" append-icon="mdi-arrow-right"
+            :loading="documentStore.saving || exporting"
+            @click="saveAndExport">
+            ถัดไป
+          </v-btn>
         </div>
-      </v-card>
-
-      <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
-        @close="dialog = null" @save="onRelationSaved" />
-    </template>
+      </template>
+    </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
-import type { LawMeta, LawRelation, RelationScope, RelationType } from '../../types/document';
+import { exportDocument } from '../../api/client';
+import type { LawMeta } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
-import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
-import { documentRelations } from '../../composables/useLawSections';
 
 const props = defineProps<{ documentId: string }>();
-
 const router = useRouter();
 const documentStore = useDocumentStore();
 
-const repealedText = ref('');
+const DOC_TYPES = ['ระเบียบ', 'ประกาศ', 'ข้อบังคับ', 'กฎหมายหลัก', 'คำสั่ง', 'มติ'];
+const LAW_GROUPS = ['ด้านวิชาการ', 'ด้านการเงิน', 'ด้านบุคคล', 'ด้านดิจิทัล', 'ด้านทั่วไป'];
 
-const EMPTY_LAW_META: LawMeta = {
-  status: '',
-  law_type: '',
-  law_group: '',
-  law_groups: [],
-  agency: '',
-  agencies: [],
-  promulgation_date: '',
-  effective_date: '',
-  published_date: '',
-  expiry_date: null,
-  section_count: null,
-  title: '',
-  gazette_reference: '',
-  royal_command: '',
-  repealed_laws: [],
+const EMPTY: LawMeta = {
+  status: '', law_type: '', law_group: '', law_groups: [],
+  agency: '', agencies: [], promulgation_date: '', effective_date: '',
+  published_date: '', expiry_date: null, section_count: null,
+  title: '', gazette_reference: '', royal_command: '', repealed_laws: [],
 };
 
-const lawMetaForm = ref<LawMeta>({ ...EMPTY_LAW_META });
-const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
-const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
+const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_laws: [] });
+const noExpiry = ref(false);
+const agencyInput = ref('');
+const exporting = ref(false);
 
-function openRelationDialog(scope: RelationScope, blockId: string | null, type: RelationType): void {
-  dialog.value = { scope, blockId, type };
-}
-
-async function onRelationSaved(relation: LawRelation): Promise<void> {
-  dialog.value = null;
-  await documentStore.saveRelations([...relations.value, relation]);
-}
-
-async function removeRelation(id: string): Promise<void> {
-  await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
-}
-
-watch(() => documentStore.review?.law_meta, (meta) => {
-  const nextMeta = {
-    ...EMPTY_LAW_META,
+watch(() => documentStore.review, (review) => {
+  const meta = review?.law_meta;
+  form.value = {
+    ...EMPTY,
     ...(meta ?? {}),
+    law_groups: [...(meta?.law_groups ?? [])],
+    agencies: [...(meta?.agencies ?? [])],
     repealed_laws: [...(meta?.repealed_laws ?? [])],
+    title: meta?.title || review?.source_file || '',
+    expiry_date: meta?.expiry_date ?? null,
   };
-  lawMetaForm.value = nextMeta;
-  repealedText.value = nextMeta.repealed_laws.join('\n');
+  noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });
 
-async function saveAndContinue(): Promise<void> {
-  const repealedLaws = repealedText.value
-    .split('\n')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+function addAgency(): void {
+  const trimmed = agencyInput.value.trim();
+  if (trimmed && !form.value.agencies.includes(trimmed)) {
+    form.value.agencies.push(trimmed);
+  }
+  agencyInput.value = '';
+}
 
-  const payload: LawMeta = { ...lawMetaForm.value, repealed_laws: repealedLaws };
-  const saved = await documentStore.saveLawMeta(payload);
-  if (saved) {
-    router.push(`/documents/${props.documentId}/rag`);
+async function saveAndExport(): Promise<void> {
+  const saved = await documentStore.saveLawMeta({ ...form.value });
+  if (!saved) return;
+  exporting.value = true;
+  try {
+    await exportDocument(props.documentId);
+    router.push(`/law/${props.documentId}`);
+  } catch {
+    documentStore.setSaveError('ส่งออกไม่สำเร็จ — ลองอีกครั้ง');
+  } finally {
+    exporting.value = false;
   }
 }
 
