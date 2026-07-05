@@ -194,6 +194,7 @@ export interface LawMeta {
   gazette_reference: string;
   royal_command: string;
   repealed_laws: string[];
+  imported_by: string;
 }
 
 export type RelationType = 'related' | 'repeals';

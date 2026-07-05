@@ -17,12 +17,12 @@
           {{ documentStore.saveError }}
         </v-alert>
 
-        <v-card flat border rounded="lg" class="pa-6">
+        <!-- ข้อมูลพื้นฐาน -->
+        <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-5">
-            <v-icon icon="mdi-file-edit-outline" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">ระบุรายละเอียดพื้นฐานของกฎหมาย</span>
+            <v-icon icon="mdi-file-document-outline" color="admin-primary" size="20" />
+            <span class="text-subtitle-1 font-weight-bold">ข้อมูลพื้นฐาน</span>
           </div>
-
           <v-row dense>
             <v-col cols="12">
               <v-text-field
@@ -32,8 +32,7 @@
                 required
               />
             </v-col>
-
-            <v-col cols="12">
+            <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
                 :items="DOC_TYPES"
@@ -43,38 +42,37 @@
                 required
               />
             </v-col>
-
+            <v-col cols="12" sm="6">
+              <!-- placeholder col for layout -->
+            </v-col>
             <v-col cols="12">
               <v-select
                 v-model="form.law_groups"
                 :items="LAW_GROUPS"
-                label="ด้านกฎหมาย / หมวดงาน"
-                placeholder="- เลือกด้านกฎหมาย / หมวดงาน -"
+                label="กลุ่มกฎหมาย"
+                placeholder="- เลือกกลุ่มกฎหมาย -"
                 multiple
                 chips
                 closable-chips
-                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 หมวด']"
+                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 กลุ่ม']"
               >
                 <template #append-inner>
                   <v-chip v-if="form.law_groups.length" size="x-small" color="admin-primary" class="mr-1">
-                    {{ form.law_groups.length }} หมวด
+                    {{ form.law_groups.length }} กลุ่ม
                   </v-chip>
                 </template>
               </v-select>
             </v-col>
+          </v-row>
+        </v-card>
 
-            <v-col cols="12">
-              <v-text-field
-                v-model.number="form.section_count"
-                label="จำนวนข้อ / มาตรา"
-                type="number"
-                min="0"
-                placeholder="กรอกตัวเลข"
-                hint="กรอกตัวเลข"
-                persistent-hint
-              />
-            </v-col>
-
+        <!-- ข้อมูลการประกาศใช้ -->
+        <v-card flat border rounded="lg" class="pa-6 mb-4">
+          <div class="d-flex align-center ga-2 mb-5">
+            <v-icon icon="mdi-calendar-check-outline" color="admin-primary" size="20" />
+            <span class="text-subtitle-1 font-weight-bold">ข้อมูลการประกาศใช้</span>
+          </div>
+          <v-row dense>
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.promulgation_date"
@@ -86,28 +84,21 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.effective_date"
-                label="วันที่มีผลบังคับใช้"
+                label="วันที่มีผลบังคับใช้ *"
                 type="date"
                 prepend-inner-icon="mdi-calendar"
-              />
-            </v-col>
-
-            <v-col cols="12" sm="6">
-              <v-text-field
-                v-model="form.published_date"
-                label="วันที่เผยแพร่"
-                type="date"
-                prepend-inner-icon="mdi-calendar"
+                :rules="[v => !!v || 'จำเป็นต้องระบุ']"
+                required
               />
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.expiry_date"
-                label="วันที่สิ้นสุด"
+                label="วันที่สิ้นสุดการใช้"
                 type="date"
                 prepend-inner-icon="mdi-calendar"
                 :disabled="noExpiry"
-                :placeholder="noExpiry ? 'ไม่มีวันสิ้นสุด' : 'วว/ดด/ปป'"
+                :placeholder="noExpiry ? 'ไม่มีวันสิ้นสุด' : ''"
               />
               <v-checkbox
                 v-model="noExpiry"
@@ -118,15 +109,41 @@
                 @update:model-value="v => { if (v) form.expiry_date = null }"
               />
             </v-col>
+          </v-row>
+        </v-card>
 
+        <!-- โครงสร้างเอกสาร -->
+        <v-card flat border rounded="lg" class="pa-6 mb-4">
+          <div class="d-flex align-center ga-2 mb-5">
+            <v-icon icon="mdi-format-list-numbered" color="admin-primary" size="20" />
+            <span class="text-subtitle-1 font-weight-bold">โครงสร้างเอกสาร</span>
+          </div>
+          <v-row dense>
+            <v-col cols="12" sm="4">
+              <v-text-field
+                v-model.number="form.section_count"
+                label="จำนวนข้อ"
+                type="number"
+                min="0"
+                placeholder="กรอกตัวเลข"
+              />
+            </v-col>
+          </v-row>
+        </v-card>
+
+        <!-- ข้อมูลหน่วยงาน -->
+        <v-card flat border rounded="lg" class="pa-6 mb-4">
+          <div class="d-flex align-center ga-2 mb-5">
+            <v-icon icon="mdi-office-building-outline" color="admin-primary" size="20" />
+            <span class="text-subtitle-1 font-weight-bold">ข้อมูลหน่วยงาน</span>
+          </div>
+          <v-row dense>
             <v-col cols="12">
               <div class="d-flex align-center ga-2 mb-2">
-                <v-icon icon="mdi-office-building-outline" size="18" color="admin-primary" />
-                <span class="text-body-2 font-weight-medium">หน่วยงานที่รับผิดชอบ</span>
+                <span class="text-body-2 font-weight-medium">หน่วยงานรับผิดชอบ</span>
                 <span class="text-caption text-error">*</span>
                 <v-chip v-if="form.agencies.length === 0" size="x-small" color="error" class="ml-1">จำเป็น</v-chip>
               </div>
-
               <div class="d-flex flex-wrap ga-2 mb-3">
                 <v-chip
                   v-for="(ag, idx) in form.agencies"
@@ -139,7 +156,6 @@
                   @click:close="form.agencies.splice(idx, 1)"
                 >{{ ag }}</v-chip>
               </div>
-
               <div class="d-flex ga-2 align-center">
                 <v-text-field
                   v-model="agencyInput"
@@ -154,6 +170,14 @@
                   เพิ่มหน่วยงาน
                 </v-btn>
               </div>
+            </v-col>
+            <v-col cols="12" sm="6" class="mt-2">
+              <v-text-field
+                v-model="form.imported_by"
+                label="ผู้นำเข้าข้อมูล"
+                prepend-inner-icon="mdi-account-outline"
+                placeholder="ชื่อผู้นำเข้าข้อมูล"
+              />
             </v-col>
           </v-row>
         </v-card>
@@ -186,14 +210,28 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 
-const DOC_TYPES = ['ระเบียบ', 'ประกาศ', 'ข้อบังคับ', 'กฎหมายหลัก', 'คำสั่ง', 'มติ'];
-const LAW_GROUPS = ['ด้านวิชาการ', 'ด้านการเงิน', 'ด้านบุคคล', 'ด้านดิจิทัล', 'ด้านทั่วไป'];
+const DOC_TYPES = ['พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'คำสั่ง', 'มติ'];
+const LAW_GROUPS = [
+  'ด้านวิชาการ',
+  'การผลิตบัณฑิต',
+  'การเรียนรู้ตลอดชีวิต',
+  'การบริหารหลักสูตร',
+  'ด้านกิจการนิสิต',
+  'ด้านบริหารบุคคล',
+  'ด้านการเงินและงบประมาณ',
+  'ด้านทรัพย์สินและจัดซื้อจัดจ้าง',
+  'ด้านเทคโนโลยีสารสนเทศ',
+  'ด้านกฎหมายและนิติการ',
+  'ด้านความร่วมมือระหว่างประเทศ',
+  'อื่นๆ',
+];
 
 const EMPTY: LawMeta = {
   status: '', law_type: '', law_group: '', law_groups: [],
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [],
+  imported_by: '',
 };
 
 const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_laws: [] });
