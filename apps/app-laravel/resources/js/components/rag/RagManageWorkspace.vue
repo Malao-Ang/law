@@ -105,7 +105,7 @@
                   :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
                 />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="openSplit(section.headBlock)">
+                  @click.prevent.stop="splitBlock(section.headBlock)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -126,7 +126,7 @@
                 </span>
                 <BlockFlow :block="child" />
                 <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="openSplit(child)">
+                  @click.prevent.stop="splitBlock(child)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -296,24 +296,52 @@ async function reloadBlocks(): Promise<void> {
   if (blockListEl.value) blockListEl.value.scrollTop = scrollTop;
 }
 
+// A head chunk-type to assign when a block should start a section.
+function headTypeFor(block: DocumentBlock): ChunkType {
+  return suggestChunkType(block) ?? 'SECTION';
+}
+
+async function persistChunkType(block: DocumentBlock, chunkType: ChunkType): Promise<void> {
+  const pageNo = blockPage.value.get(block.block_id) ?? 1;
+  await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
+}
+
 async function mergeSelected(): Promise<void> {
-  const ids = [...selectedBlockIds.value];
-  if (ids.length < 2 || blockBusy.value) return;
-  // Image/table blocks render as a single medium (BlockFlow ignores their text),
-  // so merging them into one block silently drops content. Reject instead.
   const selected = allBlocks.value.filter((b) => selectedBlockIds.value.has(b.block_id));
-  if (selected.some((b) => b.type === 'image' || b.type === 'table')) {
-    snackbar.error('รวมบล็อกรูปภาพหรือตารางไม่ได้ กรุณาเอาบล็อกเหล่านั้นออกจากการเลือก');
-    return;
-  }
+  if (selected.length < 2 || blockBusy.value) return;
   blockBusy.value = true;
   try {
-    const { block } = await blockStore.merge(props.documentId, ids);
-    composeStore.applyMerge(block, ids.filter((id) => id !== block.block_id));
+    // First selected becomes the container head; the rest become its children.
+    const [head, ...rest] = selected;
+    const headType = headTypeFor(head);
+    head.meta.chunk_type = headType;                 // optimistic
+    rest.forEach((b) => { b.meta.chunk_type = 'PARAGRAPH'; });
+    await Promise.all([
+      persistChunkType(head, headType),
+      ...rest.map((b) => persistChunkType(b, 'PARAGRAPH')),
+    ]);
     clearSelection();
-    snackbar.success('รวมบล็อกแล้ว');
+    snackbar.success('จัดกลุ่มเป็นคอนเทนเนอร์เดียวแล้ว');
   } catch (e) {
-    snackbar.error(e instanceof Error ? e.message : 'รวมบล็อกไม่สำเร็จ');
+    snackbar.error(e instanceof Error ? e.message : 'จัดกลุ่มไม่สำเร็จ');
+    await reloadBlocks();
+  } finally {
+    blockBusy.value = false;
+  }
+}
+
+async function splitBlock(block: DocumentBlock): Promise<void> {
+  if (blockBusy.value) return;
+  blockBusy.value = true;
+  try {
+    const headType = headTypeFor(block);
+    block.meta.chunk_type = headType;                // optimistic → starts a new section
+    await persistChunkType(block, headType);
+    clearSelection();
+    snackbar.success('เริ่ม section ใหม่แล้ว');
+  } catch (e) {
+    snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
+    await reloadBlocks();
   } finally {
     blockBusy.value = false;
   }
@@ -352,8 +380,8 @@ function openSplit(block: DocumentBlock): void {
 function openSplitFromSelection(): void {
   const [blockId] = [...selectedBlockIds.value];
   if (!blockId) return;
-  const block = allBlocks.value.find(b => b.block_id === blockId);
-  if (block) openSplit(block);
+  const block = allBlocks.value.find((b) => b.block_id === blockId);
+  if (block) void splitBlock(block);
 }
 
 async function setChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
