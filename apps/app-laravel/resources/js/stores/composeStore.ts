@@ -63,6 +63,7 @@ export const useComposeStore = defineStore('compose', () => {
   // Apply a merge result locally: update the anchor block returned by the API and
   // drop the other merged-away blocks. Avoids a full refetch after merge.
   function applyMerge(mergedBlock: DocumentBlock, removedIds: string[]): void {
+    // Caller must exclude mergedBlock.block_id from removedIds, else the anchor is dropped.
     if (!review.value) return;
     const removeSet = new Set(removedIds);
     for (const page of review.value.pages) {
