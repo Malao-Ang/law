@@ -261,7 +261,7 @@ const statCards = computed(() => [
     iconColor: '#64748b',
     iconBg: '#f1f5f9',
     number: docs.value.filter(d => d.status === 'failed').length,
-    label: 'ร่างเอกสาร',
+    label: 'ล้มเหลว',
   },
   {
     icon: 'mdi-clock-outline',
