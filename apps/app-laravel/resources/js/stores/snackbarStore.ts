@@ -9,8 +9,6 @@ export const useSnackbarStore = defineStore('snackbar', () => {
   const color = ref<SnackbarColor>('info');
 
   function notify(msg: string, c: SnackbarColor): void {
-    message.value = msg;
-    color.value = c;
     // Re-trigger the snackbar timeout even if one is already visible:
     // close now, reopen after Vue flushes so v-snackbar restarts its timer.
     show.value = false;
