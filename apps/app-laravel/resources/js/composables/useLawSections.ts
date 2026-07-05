@@ -38,6 +38,27 @@ function isHead(block: DocumentBlock): boolean {
   return HEAD_RE.test(blockText(block));
 }
 
+// Content-word → chunk type. First matching rule wins; null when nothing matches.
+const SUGGEST_RULES: ReadonlyArray<[RegExp, ChunkType]> = [
+  [/^ภาคผนวก/u, 'ANNEX'],
+  [/^บทเฉพาะกาล/u, 'TRANSITIONAL_PROVISION'],
+  [/^ภาค\s*[๐-๙0-9]/u, 'BOOK'],
+  [/^ลักษณะ\s*[๐-๙0-9]/u, 'PART'],
+  [/^หมวด\s*[๐-๙0-9]/u, 'CHAPTER'],
+  [/^ส่วนที่\s*[๐-๙0-9]/u, 'SECTION'],
+  [/^มาตรา\s*[๐-๙0-9]/u, 'ARTICLE'],
+  [/^ข้อ\s*[๐-๙0-9]/u, 'ARTICLE'],
+  [/^คำปรารภ/u, 'PREAMBLE'],
+];
+
+export function suggestChunkType(block: DocumentBlock): ChunkType | null {
+  const text = blockText(block);
+  for (const [re, type] of SUGGEST_RULES) {
+    if (re.test(text)) return type;
+  }
+  return null;
+}
+
 function markerFor(block: DocumentBlock): string {
   const text = blockText(block);
   const match = text.match(HEAD_RE);
