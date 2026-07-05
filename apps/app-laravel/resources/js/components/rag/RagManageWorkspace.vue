@@ -175,6 +175,7 @@ import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
+import Swal from 'sweetalert2';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -386,6 +387,46 @@ async function splitBlockInto(blockId: string, pageNo: number, before: string, a
 
 
 async function handleExport(): Promise<void> {
+  if (blockBusy.value) return;
+
+  // 1. Persist any accepted auto-suggestions (stored empty but suggestion exists).
+  const toPersist = sections.value.filter(
+    (s) => !s.headBlock.meta.chunk_type && suggestChunkType(s.headBlock),
+  );
+  if (toPersist.length > 0) {
+    blockBusy.value = true;
+    try {
+      await Promise.all(
+        toPersist.map((s) => {
+          const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
+          return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggestChunkType(s.headBlock));
+        }),
+      );
+      await reloadBlocks();
+    } catch (e) {
+      documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+      blockBusy.value = false;
+      return;
+    }
+    blockBusy.value = false;
+  }
+
+  // 2. Validate: every container must now have a stored type.
+  const missing = sections.value.filter((s) => !s.headBlock.meta.chunk_type);
+  if (missing.length > 0) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'ยังกำหนดประเภทไม่ครบ',
+      html:
+        'กรุณาเลือกประเภทให้ container ต่อไปนี้ก่อนเผยแพร่:<br><br>' +
+        missing.map((s) => `• ${escapeForHtml(s.badge)}`).join('<br>'),
+      confirmButtonText: 'ตกลง',
+      confirmButtonColor: '#1a3673',
+    });
+    return;
+  }
+
+  // 3. All typed — publish and go to the law view.
   await composeStore.triggerExport(props.documentId);
   if (!composeStore.error) {
     router.push(`/law/${props.documentId}`);
