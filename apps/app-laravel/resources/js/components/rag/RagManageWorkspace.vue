@@ -2,11 +2,12 @@
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
     subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
     <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
+      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
         ย้อนกลับ
       </v-btn>
-      <v-btn color="#1a3673" :loading="composeStore.exporting" :disabled="composeStore.exporting || blockBusy" @click="handleExport">
-        บันทึกและเผยแพร่
+      <v-btn color="admin-primary" append-icon="mdi-arrow-right" :disabled="blockBusy"
+        @click="router.push(`/documents/${props.documentId}/law-info`)">
+        ถัดไป
       </v-btn>
     </template>
 
