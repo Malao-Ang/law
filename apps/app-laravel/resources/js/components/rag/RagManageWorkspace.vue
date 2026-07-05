@@ -187,7 +187,7 @@ const sections = computed(() => buildSections(composeStore.review));
 
 function containerType(section: LawSection): ChunkType | null {
   const stored = section.headBlock.meta.chunk_type as ChunkType | null | undefined;
-  return stored || suggestChunkType(section.headBlock);
+  return stored ?? suggestChunkType(section.headBlock);
 }
 
 function containerTypeLabel(section: LawSection): string {
@@ -202,6 +202,7 @@ function containerTypeColor(section: LawSection): string | undefined {
   if (!ct) return undefined;
   return section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[ct] : 'grey';
 }
+
 const allBlocks = computed<DocumentBlock[]>(() =>
   sections.value.flatMap(s => [s.headBlock, ...s.children]),
 );
