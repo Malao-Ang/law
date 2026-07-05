@@ -1,5 +1,5 @@
 <template>
-  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG"
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
     subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
     <template #actions>
       <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
@@ -26,8 +26,10 @@
     <template v-else>
       <div class="rag-content-area">
         <!-- Selection action bar -->
-        <div v-if="selectedBlockIds.size > 0" class="d-flex align-center ga-2 px-3 py-2 rounded-lg"
-          style="position:sticky;top:0;z-index:5;background:#1a3673;color:#fff">
+        <div
+          class="rag-selection-bar d-flex align-center ga-2 px-3 py-2 rounded-lg"
+          :class="{ 'is-visible': selectedBlockIds.size > 0 }"
+        >
           <span class="text-body-2 font-weight-bold mr-auto">เลือก {{ selectedBlockIds.size }} บล็อก</span>
           <v-btn size="small" :disabled="selectedBlockIds.size < 2 || blockBusy"
             prepend-icon="mdi-table-merge-cells"
@@ -84,10 +86,16 @@
               </div>
             </div>
             <div class="rag-sec__flow">
-              <label class="rag-blockrow" :class="{ 'is-selected': selectedBlockIds.has(section.headBlock.block_id) }">
-                <input type="checkbox" class="rag-blockrow__cb-input"
-                  :checked="selectedBlockIds.has(section.headBlock.block_id)"
-                  @change="toggleBlock(section.headBlock.block_id)">
+              <div
+                class="rag-blockrow"
+                :class="{ 'is-selected': selectedBlockIds.has(section.headBlock.block_id) }"
+                role="checkbox"
+                tabindex="0"
+                :aria-checked="selectedBlockIds.has(section.headBlock.block_id)"
+                @click="toggleBlock(section.headBlock.block_id)"
+                @keydown.enter.prevent="toggleBlock(section.headBlock.block_id)"
+                @keydown.space.prevent="toggleBlock(section.headBlock.block_id)"
+              >
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
@@ -99,11 +107,19 @@
                   @click.prevent.stop="openSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
                 </button>
-              </label>
-              <label v-for="child in section.children" :key="child.block_id" class="rag-blockrow"
-                :class="{ 'is-selected': selectedBlockIds.has(child.block_id) }">
-                <input type="checkbox" class="rag-blockrow__cb-input" :checked="selectedBlockIds.has(child.block_id)"
-                  @change="toggleBlock(child.block_id)">
+              </div>
+              <div
+                v-for="child in section.children"
+                :key="child.block_id"
+                class="rag-blockrow"
+                :class="{ 'is-selected': selectedBlockIds.has(child.block_id) }"
+                role="checkbox"
+                tabindex="0"
+                :aria-checked="selectedBlockIds.has(child.block_id)"
+                @click="toggleBlock(child.block_id)"
+                @keydown.enter.prevent="toggleBlock(child.block_id)"
+                @keydown.space.prevent="toggleBlock(child.block_id)"
+              >
                 <span class="rag-blockrow__cb" aria-hidden="true">
                   <span class="mdi mdi-check"></span>
                 </span>
@@ -112,7 +128,7 @@
                   @click.prevent.stop="openSplit(child)">
                   <span class="mdi mdi-call-split" />
                 </button>
-              </label>
+              </div>
             </div>
 
 
@@ -461,8 +477,9 @@ onBeforeUnmount(() => {
 .rag-content-area {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 244px);
-  max-height: calc(100vh - 244px);
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   gap: 12px;
   overflow: hidden;
