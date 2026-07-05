@@ -1,69 +1,125 @@
 <template>
   <div class="upload-form">
+    <!-- Step 1: pick file -->
     <v-file-input
+      v-if="!pendingFile"
       v-model="fileModel"
       accept=".doc,.docx,.pdf"
       label="เลือกไฟล์ (.doc, .docx, .pdf)"
       variant="outlined"
       density="comfortable"
-      :loading="loading"
-      :disabled="loading"
       hide-details
       @update:model-value="onFileSelected"
     />
-    <div class="upload-form__scan-mode">
-      <label class="upload-form__label" for="scan-mode">โหมด OCR สำหรับ PDF สแกน</label>
-      <select id="scan-mode" v-model="scanExtractionMode" class="upload-form__select" :disabled="loading">
-        <option value="gemini">Gemini — Google Gemini Vision</option>
-        <option value="local">OCR Library — EasyOCR ในเครื่อง</option>
-      </select>
-    </div>
-    <div class="upload-form__actions">
-      <v-btn
-        variant="outlined"
-        size="large"
-        :disabled="loading"
-        @click="reset"
-      >
-        ยกเลิก
-      </v-btn>
-    </div>
+
+    <!-- Step 2: confirm scan mode then upload -->
+    <template v-else>
+      <div class="file-preview">
+        <v-icon :icon="fileIcon" size="20" color="admin-primary" class="mr-1" />
+        <span class="text-body-2 font-weight-medium">{{ pendingFile.name }}</span>
+        <v-chip size="x-small" variant="tonal" color="admin-primary" class="ml-2">{{ fileTypeLabel }}</v-chip>
+      </div>
+
+      <!-- scan mode selector — shown for all types; label changes per type -->
+      <div class="mt-3">
+        <div class="text-caption text-medium-emphasis mb-1">{{ modeLabel }}</div>
+        <v-select
+          v-model="scanMode"
+          :items="modeOptions"
+          item-title="title"
+          item-value="value"
+          density="compact"
+          variant="outlined"
+          hide-details
+        />
+        <div v-if="modeHint" class="text-caption text-medium-emphasis mt-1">{{ modeHint }}</div>
+      </div>
+
+      <div class="upload-form__actions mt-4">
+        <v-btn variant="outlined" color="grey" :disabled="loading" @click="cancelPending">ยกเลิก</v-btn>
+        <v-btn color="admin-primary" :loading="loading" prepend-icon="mdi-cloud-upload-outline" @click="doUpload">
+          อัปโหลด
+        </v-btn>
+      </div>
+    </template>
+
     <v-alert v-if="error" type="error" density="compact" class="mt-2">{{ error }}</v-alert>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import type { ScanExtractionMode } from '../../types/document';
 import { useUploadStore } from '../../stores/uploadStore';
 
-const emit = defineEmits<{
-  uploaded: [documentId: string];
-}>();
-
+const emit = defineEmits<{ uploaded: [documentId: string] }>();
 const uploadStore = useUploadStore();
 
-// Hidden defaults — sent to API, not shown in UI; fast = PHP-side extraction, falls back to Python for scans
-const extractionEngine: 'standard' | 'fast' = 'fast';
-const scanExtractionMode = ref<ScanExtractionMode>('gemini');
-
 const fileModel = ref<File | File[] | null>(null);
-const selectedFileName = ref<string | null>(null); // ponytail: kept for compat; v-file-input displays selection
+const pendingFile = ref<File | null>(null);
+const scanMode = ref<ScanExtractionMode>('local');
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-async function onFileSelected(file: File | File[] | null): Promise<void> {
+const fileExt = computed(() => pendingFile.value?.name.split('.').pop()?.toLowerCase() ?? '');
+
+const isPdf = computed(() => fileExt.value === 'pdf');
+
+// extraction_engine: fast for local (PHP path) and PDF (fast tries, falls back for scans)
+// standard when user picks a cloud/auto mode on docx/doc (routes to Python Docling)
+const extractionEngine = computed((): 'fast' | 'standard' => {
+  if (isPdf.value) return 'fast';
+  return scanMode.value === 'local' ? 'fast' : 'standard';
+});
+
+const fileTypeLabel = computed(() => ({ pdf: 'PDF', docx: 'DOCX', doc: 'DOC' }[fileExt.value] ?? fileExt.value.toUpperCase()));
+
+const fileIcon = computed(() =>
+  isPdf.value ? 'mdi-file-pdf-box' : 'mdi-file-word-box',
+);
+
+const modeLabel = computed(() =>
+  isPdf.value ? 'โหมด OCR สำหรับ PDF' : 'โหมดการประมวลผล',
+);
+
+// ponytail: PDF can't know scan vs text before upload — show all; Python decides per mode
+const modeOptions = computed(() =>
+  isPdf.value
+    ? [
+        { title: 'Gemini Vision — Google AI (แนะนำสำหรับ PDF scan)', value: 'gemini' },
+        { title: 'Auto — EasyOCR → cloud fallback', value: 'auto' },
+        { title: 'LandingAI — ADE Parse', value: 'landingai' },
+        { title: 'Local — EasyOCR ในเครื่อง', value: 'local' },
+      ]
+    : [
+        { title: 'Local — Fast PHP extraction (แนะนำ)', value: 'local' },
+        { title: 'Standard — Python Docling', value: 'auto' },
+      ],
+);
+
+const modeHint = computed(() => {
+  if (isPdf.value && scanMode.value === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY ใน .env';
+  if (isPdf.value && scanMode.value === 'landingai') return 'ต้องตั้งค่า VISION_AGENT_API_KEY ใน .env';
+  if (!isPdf.value && scanMode.value === 'auto') return 'ส่งไฟล์ผ่าน Python Docling pipeline';
+  return '';
+});
+
+function onFileSelected(file: File | File[] | null): void {
   const f = Array.isArray(file) ? (file[0] ?? null) : file;
   if (!f) return;
-  selectedFileName.value = f.name;
+  pendingFile.value = f;
   error.value = null;
+  // smart default
+  const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+  scanMode.value = ext === 'pdf' ? 'gemini' : 'local';
+}
+
+async function doUpload(): Promise<void> {
+  if (!pendingFile.value) return;
   loading.value = true;
+  error.value = null;
   try {
-    const documentId = await uploadStore.upload(
-      f,
-      scanExtractionMode.value,
-      extractionEngine,
-    );
+    const documentId = await uploadStore.upload(pendingFile.value, scanMode.value, extractionEngine.value);
     emit('uploaded', documentId);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';
@@ -72,45 +128,27 @@ async function onFileSelected(file: File | File[] | null): Promise<void> {
   }
 }
 
-function reset(): void {
+function cancelPending(): void {
+  pendingFile.value = null;
   fileModel.value = null;
-  selectedFileName.value = null;
   error.value = null;
+  scanMode.value = 'local';
 }
 </script>
 
 <style scoped>
-.upload-form__hidden-input {
-  display: none;
-}
-
-.upload-form__scan-mode {
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.upload-form__label {
-  display: block;
-  font-size: 13px;
-  color: #475569;
-  margin-bottom: 6px;
-}
-
-.upload-form__select {
-  min-width: 280px;
-  max-width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
+.file-preview {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f1f5f9;
   border-radius: 8px;
-  font-size: 14px;
-  background: #fff;
+  margin-bottom: 4px;
 }
 
 .upload-form__actions {
   display: flex;
   gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  justify-content: flex-end;
 }
 </style>
