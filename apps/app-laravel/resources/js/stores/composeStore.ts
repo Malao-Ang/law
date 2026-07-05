@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { exportDocument, fetchReview, fetchStatus, updateComposeState } from '../api/client';
-import type { DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
+import type { DocumentBlock, DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
 
 export const useComposeStore = defineStore('compose', () => {
   const review = ref<ReviewDocument | null>(null);
@@ -60,6 +60,38 @@ export const useComposeStore = defineStore('compose', () => {
     }
   }
 
+  // Apply a merge result locally: update the anchor block returned by the API and
+  // drop the other merged-away blocks. Avoids a full refetch after merge.
+  function applyMerge(mergedBlock: DocumentBlock, removedIds: string[]): void {
+    if (!review.value) return;
+    const removeSet = new Set(removedIds);
+    for (const page of review.value.pages) {
+      for (const block of page.blocks) {
+        if (block.block_id === mergedBlock.block_id) {
+          block.approved_text = mergedBlock.approved_text;
+          block.needs_review = mergedBlock.needs_review;
+          if (block.meta && mergedBlock.meta) {
+            block.meta.reviewed_html = mergedBlock.meta.reviewed_html;
+          }
+        }
+      }
+      page.blocks = page.blocks.filter((block) => !removeSet.has(block.block_id));
+    }
+  }
+
+  // Apply a split result locally: replace the original block with the two blocks
+  // returned by the API, preserving position. Avoids a full refetch after split.
+  function applySplit(originalId: string, first: DocumentBlock, second: DocumentBlock): void {
+    if (!review.value) return;
+    for (const page of review.value.pages) {
+      const index = page.blocks.findIndex((block) => block.block_id === originalId);
+      if (index !== -1) {
+        page.blocks.splice(index, 1, first, second);
+        return;
+      }
+    }
+  }
+
   function setError(msg = ''): void {
     error.value = msg;
   }
@@ -72,5 +104,5 @@ export const useComposeStore = defineStore('compose', () => {
     exporting.value = false;
   }
 
-  return { review, loading, error, docStatus, exporting, fetch, pollStatus, triggerExport, saveComposeState, setError, reset };
+  return { review, loading, error, docStatus, exporting, fetch, pollStatus, triggerExport, saveComposeState, applyMerge, applySplit, setError, reset };
 });
