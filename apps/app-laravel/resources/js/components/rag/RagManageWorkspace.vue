@@ -150,25 +150,31 @@
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
           @close="dialog = null" @save="onRelationSaved" />
 
-        <!-- Split modal: pick lines to separate into a new block -->
+        <!-- Split modal: place cursor at split point -->
         <v-dialog v-model="splitDialogOpen" max-width="560">
           <v-card v-if="splitting" class="pa-5">
             <div class="text-body-1 font-weight-bold mb-1" style="color:#1a3673">
-              เลือกบรรทัดที่จะแยกออกเป็นบล็อกใหม่
+              แบ่งบล็อกตรงตำแหน่งเคอร์เซอร์
             </div>
             <div class="text-caption text-medium-emphasis mb-3">
-              บรรทัดที่เลือกจะถูกย้ายไปเป็นบล็อกใหม่ด้านล่าง ที่เหลือจะอยู่ในบล็อกเดิม
+              คลิกวางเคอร์เซอร์ตรงจุดที่จะตัด ข้อความก่อนเคอร์เซอร์เป็นบล็อกเดิม ส่วนที่เหลือเป็นบล็อกใหม่
             </div>
-            <div class="rag-splitlines">
-              <label v-for="(line, i) in splitLines" :key="i" class="rag-splitline">
-                <input type="checkbox" :checked="selectedLines.has(i)" @change="toggleLine(i)">
-                <span>{{ line || '(บรรทัดว่าง)' }}</span>
-              </label>
+            <textarea
+              ref="splitTextarea"
+              v-model="splitting.text"
+              class="rag-splittext"
+              rows="6"
+              @click="updateSplitPos"
+              @keyup="updateSplitPos"
+              @select="updateSplitPos"
+            ></textarea>
+            <div class="text-caption text-medium-emphasis mt-2">
+              ตัดที่ตำแหน่ง {{ splitPos }} / {{ splitting.text.length }}
             </div>
             <div class="d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
               <v-btn color="#059669" size="small"
-                :disabled="selectedLines.size === 0 || selectedLines.size === splitLines.length || blockBusy"
+                :disabled="splitPos <= 0 || splitPos >= splitting.text.length || blockBusy"
                 @click="confirmSplit">แยกออก</v-btn>
             </div>
           </v-card>
@@ -230,13 +236,8 @@ const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const blockListEl = ref<HTMLElement | null>(null);
 const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
-const selectedLines = ref<Set<number>>(new Set());
-const splitLines = computed<string[]>(() => {
-  if (!splitting.value) return [];
-  const lines = splitting.value.text.split('\n');
-  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
-  return lines;
-});
+const splitPos = ref(0);
+const splitTextarea = ref<HTMLTextAreaElement | null>(null);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
@@ -330,8 +331,8 @@ async function deleteSelected(): Promise<void> {
 
 function openSplit(block: DocumentBlock): void {
   const fullText = block.approved_text || block.normalized_text || block.raw_text || '';
-  if (fullText.split('\n').length < 2) return;
-  selectedLines.value = new Set();
+  if (!fullText) return;
+  splitPos.value = 0;
   splitting.value = {
     blockId: block.block_id,
     pageNo: blockPage.value.get(block.block_id) ?? 1,
@@ -369,22 +370,17 @@ function escapeForHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function toggleLine(i: number): void {
-  const next = new Set(selectedLines.value);
-  if (next.has(i)) next.delete(i);
-  else next.add(i);
-  selectedLines.value = next;
+function updateSplitPos(event: Event): void {
+  const el = event.target as HTMLTextAreaElement;
+  splitPos.value = el.selectionStart ?? 0;
 }
 
 async function confirmSplit(): Promise<void> {
   if (!splitting.value || blockBusy.value) return;
-  const keep: string[] = [];
-  const move: string[] = [];
-  splitLines.value.forEach((line, i) => {
-    (selectedLines.value.has(i) ? move : keep).push(line);
-  });
-  const { blockId, pageNo } = splitting.value;
-  await splitBlockInto(blockId, pageNo, keep.join('\n'), move.join('\n'));
+  const { blockId, pageNo, text } = splitting.value;
+  const pos = splitPos.value;
+  if (pos <= 0 || pos >= text.length) return;
+  await splitBlockInto(blockId, pageNo, text.slice(0, pos), text.slice(pos));
 }
 
 function toBlockHtml(text: string): string {
@@ -623,29 +619,13 @@ onBeforeUnmount(() => {
 }
 
 
-.rag-splitlines {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 340px;
-  overflow-y: auto;
-  border: 1px solid #e2e8f0;
+.rag-splittext {
+  width: 100%;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 6px;
-}
-
-.rag-splitline {
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  gap: 8px;
-  align-items: start;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  line-height: 1.6;
-}
-
-.rag-splitline:hover {
-  background: #f1f5f9;
+  padding: 10px;
+  font: inherit;
+  line-height: 1.9;
+  resize: vertical;
 }
 </style>
