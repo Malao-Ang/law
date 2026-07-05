@@ -181,10 +181,16 @@ export interface ComposeState {
 export interface LawMeta {
   status: string;
   law_type: string;
-  law_group: string;
-  agency: string;
+  law_group: string;       // kept for backward compat
+  law_groups: string[];    // multi-select ด้านกฎหมาย
+  agency: string;          // kept for backward compat
+  agencies: string[];      // multi-chip หน่วยงานที่รับผิดชอบ
   promulgation_date: string;
   effective_date: string;
+  published_date: string;
+  expiry_date: string | null;
+  section_count: number | null;
+  title: string;
   gazette_reference: string;
   royal_command: string;
   repealed_laws: string[];
