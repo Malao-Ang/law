@@ -73,6 +73,7 @@ export const useComposeStore = defineStore('compose', () => {
           block.needs_review = mergedBlock.needs_review;
           if (block.meta && mergedBlock.meta) {
             block.meta.reviewed_html = mergedBlock.meta.reviewed_html;
+            block.meta.chunk_type = mergedBlock.meta.chunk_type;
           }
         }
       }
