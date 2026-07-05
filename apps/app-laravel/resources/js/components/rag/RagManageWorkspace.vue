@@ -5,7 +5,7 @@
       <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/law-info`)">
         ย้อนกลับ
       </v-btn>
-      <v-btn color="#1a3673" :loading="composeStore.exporting" @click="handleExport">
+      <v-btn color="#1a3673" :loading="composeStore.exporting" :disabled="composeStore.exporting || blockBusy" @click="handleExport">
         บันทึกและเผยแพร่
       </v-btn>
     </template>
@@ -328,12 +328,15 @@ function openSplitFromSelection(): void {
 
 async function setChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
   if (blockBusy.value) return;
+  blockBusy.value = true;
   const pageNo = blockPage.value.get(block.block_id) ?? 1;
   try {
     await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
     await reloadBlocks();
   } catch (e) {
     documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+  } finally {
+    blockBusy.value = false;
   }
 }
 
