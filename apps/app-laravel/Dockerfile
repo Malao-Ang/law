@@ -2,9 +2,13 @@ FROM node:20-bookworm-slim AS frontend
 
 WORKDIR /var/www/html
 
-COPY .npmrc package.json package-lock.json ./
+# COPY .npmrc package.json package-lock.json ./
 
-RUN npm ci && rm -f .npmrc
+# RUN npm ci && rm -f .npmrc
+
+COPY package.json ./
+
+RUN npm install --registry=https://registry.npmjs.org/
 
 COPY resources ./resources
 COPY public ./public

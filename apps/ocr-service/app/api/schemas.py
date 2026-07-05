@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 SourceType = Literal["docx", "pdf_text", "pdf_scan"]
-ScanExtractionMode = Literal["auto", "local", "landingai"]
+ScanExtractionMode = Literal["auto", "local", "landingai", "gemini"]
 
 
 class ExtractRequest(BaseModel):
@@ -33,7 +33,7 @@ class ReprocessPageRequest(BaseModel):
     document_id: str = Field(min_length=1)
     file_path: str = Field(min_length=1)
     page_no: int = Field(ge=1)
-    scan_extraction_mode: ScanExtractionMode = "landingai"
+    scan_extraction_mode: ScanExtractionMode = "gemini"
     callback_url: str | None = None
 
 
@@ -53,6 +53,8 @@ class HealthResponse(BaseModel):
     device: str = "cpu"  # "cuda" when GPU is active, "cpu" otherwise
     ocr_gpu_concurrency: int = 1
     ocr_recognizer_batch_size: int = 1
+    gemini_configured: bool = False
+    landingai_configured: bool = False
 
 
 class BlockDraft(BaseModel):

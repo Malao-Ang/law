@@ -31,7 +31,7 @@ class DocumentPipelineClient
     }
 
     /**
-     * Reprocess a single page with the given extraction mode (defaults to landingai).
+     * Reprocess a single page with the given extraction mode (defaults to gemini).
      * Returns 202 immediately; result is posted to $callbackUrl.
      */
     public function reprocessPage(

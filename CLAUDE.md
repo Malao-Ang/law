@@ -75,6 +75,7 @@ docker-compose up -d
 docker compose exec ocr-service pytest                                                       # full suite
 docker compose exec ocr-service pytest tests/test_thai_normalizer.py -k name                # single test
 docker compose exec ocr-service pytest tests/test_landingai_parser.py                       # LandingAI adapter tests
+docker compose exec ocr-service pytest tests/test_gemini_vision_parser.py                   # Gemini vision OCR tests
 docker compose exec ocr-service pytest tests/test_semantic_indent_resolver.py               # Thai legal indent tests
 docker compose exec ocr-service python scripts/regenerate-goldens.py                        # regenerate all golden fixtures
 docker compose exec ocr-service python scripts/regenerate-goldens.py --fixture prakat_1.pdf.golden.json
@@ -132,10 +133,11 @@ npm run build        # production bundle
 
 ### Python service layout (`apps/ocr-service/app/`)
 - `api/routes.py` — `/health`, `/pipeline/extract` (async 202), `/pipeline/normalize` (sync, batch), `/pipeline/correct` (async 202), `/pipeline/reprocess-page` (async 202), `/pipeline/reprocess-block` (sync).
-- `core/config.py` — `Settings` (pydantic-settings). Tunable knobs: `THAI_REVIEW_THRESHOLD`, `bbox_overlap_threshold`, `indent_cluster_step`, `tab_gap_threshold`, `pdf_header_top_fraction`, `pdf_header_min_font_pt`, `ocr_gpu_concurrency`, `landingai_api_key`, `landingai_base_url`, `landingai_parse_model`, `landingai_timeout_seconds`, `normalize_autocorrect_min_confidence`.
+- `core/config.py` — `Settings` (pydantic-settings). Tunable knobs: `THAI_REVIEW_THRESHOLD`, `bbox_overlap_threshold`, `indent_cluster_step`, `tab_gap_threshold`, `pdf_header_top_fraction`, `pdf_header_min_font_pt`, `ocr_gpu_concurrency`, `landingai_api_key`, `landingai_base_url`, `landingai_parse_model`, `landingai_timeout_seconds`, `gemini_api_key`, `gemini_model`, `gemini_timeout_seconds`, `normalize_autocorrect_min_confidence`.
 - `services/docling_service.py` — DOCX/PDF-text extraction via docling-parse (bbox-accurate).
 - `services/ocr_pipeline.py` — EasyOCR wrapper (lazy-loaded; model warmed on startup).
-- `services/landingai_parser.py` — LandingAI ADE Parse adapter. `auto` mode tries LandingAI first; falls back to EasyOCR if `mean_confidence < 0.78` or `uncertain_ratio > 0.50`.
+- `services/landingai_parser.py` — LandingAI ADE Parse adapter for scanned PDFs.
+- `services/gemini_vision_parser.py` — Google Gemini vision OCR adapter for scanned PDFs.
 - `services/block_builder.py` — assembles 4-layer block, runs Thai normalization + spellcheck.
 - `services/layout_inferrer.py` — doc-wide x-position clustering → `indent_level` per block.
 - `services/semantic_indent_resolver.py` — post-geometry pass: มาตรา anchors level 0, ข้อ → level 1, วรรค/continuation text inherits parent.
@@ -227,7 +229,7 @@ npm run build        # production bundle
 - **`normalize_autocorrect_min_confidence`** defaults to `1.0` (effectively disabled auto-correct). Lower it via `.env` to enable automatic spelling fixes. Tunable per-deploy without code changes.
 - **Path translation is one-way**: Laravel relative paths → Python absolute paths via `DocumentPipelineClient::toSharedPath()`. Never construct these inline.
 - **Docling OCR is off** — we use docling-parse for text, EasyOCR/LandingAI for scans, and Docling TableFormer only for table structure.
-- **LandingAI scan mode**: `auto` tries LandingAI first; falls back to EasyOCR if `mean_confidence < 0.78` or `uncertain_ratio > 0.50`. `local` forces EasyOCR. `landingai` forces LandingAI with no fallback.
+- **Scan extraction modes**: `local` forces EasyOCR. `gemini` forces Google Gemini vision OCR (requires `GEMINI_API_KEY`). `landingai` forces LandingAI ADE Parse (requires `VISION_AGENT_API_KEY`). `auto` tries EasyOCR first; if quality is poor, falls back to Gemini then LandingAI when keys are configured.
 - **`SemanticIndentResolver` runs after `LayoutInferrer`** — never skip on legal PDFs.
 - **Rich HTML persistence**: blocks store both `approved_text` (plain) and `reviewed_html` (bold/italic/underline). `reviewed_html` is sanitized server-side with `strip_tags` allowlist; client-side with DOMPurify before display.
 - **`ReviewStore::reorderBlocks`** builds `$blockMap` via `foreach ($document['pages'] as &$page)` — NOT `foreach (($document['pages'] ?? []) as &$page)`. The `?? []` expression creates a temporary copy that breaks PHP reference propagation.

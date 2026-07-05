@@ -7,6 +7,15 @@
       class="upload-form__hidden-input"
       @change="onFileSelected"
     />
+    <div class="upload-form__scan-mode">
+      <label class="upload-form__label" for="scan-mode">โหมด OCR สำหรับ PDF สแกน</label>
+      <select id="scan-mode" v-model="scanExtractionMode" class="upload-form__select" :disabled="loading">
+        <option value="auto">auto — EasyOCR ก่อน แล้ว fallback cloud</option>
+        <option value="gemini">gemini — Google Gemini Vision</option>
+        <option value="landingai">landingai — LandingAI ADE Parse</option>
+        <option value="local">local — EasyOCR ในเครื่อง</option>
+      </select>
+    </div>
     <div class="upload-form__actions">
       <v-btn
         color="#1a3673"
@@ -34,6 +43,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import type { ScanExtractionMode } from '../../types/document';
 import { useUploadStore } from '../../stores/uploadStore';
 
 
@@ -45,7 +55,7 @@ const uploadStore = useUploadStore();
 
 // Hidden defaults — sent to API, not shown in UI; fast = PHP-side extraction, falls back to Python for scans
 const extractionEngine: 'standard' | 'fast' = 'fast';
-const scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto';
+const scanExtractionMode = ref<ScanExtractionMode>('gemini');
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFileName = ref<string | null>(null);
@@ -61,7 +71,7 @@ async function onFileSelected(event: Event): Promise<void> {
   try {
     const documentId = await uploadStore.upload(
       file,
-      scanExtractionMode,
+      scanExtractionMode.value,
       extractionEngine,
     );
     emit('uploaded', documentId);
@@ -82,6 +92,28 @@ function reset(): void {
 <style scoped>
 .upload-form__hidden-input {
   display: none;
+}
+
+.upload-form__scan-mode {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.upload-form__label {
+  display: block;
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.upload-form__select {
+  min-width: 280px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
 }
 
 .upload-form__actions {

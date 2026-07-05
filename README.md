@@ -392,6 +392,18 @@ AI_CORRECTION_ENABLED=true
 AI_CORRECTION_PROVIDER=mock
 AI_CORRECTION_MODEL=gpt-4.1-mini
 THAI_REVIEW_THRESHOLD=0.90
+OCR_NORMALIZE_AUTOCORRECT_MIN_CONFIDENCE=1.0
+
+# Google Gemini vision OCR (optional)
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_TIMEOUT_SECONDS=120
+
+# LandingAI ADE Parse (optional)
+VISION_AGENT_API_KEY=
+LANDINGAI_BASE_URL=https://api.va.landing.ai
+LANDINGAI_PARSE_MODEL=dpt-2-latest
+LANDINGAI_TIMEOUT_SECONDS=60
 ```
 
 > หมายเหตุ: ถ้า AI correction ยังไม่เชื่อม provider จริง ให้ใช้ `mock` ก่อน
@@ -1277,6 +1289,17 @@ Requirements:
 ```bash
 cp .env.example .env
 ```
+
+ถ้าต้องการใช้ Google Gemini สำหรับ PDF scan ให้เพิ่มค่าเหล่านี้ใน `.env`:
+
+```bash
+GEMINI_API_KEY=your_google_ai_studio_key
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_TIMEOUT_SECONDS=120
+```
+
+จากนั้น upload ด้วย `scan_extraction_mode=gemini` หรือเลือก **gemini** ในหน้า upload
+โหมด `auto` จะลอง EasyOCR ก่อน แล้ว fallback ไป Gemini (ถ้ามี key) ก่อน LandingAI
 
 ถ้าต้องการใช้ LandingAI สำหรับ PDF scan ให้เพิ่มค่าเหล่านี้ใน `.env`:
 

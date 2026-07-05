@@ -169,7 +169,7 @@ class ReviewController extends Controller
     public function reprocessPage(Request $request, string $documentId): JsonResponse
     {
         $pageNo = (int) $request->input('page_no', 0);
-        $mode = (string) $request->input('scan_extraction_mode', 'landingai');
+        $mode = (string) $request->input('scan_extraction_mode', 'gemini');
 
         if ($pageNo < 1) {
             return response()->json(['message' => 'page_no must be >= 1'], 422);
@@ -197,7 +197,7 @@ class ReviewController extends Controller
 
         $this->reviewStore->setStatus($documentId, [
             'status' => 'processing',
-            'current_step' => 'reprocess_page_landingai',
+            'current_step' => 'reprocess_page_cloud_ocr',
         ]);
 
         return response()->json([

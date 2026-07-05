@@ -11,6 +11,7 @@
   ReprocessResponse,
   ReviewDocument,
   ReviewedTable,
+  ScanExtractionMode,
   UpdateDocumentReviewResponse,
   UploadResponse,
 } from '../types/document';
@@ -46,7 +47,7 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
 
 export async function uploadDocument(
   file: File,
-  scanExtractionMode: 'auto' | 'local' | 'landingai' = 'auto',
+  scanExtractionMode: ScanExtractionMode = 'auto',
   extractionEngine: 'standard' | 'fast' = 'standard',
 ): Promise<UploadResponse> {
   const form = new FormData();
@@ -168,7 +169,7 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
 export function reprocessPageWithLandingAI(
   documentId: string,
   pageNo: number,
-  scanExtractionMode: 'landingai' | 'local' | 'auto' = 'landingai',
+  scanExtractionMode: ScanExtractionMode = 'gemini',
 ): Promise<{ document_id: string; page_no: number; status: string }> {
   return jsonRequest(`/api/documents/${documentId}/pages/${pageNo}/reprocess`, {
     method: 'POST',
