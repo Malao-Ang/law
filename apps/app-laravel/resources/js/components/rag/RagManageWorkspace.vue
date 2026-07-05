@@ -151,35 +151,6 @@
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
           @close="dialog = null" @save="onRelationSaved" />
 
-        <!-- Split modal: place cursor at split point -->
-        <v-dialog v-model="splitDialogOpen" max-width="560">
-          <v-card v-if="splitting" class="pa-5">
-            <div class="text-body-1 font-weight-bold mb-1" style="color:#1a3673">
-              แบ่งบล็อกตรงตำแหน่งเคอร์เซอร์
-            </div>
-            <div class="text-caption text-medium-emphasis mb-3">
-              คลิกวางเคอร์เซอร์ตรงจุดที่จะตัด ข้อความก่อนเคอร์เซอร์เป็นบล็อกเดิม ส่วนที่เหลือเป็นบล็อกใหม่
-            </div>
-            <textarea
-              ref="splitTextarea"
-              v-model="splitting.text"
-              class="rag-splittext"
-              rows="6"
-              @click="updateSplitPos"
-              @keyup="updateSplitPos"
-              @select="updateSplitPos"
-            ></textarea>
-            <div class="text-caption text-medium-emphasis mt-2">
-              ตัดที่ตำแหน่ง {{ splitPos }} / {{ splitting.text.length }}
-            </div>
-            <div class="d-flex justify-end ga-2 mt-4">
-              <v-btn variant="text" size="small" @click="splitting = null">ยกเลิก</v-btn>
-              <v-btn color="#059669" size="small"
-                :disabled="splitPos <= 0 || splitPos >= splitting.text.length || blockBusy"
-                @click="confirmSplit">แยกออก</v-btn>
-            </div>
-          </v-card>
-        </v-dialog>
       </div>
     </template>
   </AppShell>
@@ -236,17 +207,7 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const blockListEl = ref<HTMLElement | null>(null);
-const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
-const splitPos = ref(0);
-const splitTextarea = ref<HTMLTextAreaElement | null>(null);
-
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
-
-const splitDialogOpen = computed({
-  get: () => splitting.value !== null,
-  set: (v) => { if (!v) splitting.value = null; },
-});
-
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -370,18 +331,6 @@ async function deleteSelected(): Promise<void> {
 }
 
 
-function openSplit(block: DocumentBlock): void {
-  const fullText = block.approved_text || block.normalized_text || block.raw_text || '';
-  if (!fullText) return;
-  splitPos.value = 0;
-  splitting.value = {
-    blockId: block.block_id,
-    pageNo: blockPage.value.get(block.block_id) ?? 1,
-    text: fullText,
-  };
-  void nextTick(() => splitTextarea.value?.focus());
-}
-
 function splitFromSelection(): void {
   const [blockId] = [...selectedBlockIds.value];
   if (!blockId) return;
@@ -411,44 +360,6 @@ function escapeForHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
-
-function updateSplitPos(event: Event): void {
-  const el = event.target as HTMLTextAreaElement;
-  splitPos.value = el.selectionStart ?? 0;
-}
-
-async function confirmSplit(): Promise<void> {
-  if (!splitting.value || blockBusy.value) return;
-  const { blockId, pageNo, text } = splitting.value;
-  const pos = splitPos.value;
-  if (pos <= 0 || pos >= text.length) return;
-  await splitBlockInto(blockId, pageNo, text.slice(0, pos), text.slice(pos));
-}
-
-function toBlockHtml(text: string): string {
-  return `<p>${escapeForHtml(text).replaceAll('\n', '<br>')}</p>`;
-}
-
-async function splitBlockInto(blockId: string, pageNo: number, before: string, after: string): Promise<void> {
-  blockBusy.value = true;
-  try {
-    const { first, second } = await blockStore.split(props.documentId, blockId, {
-      page_no: pageNo,
-      before_text: before,
-      before_html: toBlockHtml(before),
-      after_text: after,
-      after_html: toBlockHtml(after),
-    });
-    composeStore.applySplit(blockId, first, second);
-    splitting.value = null;
-    snackbar.success('แบ่งบล็อกแล้ว');
-  } catch (e) {
-    snackbar.error(e instanceof Error ? e.message : 'แบ่งบล็อกไม่สำเร็จ');
-  } finally {
-    blockBusy.value = false;
-  }
-}
-
 
 async function handleExport(): Promise<void> {
   if (blockBusy.value) return;
@@ -678,13 +589,4 @@ onBeforeUnmount(() => {
 }
 
 
-.rag-splittext {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 10px;
-  font: inherit;
-  line-height: 1.9;
-  resize: vertical;
-}
 </style>
