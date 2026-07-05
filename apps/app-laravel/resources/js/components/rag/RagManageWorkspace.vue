@@ -43,7 +43,7 @@
           <v-btn size="small" :disabled="selectedBlockIds.size !== 1 || blockBusy"
             prepend-icon="mdi-call-split"
             style="background:rgba(5,150,105,0.85);color:#fff"
-            @click="openSplitFromSelection">แบ่ง</v-btn>
+            @click="splitFromSelection">แบ่ง</v-btn>
           <v-btn size="small" :disabled="blockBusy"
             style="background:rgba(255,255,255,0.14);color:#fff"
             @click="clearSelection">ยกเลิกการเลือก</v-btn>
@@ -332,6 +332,11 @@ async function mergeSelected(): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
+  // Already a section head — nothing to promote.
+  if (block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type)) {
+    snackbar.success('บล็อกนี้เป็น section head อยู่แล้ว');
+    return;
+  }
   blockBusy.value = true;
   try {
     const headType = headTypeFor(block);
@@ -377,7 +382,7 @@ function openSplit(block: DocumentBlock): void {
   void nextTick(() => splitTextarea.value?.focus());
 }
 
-function openSplitFromSelection(): void {
+function splitFromSelection(): void {
   const [blockId] = [...selectedBlockIds.value];
   if (!blockId) return;
   const block = allBlocks.value.find((b) => b.block_id === blockId);
