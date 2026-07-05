@@ -299,6 +299,13 @@ async function reloadBlocks(): Promise<void> {
 async function mergeSelected(): Promise<void> {
   const ids = [...selectedBlockIds.value];
   if (ids.length < 2 || blockBusy.value) return;
+  // Image/table blocks render as a single medium (BlockFlow ignores their text),
+  // so merging them into one block silently drops content. Reject instead.
+  const selected = allBlocks.value.filter((b) => selectedBlockIds.value.has(b.block_id));
+  if (selected.some((b) => b.type === 'image' || b.type === 'table')) {
+    snackbar.error('รวมบล็อกรูปภาพหรือตารางไม่ได้ กรุณาเอาบล็อกเหล่านั้นออกจากการเลือก');
+    return;
+  }
   blockBusy.value = true;
   try {
     const { block } = await blockStore.merge(props.documentId, ids);
