@@ -4,7 +4,7 @@
       <v-btn
         variant="text"
         prepend-icon="mdi-arrow-left"
-        :to="`/documents/${documentId}/compose`"
+        :to="`/documents/${documentId}/review`"
       >กลับแก้ไข</v-btn>
       <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
       <v-spacer />

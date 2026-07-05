@@ -414,6 +414,9 @@ The project is optimized for fast development with:
 # Start all services with hot reload
 docker-compose up -d
 
+# Or use the dedicated compose script for the frontend dev stack
+./scripts/compose-dev.sh
+
 # Frontend: http://localhost:5173 (auto-reloads on file changes)
 # Backend: http://localhost:8000
 # OCR Service: http://localhost:8010
@@ -1287,7 +1290,7 @@ LANDINGAI_PARSE_MODEL=dpt-2-latest
 LANDINGAI_TIMEOUT_SECONDS=60
 ```
 
-ถ้ายังไม่มี dependency ของ Vite ในเครื่อง host ให้ติดตั้งก่อน เพราะ service `laravel-vite` mount โค้ดจาก host และตรวจ `node_modules/.bin/vite`:
+ถ้ายังไม่มี dependency ของ Vite ในเครื่อง host ให้ติดตั้งก่อน เพราะ service `laravel-vite` mount โค้ดจาก host และจะหยุดทันทีถ้า `node_modules/.bin/vite` ไม่พบ:
 
 ```bash
 cd apps/app-laravel

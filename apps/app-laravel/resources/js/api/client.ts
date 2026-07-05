@@ -60,6 +60,10 @@ export async function uploadDocument(
   });
 }
 
+export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {
+  return jsonRequest<{ documents: DocumentListItem[] }>('/api/documents');
+}
+
 export function fetchStatus(documentId: string): Promise<DocumentStatus> {
   return jsonRequest<DocumentStatus>(`/api/documents/${documentId}`);
 }

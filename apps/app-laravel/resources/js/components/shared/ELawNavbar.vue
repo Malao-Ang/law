@@ -8,7 +8,15 @@
       </div>
 
       <div class="d-flex ga-1 flex-grow-1">
-        <v-btn v-for="link in navLinks" :key="link.label" variant="text" size="small">
+        <v-btn
+          v-for="link in navLinks"
+          :key="link.label"
+          variant="text"
+          size="small"
+          :to="link.to"
+          :active="isActive(link)"
+          :color="isActive(link) ? 'elaw-gold' : undefined"
+        >
           {{ link.label }}
         </v-btn>
       </div>
@@ -21,12 +29,34 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+
 defineEmits<{ 'go-admin': [] }>();
 
+interface NavLink {
+  label: string;
+  to: string;
+  activePath: string;
+  hash?: string;
+}
+
+const route = useRoute();
+
 const navLinks = [
-  { label: 'หน้าแรก' },
-  { label: 'เกี่ยวกับระบบ' },
-  { label: 'ฐานข้อมูลกฎหมาย' },
-  { label: 'ความรู้ทางกฎหมาย' },
-];
+  { label: 'หน้าแรก', to: '/', activePath: '/' },
+  { label: 'เกี่ยวกับระบบ', to: '/#about', activePath: '/', hash: '#about' },
+  { label: 'ฐานข้อมูลกฎหมาย', to: '/database', activePath: '/database' },
+  { label: 'ความรู้ทางกฎหมาย', to: '/#knowledge', activePath: '/', hash: '#knowledge' },
+] satisfies NavLink[];
+
+const activeRoutePath = computed(() => route.path);
+
+function isActive(link: NavLink): boolean {
+  if (link.hash) {
+    return activeRoutePath.value === link.activePath && route.hash === link.hash;
+  }
+
+  return activeRoutePath.value === link.activePath;
+}
 </script>
