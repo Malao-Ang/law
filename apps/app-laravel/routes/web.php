@@ -18,4 +18,5 @@ Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za
 Route::view('/documents/{documentId}/compose', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/preview', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/rag', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/documents/{documentId}/law-info', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/law/{documentId}', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
