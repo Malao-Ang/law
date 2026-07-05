@@ -116,7 +116,7 @@
         </v-expansion-panels>
 
         <!-- Section list (e-Law style) -->
-        <div class="rag-block-list">
+        <div ref="blockListEl" class="rag-block-list">
           <div v-for="section in sections" :key="section.id" class="rag-sec">
             <div class="rag-sec__head">
               <div class="rag-sec__actions">
@@ -246,7 +246,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
@@ -289,6 +289,7 @@ const allBlocks = computed<DocumentBlock[]>(() =>
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
+const blockListEl = ref<HTMLElement | null>(null);
 const splitting = ref<{ blockId: string; pageNo: number; text: string } | null>(null);
 
 const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
@@ -336,11 +337,15 @@ function clearSelection(): void {
 }
 
 async function reloadBlocks(): Promise<void> {
+  // ponytail: Vuetify overlay focus-restore scrolls the list after DOM replace; pin scrollTop
+  const scrollTop = blockListEl.value?.scrollTop ?? 0;
   await Promise.all([
     composeStore.fetch(props.documentId),
     documentStore.fetch(props.documentId),
   ]);
   clearSelection();
+  await nextTick();
+  if (blockListEl.value) blockListEl.value.scrollTop = scrollTop;
 }
 
 async function mergeSelected(): Promise<void> {
