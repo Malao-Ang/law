@@ -119,6 +119,18 @@
             <span class="text-subtitle-1 font-weight-bold">โครงสร้างเอกสาร</span>
           </div>
           <v-row dense>
+            <v-col cols="12" sm="8">
+              <v-select
+                v-model="form.parent_document_id"
+                :items="parentLawItems"
+                item-title="title"
+                item-value="document_id"
+                label="กฎหมายแม่ (ไม่บังคับ)"
+                placeholder="- ไม่มี / เป็นกฎหมายหลัก -"
+                clearable
+                prepend-inner-icon="mdi-file-tree"
+              />
+            </v-col>
             <v-col cols="12" sm="4">
               <v-text-field
                 v-model.number="form.section_count"
@@ -199,11 +211,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
-import { exportDocument } from '../../api/client';
-import type { LawMeta } from '../../types/document';
+import { exportDocument, listDocuments } from '../../api/client';
+import type { DocumentListItem, LawMeta } from '../../types/document';
+import { isPickableDocument } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const props = defineProps<{ documentId: string }>();
@@ -231,13 +244,20 @@ const EMPTY: LawMeta = {
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [],
-  imported_by: '',
+  imported_by: '', parent_document_id: null,
 };
 
 const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_laws: [] });
 const noExpiry = ref(false);
 const agencyInput = ref('');
 const exporting = ref(false);
+const catalogDocs = ref<DocumentListItem[]>([]);
+
+const parentLawItems = computed(() =>
+  catalogDocs.value.filter(
+    (doc) => doc.document_id !== props.documentId && isPickableDocument(doc),
+  ),
+);
 
 watch(() => documentStore.review, (review) => {
   const meta = review?.law_meta;
@@ -249,6 +269,7 @@ watch(() => documentStore.review, (review) => {
     repealed_laws: [...(meta?.repealed_laws ?? [])],
     title: meta?.title || review?.source_file || '',
     expiry_date: meta?.expiry_date ?? null,
+    parent_document_id: meta?.parent_document_id ?? null,
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });
@@ -275,6 +296,14 @@ async function saveAndExport(): Promise<void> {
   }
 }
 
-onMounted(() => documentStore.fetch(props.documentId));
+onMounted(async () => {
+  await documentStore.fetch(props.documentId);
+  try {
+    const res = await listDocuments();
+    catalogDocs.value = res.documents;
+  } catch {
+    catalogDocs.value = [];
+  }
+});
 onBeforeUnmount(() => documentStore.reset());
 </script>

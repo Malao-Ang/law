@@ -195,6 +195,7 @@ export interface LawMeta {
   royal_command: string;
   repealed_laws: string[];
   imported_by: string;
+  parent_document_id: string | null;
 }
 
 export type RelationType = 'related' | 'repeals';
@@ -217,6 +218,20 @@ export interface DocumentListItem {
   title: string;
   status: string;
   updated_at?: string | null;
+  parent_document_id?: string | null;
+}
+
+export interface LawCatalogSection {
+  block_id: string;
+  badge: string;
+  preview: string;
+}
+
+export interface LawRelationTarget {
+  document_id: string;
+  title: string;
+  section: string | null;
+  block_id: string | null;
 }
 
 export interface ReviewDocument {

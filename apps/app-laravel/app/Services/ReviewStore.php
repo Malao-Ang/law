@@ -103,11 +103,29 @@ class ReviewStore
         foreach (glob($dir.'/*.json') ?: [] as $file) {
             $status = $this->readJson($file);
             $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
+            $title = (string) ($status['source_file'] ?? $documentId);
+            $parentDocumentId = null;
+
+            $reviewPath = $this->intermediatePath($documentId);
+            if (is_file($reviewPath)) {
+                $review = $this->readJson($reviewPath);
+                $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+                $metaTitle = trim((string) ($meta['title'] ?? ''));
+                if ($metaTitle !== '') {
+                    $title = $metaTitle;
+                }
+                $parentRaw = trim((string) ($meta['parent_document_id'] ?? ''));
+                if ($parentRaw !== '') {
+                    $parentDocumentId = $parentRaw;
+                }
+            }
+
             $documents[] = [
                 'document_id' => $documentId,
-                'title' => (string) ($status['source_file'] ?? $documentId),
+                'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
+                'parent_document_id' => $parentDocumentId,
             ];
         }
 
@@ -1173,6 +1191,8 @@ class ReviewStore
             }
         }
 
+        $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+
         $document['law_meta'] = array_merge([
             'status' => '',
             'law_type' => '',
@@ -1182,8 +1202,10 @@ class ReviewStore
             'effective_date' => '',
             'gazette_reference' => '',
             'royal_command' => '',
+            'parent_document_id' => null,
         ], $meta, [
             'repealed_laws' => $repealed,
+            'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
         ]);
     }
 

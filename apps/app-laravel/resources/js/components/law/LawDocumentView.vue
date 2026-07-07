@@ -149,12 +149,20 @@ const EMPTY_META: LawMeta = {
   status: '',
   law_type: '',
   law_group: '',
+  law_groups: [],
   agency: '',
+  agencies: [],
   promulgation_date: '',
   effective_date: '',
+  published_date: '',
+  expiry_date: null,
+  section_count: null,
+  title: '',
   gazette_reference: '',
   royal_command: '',
   repealed_laws: [],
+  imported_by: '',
+  parent_document_id: null,
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
