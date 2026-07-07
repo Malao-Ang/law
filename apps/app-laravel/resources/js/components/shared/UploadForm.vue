@@ -65,10 +65,9 @@ const fileExt = computed(() => pendingFile.value?.name.split('.').pop()?.toLower
 
 const isPdf = computed(() => fileExt.value === 'pdf');
 
-// extraction_engine: fast for local (PHP path) and PDF (fast tries, falls back for scans)
-// standard when user picks a cloud/auto mode on docx/doc (routes to Python Docling)
+// PDF + explicit OCR mode must use the Python pipeline (Gemini / LandingAI / EasyOCR).
 const extractionEngine = computed((): 'fast' | 'standard' => {
-  if (isPdf.value) return 'fast';
+  if (isPdf.value && scanMode.value !== 'auto') return 'standard';
   return scanMode.value === 'local' ? 'fast' : 'standard';
 });
 

@@ -131,3 +131,51 @@ def test_gemini_mode_falls_back_to_local_on_api_error(tmp_path: Path) -> None:
     assert pages[0]["blocks"][0]["raw_text"] == "ocr fallback"
     assert landingai_meta is None
     assert gemini_meta is None
+
+
+def test_should_force_gemini_scan_for_pdf_text_and_mixed() -> None:
+    from app.api.routes import _should_force_gemini_scan
+
+    assert _should_force_gemini_scan("pdf_text", "gemini") is True
+    assert _should_force_gemini_scan("mixed", "gemini") is True
+    assert _should_force_gemini_scan("pdf_scan", "gemini") is False
+    assert _should_force_gemini_scan("pdf_text", "auto") is False
+    assert _should_force_gemini_scan("pdf_text", "local") is False
+
+
+def test_pdf_text_with_gemini_mode_uses_scan_pipeline(tmp_path: Path) -> None:
+    from app.api.routes import _run_extraction
+    from app.api.schemas import ExtractRequest
+
+    pdf_path = _make_pdf(tmp_path)
+    payload = ExtractRequest(
+        document_id="doc-force-gemini",
+        file_path=str(pdf_path),
+        enable_ai_correction=False,
+        callback_url=None,
+        scan_extraction_mode="gemini",
+    )
+
+    scan_pages = [{"page_no": 1, "blocks": [{"type": "paragraph", "raw_text": "จาก gemini", "confidence": 0.9, "flags": ["gemini_ocr"]}]}]
+    gemini_meta = {"source": "gemini", "model": "gemini-2.0-flash", "page_count": 1}
+
+    with patch("app.api.routes.detect_file_type") as mock_detect, \
+         patch("app.api.routes._extract_scan_pages") as mock_scan, \
+         patch("app.api.routes.DoclingService") as mock_docling_cls, \
+         patch("app.api.routes.build_document_output") as mock_build, \
+         patch("app.api.routes.get_settings") as mock_settings:
+
+        mock_detect.return_value = {"mode": "pdf_text", "pages": {"text": [0], "scan": []}}
+        mock_scan.return_value = (scan_pages, "gemini", None, gemini_meta)
+        mock_build.return_value = {
+            "document_id": payload.document_id,
+            "pages": [],
+            "extraction": {},
+        }
+        mock_settings.return_value.data_root = tmp_path
+        mock_settings.return_value.thai_review_threshold = 0.9
+
+        _run_extraction(payload)
+
+    mock_scan.assert_called_once()
+    mock_docling_cls.return_value.extract.assert_not_called()
