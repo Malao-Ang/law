@@ -5,29 +5,35 @@
     subtitle="จัดการกฎหมายทั้งหมด ค้นหา แก้ไข ความสัมพันธ์ และเวอร์ชัน"
   >
     <template #actions>
-      <v-btn color="admin-navy" prepend-icon="mdi-plus" to="/admin/upload">
+      <v-btn color="admin-primary" prepend-icon="mdi-plus" to="/admin/upload">
         + เพิ่มกฎหมายใหม่
       </v-btn>
     </template>
 
     <v-row class="mb-5">
-      <v-col v-for="stat in typeStats" :key="stat.label" cols="6" sm="3">
+      <v-col v-for="stat in typeStats" :key="stat.value" cols="6" sm="3">
         <v-card
           flat
-          border
           rounded="lg"
-          class="pa-3 cursor-pointer"
-          :class="{ 'border-primary': activeType === stat.value }"
-          @click="activeType = stat.value"
+          class="type-tab pa-4"
+          :class="{ 'type-tab--active': filterType === stat.value }"
+          :style="{ '--accent': `var(--v-theme-${stat.color})` }"
+          role="button"
+          @click="toggleType(stat.value)"
         >
-          <div class="d-flex align-center ga-2 mb-1">
-            <v-chip size="x-small" :color="stat.color" rounded="pill">{{ stat.label }}</v-chip>
-            <v-chip size="x-small" color="success" variant="tonal" rounded="pill">
-              +{{ stat.delta }} เดือนนี้
-            </v-chip>
+          <div class="d-flex align-center justify-space-between mb-3">
+            <div class="d-flex align-center ga-2">
+              <v-avatar size="32" rounded="lg" class="type-tab__icon">
+                <v-icon :icon="stat.icon" size="18" />
+              </v-avatar>
+              <span class="text-body-2 font-weight-bold type-tab__label">{{ stat.label }}</span>
+            </div>
+            <span class="text-caption text-success font-weight-medium">+{{ stat.delta }} เดือนนี้</span>
           </div>
-          <p class="text-h6 font-weight-black mb-0">{{ stat.count }}</p>
-          <p class="text-caption text-medium-emphasis">ฉบับ</p>
+          <div class="d-flex align-end ga-1">
+            <span class="text-h5 font-weight-black">{{ stat.count.toLocaleString('th-TH') }}</span>
+            <span class="text-caption text-medium-emphasis mb-1">ฉบับ</span>
+          </div>
         </v-card>
       </v-col>
     </v-row>
@@ -93,7 +99,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(law, idx) in laws" :key="law.id">
+          <tr v-if="filteredLaws.length === 0">
+            <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
+          </tr>
+          <tr v-for="(law, idx) in filteredLaws" :key="law.id">
             <td class="text-caption text-medium-emphasis">{{ idx + 1 }}</td>
             <td class="py-3" style="max-width: 400px">
               <div class="d-flex align-center ga-2 flex-wrap mb-1">
@@ -143,7 +152,7 @@
 
       <v-divider />
       <div class="d-flex justify-space-between align-center pa-3">
-        <span class="text-caption text-medium-emphasis">กำลังแสดงผล 1 - 4 จากทั้งหมด 12,402 รายการ</span>
+        <span class="text-caption text-medium-emphasis">กำลังแสดงผล {{ filteredLaws.length }} จากทั้งหมด 12,402 รายการ</span>
         <v-pagination v-model="page" :length="45" :total-visible="5" rounded="circle" density="compact" />
       </div>
     </v-card>
@@ -151,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const search = ref('');
@@ -159,14 +168,34 @@ const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const sortOrder = ref('newest');
 const page = ref(1);
-const activeType = ref('all');
 
 const typeStats = [
-  { label: 'พระราชบัญญัติ', value: 'phrb', count: 124, delta: 4, color: 'deep-purple' },
-  { label: 'ข้อบังคับ', value: 'kho-bangkhab', count: 356, delta: 12, color: 'info' },
-  { label: 'ระเบียบ', value: 'rabiap', count: 742, delta: 8, color: 'success' },
-  { label: 'ประกาศ', value: 'prakat', count: 1218, delta: 24, color: 'warning' },
+  { label: 'พระราชบัญญัติ', value: 'phrb', count: 124, delta: 4, color: 'doc-phrb', icon: 'mdi-bank-outline' },
+  { label: 'ข้อบังคับ', value: 'kho-bangkhab', count: 356, delta: 12, color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
+  { label: 'ระเบียบ', value: 'rabiap', count: 742, delta: 8, color: 'doc-rabiap', icon: 'mdi-folder-outline' },
+  { label: 'ประกาศ', value: 'prakat', count: 1218, delta: 24, color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 ];
+
+// Cards double as type filter tabs; clicking the active one clears the filter.
+const typeLabelByValue: Record<string, string> = {
+  phrb: 'พระราชบัญญัติ',
+  'kho-bangkhab': 'ข้อบังคับ',
+  rabiap: 'ระเบียบ',
+  prakat: 'ประกาศ',
+};
+
+function toggleType(value: string): void {
+  filterType.value = filterType.value === value ? null : value;
+}
+
+const filteredLaws = computed(() =>
+  laws.filter((law) => {
+    if (filterType.value && law.lawType !== typeLabelByValue[filterType.value]) return false;
+    if (filterStatus.value === 'active' && law.status !== 'มีผลบังคับใช้') return false;
+    if (search.value && !law.title.toLowerCase().includes(search.value.toLowerCase())) return false;
+    return true;
+  }),
+);
 
 const typeOptions = [
   { label: 'ทุกประเภท', value: null },
@@ -254,10 +283,10 @@ const laws = [
 
 function typeColor(type: string): string {
   return ({
-    พระราชบัญญัติ: 'deep-purple',
-    ระเบียบ: 'success',
-    ข้อบังคับ: 'info',
-    ประกาศ: 'warning',
+    พระราชบัญญัติ: 'doc-phrb',
+    ระเบียบ: 'doc-rabiap',
+    ข้อบังคับ: 'doc-kho-bangkhab',
+    ประกาศ: 'doc-prakat',
   } as Record<string, string>)[type] ?? 'grey';
 }
 
@@ -269,3 +298,32 @@ function statusColor(status: string): string {
   } as Record<string, string>)[status] ?? 'grey';
 }
 </script>
+
+<style scoped>
+/* Each card is a filter tab tinted by its document-type color (--accent = doc-* rgb triplet). */
+.type-tab {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 3px solid rgb(var(--accent));
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.type-tab:hover {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+}
+
+.type-tab--active {
+  background: rgba(var(--accent), 0.06);
+  border: 1px solid rgb(var(--accent));
+  border-top: 3px solid rgb(var(--accent));
+}
+
+.type-tab__icon {
+  background: rgba(var(--accent), 0.14);
+  color: rgb(var(--accent));
+}
+
+.type-tab__label {
+  color: rgb(var(--accent));
+}
+</style>
