@@ -39,7 +39,7 @@ export const METRIC_CARDS: MetricCard[] = [
   { label: 'จุดเสี่ยง: ขาดกฎหมายลูก', value: '84', footnote: '* มาตราที่สั่งให้ออกกฎหมายลูก แต่ยังไม่มีในระบบ', accent: 'error' },
   { label: 'รอปรับปรุง (LEGACY LINK)', value: '216', footnote: '* กฎหมายลูกที่อ้างอิง พ.ร.บ. ฉบับที่ยกเลิกแล้ว', accent: 'warning' },
   { label: 'คิวประมวลผล OCR', value: '12', footnote: '* จำนวนไฟล์ PDF ที่รอยืนยันความถูกต้อง', accent: 'primary' },
-  { label: 'ความสัมพันธ์ที่บันทึกแล้ว', value: '12,402', footnote: 'เส้นเชื่อมโยง (Linkage)', accent: 'elaw-gold', filled: true },
+  { label: 'ความสัมพันธ์ที่บันทึกแล้ว', value: '12,402', footnote: 'เส้นเชื่อมโยง (Linkage)', accent: 'primary' },
 ];
 
 export const COMPLETENESS_ROWS: CompletenessRow[] = [
