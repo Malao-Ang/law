@@ -114,6 +114,7 @@ const defaultNavGroups: NavGroup[] = [
     label: 'เมนูหลัก',
     items: [
       { label: 'หน้าแรก', icon: 'mdi-home-outline', to: '/admin' },
+      { label: 'รายงาน', icon: 'mdi-chart-box-outline', to: '/admin/reports' },
       { label: 'หน้าเว็บผู้ใช้', icon: 'mdi-open-in-new', to: '/', exact: true },
       { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline' },
     ],
