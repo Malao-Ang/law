@@ -9,6 +9,8 @@
   LawRelation,
   PreviewData,
   ReprocessResponse,
+  ReportFilters,
+  ReportSummary,
   ReviewDocument,
   ReviewedTable,
   ScanExtractionMode,
@@ -264,4 +266,17 @@ export function createBlock(
 
 export function listDocuments(): Promise<{ documents: DocumentListItem[] }> {
   return jsonRequest('/api/documents');
+}
+
+export function fetchReportSummary(filters: ReportFilters = {}): Promise<ReportSummary> {
+  const params = new URLSearchParams();
+  if (filters.date_from) params.set('date_from', filters.date_from);
+  if (filters.date_to) params.set('date_to', filters.date_to);
+  if (filters.type) params.set('type', filters.type);
+  if (filters.status) params.set('status', filters.status);
+  for (const g of filters.group ?? []) params.append('group[]', g);
+  for (const a of filters.agency ?? []) params.append('agency[]', a);
+
+  const qs = params.toString();
+  return jsonRequest<ReportSummary>(`/api/reports/summary${qs ? `?${qs}` : ''}`);
 }

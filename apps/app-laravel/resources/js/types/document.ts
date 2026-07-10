@@ -337,3 +337,37 @@ export interface PreviewData {
   html_mode: 'generated' | 'manual';
   source_file?: string | null;
 }
+
+export interface ReportBucket {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface ReportDocument {
+  id: string;
+  title: string;
+  type: string;
+  group: string;
+  agency: string;
+  status: string;
+  date: string | null;
+}
+
+export interface ReportSummary {
+  totals: { all: number; published: number; processing: number; failed: number; esign: number };
+  by_type: ReportBucket[];
+  by_group: ReportBucket[];
+  by_agency: ReportBucket[];
+  by_year: ReportBucket[];
+  documents: ReportDocument[];
+}
+
+export interface ReportFilters {
+  date_from?: string;
+  date_to?: string;
+  type?: string;
+  status?: string;
+  group?: string[];
+  agency?: string[];
+}
