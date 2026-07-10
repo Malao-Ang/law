@@ -79,12 +79,6 @@
                   />
                 </v-list>
               </v-menu>
-              <div class="rag-sec__actions">
-                <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
-                  @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
-                <v-btn size="x-small" variant="outlined" color="error" prepend-icon="mdi-cancel"
-                  @click="openRelationDialog('section', section.id, 'repeals')">ยกเลิกมาตรา</v-btn>
-              </div>
             </div>
             <div class="rag-sec__flow">
               <div
@@ -148,10 +142,6 @@
           </div>
         </div>
 
-        <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
-          :exclude-document-id="props.documentId"
-          @close="dialog = null" @save="onRelationSaved" />
-
       </div>
     </template>
   </AppShell>
@@ -164,10 +154,9 @@ import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
-import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
+import type { DocumentBlock, LawRelation } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
-import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
@@ -208,7 +197,6 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const blockListEl = ref<HTMLElement | null>(null);
-const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -217,15 +205,6 @@ const blockPage = computed<Map<string, number>>(() => {
   });
   return map;
 });
-
-function openRelationDialog(scope: RelationScope, blockId: string | null, type: RelationType): void {
-  dialog.value = { scope, blockId, type };
-}
-
-async function onRelationSaved(relation: LawRelation): Promise<void> {
-  dialog.value = null;
-  await documentStore.saveRelations([...relations.value, relation]);
-}
 
 async function removeRelation(id: string): Promise<void> {
   await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
@@ -479,12 +458,6 @@ onBeforeUnmount(() => {
   gap: 10px;
   margin-bottom: 8px;
   flex-wrap: wrap;
-}
-
-.rag-sec__actions {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
 }
 
 .rag-sec__typechip {
