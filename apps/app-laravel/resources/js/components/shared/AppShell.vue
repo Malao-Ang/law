@@ -42,12 +42,18 @@
     </v-list>
 
     <template #append>
-      <v-list-item
-        prepend-icon="mdi-account-circle-outline"
-        title="ผู้ดูแลระบบ (Admin)"
-        subtitle="สายจัดการข้อมูล"
-        class="ma-2"
-      />
+      <v-list-item class="ma-2" rounded="lg">
+        <template #prepend>
+          <v-badge dot color="success" location="bottom end" offset-x="2" offset-y="2">
+            <v-avatar color="secondary" size="40"><span class="text-caption font-weight-bold">AD</span></v-avatar>
+          </v-badge>
+        </template>
+        <v-list-item-title class="text-body-2 font-weight-bold">ผู้ดูแลระบบ (Admin)</v-list-item-title>
+        <v-list-item-subtitle class="text-caption">ลงชื่อออก</v-list-item-subtitle>
+        <template #append>
+          <v-btn icon="mdi-logout" variant="text" size="small" />
+        </template>
+      </v-list-item>
     </template>
   </v-navigation-drawer>
 
@@ -73,12 +79,15 @@
               class="app-shell__breadcrumbs pa-0"
             />
           </div>
-          <h1 class="text-h5 font-weight-black mb-1">{{ title }}</h1>
+          <h1 v-if="title" class="text-h5 font-weight-black mb-1">{{ title }}</h1>
           <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
         </div>
 
-        <div v-if="$slots.actions" class="app-shell__page-actions">
+        <div class="app-shell__page-actions">
           <slot name="actions" />
+          <v-badge color="error" content="3" offset-x="4" offset-y="4">
+            <v-btn icon="mdi-bell-outline" variant="text" size="small" />
+          </v-badge>
         </div>
       </div>
 
@@ -114,21 +123,19 @@ const defaultNavGroups: NavGroup[] = [
     label: 'เมนูหลัก',
     items: [
       { label: 'หน้าแรก', icon: 'mdi-home-outline', to: '/admin' },
-      { label: 'รายงาน', icon: 'mdi-chart-box-outline', to: '/admin/reports' },
-      { label: 'หน้าเว็บผู้ใช้', icon: 'mdi-open-in-new', to: '/', exact: true },
-      { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline' },
+      { label: 'จัดการตัวบทกฎหมาย', icon: 'mdi-file-document-multiple-outline', to: '/admin/laws' },
     ],
   },
   {
     label: 'การจัดการข้อมูล',
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
-      { label: 'การจัดการเอกสารเก่า', icon: 'mdi-archive-outline' },
+      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline' },
       { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline' },
     ],
   },
   {
-    label: 'พื้นที่งาน',
+    label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
       { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
