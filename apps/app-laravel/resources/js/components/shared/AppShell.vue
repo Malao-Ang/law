@@ -97,8 +97,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+
+// Rail state persists across page changes (AppShell remounts per page) and reloads.
+const RAIL_KEY = 'lawspace.nav.rail';
 
 interface NavItem { label: string; icon: string; to?: string; exact?: boolean; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -117,7 +120,8 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const drawer = ref(true);
-const rail = ref(false);
+const rail = ref(localStorage.getItem(RAIL_KEY) === '1');
+watch(rail, (v) => localStorage.setItem(RAIL_KEY, v ? '1' : '0'));
 const showTopNavigation = computed(() => props.showTopBar === true && props.hideTopBar !== true);
 
 const defaultNavGroups: NavGroup[] = [
