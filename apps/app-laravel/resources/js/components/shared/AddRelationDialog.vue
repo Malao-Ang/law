@@ -1,10 +1,11 @@
 <template>
   <v-dialog
     :model-value="true"
-    max-width="480"
+    max-width="960"
+    scrollable
     @update:model-value="(val) => { if (!val) $emit('close') }"
   >
-    <v-card>
+    <v-card class="add-relation-dialog">
       <v-card-title class="d-flex align-center justify-space-between pr-2">
         {{ defaultType === 'repeals' ? 'ยกเลิกมาตรา / กฎหมาย' : 'เพิ่มความสัมพันธ์' }}
         <v-btn icon variant="text" @click="$emit('close')">
@@ -36,10 +37,10 @@
           <div class="d-flex gap-2">
             <v-btn
               size="small"
-              :color="mode === 'doc' ? 'primary' : ''"
-              :variant="mode === 'doc' ? 'flat' : 'outlined'"
-              @click="mode = 'doc'"
-            >เลือกจากเอกสาร</v-btn>
+              :color="mode === 'picker' ? 'primary' : ''"
+              :variant="mode === 'picker' ? 'flat' : 'outlined'"
+              @click="mode = 'picker'"
+            >เลือกจากคลังกฎหมาย</v-btn>
             <v-btn
               size="small"
               :color="mode === 'text' ? 'primary' : ''"
@@ -49,26 +50,11 @@
           </div>
         </div>
 
-        <template v-if="mode === 'doc'">
-          <v-select
-            v-model="selectedDocId"
-            :items="docItems"
-            label="เอกสาร"
-            item-title="title"
-            item-value="value"
-            class="mb-3"
-            @update:model-value="onDocPicked"
-          />
-          <v-select
-            v-if="targetSections.length"
-            v-model="form.target_section"
-            :items="sectionItems"
-            label="มาตรา (ไม่บังคับ)"
-            item-title="title"
-            item-value="value"
-            class="mb-3"
-          />
-        </template>
+        <LawRelationColumnPicker
+          v-if="mode === 'picker'"
+          v-model="pickerTarget"
+          :exclude-document-id="excludeDocumentId"
+        />
 
         <template v-else>
           <v-text-field
@@ -95,6 +81,7 @@
           v-model="form.note"
           label="หมายเหตุ"
           placeholder="ไม่บังคับ"
+          class="mt-4"
         />
       </v-card-text>
 
@@ -108,23 +95,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { listDocuments, fetchReview } from '../../api/client';
-import { buildSections } from '../../composables/useLawSections';
-import type { DocumentListItem, LawRelation, RelationScope, RelationType } from '../../types/document';
+import { computed, ref, watch } from 'vue';
+import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from '../../types/document';
+import LawRelationColumnPicker from './LawRelationColumnPicker.vue';
 
 const props = defineProps<{
   scope: RelationScope;
   blockId?: string | null;
   defaultType?: RelationType;
+  excludeDocumentId?: string | null;
 }>();
 
 const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 
-const mode = ref<'doc' | 'text'>('doc');
-const docs = ref<DocumentListItem[]>([]);
-const selectedDocId = ref('');
-const targetSections = ref<string[]>([]);
+const mode = ref<'picker' | 'text'>('picker');
+const pickerTarget = ref<LawRelationTarget | null>(null);
 
 const form = ref<LawRelation>({
   id: crypto.randomUUID(),
@@ -138,51 +123,51 @@ const form = ref<LawRelation>({
   url: '',
 });
 
-const canSave = computed(() => form.value.target_title.trim() !== '');
-
-const docItems = computed(() => [
-  { title: '— เลือกเอกสาร —', value: '' },
-  ...docs.value.map((d) => ({ title: d.title, value: d.document_id })),
-]);
-
-const sectionItems = computed(() => [
-  { title: '— ทั้งฉบับ —', value: '' },
-  ...targetSections.value.map((s) => ({ title: s, value: s })),
-]);
-
-onMounted(async () => {
-  try {
-    docs.value = (await listDocuments()).documents.filter((d) => d.status === 'done');
-  } catch {
-    docs.value = [];
+const canSave = computed(() => {
+  if (mode.value === 'text') {
+    return form.value.target_title.trim() !== '';
   }
+  return pickerTarget.value !== null && pickerTarget.value.title.trim() !== '';
 });
 
 watch(mode, () => {
   form.value.target_title = '';
   form.value.target_document_id = null;
   form.value.target_section = '';
-  selectedDocId.value = '';
-  targetSections.value = [];
+  form.value.url = '';
+  pickerTarget.value = null;
 });
 
-async function onDocPicked(): Promise<void> {
-  targetSections.value = [];
-  form.value.target_section = '';
-  const doc = docs.value.find((d) => d.document_id === selectedDocId.value);
-  form.value.target_document_id = selectedDocId.value || null;
-  form.value.target_title = doc?.title ?? '';
-  if (!selectedDocId.value) return;
-  try {
-    const review = await fetchReview(selectedDocId.value);
-    targetSections.value = buildSections(review).map((s) => s.badge);
-  } catch {
-    targetSections.value = [];
+watch(pickerTarget, (target) => {
+  if (!target) {
+    form.value.target_document_id = null;
+    form.value.target_title = '';
+    form.value.target_section = '';
+    return;
   }
-}
+
+  form.value.target_document_id = target.document_id;
+  form.value.target_title = target.title;
+  form.value.target_section = target.section ?? '';
+});
 
 function save(): void {
   if (!canSave.value) return;
-  emit('save', { ...form.value, target_title: form.value.target_title.trim() });
+
+  const targetSection = form.value.target_section?.trim() ?? '';
+  emit('save', {
+    ...form.value,
+    target_title: form.value.target_title.trim(),
+    target_section: targetSection !== '' ? targetSection : null,
+    target_document_id: form.value.target_document_id || null,
+    url: form.value.url?.trim() || null,
+    note: form.value.note?.trim() || null,
+  });
 }
 </script>
+
+<style scoped>
+.add-relation-dialog :deep(.v-card-text) {
+  padding-top: 8px;
+}
+</style>

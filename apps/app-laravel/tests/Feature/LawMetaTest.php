@@ -73,4 +73,80 @@ class LawMetaTest extends TestCase
         $doc = $store->getReviewDocument($id);
         $this->assertSame('พระราชบัญญัติ', $doc['law_meta']['law_type']);
     }
+
+    public function test_parent_document_id_persists_in_law_meta(): void
+    {
+        $store = app(ReviewStore::class);
+        $parentId = 'doc_parent_'.uniqid();
+        $childId = 'doc_child_'.uniqid();
+        $this->seedDocument($store, $parentId);
+        $this->seedDocument($store, $childId);
+
+        $response = $this->putJson("/api/documents/{$childId}/document-review", [
+            'law_meta' => [
+                'title' => 'กฎหมายลูก',
+                'parent_document_id' => $parentId,
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('law_meta.parent_document_id', $parentId);
+
+        $doc = $store->getReviewDocument($childId);
+        $this->assertSame($parentId, $doc['law_meta']['parent_document_id']);
+    }
+
+    public function test_list_documents_includes_parent_document_id_and_title(): void
+    {
+        $store = app(ReviewStore::class);
+        $parentId = 'doc_cat_parent_'.uniqid();
+        $childId = 'doc_cat_child_'.uniqid();
+
+        $store->setStatus($parentId, [
+            'status' => 'done',
+            'source_file' => 'parent.docx',
+        ]);
+        $store->setStatus($childId, [
+            'status' => 'done',
+            'source_file' => 'child.docx',
+        ]);
+
+        $store->writeReviewDocument($parentId, [
+            'document_id' => $parentId,
+            'source_file' => 'parent.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => ['title' => 'พ.ร.บ. แม่'],
+            'pages' => [],
+        ]);
+
+        $store->writeReviewDocument($childId, [
+            'document_id' => $childId,
+            'source_file' => 'child.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => [
+                'title' => 'กฎกระทรวงลูก',
+                'parent_document_id' => $parentId,
+            ],
+            'pages' => [],
+        ]);
+
+        $response = $this->getJson('/api/documents');
+        $response->assertOk();
+
+        $documents = collect($response->json('documents'));
+        $parent = $documents->firstWhere('document_id', $parentId);
+        $child = $documents->firstWhere('document_id', $childId);
+
+        $this->assertNotNull($parent);
+        $this->assertSame('พ.ร.บ. แม่', $parent['title']);
+        $this->assertNull($parent['parent_document_id']);
+
+        $this->assertNotNull($child);
+        $this->assertSame('กฎกระทรวงลูก', $child['title']);
+        $this->assertSame($parentId, $child['parent_document_id']);
+    }
 }

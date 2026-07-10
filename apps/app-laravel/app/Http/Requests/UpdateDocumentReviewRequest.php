@@ -62,6 +62,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.expiry_date' => ['nullable', 'string', 'max:120'],
             'law_meta.title' => ['nullable', 'string', 'max:500'],
             'law_meta.imported_by' => ['nullable', 'string', 'max:255'],
+            'law_meta.parent_document_id' => ['nullable', 'string', 'max:128'],
             'relations' => ['nullable', 'array'],
             'relations.*.id' => ['nullable', 'string', 'max:64'],
             'relations.*.scope' => ['nullable', 'string', 'in:document,section'],

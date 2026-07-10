@@ -149,6 +149,7 @@
         </div>
 
         <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
+          :exclude-document-id="props.documentId"
           @close="dialog = null" @save="onRelationSaved" />
 
       </div>
