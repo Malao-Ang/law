@@ -1070,12 +1070,18 @@ class ReviewStore
                     is_array($meta['formatting'] ?? null) ? $meta['formatting'] : [],
                     $this->extractFormattingHints((string) $meta['reviewed_html']),
                 );
-                $derivedAlignment = $this->extractAlignmentHint((string) $meta['reviewed_html']);
+                // Prefer the alignment captured from the wrapper element (TextAlign puts
+                // text-align on the block's own <p>, which innerHtml drops from reviewed_html).
+                $derivedAlignment = $byId[$bid]['meta']['layout']['alignment']
+                    ?? $this->extractAlignmentHint((string) $meta['reviewed_html']);
+                $layout = is_array($meta['layout'] ?? null) ? $meta['layout'] : [];
                 if ($derivedAlignment !== null) {
-                    $layout = is_array($meta['layout'] ?? null) ? $meta['layout'] : [];
                     $layout['alignment'] = $derivedAlignment;
-                    $meta['layout'] = $layout;
+                } else {
+                    // Reverting to the default (left) drops the style entirely — clear it.
+                    unset($layout['alignment']);
                 }
+                $meta['layout'] = $layout;
                 $block['meta'] = $meta;
                 unset($block);
             }

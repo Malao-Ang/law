@@ -332,6 +332,9 @@ class DocumentHtmlService
                 'layout' => [
                     'bbox' => null,
                     'reading_order' => $readingOrder !== '' ? (int) $readingOrder : null,
+                    // TextAlign renders text-align on the wrapper element itself, which
+                    // innerHtml() drops — capture it here so alignment survives writeback.
+                    'alignment' => $this->extractInlineTextAlign($wrapper),
                 ],
                 'table' => $type === 'table' ? $this->extractTableData($wrapper) : null,
             ],
