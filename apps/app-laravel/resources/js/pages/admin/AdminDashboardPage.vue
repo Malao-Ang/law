@@ -1,5 +1,5 @@
 <template>
-  <AppShell :breadcrumbs="['เมนูหลัก', 'หน้าแรก']" title="" hide-top-bar>
+  <AppShell :breadcrumbs="['เมนูหลัก', 'หน้าแรก']" title="" hide-top-bar show-bell>
     <!-- Row 1: metric cards -->
     <v-row class="mb-6">
       <v-col v-for="card in METRIC_CARDS" :key="card.label" cols="12" sm="6" md="3">

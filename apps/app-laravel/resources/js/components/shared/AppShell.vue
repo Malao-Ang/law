@@ -83,9 +83,9 @@
           <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
         </div>
 
-        <div class="app-shell__page-actions">
+        <div v-if="$slots.actions || showBell" class="app-shell__page-actions">
           <slot name="actions" />
-          <v-badge color="error" content="3" offset-x="4" offset-y="4">
+          <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
             <v-btn icon="mdi-bell-outline" variant="text" size="small" />
           </v-badge>
         </div>
@@ -111,6 +111,7 @@ const props = defineProps<{
   fullHeight?: boolean;
   hideTopBar?: boolean;
   showTopBar?: boolean;
+  showBell?: boolean;
 }>();
 
 const router = useRouter();
