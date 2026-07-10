@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -9,6 +10,8 @@ use App\Http\Controllers\Api\UploadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
+
+Route::get('/reports/summary', [ReportController::class, 'summary']);
 
 Route::get('/documents', [UploadController::class, 'index']);
 Route::post('/documents', [UploadController::class, 'store']);
