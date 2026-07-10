@@ -15,10 +15,10 @@
     </template>
   </v-app-bar>
 
-  <v-navigation-drawer v-model="drawer" width="290">
-    <div class="pa-4 d-flex align-center ga-3">
+  <v-navigation-drawer v-model="drawer" :rail="rail" rail-width="72" width="290">
+    <div class="d-flex align-center ga-3" :class="rail ? 'pa-2 justify-center' : 'pa-4'">
       <v-avatar color="admin-primary" rounded="lg"><v-icon icon="mdi-bank-outline" /></v-avatar>
-      <div>
+      <div v-if="!rail">
         <p class="text-subtitle-2 font-weight-bold mb-0">LAWSPACE</p>
         <p class="text-caption text-medium-emphasis mb-0">ระบบจัดการฐานข้อมูลกฎหมาย</p>
       </div>
@@ -28,7 +28,7 @@
 
     <v-list nav density="comfortable">
       <template v-for="group in resolvedNavGroups" :key="group.label">
-        <v-list-subheader>{{ group.label }}</v-list-subheader>
+        <v-list-subheader v-if="!rail">{{ group.label }}</v-list-subheader>
         <v-list-item
           v-for="item in group.items"
           :key="item.label"
@@ -66,11 +66,11 @@
         <div class="app-shell__page-title">
           <div class="d-flex align-center ga-3 mb-2">
             <v-btn
-              icon="mdi-menu"
+              :icon="rail ? 'mdi-menu' : 'mdi-backburger'"
               size="small"
               variant="text"
               class="app-shell__drawer-toggle"
-              @click="drawer = !drawer"
+              @click="rail = !rail"
             />
             <v-breadcrumbs
               v-if="breadcrumbs.length"
@@ -117,6 +117,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const drawer = ref(true);
+const rail = ref(false);
 const showTopNavigation = computed(() => props.showTopBar === true && props.hideTopBar !== true);
 
 const defaultNavGroups: NavGroup[] = [
