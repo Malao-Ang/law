@@ -6,25 +6,6 @@
       </v-btn>
     </template> -->
 
-    <v-row class="mb-6">
-      <v-col
-        v-for="stat in statCards"
-        :key="stat.label"
-        cols="12"
-        sm="6"
-        md="2"
-        class="d-flex"
-      >
-        <AdminStatCard
-          :icon="stat.icon"
-          :icon-color="stat.iconColor"
-          :icon-bg="stat.iconBg"
-          :number="stat.number"
-          :label="stat.label"
-        />
-      </v-col>
-    </v-row>
-
     <!-- Document log filters -->
     <div class="admin-log-tools mb-3">
       <div class="admin-log-tools__filters">
@@ -177,7 +158,6 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
-import AdminStatCard from '../../components/admin/AdminStatCard.vue';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const router = useRouter();
@@ -195,48 +175,6 @@ onMounted(async () => {
     loading.value = false;
   }
 });
-
-// ── Status card counts ─────────────────────────────────────
-const PUBLISHED = ['done', 'exported', 'ingested'];
-const PROCESSING = ['queued', 'processing', 'ingesting'];
-
-const statCards = computed(() => [
-  {
-    icon: 'mdi-file-document-multiple-outline',
-    iconColor: '#2563eb',
-    iconBg: '#dbeafe',
-    number: docs.value.length,
-    label: 'เอกสารทั้งหมด',
-  },
-  {
-    icon: 'mdi-check-circle-outline',
-    iconColor: '#16a34a',
-    iconBg: '#dcfce7',
-    number: docs.value.filter(d => PUBLISHED.includes(d.status)).length,
-    label: 'เผยแพร่แล้ว',
-  },
-  {
-    icon: 'mdi-file-edit-outline',
-    iconColor: '#64748b',
-    iconBg: '#f1f5f9',
-    number: docs.value.filter(d => d.status === 'failed').length,
-    label: 'ล้มเหลว',
-  },
-  {
-    icon: 'mdi-clock-outline',
-    iconColor: '#d97706',
-    iconBg: '#fef3c7',
-    number: docs.value.filter(d => PROCESSING.includes(d.status)).length,
-    label: 'รอตรวจสอบ',
-  },
-  {
-    icon: 'mdi-draw-pen',
-    iconColor: '#7c3aed',
-    iconBg: '#ede9fe',
-    number: 0,  // ponytail: eSign not in current API, show 0 until workflow added
-    label: 'รอลงนาม (eSign)',
-  },
-]);
 
 // ── Completeness bars (keep as-is) ─────────────────────────
 const completeness = [
