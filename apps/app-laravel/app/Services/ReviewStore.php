@@ -135,6 +135,58 @@ class ReviewStore
     }
 
     /**
+     * Raw per-document law_meta rows for reporting. Reads every status file
+     * and merges the intermediate review's law_meta. Missing meta → empty defaults.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listLawMeta(): array
+    {
+        $dir = $this->basePath.'/status';
+        if (! is_dir($dir)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach (glob($dir.'/*.json') ?: [] as $file) {
+            $status = $this->readJson($file);
+            $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
+
+            $meta = [];
+            $reviewPath = $this->intermediatePath($documentId);
+            if (is_file($reviewPath)) {
+                $review = $this->readJson($reviewPath);
+                $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+            }
+
+            $groups = is_array($meta['law_groups'] ?? null) ? array_values(array_filter($meta['law_groups'], 'is_string')) : [];
+            if ($groups === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
+                $groups = [(string) $meta['law_group']];
+            }
+
+            $agencies = is_array($meta['agencies'] ?? null) ? array_values(array_filter($meta['agencies'], 'is_string')) : [];
+            if ($agencies === [] && trim((string) ($meta['agency'] ?? '')) !== '') {
+                $agencies = [(string) $meta['agency']];
+            }
+
+            $title = trim((string) ($meta['title'] ?? '')) ?: (string) ($status['source_file'] ?? $documentId);
+
+            $rows[] = [
+                'document_id' => $documentId,
+                'title' => $title,
+                'status' => (string) ($status['status'] ?? 'unknown'),
+                'updated_at' => $status['updated_at'] ?? null,
+                'law_type' => trim((string) ($meta['law_type'] ?? '')),
+                'law_groups' => $groups,
+                'agencies' => $agencies,
+                'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param  array<string, mixed>  $document
      */
     public function writeReviewDocument(string $documentId, array $document): void
