@@ -82,13 +82,12 @@ import type { DocumentListItem } from '../../types/document';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
   deriveStage, laterStage, nextStage, prevStage, readStages, writeStage,
-  STAGE_MAP, STAGES, type StageKey,
+  STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
 
 interface Row {
   documentId: string;
   title: string;
-  status: string;
   updatedAt: string;
   stage: StageKey;
 }
@@ -106,8 +105,6 @@ const headers = [
   { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'end' as const },
 ];
 
-const PROCESSED_FLOOR = STAGES.findIndex((s) => s.key === 'processed');
-
 function effectiveStage(doc: DocumentListItem): StageKey {
   const derived = deriveStage(doc.status);
   if (derived === 'failed') return 'failed';
@@ -119,7 +116,6 @@ const rows = computed<Row[]>(() =>
   docs.value.map((doc) => ({
     documentId: doc.document_id,
     title: doc.title || doc.document_id,
-    status: doc.status,
     updatedAt: formatDate(doc.updated_at),
     stage: effectiveStage(doc),
   })),
@@ -135,8 +131,7 @@ function actionLabel(stage: StageKey): string {
 }
 
 function canRollback(stage: StageKey): boolean {
-  const i = STAGES.findIndex((s) => s.key === stage);
-  return i > PROCESSED_FLOOR;
+  return prevStage(stage) !== stage;
 }
 
 function setStage(documentId: string, stage: StageKey): void {
