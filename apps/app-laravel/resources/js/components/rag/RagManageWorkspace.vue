@@ -4,8 +4,9 @@
     <WorkflowFooterBar
       :step="3"
       :next-disabled="blockBusy"
+      :next-loading="documentStore.saving"
       @back="router.push(`/documents/${props.documentId}/review`)"
-      @next="router.push(`/documents/${props.documentId}/law-info`)"
+      @next="goToLawInfo"
     />
 
     <!-- Loading -->
@@ -212,6 +213,52 @@ const blockPage = computed<Map<string, number>>(() => {
   });
   return map;
 });
+
+async function goToLawInfo(): Promise<void> {
+  if (blockBusy.value) return;
+
+  // Auto-persist suggestions for untyped head blocks.
+  const toPersist = sections.value.filter(
+    (s) => !s.headBlock.meta.chunk_type && suggestChunkType(s.headBlock),
+  );
+  if (toPersist.length > 0) {
+    blockBusy.value = true;
+    try {
+      await Promise.all(
+        toPersist.map((s) => {
+          const suggested = suggestChunkType(s.headBlock)!;
+          s.headBlock.meta.chunk_type = suggested;
+          const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
+          return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggested);
+        }),
+      );
+    } catch (e) {
+      documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+      return;
+    } finally {
+      blockBusy.value = false;
+    }
+  }
+
+  // Block if any section still has no type.
+  const missing = sections.value.filter((s) => !s.headBlock.meta.chunk_type);
+  if (missing.length > 0) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'ยังกำหนดประเภทไม่ครบ',
+      html:
+        'กรุณาเลือกประเภทให้ส่วนต่อไปนี้ก่อนดำเนินการต่อ:<br><br>' +
+        missing.map((s) => `• ${escapeForHtml(s.badge)}`).join('<br>'),
+      confirmButtonText: 'ตกลง',
+      confirmButtonColor: '#1a3673',
+    });
+    return;
+  }
+
+  const progressed = await documentStore.completeWorkflowStep(3);
+  if (!progressed) return;
+  router.push(`/documents/${props.documentId}/law-info`);
+}
 
 async function removeRelation(id: string): Promise<void> {
   await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
@@ -424,53 +471,6 @@ function escapeForHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-}
-
-async function handleExport(): Promise<void> {
-  if (blockBusy.value) return;
-
-  // 1. Persist any accepted auto-suggestions (stored empty but suggestion exists).
-  const toPersist = sections.value.filter(
-    (s) => !s.headBlock.meta.chunk_type && suggestChunkType(s.headBlock),
-  );
-  if (toPersist.length > 0) {
-    blockBusy.value = true;
-    try {
-      await Promise.all(
-        toPersist.map((s) => {
-          const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
-          return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggestChunkType(s.headBlock));
-        }),
-      );
-      await reloadBlocks();
-    } catch (e) {
-      documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
-      return;
-    } finally {
-      blockBusy.value = false;
-    }
-  }
-
-  // 2. Validate: every container must now have a stored type.
-  const missing = sections.value.filter((s) => !s.headBlock.meta.chunk_type);
-  if (missing.length > 0) {
-    await Swal.fire({
-      icon: 'warning',
-      title: 'ยังกำหนดประเภทไม่ครบ',
-      html:
-        'กรุณาเลือกประเภทให้ container ต่อไปนี้ก่อนเผยแพร่:<br><br>' +
-        missing.map((s) => `• ${escapeForHtml(s.badge)}`).join('<br>'),
-      confirmButtonText: 'ตกลง',
-      confirmButtonColor: '#1a3673',
-    });
-    return;
-  }
-
-  // 3. All typed — publish and go to the law view.
-  await composeStore.triggerExport(props.documentId);
-  if (!composeStore.error) {
-    router.push(`/law/${props.documentId}`);
-  }
 }
 
 onMounted(async () => {
