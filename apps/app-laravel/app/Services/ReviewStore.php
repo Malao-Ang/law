@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use RuntimeException;
 
@@ -11,6 +12,7 @@ class ReviewStore
 
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
+        private readonly MongoBlobStore $blob,
         ?string $basePath = null,
     ) {
         $this->basePath = $basePath ?? storage_path('app/poc');
@@ -61,10 +63,7 @@ class ReviewStore
      */
     public function setStatus(string $documentId, array $status): void
     {
-        $path = $this->statusPath($documentId);
-        $this->ensureDirectoryExists(dirname($path));
-
-        $this->withLockedFile($path, function (array &$current) use ($documentId, $status): void {
+        $this->blob->withLock('status', $documentId, function (array &$current) use ($documentId, $status): void {
             if ($current === []) {
                 $current = ['document_id' => $documentId];
             }
@@ -80,13 +79,7 @@ class ReviewStore
      */
     public function getStatus(string $documentId): ?array
     {
-        $path = $this->statusPath($documentId);
-
-        if (! is_file($path)) {
-            return null;
-        }
-
-        return $this->readJson($path);
+        return $this->blob->read('status', $documentId);
     }
 
     /**
@@ -94,22 +87,18 @@ class ReviewStore
      */
     public function listDocuments(): array
     {
-        $dir = $this->basePath.'/status';
-        if (! is_dir($dir)) {
-            return [];
-        }
-
         $documents = [];
-        foreach (glob($dir.'/*.json') ?: [] as $file) {
-            $status = $this->readJson($file);
-            $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
+        foreach ($this->blob->allStatuses() as $status) {
+            $documentId = (string) ($status['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
             $title = (string) ($status['source_file'] ?? $documentId);
             $parentDocumentId = null;
             $accessScope = 'public';
 
-            $reviewPath = $this->intermediatePath($documentId);
-            if (is_file($reviewPath)) {
-                $review = $this->readJson($reviewPath);
+            $review = $this->blob->read('review', $documentId);
+            if ($review !== null) {
                 $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
                 $metaTitle = trim((string) ($meta['title'] ?? ''));
                 if ($metaTitle !== '') {
@@ -148,20 +137,16 @@ class ReviewStore
      */
     public function listLawMeta(): array
     {
-        $dir = $this->basePath.'/status';
-        if (! is_dir($dir)) {
-            return [];
-        }
-
         $rows = [];
-        foreach (glob($dir.'/*.json') ?: [] as $file) {
-            $status = $this->readJson($file);
-            $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
+        foreach ($this->blob->allStatuses() as $status) {
+            $documentId = (string) ($status['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
 
             $meta = [];
-            $reviewPath = $this->intermediatePath($documentId);
-            if (is_file($reviewPath)) {
-                $review = $this->readJson($reviewPath);
+            $review = $this->blob->read('review', $documentId);
+            if ($review !== null) {
                 $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
             }
 
@@ -199,10 +184,7 @@ class ReviewStore
     public function writeReviewDocument(string $documentId, array $document): void
     {
         $this->syncDocumentReview($document);
-
-        $path = $this->intermediatePath($documentId);
-        $this->ensureDirectoryExists(dirname($path));
-        $this->atomicWrite($path, $document);
+        $this->blob->write('review', $documentId, $document);
     }
 
     /**
@@ -210,20 +192,18 @@ class ReviewStore
      */
     public function getReviewDocument(string $documentId): array
     {
-        $path = $this->intermediatePath($documentId);
+        $document = $this->blob->read('review', $documentId);
 
-        if (! is_file($path)) {
+        if ($document === null) {
             throw new RuntimeException('Review document not found.');
         }
-
-        $document = $this->readJson($path);
 
         $review = is_array($document['document_review'] ?? null) ? $document['document_review'] : [];
         $needsSync = $review === [] || (bool) ($review['out_of_sync'] ?? false);
 
         if ($needsSync) {
             $this->syncDocumentReview($document);
-            $this->atomicWrite($path, $document);
+            $this->blob->write('review', $documentId, $document);
         }
 
         return $document;
@@ -237,7 +217,7 @@ class ReviewStore
     {
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
             $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
             $block['approved_text'] = (string) ($patch['approved_text'] ?? $block['approved_text'] ?? '');
@@ -312,7 +292,7 @@ class ReviewStore
     {
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($result, &$returnBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($result, &$returnBlock): void {
             $pageNo = (int) ($result['page_no'] ?? 0);
             $blockId = (string) ($result['block_id'] ?? '');
             $block = &$this->findBlockReference($document, $pageNo, $blockId);
@@ -348,7 +328,7 @@ class ReviewStore
     {
         $returnPayload = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($documentId, $payload, &$returnPayload): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($documentId, $payload, &$returnPayload): void {
             if (array_key_exists('draft_html', $payload) && is_string($payload['draft_html'])) {
                 $this->applyDraftHtmlToBlocksInPlace($document, $documentId, $payload['draft_html']);
             }
@@ -447,7 +427,7 @@ class ReviewStore
     {
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
             $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
             $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
@@ -509,7 +489,7 @@ class ReviewStore
     {
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pageNo, $blockId, $patch, &$returnBlock): void {
             $block = &$this->findBlockReference($document, $pageNo, $blockId);
 
             $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
@@ -574,58 +554,8 @@ class ReviewStore
 
     private function ensureDirectories(): void
     {
-        foreach (['uploads', 'pages', 'intermediate', 'exports', 'ingested', 'status'] as $dir) {
+        foreach (['uploads', 'pages', 'exports', 'ingested'] as $dir) {
             $this->ensureDirectoryExists($this->basePath.'/'.$dir);
-        }
-    }
-
-    private function statusPath(string $documentId): string
-    {
-        return $this->basePath.'/status/'.$documentId.'.json';
-    }
-
-    private function intermediatePath(string $documentId): string
-    {
-        return $this->basePath.'/intermediate/'.$documentId.'.review.json';
-    }
-
-    /**
-     * Exclusive-lock the file at $path, read its JSON content (or [] if empty),
-     * pass the data by reference to $callback for in-place modification, then
-     * write it back atomically before releasing the lock.
-     *
-     * All read-modify-write operations on state files must go through this method
-     * to prevent concurrent queue workers from corrupting the same document.
-     *
-     * @param  callable(array<string,mixed> &): void  $callback
-     */
-    private function withLockedFile(string $path, callable $callback): void
-    {
-        $this->ensureDirectoryExists(dirname($path));
-
-        $fp = fopen($path, 'c+');
-        if ($fp === false) {
-            throw new RuntimeException("Cannot open file for locked write: {$path}");
-        }
-
-        try {
-            flock($fp, LOCK_EX);
-
-            $size = fstat($fp)['size'] ?? 0;
-            $contents = $size > 0 ? stream_get_contents($fp) : '';
-            /** @var array<string, mixed> $data */
-            $data = ($contents !== false && $contents !== '')
-                ? json_decode($contents, true, 512, JSON_THROW_ON_ERROR)
-                : [];
-
-            $callback($data);
-
-            ftruncate($fp, 0);
-            rewind($fp);
-            fwrite($fp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-        } finally {
-            flock($fp, LOCK_UN);
-            fclose($fp);
         }
     }
 
@@ -636,7 +566,7 @@ class ReviewStore
      */
     public function reorderBlocks(string $documentId, array $blockIds): void
     {
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($blockIds): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($blockIds): void {
             // Collect all blocks by ID for fast lookup
             $blockMap = [];
             foreach (($document['pages'] ?? []) as &$page) {
@@ -684,7 +614,7 @@ class ReviewStore
 
     public function deleteBlock(string $documentId, int $pageNo, string $blockId): void
     {
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $blockId): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pageNo, $blockId): void {
             $deleted = false;
             foreach ($document['pages'] as &$page) {
                 if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
@@ -722,7 +652,7 @@ class ReviewStore
         $idSet = array_flip(array_map('strval', $blockIds));
         $returnBlock = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($idSet, &$returnBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($idSet, &$returnBlock): void {
             // Collect selected blocks in DOCUMENT order (not the caller's click/selection order).
             $ordered = [];
             foreach (($document['pages'] ?? []) as $page) {
@@ -811,7 +741,7 @@ class ReviewStore
     ): array {
         $result = null;
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($documentId, $pageNo, $blockId, $beforeText, $beforeHtml, $afterText, $afterHtml, &$result): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($documentId, $pageNo, $blockId, $beforeText, $beforeHtml, $afterText, $afterHtml, &$result): void {
             foreach ($document['pages'] as &$page) {
                 if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
                     continue;
@@ -880,7 +810,7 @@ class ReviewStore
             ],
         ];
 
-        $this->withLockedFile($this->intermediatePath($documentId), function (array &$document) use ($pageNo, $afterBlockId, $newBlock): void {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pageNo, $afterBlockId, $newBlock): void {
             foreach ($document['pages'] as &$page) {
                 if ((int) ($page['page_no'] ?? 0) !== $pageNo) {
                     continue;
@@ -960,20 +890,6 @@ class ReviewStore
         $this->writeReviewDocument($documentId, $doc);
 
         return $doc;
-    }
-
-    /**
-     * Write a complete document to disk in one atomic operation.
-     * Used when we already have the full document in memory and only need to persist it.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private function atomicWrite(string $path, array $data): void
-    {
-        $this->ensureDirectoryExists(dirname($path));
-        $tmp = $path.'.tmp.'.getmypid();
-        file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-        rename($tmp, $path);
     }
 
     /**
@@ -1128,22 +1044,6 @@ class ReviewStore
         }
         $document['document_review']['out_of_sync'] = true;
         $document['document_review']['updated_at'] = now()->toIso8601String();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function readJson(string $path): array
-    {
-        /** @var array<string, mixed> $data */
-        $contents = file_get_contents($path);
-        if ($contents === false) {
-            throw new RuntimeException("Unable to read JSON file: {$path}");
-        }
-
-        $data = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-
-        return $data;
     }
 
     /**
