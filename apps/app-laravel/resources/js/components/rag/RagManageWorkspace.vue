@@ -1,7 +1,6 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
     subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
-    <WorkflowStepper :step="3" />
     <WorkflowFooterBar
       :step="3"
       :next-disabled="blockBusy"
@@ -23,6 +22,7 @@
     </div>
 
     <template v-else>
+      <WorkflowStepper :step="3" />
       <div class="rag-content-area">
         <!-- Selection action bar -->
         <div
@@ -444,7 +444,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   gap: 12px;
   overflow: hidden;
-  padding-top: 56px;
 }
 
 .rag-selection-bar {

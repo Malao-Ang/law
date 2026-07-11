@@ -1,6 +1,5 @@
 <template>
-  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:72px 24px 60px; background:#f8fafc; box-sizing:border-box">
-    <WorkflowStepper :step="2" />
+  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:16px 24px 60px; background:#f8fafc; box-sizing:border-box">
     <WorkflowFooterBar
       :step="2"
       next-label="บันทึก →"
@@ -15,6 +14,7 @@
         <div class="text-caption text-medium-emphasis">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</div>
       </div>
     </div>
+    <WorkflowStepper :step="2" />
 
     <!-- Toolbar -->
     <div v-if="editor" class="d-flex flex-wrap align-center ga-1 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">

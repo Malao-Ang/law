@@ -39,18 +39,13 @@ defineProps<{ step: number }>();
 
 <style scoped>
 .wf-stepper {
-  position: fixed;
-  top: 0;
-  left: var(--v-layout-left, 0px);
-  right: var(--v-layout-right, 0px);
-  z-index: 50;
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
   height: 56px;
   display: flex;
   align-items: flex-start;
   padding: 8px 24px 0;
-  box-shadow: 0 2px 8px rgba(26, 54, 115, 0.06);
+  margin-bottom: 16px;
 }
 
 .wf-stepper__track {

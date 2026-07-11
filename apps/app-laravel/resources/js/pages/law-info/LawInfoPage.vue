@@ -4,7 +4,6 @@
     title="นำเข้าเอกสารกฎหมาย"
     subtitle="ขั้นตอนที่ 4 จาก 5: ข้อมูลเอกสาร"
   >
-    <WorkflowStepper :step="4" />
     <WorkflowFooterBar
       :step="4"
       next-label="บันทึกและเผยแพร่ →"
@@ -12,7 +11,8 @@
       @back="router.push(`/documents/${props.documentId}/rag`)"
       @next="saveAndExport"
     />
-    <div class="mx-auto" style="max-width:860px; padding-top:56px; padding-bottom:60px">
+    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
+      <WorkflowStepper :step="4" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
