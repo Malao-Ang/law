@@ -276,21 +276,14 @@ const noExpiry = ref(false);
 const articleBlocks = computed<DocumentBlock[]>(() =>
   (documentStore.review?.pages ?? [])
     .flatMap((page) => page.blocks)
-    .filter((block) => block.meta?.chunk_type === 'ARTICLE'),
+    .filter((block) => block.meta?.chunk_type === 'ARTICLE' || block.meta?.chunk_type === 'CLAUSE'),
 );
 const articleCount = computed(() => articleBlocks.value.length);
 const articleUnitLabel = computed(() => {
-  let hasItem = false;
-  let hasArticle = false;
-
-  for (const block of articleBlocks.value) {
-    const text = blockText(block);
-    if (/^ข้อ\s*[๐-๙0-9]/u.test(text)) hasItem = true;
-    if (/^มาตรา\s*[๐-๙0-9]/u.test(text)) hasArticle = true;
-  }
-
-  if (hasItem && hasArticle) return 'ข้อ/มาตรา';
-  if (hasItem) return 'ข้อ';
+  const hasClause = articleBlocks.value.some((b) => b.meta?.chunk_type === 'CLAUSE');
+  const hasArticle = articleBlocks.value.some((b) => b.meta?.chunk_type === 'ARTICLE');
+  if (hasClause && hasArticle) return 'ข้อ/มาตรา';
+  if (hasClause) return 'ข้อ';
   if (hasArticle) return 'มาตรา';
   return 'ข้อ/มาตรา';
 });
