@@ -155,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue';
+import { onBeforeUnmount, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchStatus, uploadDocument } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
@@ -197,7 +197,7 @@ function addFiles(value: File | File[] | null): void {
   if (files.length === 0) return;
 
   files.forEach((file) => {
-    const item: UploadQueueItem = {
+    const item = reactive<UploadQueueItem>({
       id: `${Date.now()}-${crypto.randomUUID()}`,
       file,
       fileName: file.name,
@@ -207,7 +207,7 @@ function addFiles(value: File | File[] | null): void {
       progress: 0,
       error: '',
       scanMode: scanMode.value,
-    };
+    });
     queue.value.unshift(item);
     void startUpload(item);
   });
