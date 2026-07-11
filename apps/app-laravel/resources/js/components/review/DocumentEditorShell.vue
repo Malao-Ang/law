@@ -183,7 +183,6 @@ const editor = useEditor({
   },
 });
 
-const charCount = computed(() => editor.value?.state.doc.textContent.length ?? 0);
 
 const activeHeadingLevel = computed<string>(() => {
   if (!editor.value) return '0';
