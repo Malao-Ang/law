@@ -112,13 +112,14 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Raw MongoDB config — consumed by App\Services\Storage\MongoBlobStore via MongoDB\Client.
+        // Not a registered Laravel DB driver; DB::connection('mongodb') will not work without the ODM.
         'mongodb' => [
-            'driver'   => 'mongodb',
-            'host'     => env('MONGO_HOST', 'mongo'),
-            'port'     => (int) env('MONGO_PORT', 27017),
+            'host' => env('MONGO_HOST', 'mongo'),
+            'port' => (int) env('MONGO_PORT', 27017),
             'database' => env('MONGO_DATABASE', 'poc'),
-            'username' => env('MONGO_USERNAME', ''),
-            'password' => env('MONGO_PASSWORD', ''),
+            'username' => env('MONGO_USERNAME'),
+            'password' => env('MONGO_PASSWORD'),
         ],
 
     ],
