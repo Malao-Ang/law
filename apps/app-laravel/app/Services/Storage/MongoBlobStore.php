@@ -11,7 +11,7 @@ final class MongoBlobStore
 {
     public function __construct(private readonly Collection $collection) {}
 
-    /** @return array<string, mixed>|null */
+    /** @return array<int|string, mixed>|null */
     public function read(string $kind, string $id): ?array
     {
         $doc = $this->collection->findOne(['_id' => $id, $kind => ['$exists' => true]]);
@@ -23,7 +23,7 @@ final class MongoBlobStore
         return $sub !== null ? (array) $sub : null;
     }
 
-    /** @param array<string, mixed> $data */
+    /** @param array<int|string, mixed> $data */
     public function write(string $kind, string $id, array $data): void
     {
         $this->collection->updateOne(
@@ -44,7 +44,7 @@ final class MongoBlobStore
         ]) > 0;
     }
 
-    /** @param callable(array<string,mixed> &): void $cb */
+    /** @param callable(array<int|string, mixed> &): void $cb */
     public function withLock(string $kind, string $id, callable $cb): void
     {
         for ($attempt = 0; $attempt < 3; $attempt++) {
