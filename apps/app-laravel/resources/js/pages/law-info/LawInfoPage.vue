@@ -6,7 +6,7 @@
   >
     <WorkflowFooterBar
       :step="4"
-      next-label="บันทึกและเผยแพร่ →"
+      next-label="บันทึกและเผยแพร่"
       :next-loading="documentStore.saving || exporting"
       @back="router.push(`/documents/${props.documentId}/rag`)"
       @next="saveAndExport"

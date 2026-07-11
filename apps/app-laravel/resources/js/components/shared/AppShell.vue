@@ -61,7 +61,7 @@
     <div v-if="$slots.banner" class="px-6 pt-4">
       <slot name="banner" />
     </div>
-    <v-container fluid class="pa-6 app-shell__container" :class="{ 'app-shell__container--full-height': fullHeight }">
+    <v-container fluid class="pa-4  pt-6 app-shell__container" :class="{ 'app-shell__container--full-height': fullHeight }">
       <div v-if="!showTopNavigation" class="app-shell__page-header">
         <div class="app-shell__page-title">
           <div class="d-flex align-center ga-3 mb-2">
@@ -172,8 +172,8 @@ function isActive(item: NavItem): boolean {
   flex: 0 0 auto;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 24px;
-  padding: 18px 20px;
+  margin-bottom: 4px;
+  padding: 0px 20px;
 }
 
 .app-shell__page-title {

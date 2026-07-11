@@ -88,15 +88,18 @@ class DocumentHtmlService
             $caption = trim((string) ($imgMeta['caption'] ?? ''));
             $displayWidth = isset($imgMeta['display_width_px']) ? (int) $imgMeta['display_width_px'] : 0;
             if ($srcUrl !== '') {
+                $rawAlign = $block['meta']['layout']['alignment'] ?? null;
+                $alignment = in_array($rawAlign, ['left', 'center', 'right', 'justify'], true) ? $rawAlign : 'center';
                 $imgStyle = $displayWidth > 0
-                    ? sprintf('width:%dpx;height:auto;display:block;margin:0 auto;', $displayWidth)
-                    : 'max-width:100%;height:auto;display:block;margin:0 auto;';
+                    ? sprintf('width:%dpx;height:auto;', $displayWidth)
+                    : 'max-width:100%;height:auto;';
 
                 return sprintf(
-                    '<figure data-block-id="%s" class="doc-image" style="text-align:center;margin:1rem 0;">'.
+                    '<figure data-block-id="%s" class="doc-image" style="text-align:%s;margin:1rem 0;">'.
                     '<img src="%s" alt="%s" data-block-id="%s" data-page-no="%d" style="%s"/>'.
                     '%s</figure>',
                     e($blockId),
+                    e($alignment),
                     e($srcUrl),
                     e($caption ?: 'embedded image'),
                     e($blockId),
@@ -131,7 +134,7 @@ class DocumentHtmlService
         }
 
         $indentLevel = $layout['indent_level'] ?? null;
-        $indentLeft  = $layout['indent_left']  ?? null;
+        $indentLeft = $layout['indent_left'] ?? null;
 
         // When indent_level is not set but indent_left (twips) is, derive a level.
         // This ensures TipTap—which strips inline styles from <p> tags—sees a

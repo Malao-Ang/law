@@ -1042,24 +1042,40 @@ class ReviewStore
                 }
             }
         }
-        if ($byId === []) {
-            return;
-        }
+        $imgAlignments = $this->extractImageAlignmentsFromHtml($html);
 
         // ponytail: no ?? [] on foreach with references — PHP copies the rvalue, breaking mutation
         foreach (array_keys($document['pages'] ?? []) as $pi) {
             foreach (array_keys($document['pages'][$pi]['blocks'] ?? []) as $bi) {
                 $block = &$document['pages'][$pi]['blocks'][$bi];
                 $bid = (string) ($block['block_id'] ?? '');
-                if ($bid === '' || ! isset($byId[$bid])) {
+                $type = (string) ($block['type'] ?? '');
+                if ($type === 'image') {
+                    if ($bid !== '' && array_key_exists($bid, $imgAlignments)) {
+                        $meta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+                        $layout = is_array($meta['layout'] ?? null) ? $meta['layout'] : [];
+                        $al = $imgAlignments[$bid];
+                        if ($al !== null) {
+                            $layout['alignment'] = $al;
+                        } else {
+                            unset($layout['alignment']);
+                        }
+                        $meta['layout'] = $layout;
+                        $block['meta'] = $meta;
+                    }
+                    unset($block);
+
                     continue;
                 }
-                $type = (string) ($block['type'] ?? '');
-                if (in_array($type, ['table', 'image'], true)) {
+                if ($type === 'table' || $bid === '' || ! isset($byId[$bid])) {
+                    unset($block);
+
                     continue;
                 }
                 $text = trim((string) ($byId[$bid]['text'] ?? ''));
                 if ($text === '') {
+                    unset($block);
+
                     continue;
                 }
                 $block['approved_text'] = $text;
@@ -1313,6 +1329,48 @@ class ReviewStore
         }
 
         return null;
+    }
+
+    /**
+     * Scan draft HTML for <img data-block-id="..."> elements and return each block ID's
+     * alignment from the nearest ancestor with a text-align style (TipTap wraps the image
+     * node in a <p style="text-align:..."> when the user changes alignment).
+     *
+     * @return array<string, string|null> blockId => alignment (null = revert to default)
+     */
+    private function extractImageAlignmentsFromHtml(string $html): array
+    {
+        if (trim($html) === '') {
+            return [];
+        }
+        $internalErrors = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="utf-8" ?><body>'.$html.'</body>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+
+        $xpath = new \DOMXPath($dom);
+        $result = [];
+        foreach ($xpath->query('//img[@data-block-id]') as $img) {
+            /** @var \DOMElement $img */
+            $bid = $img->getAttribute('data-block-id');
+            if ($bid === '') {
+                continue;
+            }
+            $alignment = null;
+            $node = $img->parentNode;
+            while ($node instanceof \DOMElement) {
+                $style = $node->getAttribute('style');
+                if (preg_match('/text-align\s*:\s*(left|center|right|justify)/i', $style, $m) === 1) {
+                    $alignment = strtolower($m[1]);
+                    break;
+                }
+                $node = $node->parentNode;
+            }
+            $result[$bid] = $alignment;
+        }
+
+        return $result;
     }
 
     /**

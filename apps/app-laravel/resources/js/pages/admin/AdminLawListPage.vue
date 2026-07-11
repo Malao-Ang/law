@@ -4,11 +4,6 @@
     title="จัดการตัวบทกฎหมาย"
     subtitle="จัดการกฎหมายทั้งหมด ค้นหา แก้ไข ความสัมพันธ์ และเวอร์ชัน"
   >
-    <template #actions>
-      <v-btn color="admin-primary" prepend-icon="mdi-plus" to="/admin/upload">
-        + เพิ่มกฎหมายใหม่
-      </v-btn>
-    </template>
 
     <v-row class="mb-5">
       <v-col v-for="stat in typeStats" :key="stat.value" cols="6" sm="3">
