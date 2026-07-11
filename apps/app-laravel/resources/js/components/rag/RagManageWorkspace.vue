@@ -273,17 +273,27 @@ async function mergeSelected(): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
-  // Toggle the section boundary: a normal block becomes a section head (starts a
-  // new section); a block that is already a head is demoted back to a paragraph
-  // (merges into the previous section). Every block can therefore be split/joined.
+  // Split the block out as its own section head — never merge into the previous
+  // section. Splitting a block that is already a main heading is guarded by a
+  // confirmation dialog.
   const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type);
+  if (isHead) {
+    const confirmed = await Swal.fire({
+      title: 'คุณมั่นใจไหมที่ต้องการแยกหัวข้อหลักออก',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'แยกออก',
+      cancelButtonText: 'ยกเลิก',
+    });
+    if (!confirmed.isConfirmed) return;
+  }
   blockBusy.value = true;
   try {
-    const nextType: ChunkType = isHead ? 'PARAGRAPH' : headTypeFor(block);
-    block.meta.chunk_type = nextType;                // optimistic
-    await persistChunkType(block, nextType);
+    const headType: ChunkType = isHead ? (block.meta.chunk_type as ChunkType) : headTypeFor(block);
+    block.meta.chunk_type = headType;                // optimistic → starts its own section
+    await persistChunkType(block, headType);
     clearSelection();
-    snackbar.success(isHead ? 'รวมเข้ากับ section ก่อนหน้าแล้ว' : 'เริ่ม section ใหม่แล้ว');
+    snackbar.success('แยก section ออกแล้ว');
   } catch (e) {
     snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
     await reloadBlocks();
