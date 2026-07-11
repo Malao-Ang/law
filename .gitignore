@@ -1,6 +1,5 @@
 .env
 .env.*
-!.env.example
 .claude/settings.local.json
 .claude/worktrees/
 .claude/
@@ -39,6 +38,7 @@ tmp/
 temp/
 *.env
 *.env.example
+!.env.example
 docs/
 *.jpg
 *.png
