@@ -69,7 +69,7 @@
                 :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 กลุ่ม']"
               >
                 <template #item="{ props: itemProps, item }">
-                  <v-list-item v-bind="itemProps" :subtitle="item.raw.subtitle" />
+                  <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
                 </template>
                 <template #append-inner>
                   <v-chip v-if="form.law_groups.length" size="x-small" color="admin-primary" class="mr-1">
@@ -183,7 +183,7 @@
                 :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 หน่วยงาน']"
               >
                 <template #item="{ props: itemProps, item }">
-                  <v-list-item v-bind="itemProps" :subtitle="item.raw.subtitle" />
+                  <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
                 </template>
               </v-autocomplete>
             </v-col>
