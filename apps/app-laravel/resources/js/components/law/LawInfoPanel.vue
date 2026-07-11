@@ -33,9 +33,23 @@
           <span class="text-medium-emphasis">หน่วยงาน</span>
           <span class="font-weight-semibold">{{ meta.agency }}</span>
         </div>
+        <div v-if="meta.keywords.length" class="mt-3">
+          <div class="text-caption text-medium-emphasis font-weight-bold mb-2">คำสำคัญ</div>
+          <div class="d-flex flex-wrap ga-2">
+            <v-chip
+              v-for="keyword in meta.keywords"
+              :key="keyword"
+              size="small"
+              variant="tonal"
+              color="primary"
+            >
+              {{ keyword }}
+            </v-chip>
+          </div>
+        </div>
         <div class="d-flex justify-space-between ga-4 py-1">
           <span class="text-medium-emphasis">จำนวนข้อ</span>
-          <span class="font-weight-semibold">{{ articleCount }} มาตรา</span>
+          <span class="font-weight-semibold">{{ articleCount }} {{ articleUnitLabel ?? 'ข้อ/มาตรา' }}</span>
         </div>
 
         <div v-if="meta.repealed_laws.length" class="mt-3">
@@ -89,5 +103,5 @@
 <script setup lang="ts">
 import type { LawMeta, LawRelation } from '../../types/document';
 
-defineProps<{ meta: LawMeta; articleCount: number; relations?: LawRelation[] }>();
+defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[] }>();
 </script>

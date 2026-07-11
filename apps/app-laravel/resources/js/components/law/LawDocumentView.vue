@@ -28,6 +28,16 @@
         {{ documentStore.error }}
       </v-alert>
 
+      <v-alert
+        v-else-if="documentStore.review && meta.access_scope === 'private'"
+        type="warning"
+        variant="tonal"
+        density="comfortable"
+        class="ma-4"
+      >
+        เอกสารนี้ถูกกำหนดให้เป็น Private และไม่แสดงบนหน้าสาธารณะ
+      </v-alert>
+
       <div
         v-else-if="documentStore.review"
         class="lawx-grid"
@@ -112,7 +122,7 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="articleCount" :relations="documentRelations(relations)" />
+        <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" />
       </aside>
       </div>
 
@@ -149,9 +159,12 @@ const EMPTY_META: LawMeta = {
   status: '',
   law_type: '',
   law_group: '',
+  change_status: null,
   law_groups: [],
   agency: '',
+  signer_group: null,
   agencies: [],
+  keywords: [],
   promulgation_date: '',
   effective_date: '',
   published_date: '',
@@ -163,11 +176,23 @@ const EMPTY_META: LawMeta = {
   repealed_laws: [],
   imported_by: '',
   parent_document_id: null,
+  access_scope: 'public',
+  permission_group_ids: [],
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
 
-const articleCount = computed(() => sections.value.filter((section) => section.badge.startsWith('มาตรา')).length);
+const articleCount = computed(() =>
+  sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
+);
+const articleUnitLabel = computed(() => {
+  const hasClause = sections.value.some((s) => s.badge.startsWith('ข้อ'));
+  const hasArticle = sections.value.some((s) => s.badge.startsWith('มาตรา'));
+  if (hasClause && hasArticle) return 'ข้อ/มาตรา';
+  if (hasClause) return 'ข้อ';
+  if (hasArticle) return 'มาตรา';
+  return 'ข้อ/มาตรา';
+});
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const tocOpen = ref(true);
