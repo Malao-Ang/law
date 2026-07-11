@@ -232,9 +232,9 @@ const fallbackPrakatDocs: DocumentVersion[] = [
   }),
 ];
 
-const latestDocs = ref<DocumentVersion[]>(fallbackLatestDocs);
-const rabiapDocs = ref<DocumentVersion[]>(fallbackRabiapDocs);
-const prakatDocs = ref<DocumentVersion[]>(fallbackPrakatDocs);
+const latestDocs = ref<DocumentVersion[]>(fallbackLatestDocs.filter((doc) => doc.metadata.publicationScope === 'public'));
+const rabiapDocs = ref<DocumentVersion[]>(fallbackRabiapDocs.filter((doc) => doc.metadata.publicationScope === 'public'));
+const prakatDocs = ref<DocumentVersion[]>(fallbackPrakatDocs.filter((doc) => doc.metadata.publicationScope === 'public'));
 
 onMounted(async () => {
   try {
@@ -243,12 +243,13 @@ onMounted(async () => {
     const hydrated = (await Promise.all(recentDocs.map(async (doc) => hydrateDoc(doc)))).filter(
       (doc): doc is DocumentVersion => doc !== null,
     );
+    const publicDocs = hydrated.filter((doc) => doc.metadata.publicationScope === 'public');
 
-    if (hydrated.length > 0) {
-      latestDocs.value = hydrated.slice(0, 4);
+    if (publicDocs.length > 0) {
+      latestDocs.value = publicDocs.slice(0, 4);
 
-      const rabiap = hydrated.filter((doc) => doc.metadata.documentType === 'rabiap').slice(0, 3);
-      const prakat = hydrated.filter((doc) => doc.metadata.documentType === 'prakat').slice(0, 3);
+      const rabiap = publicDocs.filter((doc) => doc.metadata.documentType === 'rabiap').slice(0, 3);
+      const prakat = publicDocs.filter((doc) => doc.metadata.documentType === 'prakat').slice(0, 3);
 
       if (rabiap.length > 0) rabiapDocs.value = rabiap;
       if (prakat.length > 0) prakatDocs.value = prakat;
@@ -266,9 +267,7 @@ function hydrateDoc(doc: DocumentListItem): Promise<DocumentVersion | null> {
 
 function mapReviewToDocumentVersion(doc: DocumentListItem, review: ReviewDocument): DocumentVersion {
   const docType = inferDocType(review.law_meta?.law_type ?? doc.title);
-  const publicationScope: PublicationScope = doc.status === 'done' || doc.status === 'exported' || doc.status === 'ingested'
-    ? 'public'
-    : 'private';
+  const publicationScope: PublicationScope = review.law_meta?.access_scope === 'private' ? 'private' : 'public';
   const group = review.law_meta?.law_group || 'กลุ่มกฎหมาย';
   const org = review.law_meta?.agency || 'หน่วยงานที่เกี่ยวข้อง';
   const publishedDate = toDate(review.law_meta?.promulgation_date)
@@ -282,7 +281,7 @@ function mapReviewToDocumentVersion(doc: DocumentListItem, review: ReviewDocumen
     versionNo: Math.max(review.relations?.length ?? 0, 1),
     documentType: docType,
     publicationScope,
-    title: review.source_file || doc.title,
+    title: review.law_meta?.title || doc.title,
     summary: review.law_meta?.status
       ? `${review.law_meta.status} · ${group}`
       : `อัปเดตล่าสุดจาก ${org}`,
