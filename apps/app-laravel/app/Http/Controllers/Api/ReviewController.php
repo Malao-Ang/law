@@ -11,9 +11,11 @@ use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
 use App\Services\DocumentHtmlService;
 use App\Services\DocumentPipelineClient;
+use App\Services\Permissions\PermissionStore;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class ReviewController extends Controller
@@ -22,6 +24,7 @@ class ReviewController extends Controller
         private readonly ReviewStore $reviewStore,
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly DocumentPipelineClient $pipelineClient,
+        private readonly PermissionStore $permissionStore,
     ) {}
 
     public function show(string $documentId): JsonResponse
@@ -108,8 +111,16 @@ class ReviewController extends Controller
 
     public function updateDocumentReview(UpdateDocumentReviewRequest $request, string $documentId): JsonResponse
     {
+        $payload = $request->validated();
+
         try {
-            $payload = $this->reviewStore->updateDocumentReview($documentId, $request->validated());
+            if (isset($payload['law_meta']) && is_array($payload['law_meta'])) {
+                $payload['law_meta'] = $this->normalizePermissionLawMeta($payload['law_meta']);
+            }
+
+            $payload = $this->reviewStore->updateDocumentReview($documentId, $payload);
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -121,6 +132,68 @@ class ReviewController extends Controller
             'compose_state' => $payload['compose_state'],
             'law_meta' => $payload['law_meta'] ?? [],
             'relations' => $payload['relations'] ?? [],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $lawMeta
+     * @return array<string, mixed>
+     */
+    private function normalizePermissionLawMeta(array $lawMeta): array
+    {
+        $hasScope = array_key_exists('access_scope', $lawMeta);
+        $hasGroupIds = array_key_exists('permission_group_ids', $lawMeta);
+
+        if (! $hasScope && ! $hasGroupIds) {
+            return $lawMeta;
+        }
+
+        $scope = $hasScope ? (string) $lawMeta['access_scope'] : null;
+
+        if ($scope === 'public') {
+            $lawMeta['permission_group_ids'] = [];
+            return $lawMeta;
+        }
+
+        $groupIds = $this->permissionStore->validateGroupIds((array) ($lawMeta['permission_group_ids'] ?? []));
+
+        if ($scope === 'private' && $groupIds === []) {
+            throw ValidationException::withMessages([
+                'law_meta.permission_group_ids' => ['ต้องเลือกกลุ่มสิทธิ์อย่างน้อย 1 กลุ่มเมื่อกำหนดเป็น Private'],
+            ]);
+        }
+
+        if ($hasGroupIds || $scope === 'private') {
+            $lawMeta['permission_group_ids'] = $groupIds;
+        }
+
+        return $lawMeta;
+    }
+
+    public function updateWorkflowProgress(Request $request, string $documentId): JsonResponse
+    {
+        $validated = $request->validate([
+            'completed_step' => ['required', 'integer', 'min:1', 'max:6'],
+        ]);
+
+        if ($this->reviewStore->getStatus($documentId) === null) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $completedStep = (int) $validated['completed_step'];
+        $currentStep = min($completedStep + 1, 6);
+
+        $this->reviewStore->setStatus($documentId, [
+            'workflow_completed_step' => $completedStep,
+            'workflow_current_step' => $currentStep,
+            'workflow_updated_at' => now()->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status' => 'updated',
+            'workflow_completed_step' => $completedStep,
+            'workflow_current_step' => $currentStep,
         ]);
     }
 
