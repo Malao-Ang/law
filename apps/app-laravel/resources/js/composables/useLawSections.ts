@@ -45,7 +45,7 @@ const SUGGEST_RULES: ReadonlyArray<[RegExp, ChunkType]> = [
   [/^หมวด\s*[๐-๙0-9]/u, 'CHAPTER'],
   [/^ส่วนที่\s*[๐-๙0-9]/u, 'SECTION'],
   [/^มาตรา\s*[๐-๙0-9]/u, 'ARTICLE'],
-  [/^ข้อ\s*[๐-๙0-9]/u, 'ARTICLE'],
+  [/^ข้อ\s*[๐-๙0-9]/u, 'CLAUSE'],
   [/^คำปรารภ/u, 'PREAMBLE'],
 ];
 

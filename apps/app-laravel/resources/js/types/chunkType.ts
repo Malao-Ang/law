@@ -1,6 +1,6 @@
 export const CHUNK_TYPES = [
   'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION',
-  'ARTICLE', 'PARAGRAPH', 'ITEM', 'DEFINITION', 'TRANSITIONAL_PROVISION',
+  'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM', 'DEFINITION', 'TRANSITIONAL_PROVISION',
   'ANNEX', 'TABLE', 'NOTE', 'FOOTNOTE', 'SIGNATURE_BLOCK', 'OTHER',
 ] as const;
 
@@ -8,7 +8,7 @@ export type ChunkType = typeof CHUNK_TYPES[number];
 
 // Structural heading types — the ones isHead() treats as section heads.
 export const HEAD_CHUNK_TYPES: readonly ChunkType[] = [
-  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'ANNEX', 'TRANSITIONAL_PROVISION',
+  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'ANNEX', 'TRANSITIONAL_PROVISION',
 ];
 
 export const CHUNK_TYPE_LABELS: Record<ChunkType, string> = {
@@ -19,6 +19,7 @@ export const CHUNK_TYPE_LABELS: Record<ChunkType, string> = {
   CHAPTER: 'หมวด',
   SECTION: 'ส่วน',
   ARTICLE: 'มาตรา',
+  CLAUSE: 'ข้อ',
   PARAGRAPH: 'วรรค',
   ITEM: 'รายการ',
   DEFINITION: 'นิยาม',
@@ -39,6 +40,7 @@ export const CHUNK_TYPE_COLORS: Record<ChunkType, string> = {
   CHAPTER: 'deep-purple',
   SECTION: 'red',
   ARTICLE: 'primary',
+  CLAUSE: 'orange',
   PARAGRAPH: 'teal',
   ITEM: 'warning',
   DEFINITION: 'amber',
