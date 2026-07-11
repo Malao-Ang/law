@@ -16,7 +16,10 @@
   ScanExtractionMode,
   UpdateDocumentReviewResponse,
   UploadResponse,
+  WorkflowProgressResponse,
 } from '../types/document';
+import type { LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
+import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
 
 type ApiErrorPayload = {
   message?: string;
@@ -109,6 +112,16 @@ export function saveDocumentReview(
   });
 }
 
+export function updateWorkflowProgress(
+  documentId: string,
+  completedStep: number,
+): Promise<WorkflowProgressResponse> {
+  return jsonRequest<WorkflowProgressResponse>(`/api/documents/${documentId}/workflow-progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ completed_step: completedStep }),
+  });
+}
+
 export function updateComposeState(
   documentId: string,
   payload: Partial<ComposeState>,
@@ -183,6 +196,21 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
   return jsonRequest<ExportResponse>(`/api/documents/${documentId}/export`, {
     method: 'POST',
     body: JSON.stringify({}),
+  });
+}
+
+export function searchLaws(params: LawSearchParams): Promise<LawSearchResponse> {
+  return jsonRequest<LawSearchResponse>('/api/laws/search', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export function suggestLaws(params: LawSuggestParams, signal?: AbortSignal): Promise<LawSuggestResponse> {
+  return jsonRequest<LawSuggestResponse>('/api/laws/suggest', {
+    method: 'POST',
+    body: JSON.stringify(params),
+    signal,
   });
 }
 
@@ -279,4 +307,36 @@ export function fetchReportSummary(filters: ReportFilters = {}): Promise<ReportS
 
   const qs = params.toString();
   return jsonRequest<ReportSummary>(`/api/reports/summary${qs ? `?${qs}` : ''}`);
+}
+
+export function fetchPermissionDirectory(): Promise<PermissionDirectoryResponse> {
+  return jsonRequest<PermissionDirectoryResponse>('/api/permission-directory');
+}
+
+export function listPermissionGroups(): Promise<{ groups: PermissionGroup[] }> {
+  return jsonRequest<{ groups: PermissionGroup[] }>('/api/permission-groups');
+}
+
+export function fetchPermissionGroup(groupId: string): Promise<PermissionGroup> {
+  return jsonRequest<PermissionGroup>(`/api/permission-groups/${groupId}`);
+}
+
+export function createPermissionGroup(payload: UpsertPermissionGroupPayload): Promise<PermissionGroup> {
+  return jsonRequest<PermissionGroup>('/api/permission-groups', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePermissionGroup(groupId: string, payload: UpsertPermissionGroupPayload): Promise<PermissionGroup> {
+  return jsonRequest<PermissionGroup>(`/api/permission-groups/${groupId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePermissionGroup(groupId: string): Promise<{ group_id: string; status: string }> {
+  return jsonRequest<{ group_id: string; status: string }>(`/api/permission-groups/${groupId}`, {
+    method: 'DELETE',
+  });
 }
