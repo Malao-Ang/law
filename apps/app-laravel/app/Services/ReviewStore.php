@@ -105,6 +105,7 @@ class ReviewStore
             $documentId = (string) ($status['document_id'] ?? basename($file, '.json'));
             $title = (string) ($status['source_file'] ?? $documentId);
             $parentDocumentId = null;
+            $accessScope = 'public';
 
             $reviewPath = $this->intermediatePath($documentId);
             if (is_file($reviewPath)) {
@@ -118,6 +119,7 @@ class ReviewStore
                 if ($parentRaw !== '') {
                     $parentDocumentId = $parentRaw;
                 }
+                $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
             }
 
             $documents[] = [
@@ -126,6 +128,10 @@ class ReviewStore
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
                 'parent_document_id' => $parentDocumentId,
+                'access_scope' => $accessScope,
+                'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
+                'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,
+                'workflow_updated_at' => $status['workflow_updated_at'] ?? null,
             ];
         }
 
@@ -176,6 +182,7 @@ class ReviewStore
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
+                'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
                 'law_type' => trim((string) ($meta['law_type'] ?? '')),
                 'law_groups' => $groups,
                 'agencies' => $agencies,
@@ -403,7 +410,11 @@ class ReviewStore
 
             if (array_key_exists('law_meta', $payload) && is_array($payload['law_meta'])) {
                 $this->ensureLawMetaDefaults($document);
-                $document['law_meta'] = array_merge($document['law_meta'], $payload['law_meta']);
+                $lawMetaPayload = $payload['law_meta'];
+                if (($lawMetaPayload['access_scope'] ?? null) === 'public') {
+                    $lawMetaPayload['permission_group_ids'] = [];
+                }
+                $document['law_meta'] = array_merge($document['law_meta'], $lawMetaPayload);
                 $this->ensureLawMetaDefaults($document);
             }
 
@@ -1265,22 +1276,93 @@ class ReviewStore
             }
         }
 
+        $keywords = [];
+        foreach (($meta['keywords'] ?? []) as $entry) {
+            $text = trim((string) $entry);
+            if ($text !== '' && ! in_array($text, $keywords, true)) {
+                $keywords[] = $text;
+            }
+        }
+
         $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+        $lawGroups = is_array($meta['law_groups'] ?? null) ? array_values(array_filter(array_map(
+            static fn (mixed $entry): string => trim((string) $entry),
+            $meta['law_groups'],
+        ))) : [];
+        $agencies = is_array($meta['agencies'] ?? null) ? array_values(array_filter(array_map(
+            static fn (mixed $entry): string => trim((string) $entry),
+            $meta['agencies'],
+        ))) : [];
+        $legacyLawGroup = trim((string) ($meta['law_group'] ?? ''));
+        $legacyAgency = trim((string) ($meta['agency'] ?? ''));
+        $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
+        $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null) ? array_values(array_unique(array_filter(array_map(
+            static fn (mixed $entry): string => trim((string) $entry),
+            $meta['permission_group_ids'],
+        )))) : [];
+
+        if ($lawGroups === [] && $legacyLawGroup !== '') {
+            $lawGroups = [$legacyLawGroup];
+        }
+
+        if ($agencies === [] && $legacyAgency !== '') {
+            $agencies = [$legacyAgency];
+        }
+
+        $sectionCount = $this->countLawSections($document);
 
         $document['law_meta'] = array_merge([
             'status' => '',
             'law_type' => '',
             'law_group' => '',
+            'change_status' => null,
+            'law_groups' => [],
             'agency' => '',
+            'signer_group' => null,
+            'agencies' => [],
+            'keywords' => [],
             'promulgation_date' => '',
             'effective_date' => '',
             'gazette_reference' => '',
             'royal_command' => '',
             'parent_document_id' => null,
+            'access_scope' => 'public',
+            'permission_group_ids' => [],
         ], $meta, [
+            'law_group' => $lawGroups[0] ?? '',
+            'law_groups' => $lawGroups,
+            'agency' => $agencies[0] ?? '',
+            'agencies' => $agencies,
+            'keywords' => $keywords,
             'repealed_laws' => $repealed,
+            'section_count' => $sectionCount,
             'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
+            'access_scope' => $accessScope,
+            'permission_group_ids' => $accessScope === 'public' ? [] : $permissionGroupIds,
         ]);
+    }
+
+    private function countLawSections(array $document): int
+    {
+        $count = 0;
+        foreach (($document['pages'] ?? []) as $page) {
+            if (! is_array($page) || ! is_array($page['blocks'] ?? null)) {
+                continue;
+            }
+
+            foreach ($page['blocks'] as $block) {
+                if (! is_array($block)) {
+                    continue;
+                }
+
+                $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
+                if ($chunkType === 'ARTICLE') {
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
     }
 
     private function sanitizeHtml(string $html): string
