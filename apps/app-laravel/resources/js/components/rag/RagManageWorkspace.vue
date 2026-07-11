@@ -273,11 +273,18 @@ async function mergeSelected(): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
-  // Split the block out as its own section head — never merge into the previous
-  // section. Splitting a block that is already a main heading is guarded by a
-  // confirmation dialog.
   const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type);
+
   if (isHead) {
+    // Splitting a header detaches its body: the header stays its own section and
+    // the blocks under it start a NEW section (promote the first child to a head).
+    // Never merges into the previous section. Guarded by a confirmation dialog.
+    const section = sections.value.find((s) => s.headBlock.block_id === block.block_id);
+    const firstChild = section?.children[0];
+    if (!firstChild) {
+      snackbar.success('ไม่มีเนื้อหาใต้หัวข้อให้แยกออก');
+      return;
+    }
     const confirmed = await Swal.fire({
       title: 'คุณมั่นใจไหมที่ต้องการแยกหัวข้อหลักออก',
       icon: 'warning',
@@ -286,14 +293,31 @@ async function splitBlock(block: DocumentBlock): Promise<void> {
       cancelButtonText: 'ยกเลิก',
     });
     if (!confirmed.isConfirmed) return;
+
+    blockBusy.value = true;
+    try {
+      const childHeadType = headTypeFor(firstChild);
+      firstChild.meta.chunk_type = childHeadType;    // optimistic → body becomes a new section
+      await persistChunkType(firstChild, childHeadType);
+      clearSelection();
+      snackbar.success('แยกหัวข้อหลักออกแล้ว');
+    } catch (e) {
+      snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
+      await reloadBlocks();
+    } finally {
+      blockBusy.value = false;
+    }
+    return;
   }
+
+  // Non-head block → promote it to a section head, splitting the section here.
   blockBusy.value = true;
   try {
-    const headType: ChunkType = isHead ? (block.meta.chunk_type as ChunkType) : headTypeFor(block);
-    block.meta.chunk_type = headType;                // optimistic → starts its own section
+    const headType = headTypeFor(block);
+    block.meta.chunk_type = headType;                // optimistic → starts a new section
     await persistChunkType(block, headType);
     clearSelection();
-    snackbar.success('แยก section ออกแล้ว');
+    snackbar.success('เริ่ม section ใหม่แล้ว');
   } catch (e) {
     snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
     await reloadBlocks();
