@@ -30,8 +30,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - ocr-service
+      redis:
+        condition: service_started
+      ocr-service:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
     ports:
       - "8000:8000"
 
@@ -84,9 +88,14 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - laravel-app
-      - ocr-service
+      redis:
+        condition: service_started
+      laravel-app:
+        condition: service_started
+      ocr-service:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
 
   ocr-service:
     build:
@@ -129,8 +138,6 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    ulimits:
-      memlock: { soft: -1, hard: -1 }
     volumes:
       - es_data:/usr/share/elasticsearch/data
     ports:
