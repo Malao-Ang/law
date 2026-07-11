@@ -273,18 +273,17 @@ async function mergeSelected(): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
-  // Already a section head — nothing to promote.
-  if (block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type)) {
-    snackbar.success('บล็อกนี้เป็น section head อยู่แล้ว');
-    return;
-  }
+  // Toggle the section boundary: a normal block becomes a section head (starts a
+  // new section); a block that is already a head is demoted back to a paragraph
+  // (merges into the previous section). Every block can therefore be split/joined.
+  const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type);
   blockBusy.value = true;
   try {
-    const headType = headTypeFor(block);
-    block.meta.chunk_type = headType;                // optimistic → starts a new section
-    await persistChunkType(block, headType);
+    const nextType: ChunkType = isHead ? 'PARAGRAPH' : headTypeFor(block);
+    block.meta.chunk_type = nextType;                // optimistic
+    await persistChunkType(block, nextType);
     clearSelection();
-    snackbar.success('เริ่ม section ใหม่แล้ว');
+    snackbar.success(isHead ? 'รวมเข้ากับ section ก่อนหน้าแล้ว' : 'เริ่ม section ใหม่แล้ว');
   } catch (e) {
     snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
     await reloadBlocks();
