@@ -11,7 +11,7 @@ class LawIndexDefinition
             'type' => 'text',
             'analyzer' => 'thai',
             'fields' => $withKeyword ? ['keyword' => ['type' => 'keyword', 'ignore_above' => 256]] : null,
-        ]);
+        ], fn ($v) => $v !== null);
 
         return [
             'mappings' => [

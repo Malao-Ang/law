@@ -4,6 +4,7 @@ namespace App\Services\Search;
 
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
+use Elastic\Elasticsearch\Exception\ClientResponseException;
 
 class ElasticClient
 {
@@ -20,7 +21,12 @@ class ElasticClient
 
     public function indexExists(): bool
     {
-        return $this->client->indices()->exists(['index' => $this->index])->getStatusCode() === 200;
+        try {
+            $this->client->indices()->exists(['index' => $this->index]);
+            return true;
+        } catch (ClientResponseException $e) {
+            return $e->getCode() !== 404;
+        }
     }
 
     public function createIndex(array $definition): void
