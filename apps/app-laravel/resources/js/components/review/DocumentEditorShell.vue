@@ -300,6 +300,8 @@ async function saveAndContinue(): Promise<void> {
   const result = await documentStore.saveReview({ draft_html: editor.value?.getHTML() ?? '' });
   if (result !== null) {
     reviewUiStore.setDirty(false);
+    const progressed = await documentStore.completeWorkflowStep(2);
+    if (!progressed) return;
     router.push(`/documents/${props.documentId}/rag`);
   }
 }

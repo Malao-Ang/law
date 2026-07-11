@@ -81,7 +81,7 @@ import { listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
-  deriveStage, laterStage, nextStage, prevStage, readStages, writeStage,
+  deriveStage, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
 
@@ -106,9 +106,12 @@ const headers = [
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
+  const workflowStage = deriveStageFromWorkflow(doc.workflow_completed_step);
+  const stored = localStages.value[doc.document_id];
+  if (workflowStage) return stored ? laterStage(workflowStage, stored) : workflowStage;
+
   const derived = deriveStage(doc.status);
   if (derived === 'failed') return 'failed';
-  const stored = localStages.value[doc.document_id];
   return stored ? laterStage(derived, stored) : derived;
 }
 

@@ -182,9 +182,12 @@ export interface LawMeta {
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
+  change_status?: 'new' | 'amended' | 'repealed' | 'consolidated' | null;
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
+  signer_group?: string | null;
   agencies: string[];      // multi-chip หน่วยงานที่รับผิดชอบ
+  keywords: string[];
   promulgation_date: string;
   effective_date: string;
   published_date: string;
@@ -196,6 +199,8 @@ export interface LawMeta {
   repealed_laws: string[];
   imported_by: string;
   parent_document_id: string | null;
+  access_scope: 'public' | 'private';
+  permission_group_ids: string[];
 }
 
 export type RelationType = 'related' | 'repeals';
@@ -219,6 +224,10 @@ export interface DocumentListItem {
   status: string;
   updated_at?: string | null;
   parent_document_id?: string | null;
+  access_scope?: 'public' | 'private';
+  workflow_completed_step?: number | null;
+  workflow_current_step?: number | null;
+  workflow_updated_at?: string | null;
 }
 
 export interface LawCatalogSection {
@@ -282,6 +291,9 @@ export interface DocumentStatus {
   status: 'queued' | 'processing' | 'done' | 'failed' | 'exported' | 'ingesting' | 'ingested';
   progress: number;
   current_step: string;
+  workflow_completed_step?: number | null;
+  workflow_current_step?: number | null;
+  workflow_updated_at?: string | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;
@@ -329,6 +341,13 @@ export interface UpdateDocumentReviewResponse {
   compose_state?: ComposeState;
   law_meta?: LawMeta;
   relations?: LawRelation[];
+}
+
+export interface WorkflowProgressResponse {
+  document_id: string;
+  status: 'updated';
+  workflow_completed_step: number;
+  workflow_current_step: number;
 }
 
 export interface PreviewData {

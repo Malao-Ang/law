@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { fetchReview, saveDocumentReview } from '../api/client';
+import { fetchReview, saveDocumentReview, updateWorkflowProgress } from '../api/client';
 import type { DocumentReviewState, LawMeta, LawRelation, ReviewDocument } from '../types/document';
 
 export const useDocumentStore = defineStore('document', () => {
@@ -80,6 +80,20 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
+  async function completeWorkflowStep(step: number): Promise<boolean> {
+    saving.value = true;
+    saveError.value = '';
+    try {
+      await updateWorkflowProgress(documentId.value, step);
+      return true;
+    } catch (e: unknown) {
+      saveError.value = e instanceof Error ? e.message : 'อัปเดตขั้นตอนไม่สำเร็จ';
+      return false;
+    } finally {
+      saving.value = false;
+    }
+  }
+
   function setSaveError(msg = ''): void {
     saveError.value = msg;
   }
@@ -93,5 +107,19 @@ export const useDocumentStore = defineStore('document', () => {
     saveError.value = '';
   }
 
-  return { documentId, review, loading, error, saving, saveError, fetch, saveReview, saveLawMeta, saveRelations, setSaveError, reset };
+  return {
+    documentId,
+    review,
+    loading,
+    error,
+    saving,
+    saveError,
+    fetch,
+    saveReview,
+    saveLawMeta,
+    saveRelations,
+    completeWorkflowStep,
+    setSaveError,
+    reset,
+  };
 });

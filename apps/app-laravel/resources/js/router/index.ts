@@ -11,6 +11,8 @@ import ComposePage from '../pages/compose/ComposePage.vue';
 import PreviewPage from '../pages/preview/PreviewPage.vue';
 import RagPage from '../pages/rag/RagPage.vue';
 import LawInfoPage from '../pages/law-info/LawInfoPage.vue';
+import LawRelationsPage from '../pages/law-relations/LawRelationsPage.vue';
+import PermissionAccessPage from '../pages/permissions/PermissionAccessPage.vue';
 import LawPage from '../pages/law/LawPage.vue';
 
 const routes: RouteRecordRaw[] = [
@@ -24,6 +26,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/compose', name: 'compose', component: ComposePage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/law-info', name: 'law-info', component: LawInfoPage, props: true, meta: { bareLayout: true } },
+  { path: '/documents/:documentId/relations', name: 'law-relations', component: LawRelationsPage, props: true, meta: { bareLayout: true } },
+  { path: '/documents/:documentId/permissions', name: 'document-permissions', component: PermissionAccessPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/rag', name: 'rag', component: RagPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/preview', name: 'preview', component: PreviewPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },

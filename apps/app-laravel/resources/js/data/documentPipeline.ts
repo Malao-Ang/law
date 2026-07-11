@@ -1,6 +1,7 @@
 // apps/app-laravel/resources/js/data/documentPipeline.ts
 // Front-end workflow stages. Backend owns queue/processing/processed + failed;
-// later stages are advanced in the UI and persisted per-document in localStorage.
+// later workflow steps prefer server-side progress, with localStorage kept only
+// as a fallback for older documents and manual admin overrides.
 
 export type StageKey =
   | 'queue' | 'processing' | 'processed' | 'normalize' | 'rag'
@@ -26,8 +27,8 @@ export const STAGES: StageDef[] = [
   { key: 'processed',  label: 'ประมวลผลแล้ว',    color: 'primary',          icon: 'mdi-check-circle-outline', action: { type: 'route', label: 'เริ่มตรวจ', to: (id) => `/documents/${id}/review` } },
   { key: 'normalize',  label: 'ปรับข้อความ',      color: 'warning',          icon: 'mdi-format-text',          action: { type: 'route', label: 'แก้ไขข้อความ', to: (id) => `/documents/${id}/review` } },
   { key: 'rag',        label: 'จัดการ RAG',       color: 'admin-primary',    icon: 'mdi-database-cog-outline', action: { type: 'route', label: 'จัดการ RAG', to: (id) => `/documents/${id}/rag` } },
-  { key: 'relation',   label: 'เพิ่มความสัมพันธ์', color: 'doc-rabiap',       icon: 'mdi-graph-outline',        action: { type: 'route', label: 'เพิ่มความสัมพันธ์', to: (id) => `/documents/${id}/law-info` } },
   { key: 'info',       label: 'กรอกข้อมูลเอกสาร',  color: 'doc-kho-bangkhab', icon: 'mdi-information-outline',   action: { type: 'route', label: 'กรอกข้อมูล', to: (id) => `/documents/${id}/law-info` } },
+  { key: 'relation',   label: 'เพิ่มความสัมพันธ์', color: 'doc-rabiap',       icon: 'mdi-graph-outline',        action: { type: 'route', label: 'เพิ่มความสัมพันธ์', to: (id) => `/documents/${id}/relations` } },
   { key: 'complete',   label: 'เสร็จสมบูรณ์',      color: 'success',          icon: 'mdi-check-decagram-outline', action: { type: 'advance', label: 'ส่งลงนาม e-Sign' } },
   { key: 'wait_esign', label: 'รอลงนาม',          color: 'elaw-gold',        icon: 'mdi-draw-pen',             action: { type: 'advance', label: 'ยืนยันลงนาม' } },
   { key: 'public',     label: 'เผยแพร่แล้ว',       color: 'success',          icon: 'mdi-earth',                action: { type: 'route', label: 'ดูหน้าเผยแพร่', to: (id) => `/law/${id}` } },
@@ -59,6 +60,17 @@ export function deriveStage(backendStatus: string): StageKey {
     case 'exported':
     case 'ingested': return 'processed';
     default: return 'queue'; // queued / pending / unknown
+  }
+}
+
+export function deriveStageFromWorkflow(completedStep?: number | null): StageKey | null {
+  switch (completedStep) {
+    case 2: return 'rag';
+    case 3: return 'info';
+    case 4: return 'relation';
+    case 5: return 'complete';
+    case 6: return 'public';
+    default: return null;
   }
 }
 
