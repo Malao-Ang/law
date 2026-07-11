@@ -202,8 +202,10 @@ class ReviewStore
         $needsSync = $review === [] || (bool) ($review['out_of_sync'] ?? false);
 
         if ($needsSync) {
-            $this->syncDocumentReview($document);
-            $this->blob->write('review', $documentId, $document);
+            $this->blob->withLock('review', $documentId, function (array &$doc): void {
+                $this->syncDocumentReview($doc);
+            });
+            $document = $this->blob->read('review', $documentId) ?? $document;
         }
 
         return $document;
@@ -848,48 +850,55 @@ class ReviewStore
      */
     public function applyNormalizationResults(string $documentId, array $results): array
     {
-        $doc = $this->getReviewDocument($documentId);
+        $returnDoc = [];
 
-        $byId = [];
-        foreach ($results as $result) {
-            $blockId = $result['block_id'] ?? null;
-            if (is_string($blockId) && $blockId !== '') {
-                $byId[$blockId] = $result;
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($results, &$returnDoc): void {
+            if ($document === []) {
+                throw new RuntimeException('Review document not found.');
             }
-        }
 
-        $reviewCount = 0;
-        foreach ($doc['pages'] ?? [] as $pageIndex => $page) {
-            foreach ($page['blocks'] ?? [] as $blockIndex => $block) {
-                $blockId = $block['block_id'] ?? null;
-
-                if (is_string($blockId) && isset($byId[$blockId])) {
-                    $result = $byId[$blockId];
-                    $approved = (string) ($result['approved_text'] ?? ($block['approved_text'] ?? ''));
-
-                    $block['normalized_text'] = (string) ($result['normalized_text'] ?? ($block['normalized_text'] ?? ''));
-                    $block['approved_text'] = $approved;
-                    $block['ai_suggested_text'] = $approved;
-                    $block['flags'] = $result['flags'] ?? ($block['flags'] ?? []);
-                    $block['needs_review'] = false;
-                    $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
-                    $existingMeta['spell_suggestions'] = $result['spell_suggestions'] ?? [];
-                    $block['meta'] = $existingMeta;
-
-                    $doc['pages'][$pageIndex]['blocks'][$blockIndex] = $block;
-                }
-
-                if (($doc['pages'][$pageIndex]['blocks'][$blockIndex]['needs_review'] ?? false) === true) {
-                    $reviewCount++;
+            $byId = [];
+            foreach ($results as $result) {
+                $blockId = $result['block_id'] ?? null;
+                if (is_string($blockId) && $blockId !== '') {
+                    $byId[$blockId] = $result;
                 }
             }
-        }
 
-        $doc['summary']['review_required_count'] = $reviewCount;
+            $reviewCount = 0;
+            foreach ($document['pages'] ?? [] as $pageIndex => $page) {
+                foreach ($page['blocks'] ?? [] as $blockIndex => $block) {
+                    $blockId = $block['block_id'] ?? null;
 
-        $this->writeReviewDocument($documentId, $doc);
+                    if (is_string($blockId) && isset($byId[$blockId])) {
+                        $result = $byId[$blockId];
+                        $approved = (string) ($result['approved_text'] ?? ($block['approved_text'] ?? ''));
 
-        return $doc;
+                        $block['normalized_text'] = (string) ($result['normalized_text'] ?? ($block['normalized_text'] ?? ''));
+                        $block['approved_text'] = $approved;
+                        $block['ai_suggested_text'] = $approved;
+                        $block['flags'] = $result['flags'] ?? ($block['flags'] ?? []);
+                        $block['needs_review'] = false;
+                        $existingMeta = is_array($block['meta'] ?? null) ? $block['meta'] : [];
+                        $existingMeta['spell_suggestions'] = $result['spell_suggestions'] ?? [];
+                        $block['meta'] = $existingMeta;
+
+                        $document['pages'][$pageIndex]['blocks'][$blockIndex] = $block;
+                    }
+
+                    if (($document['pages'][$pageIndex]['blocks'][$blockIndex]['needs_review'] ?? false) === true) {
+                        $reviewCount++;
+                    }
+                }
+            }
+
+            $document['summary']['review_required_count'] = $reviewCount;
+
+            $this->syncDocumentReview($document);
+            $returnDoc = $document;
+        });
+
+        return $returnDoc;
     }
 
     /**
