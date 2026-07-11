@@ -22,10 +22,9 @@ class ElasticClient
     public function indexExists(): bool
     {
         try {
-            $this->client->indices()->exists(['index' => $this->index]);
-            return true;
+            return $this->client->indices()->exists(['index' => $this->index])->getStatusCode() === 200;
         } catch (ClientResponseException $e) {
-            return $e->getCode() !== 404;
+            return false;
         }
     }
 
@@ -36,8 +35,16 @@ class ElasticClient
 
     public function deleteIndex(): void
     {
-        if ($this->indexExists()) {
+        if (! $this->indexExists()) {
+            return;
+        }
+
+        try {
             $this->client->indices()->delete(['index' => $this->index]);
+        } catch (ClientResponseException $e) {
+            if ($e->getCode() !== 404) {
+                throw $e;
+            }
         }
     }
 
