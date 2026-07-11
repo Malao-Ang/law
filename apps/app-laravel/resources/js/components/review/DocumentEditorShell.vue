@@ -1,5 +1,13 @@
 <template>
-  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:16px 24px; background:#f8fafc; box-sizing:border-box">
+  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:72px 24px 60px; background:#f8fafc; box-sizing:border-box">
+    <WorkflowStepper :step="2" />
+    <WorkflowFooterBar
+      :step="2"
+      next-label="บันทึก →"
+      :next-loading="documentStore.saving"
+      @back="router.push('/admin/upload')"
+      @next="saveAndContinue"
+    />
     <!-- Header -->
     <div class="d-flex justify-space-between align-center py-3" style="flex-shrink:0">
       <div>
@@ -69,10 +77,11 @@
         <option value="2">2.0</option>
       </select>
       <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
-      <span class="text-caption d-flex align-center ga-1 ml-auto" style="white-space:nowrap">
+      <span class="text-caption d-flex align-center ga-1 mr-auto" style="white-space:nowrap">
         <v-icon :icon="reviewUiStore.isDirty ? 'mdi-circle-medium' : 'mdi-check-circle-outline'" :color="reviewUiStore.isDirty ? 'warning' : 'success'" size="16" />
         บันทึกอัตโนมัติ
       </span>
+      <v-btn size="small" variant="outlined" prepend-icon="mdi-eye-outline" :loading="documentStore.saving" @click="openPreview">ดูตัวอย่าง</v-btn>
 
       <!-- Row 4: Table + Image -->
       <v-divider vertical class="mx-2" style="height:18px; align-self:center" />
@@ -103,15 +112,6 @@
       </template>
     </v-alert>
 
-    <!-- Footer -->
-    <div class="d-flex align-center justify-space-between px-6 py-3 bg-white" style="border-top:1px solid #e2e8f0; flex-shrink:0">
-      <span class="text-caption text-medium-emphasis">{{ charCount }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด</span>
-      <div class="d-flex ga-2">
-        <v-btn variant="outlined" @click="router.back()">ยกเลิก</v-btn>
-        <v-btn variant="outlined" prepend-icon="mdi-eye-outline" :loading="documentStore.saving" @click="openPreview">ดูตัวอย่าง</v-btn>
-        <v-btn color="#1c398e" :loading="documentStore.saving" @click="saveAndContinue">บันทึกข้อมูล</v-btn>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -137,6 +137,8 @@ import { ResizableImageExtension } from '../../extensions/ResizableImageExtensio
 import { TableWithBlockIdExtension } from '../../extensions/TableWithBlockIdExtension';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
+import WorkflowStepper from '../shared/WorkflowStepper.vue';
+import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 
 const props = defineProps<{ documentId: string }>();
 
