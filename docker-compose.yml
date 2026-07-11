@@ -36,6 +36,8 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     ports:
       - "8000:8000"
 
@@ -96,6 +98,8 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
 
   ocr-service:
     build:
@@ -152,6 +156,20 @@ services:
       timeout: 5s
       retries: 12
 
+  mongo:
+    image: mongo:7
+    container_name: thai-ocr-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - poc_mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 volumes:
   poc_storage:
   es_data:
+  poc_mongo:

@@ -37,7 +37,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd mbstring zip pcntl \
     && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install mongodb \
+    && docker-php-ext-enable redis mongodb \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

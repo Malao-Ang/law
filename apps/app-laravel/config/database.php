@@ -112,6 +112,15 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        'mongodb' => [
+            'driver'   => 'mongodb',
+            'host'     => env('MONGO_HOST', 'mongo'),
+            'port'     => (int) env('MONGO_PORT', 27017),
+            'database' => env('MONGO_DATABASE', 'poc'),
+            'username' => env('MONGO_USERNAME', ''),
+            'password' => env('MONGO_PASSWORD', ''),
+        ],
+
     ],
 
     /*
