@@ -96,8 +96,8 @@
                   :block="section.headBlock"
                   :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
                 />
-                <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="splitBlock(section.headBlock)">
+                <button class="rag-blockrow__split" :disabled="blockBusy" title="แยกบรรทัด"
+                  @click.prevent.stop="openLineSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -117,8 +117,8 @@
                   <span class="mdi mdi-check"></span>
                 </span>
                 <BlockFlow :block="child" />
-                <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="splitBlock(child)">
+                <button class="rag-blockrow__split" :disabled="blockBusy" title="แยกบรรทัด"
+                  @click.prevent.stop="openLineSplit(child)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -142,6 +142,11 @@
 
       </div>
     </template>
+    <SplitBlockDialog
+      v-model="splitDialog.open"
+      :block="splitDialog.block"
+      @confirm="onLineSplitConfirm"
+    />
   </AppShell>
 </template>
 
@@ -158,6 +163,7 @@ import WorkflowStepper from '../shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import BlockFlow from '../shared/BlockFlow.vue';
+import SplitBlockDialog from './SplitBlockDialog.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
@@ -196,6 +202,7 @@ const allBlocks = computed<DocumentBlock[]>(() =>
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
+const splitDialog = ref<{ open: boolean; block: DocumentBlock | null }>({ open: false, block: null });
 const blockListEl = ref<HTMLElement | null>(null);
 
 const blockPage = computed<Map<string, number>>(() => {
@@ -265,6 +272,51 @@ async function mergeSelected(): Promise<void> {
     snackbar.success('จัดกลุ่มเป็นคอนเทนเนอร์เดียวแล้ว');
   } catch (e) {
     snackbar.error(e instanceof Error ? e.message : 'จัดกลุ่มไม่สำเร็จ');
+    await reloadBlocks();
+  } finally {
+    blockBusy.value = false;
+  }
+}
+
+function blockLines(block: DocumentBlock): string[] {
+  return (block.approved_text || block.normalized_text || block.raw_text || '').split('\n');
+}
+
+function openLineSplit(block: DocumentBlock): void {
+  if (blockBusy.value) return;
+  if (blockLines(block).length < 2) {
+    snackbar.success('บล็อกนี้มีบรรทัดเดียว ไม่สามารถแบ่งได้');
+    return;
+  }
+  splitDialog.value = { open: true, block };
+}
+
+async function onLineSplitConfirm(boundaries: number[]): Promise<void> {
+  const block = splitDialog.value.block;
+  splitDialog.value.open = false;
+  if (!block || boundaries.length === 0) return;
+
+  blockBusy.value = true;
+  try {
+    const lines = blockLines(block);
+    const pageNo = blockPage.value.get(block.block_id) ?? 1;
+    let tailId = block.block_id;
+    let consumed = 0;
+    for (const boundary of [...boundaries].sort((a, b) => a - b)) {
+      const res = await blockStore.split(props.documentId, tailId, {
+        page_no: pageNo,
+        before_text: lines.slice(consumed, boundary).join('\n'),
+        before_html: '',
+        after_text: lines.slice(boundary).join('\n'),
+        after_html: '',
+      });
+      tailId = res.second.block_id;
+      consumed = boundary;
+    }
+    await reloadBlocks();
+    snackbar.success('แยกบรรทัดออกเป็นบล็อกใหม่แล้ว');
+  } catch (e) {
+    snackbar.error(e instanceof Error ? e.message : 'แยกบรรทัดไม่สำเร็จ');
     await reloadBlocks();
   } finally {
     blockBusy.value = false;
@@ -435,7 +487,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: keep page scroll locked; only rag-block-list should scroll */
 .rag-content-area {
   display: flex;
   flex-direction: column;
