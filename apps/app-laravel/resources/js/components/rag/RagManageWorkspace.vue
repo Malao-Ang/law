@@ -1,15 +1,13 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
     subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
-    <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
-        ย้อนกลับ
-      </v-btn>
-      <v-btn color="admin-primary" append-icon="mdi-arrow-right" :disabled="blockBusy"
-        @click="router.push(`/documents/${props.documentId}/law-info`)">
-        ถัดไป
-      </v-btn>
-    </template>
+    <WorkflowStepper :step="3" />
+    <WorkflowFooterBar
+      :step="3"
+      :next-disabled="blockBusy"
+      @back="router.push(`/documents/${props.documentId}/review`)"
+      @next="router.push(`/documents/${props.documentId}/law-info`)"
+    />
 
     <!-- Loading -->
     <div v-if="composeStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
@@ -156,6 +154,8 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import type { DocumentBlock, LawRelation } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
+import WorkflowStepper from '../shared/WorkflowStepper.vue';
+import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
@@ -420,6 +420,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   gap: 12px;
   overflow: hidden;
+  padding-top: 56px;
 }
 
 .rag-selection-bar {
@@ -450,6 +451,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   padding-right: 4px;
+  padding-bottom: 60px;
   overscroll-behavior: contain;
 }
 
