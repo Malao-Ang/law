@@ -12,69 +12,104 @@
               ค้นหาชื่อกฎหมาย, เลขที่ประกาศ, คำสำคัญ, มาตรา หรือหน่วยงานที่เกี่ยวข้อง
             </p>
           </div>
-            <div>
-              <div class="d-flex flex-column flex-md-row ga-3 align-stretch align-md-center">
-                <v-text-field
-                  v-model="query"
-                  :placeholder="'พิมพ์คำค้น เช่น พระราชบัญญัติ, มาตรา, สิทธิข้อมูลส่วนบุคคล...'"
-                  variant="outlined"
-                  density="comfortable"
-                  hide-details
-                  rounded="xl"
-                  class="flex-grow-1 elaw-search-input"
-                  bg-color="detail-surface"
-                  @keydown.enter="doSearch"
-                />
-                <v-btn color="secondary" size="large" rounded="lg" @click="doSearch">
-                  <v-icon start icon="mdi-magnify" />
-                  ค้นหาข้อมูล
-                </v-btn>
-              </div>
+
+          <div class="d-flex flex-column flex-md-row ga-3 align-stretch align-md-start">
+            <div class="flex-grow-1 elaw-search-shell">
+              <v-text-field
+                v-model="query"
+                :placeholder="'พิมพ์คำค้น เช่น พระราชบัญญัติ, มาตรา, สิทธิข้อมูลส่วนบุคคล...'"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                rounded="xl"
+                class="elaw-search-input"
+                bg-color="detail-surface"
+                @focus="searchFocused = true"
+                @blur="queueHideSuggestions"
+                @keydown.enter.prevent="doSearch"
+              />
+              <v-card
+                v-if="showSuggestions"
+                class="elaw-suggest-card"
+                flat
+                border
+              >
+                <div v-if="searchStore.suggesting" class="d-flex align-center ga-2 px-4 py-3 text-caption text-medium-emphasis">
+                  <v-progress-circular indeterminate size="14" width="2" />
+                  กำลังแนะนำคำค้น...
+                </div>
+                <div v-else-if="searchStore.suggestions.length === 0" class="px-4 py-3 text-caption text-medium-emphasis">
+                  ไม่พบคำแนะนำเพิ่มเติม
+                </div>
+                <button
+                  v-for="suggestion in searchStore.suggestions"
+                  :key="suggestion.law_id"
+                  type="button"
+                  class="elaw-suggest-item"
+                  @mousedown.prevent="applySuggestion(suggestion)"
+                >
+                  <div class="d-flex align-center justify-space-between ga-3">
+                    <span class="text-body-2 font-weight-bold text-left">
+                      {{ suggestion.title || 'ไม่ระบุชื่อกฎหมาย' }}
+                    </span>
+                    <v-chip size="x-small" color="primary" rounded="pill">
+                      {{ lawTypeLabel(suggestion.law_type) }}
+                    </v-chip>
+                  </div>
+                  <div class="d-flex flex-wrap ga-2 mt-2">
+                    <v-chip
+                      v-for="keyword in suggestion.keywords.slice(0, 3)"
+                      :key="`${suggestion.law_id}-${keyword}`"
+                      size="x-small"
+                      variant="tonal"
+                      color="secondary"
+                    >
+                      {{ keyword }}
+                    </v-chip>
+                  </div>
+                  <div class="d-flex flex-wrap ga-3 mt-2 text-caption text-medium-emphasis">
+                    <span>{{ suggestion.agency || 'ไม่ระบุหน่วยงาน' }}</span>
+                    <span>{{ suggestion.published_date || 'ไม่ระบุปีประกาศ' }}</span>
+                  </div>
+                </button>
+              </v-card>
             </div>
+            <v-btn color="secondary" size="large" rounded="lg" @click="doSearch">
+              <v-icon start icon="mdi-magnify" />
+              ค้นหาข้อมูล
+            </v-btn>
+          </div>
 
-            <v-row class="ga-4 mt-4 justify-start align-start">
-              <v-col cols="12" md="7">
-                <div class="d-flex align-start flex-wrap ga-3 elaw-filter-row">
-                  <p class="text-caption font-weight-bold text-medium-emphasis mb-0 mt-0">ประเภทเอกสาร</p>
-                  <v-chip
-                    v-for="type in typeFilters"
-                    :key="type.value"
-                    :value="type.value"
-                    :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
-                    color="primary"
-                    rounded="pill"
-                    size="small"
-                    class="elaw-search-chip"
-                    @click="toggleType(type.value)"
-                  >
-                    {{ type.label }}
-                  </v-chip>
-                </div>
-              </v-col>
-
-              <!-- <v-col cols="12" md="5">
-                <div class="d-flex align-start ga-3 elaw-filter-row">
-                  <p class="text-caption font-weight-bold text-medium-emphasis mb-0 text-no-wrap">กลุ่มกฎหมาย</p>
-                  <v-select
-                    v-model="selectedGroups"
-                    :items="groupFilters"
-                    item-title="label"
-                    item-value="value"
-                    label="เลือกได้หลายกลุ่ม"
-                    variant="outlined"
-                    density="comfortable"
-                    rounded="lg"
-                    hide-details
-                    multiple
-                    chips
-                    closable-chips
-                    size="small"
-                    class="elaw-group-select flex-grow-1"
-                    bg-color="detail-surface"
-                  />
-                </div>
-              </v-col> -->
-            </v-row>
+          <v-row class="ga-4 mt-4 justify-start align-start">
+            <v-col cols="12" md="7">
+              <div class="d-flex align-start flex-wrap ga-3 elaw-filter-row">
+                <p class="text-caption font-weight-bold text-medium-emphasis mb-0 mt-0">ประเภทเอกสาร</p>
+                <v-chip
+                  :variant="isTypeSelected('all') ? 'flat' : 'outlined'"
+                  color="primary"
+                  rounded="pill"
+                  size="small"
+                  class="elaw-search-chip"
+                  @click="toggleType('all')"
+                >
+                  ทั้งหมด
+                </v-chip>
+                <v-chip
+                  v-for="type in typeFilters"
+                  :key="type.value"
+                  :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
+                  color="primary"
+                  rounded="pill"
+                  size="small"
+                  class="elaw-search-chip"
+                  @click="toggleType(type.value)"
+                >
+                  {{ type.label }}
+                  <span class="ml-1 text-caption">({{ type.count }})</span>
+                </v-chip>
+              </div>
+            </v-col>
+          </v-row>
         </v-container>
       </section>
 
@@ -91,8 +126,15 @@
                 <v-expansion-panel value="change-status">
                   <v-expansion-panel-title>สถานะการเปลี่ยนแปลง</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-checkbox v-for="status in changeStatuses" :key="status.value" v-model="selectedStatuses"
-                      :value="status.value" density="compact" hide-details class="mb-n1">
+                    <v-checkbox
+                      v-for="status in changeStatusFilters"
+                      :key="status.value"
+                      v-model="selectedStatuses"
+                      :value="status.value"
+                      density="compact"
+                      hide-details
+                      class="mb-n1"
+                    >
                       <template #label>
                         <span class="elaw-filter-option">
                           <span>{{ status.label }}</span>
@@ -106,8 +148,15 @@
                 <v-expansion-panel value="use-status">
                   <v-expansion-panel-title>สถานะการบังคับใช้</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-checkbox v-for="status in useStatuses" :key="status.value" v-model="selectedUseStatuses"
-                      :value="status.value" density="compact" hide-details class="mb-n1">
+                    <v-checkbox
+                      v-for="status in useStatusFilters"
+                      :key="status.value"
+                      v-model="selectedUseStatuses"
+                      :value="status.value"
+                      density="compact"
+                      hide-details
+                      class="mb-n1"
+                    >
                       <template #label>
                         <span class="elaw-filter-option">
                           <span>{{ status.label }}</span>
@@ -132,8 +181,15 @@
                 <v-expansion-panel value="agency">
                   <v-expansion-panel-title>หน่วยงาน</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-checkbox v-for="agency in agencyFilters" :key="agency.value" v-model="selectedAgencies"
-                      :value="agency.value" density="compact" hide-details class="mb-n1">
+                    <v-checkbox
+                      v-for="agency in agencyFilters"
+                      :key="agency.value"
+                      v-model="selectedAgencies"
+                      :value="agency.value"
+                      density="compact"
+                      hide-details
+                      class="mb-n1"
+                    >
                       <template #label>
                         <span class="elaw-filter-option">
                           <span>{{ agency.label }}</span>
@@ -147,8 +203,15 @@
                 <v-expansion-panel value="law-group">
                   <v-expansion-panel-title>กลุ่มกฎหมาย</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-checkbox v-for="group in groupFilters" :key="group.value" v-model="selectedGroups"
-                      :value="group.value" density="compact" hide-details class="mb-n1">
+                    <v-checkbox
+                      v-for="group in groupFilters"
+                      :key="group.value"
+                      v-model="selectedGroups"
+                      :value="group.value"
+                      density="compact"
+                      hide-details
+                      class="mb-n1"
+                    >
                       <template #label>
                         <span class="elaw-filter-option">
                           <v-tooltip :text="group.label" location="top">
@@ -168,8 +231,15 @@
                 <v-expansion-panel value="keeper-group">
                   <v-expansion-panel-title>กลุ่มผู้ออกคำสั่ง/ลงนาม</v-expansion-panel-title>
                   <v-expansion-panel-text>
-                    <v-checkbox v-for="keeper in keeperGroupFilters" :key="keeper.value" v-model="selectedKeeperGroups"
-                      :value="keeper.value" density="compact" hide-details class="mb-n1">
+                    <v-checkbox
+                      v-for="keeper in keeperGroupFilters"
+                      :key="keeper.value"
+                      v-model="selectedKeeperGroups"
+                      :value="keeper.value"
+                      density="compact"
+                      hide-details
+                      class="mb-n1"
+                    >
                       <template #label>
                         <span class="elaw-filter-option">
                           <span>{{ keeper.label }}</span>
@@ -192,23 +262,103 @@
 
           <v-col cols="12" md="9">
             <div class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between mb-3 ga-3">
-              <span class="text-body-2">
-                พบผลการค้นหา <strong>{{ results.length }}</strong> รายการ
-              </span>
-              <v-select v-model="sortBy" :items="sortOptions" item-title="label" item-value="value" variant="outlined"
-                density="compact" hide-details style="max-width: 220px" />
-            </div>
-
-            <div class="d-flex flex-column ga-3">
-              <DocumentVersionCard
-                v-for="item in results"
-                :key="item._id"
-                :version="item"
+              <div class="d-flex flex-column">
+                <span class="text-body-2">
+                  พบผลการค้นหา <strong>{{ searchStore.total }}</strong> รายการ
+                </span>
+                <span v-if="searchStore.loading" class="text-caption text-medium-emphasis">กำลังค้นหา...</span>
+              </div>
+              <v-select
+                v-model="sortBy"
+                :items="sortOptions"
+                item-title="label"
+                item-value="value"
+                variant="outlined"
+                density="compact"
+                hide-details
+                style="max-width: 220px"
               />
             </div>
 
+            <v-alert
+              v-if="searchStore.error"
+              type="warning"
+              variant="tonal"
+              density="comfortable"
+              class="mb-4"
+            >
+              {{ searchStore.error }}
+            </v-alert>
+
+            <div v-if="searchStore.loading" class="d-flex justify-center py-10">
+              <v-progress-circular indeterminate color="primary" />
+            </div>
+
+            <div v-else-if="sortedResults.length === 0" class="law-empty-state">
+              <v-icon icon="mdi-file-search-outline" size="28" color="medium-emphasis" />
+              <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสารที่ตรงกับเงื่อนไขค้นหา</p>
+            </div>
+
+            <div v-else class="d-flex flex-column ga-3">
+              <v-card
+                v-for="law in sortedResults"
+                :key="law.law_id"
+                flat
+                border
+                rounded="lg"
+                class="pa-4 law-result-card"
+              >
+                <div class="d-flex flex-wrap align-center ga-2 mb-3">
+                  <v-chip size="x-small" color="primary" rounded="pill">{{ lawTypeLabel(law.law_type) }}</v-chip>
+                  <v-chip v-if="law.status" size="x-small" color="success" variant="tonal" rounded="pill">
+                    {{ statusLabel(law.status) }}
+                  </v-chip>
+                  <v-chip v-if="law.change_status" size="x-small" color="warning" variant="tonal" rounded="pill">
+                    {{ changeStatusLabel(law.change_status) }}
+                  </v-chip>
+                </div>
+
+                <h2 class="text-subtitle-1 font-weight-bold mb-2 law-result-card__title">
+                  {{ law.title || 'ไม่ระบุชื่อกฎหมาย' }}
+                </h2>
+
+                <p v-if="law.summary" class="text-body-2 text-medium-emphasis mb-3 law-result-card__summary">
+                  {{ law.summary }}
+                </p>
+
+                <div class="d-flex flex-wrap ga-4 text-caption text-medium-emphasis mb-3">
+                  <span class="law-result-card__meta-item">
+                    <v-icon size="13" icon="mdi-calendar-month-outline" />
+                    {{ law.published_date || 'ไม่ระบุวันที่ประกาศ' }}
+                  </span>
+                  <span class="law-result-card__meta-item">
+                    <v-icon size="13" icon="mdi-domain" />
+                    {{ law.agency || 'ไม่ระบุหน่วยงาน' }}
+                  </span>
+                  <span v-if="law.signer_group" class="law-result-card__meta-item">
+                    <v-icon size="13" icon="mdi-account-group-outline" />
+                    {{ law.signer_group }}
+                  </span>
+                </div>
+
+                <div class="d-flex flex-column ga-2">
+                  <div
+                    v-for="(snippet, index) in law.snippets"
+                    :key="`${law.law_id}-${index}`"
+                    class="law-snippet text-body-2"
+                    v-html="sanitizeHighlight(snippet)"
+                  />
+                </div>
+              </v-card>
+            </div>
+
             <div class="d-flex justify-center mt-6">
-              <v-pagination v-model="page" :length="45" :total-visible="7" rounded="circle" />
+              <v-pagination
+                v-model="page"
+                :length="pageCount"
+                :total-visible="7"
+                rounded="circle"
+              />
             </div>
           </v-col>
         </v-row>
@@ -220,195 +370,164 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import DocumentVersionCard from '../../components/shared/DocumentVersionCard.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
-import type { DocumentVersion } from '../../types/document-version';
+import { useLawSearchStore } from '../../stores/lawSearchStore';
+import type { FacetBucket, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
+import { sanitizeHighlight } from '../../utils/highlightSanitizer';
+
+const PER_PAGE = 20;
+
+const LAW_TYPE_LABELS: Record<string, string> = {
+  phrb: 'พ.ร.บ.',
+  'kho-bangkhab': 'ข้อบังคับ',
+  rabiap: 'ระเบียบ',
+  prakat: 'ประกาศ',
+  command: 'คำสั่ง',
+  resolution: 'มติ',
+};
+
+const CHANGE_STATUS_LABELS: Record<string, string> = {
+  new: 'ออกใหม่',
+  amended: 'แก้ไขเพิ่มเติม',
+  repealed: 'ยกเลิก',
+  consolidated: 'ฉบับรวม',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'มีผลบังคับใช้',
+  cancelled: 'ยกเลิก',
+  draft: 'ร่าง',
+};
 
 const router = useRouter();
 const route = useRoute();
-const query = ref(typeof route.query.q === 'string' ? route.query.q : '');
-const selectedTypes = ref<string[]>(readTypeArray(route.query.type));
-const selectedGroups = ref<string[]>(readStringArray(route.query.group));
+const searchStore = useLawSearchStore();
+
+const query = ref('');
+const selectedTypes = ref<string[]>(['all']);
+const selectedGroups = ref<string[]>([]);
 const selectedStatuses = ref<string[]>([]);
 const selectedUseStatuses = ref<string[]>([]);
 const selectedAgencies = ref<string[]>([]);
 const selectedKeeperGroups = ref<string[]>([]);
-const yearFrom = ref('2560');
-const yearTo = ref('2568');
-const sortBy = ref('thai-asc');
+const yearFrom = ref<string | null>(null);
+const yearTo = ref<string | null>(null);
+const sortBy = ref<'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest'>('relevance');
 const page = ref(1);
 const filterPanels = ref(['change-status', 'use-status', 'year']);
-
-const breadcrumbs = [{ title: 'หน้าหลัก', disabled: false, to: '/' }, { title: 'ฐานข้อมูลกฎหมาย', disabled: true }];
-
-const typeFilters = [
-  { label: 'ทั้งหมด', value: 'all' },
-  { label: 'พ.ร.บ.', value: 'phrb' },
-  { label: 'ข้อบังคับ', value: 'kho-bangkhab' },
-  { label: 'ระเบียบ', value: 'rabiap' },
-  { label: 'ประกาศ', value: 'prakat' },
-];
-
-const groupFilters = [
-  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'academic', count: 328 },
-  { label: 'ด้านกิจการนิสิต', value: 'student-affairs', count: 86 },
-  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'research-innovation', count: 142 },
-  { label: 'ด้านบริการวิชาการ', value: 'academic-service', count: 74 },
-  { label: 'ด้านการทะนุบำรุงศิลปวัฒนธรรม', value: 'arts-culture', count: 51 },
-  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'organization-admin', count: 248 },
-  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'hr-discipline', count: 214 },
-  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'finance-assets-risk', count: 196 },
-  { label: 'ด้านการพัฒนารายได้', value: 'revenue-development', count: 39 },
-  { label: 'ด้านการรักษาพยาบาล', value: 'healthcare', count: 62 },
-  { label: 'ด้านการบริการเฉพาะด้าน เช่น ทันตกรรม', value: 'special-service', count: 28 },
-  { label: 'ด้านอื่น ๆ', value: 'other', count: 45 },
-];
-
-const agencyFilters = [
-  { label: 'มหาวิทยาลัยบูรพา', value: 'burapha-university', count: 412 },
-  { label: 'กองคลัง', value: 'finance-division', count: 168 },
-  { label: 'กองทรัพยากรบุคคล', value: 'hr-division', count: 126 },
-  { label: 'สำนักคอมพิวเตอร์', value: 'computer-center', count: 74 },
-  { label: 'สำนักงานอธิการบดี', value: 'president-office', count: 238 },
-];
-
-const keeperGroupFilters = [
-  { label: 'อธิการบดี', value: 'president', count: 302 },
-  { label: 'รองอธิการบดี', value: 'vice-president', count: 186 },
-  { label: 'คณบดี', value: 'dean', count: 94 },
-  { label: 'ผู้อำนวยการสำนัก/สถาบัน', value: 'director', count: 71 },
-  { label: 'หัวหน้าส่วนงาน', value: 'division-head', count: 43 },
-];
-
-const changeStatuses = [
-  { label: 'กฎหมายใหม่', value: 'new', count: 124 },
-  { label: 'ปรับปรุงรายมาตรา', value: 'amended', count: 356 },
-  { label: 'ปรับปรุงทั้งฉบับ', value: 'amended-full', count: 428 },
-  { label: 'ยกเลิกรายมาตรา', value: 'repealed-section', count: 86 },
-  { label: 'ยกเลิกทั้งฉบับ', value: 'repealed', count: 42 },
-];
-
-const useStatuses = [
-  { label: 'มีผลบังคับใช้', value: 'active', count: 2128 },
-  { label: 'ยกเลิก', value: 'cancelled', count: 212 },
-  { label: 'ร่าง', value: 'draft', count: 100 },
-];
-
-const years = Array.from({ length: 10 }, (_, index) => String(2560 + index));
-const currentTypes = computed(() => selectedTypes.value.includes('all') ? [] : selectedTypes.value);
-watch(
-  () => route.query.type,
-  (value) => {
-    selectedTypes.value = readTypeArray(value);
-  },
-  { immediate: true },
-);
-
-watch(
-  () => route.query.group,
-  (value) => {
-    selectedGroups.value = readStringArray(value);
-  },
-  { immediate: true },
-);
+const searchFocused = ref(false);
 
 const sortOptions = [
+  { label: 'เกี่ยวข้องมากที่สุด', value: 'relevance' },
   { label: 'เรียงลำดับตาม ก-ฮ', value: 'thai-asc' },
   { label: 'เรียงลำดับตาม ฮ-ก', value: 'thai-desc' },
   { label: 'ล่าสุด', value: 'newest' },
   { label: 'เก่าสุด', value: 'oldest' },
-];
+] as const;
 
-const results: DocumentVersion[] = [
-  {
-    _id: 'ver-001',
-    documentId: 'doc-001',
-    versionNo: 12,
-    status: 'published',
-    isCurrent: true,
-    metadata: {
-      title: 'พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (และที่แก้ไขเพิ่มเติมถึงฉบับปัจจุบัน)',
-      documentType: 'phrb',
-      documentGroupId: '1.6 โครงสร้างองค์กร',
-      publicationScope: 'public',
-      summary: 'กำหนดกลไกและมาตรการคุ้มครองข้อมูลส่วนบุคคลเพื่อเป็นมาตรฐาน ควบคุมผู้ควบคุมข้อมูลและผู้ประมวลผลข้อมูลไม่ให้สิทธิของ...',
-      publishedDate: new Date('2020-05-28'),
-      ownerAgencyId: 'รัฐบาลดิจิทัล',
-      keywords: ['ข้อมูลส่วนบุคคล', 'PDPA'],
-    },
-    changeSummary: 'ปรับแก้ล่าสุดเพื่อให้สอดคล้องกับข้อกำหนดด้านการคุ้มครองข้อมูลภาครัฐ',
-    publishedAt: new Date('2020-05-28'),
-    createdAt: new Date('2020-05-28'),
-    updatedAt: new Date('2024-05-18'),
+const currentTypes = computed(() => selectedTypes.value.includes('all') ? [] : selectedTypes.value);
+const pageCount = computed(() => Math.max(1, Math.ceil(searchStore.total / PER_PAGE)));
+const showSuggestions = computed(() => searchFocused.value && query.value.trim().length >= 2 && (searchStore.suggesting || searchStore.suggestions.length > 0));
+
+const typeFilters = computed(() => mapFacetOptions(searchStore.facets.law_type, lawTypeLabel));
+const groupFilters = computed(() => mapFacetOptions(searchStore.facets.law_group));
+const agencyFilters = computed(() => mapFacetOptions(searchStore.facets.agency));
+const keeperGroupFilters = computed(() => mapFacetOptions(searchStore.facets.signer_group));
+const changeStatusFilters = computed(() => mapFacetOptions(searchStore.facets.change_status, changeStatusLabel));
+const useStatusFilters = computed(() => mapFacetOptions(searchStore.facets.status, statusLabel));
+const years = computed(() => {
+  const values = searchStore.facets.years.map((bucket) => String(bucket.year));
+  if (yearFrom.value) values.push(yearFrom.value);
+  if (yearTo.value) values.push(yearTo.value);
+
+  return Array.from(new Set(values.filter(Boolean))).sort((left, right) => Number(right) - Number(left));
+});
+
+const sortedResults = computed(() => {
+  const items = [...searchStore.results];
+
+  switch (sortBy.value) {
+    case 'thai-asc':
+      return items.sort((left, right) => (left.title || '').localeCompare(right.title || '', 'th'));
+    case 'thai-desc':
+      return items.sort((left, right) => (right.title || '').localeCompare(left.title || '', 'th'));
+    case 'newest':
+      return items.sort((left, right) => extractYear(right) - extractYear(left));
+    case 'oldest':
+      return items.sort((left, right) => extractYear(left) - extractYear(right));
+    default:
+      return items;
+  }
+});
+
+let syncingFromRoute = false;
+let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+let hideSuggestionsTimer: ReturnType<typeof setTimeout> | null = null;
+let routeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+let suppressNextRouteSearch = false;
+let mutatingSearchState = false;
+
+watch(
+  () => route.query,
+  () => {
+    syncingFromRoute = true;
+    syncFromRoute();
+    syncingFromRoute = false;
+    if (suppressNextRouteSearch) {
+      suppressNextRouteSearch = false;
+      return;
+    }
+    searchStore.clearSuggestions();
+    void runSearch();
   },
-  {
-    _id: 'ver-002',
-    documentId: 'doc-002',
-    versionNo: 3,
-    status: 'published',
-    isCurrent: true,
-    metadata: {
-      title: 'ข้อบังคับมหาวิทยาลัยบูรพา ว่าด้วยการบริหารงานบุคคล พ.ศ. 2563 (แก้ไขเพิ่มเติม ฉบับที่ 3)',
-      documentType: 'kho-bangkhab',
-      documentGroupId: '1.7 การบริหารงานบุคคล',
-      publicationScope: 'organization',
-      summary: 'แก้ไขเพิ่มเติมหลักเกณฑ์เกี่ยวกับการประเมินผลการปฏิบัติงาน และการเลื่อนระดับตำแหน่งของบุคลากร...',
-      publishedDate: new Date('2021-01-31'),
-      ownerAgencyId: 'มหาวิทยาลัยบูรพา',
-      keywords: ['บุคลากร', 'เลื่อนระดับ'],
-    },
-    changeSummary: 'อัปเดตโครงสร้างตำแหน่งและหลักเกณฑ์การประเมินผลบุคลากร',
-    publishedAt: new Date('2021-01-31'),
-    createdAt: new Date('2021-01-31'),
-    updatedAt: new Date('2024-04-10'),
-  },
-  {
-    _id: 'ver-003',
-    documentId: 'doc-003',
-    versionNo: 1,
-    status: 'published',
-    isCurrent: true,
-    metadata: {
-      title: 'ระเบียบมหาวิทยาลัยบูรพา ว่าด้วยการเบิกจ่ายค่าใช้จ่ายในการเดินทางไปราชการ (ฉบับใหม่) พ.ศ. 2567',
-      documentType: 'rabiap',
-      documentGroupId: '1.8 การเงินและพัสดุ',
-      publicationScope: 'public',
-      summary: 'กำหนดหลักเกณฑ์และอัตราการเบิกค่าใช้จ่ายในการเดินทางไปราชการและการเบิกค่าใช้จ่ายในการฝึกอบรม...',
-      publishedDate: new Date('2024-05-20'),
-      ownerAgencyId: 'กองคลัง',
-      keywords: ['เดินทางไปราชการ', 'เบิกจ่าย'],
-    },
-    changeSummary: 'ประกาศใช้อัตราใหม่และหลักฐานการเบิกจ่ายรูปแบบล่าสุด',
-    publishedAt: new Date('2024-05-20'),
-    createdAt: new Date('2024-05-20'),
-    updatedAt: new Date('2024-05-20'),
-  },
-  {
-    _id: 'ver-004',
-    documentId: 'doc-004',
-    versionNo: 18,
-    status: 'published',
-    isCurrent: false,
-    metadata: {
-      title: 'ประกาศมหาวิทยาลัยบูรพา เรื่อง หลักเกณฑ์และเงื่อนไขการสนับสนุนทุนวิจัยระดับนานาชาติ',
-      documentType: 'prakat',
-      documentGroupId: '1.3 การวิจัย นวัตกรรม',
-      publicationScope: 'private',
-      summary: 'กำหนดขั้นตอนและเงื่อนไขการสนับสนุนทุนวิจัยเพื่อการตีพิมพ์ผลงานในวารสารระดับนานาชาติ...',
-      publishedDate: new Date('2024-03-10'),
-      ownerAgencyId: 'สถาบันวิจัย',
-      keywords: ['ทุนวิจัย', 'วารสารนานาชาติ'],
-    },
-    changeSummary: 'ฉบับนี้ถูกแทนที่ด้วยเกณฑ์ทุนฉบับใหม่',
-    publishedAt: new Date('2024-03-10'),
-    supersededBy: 'ver-005',
-    createdAt: new Date('2024-03-10'),
-    updatedAt: new Date('2024-06-01'),
-  },
-];
+  { immediate: true },
+);
+
+watch(query, () => {
+  if (syncingFromRoute || mutatingSearchState) return;
+  page.value = 1;
+  if (query.value.trim().length < 2) {
+    searchStore.clearSuggestions();
+  }
+  queueSuggest();
+  queueRouteUpdate();
+});
+
+watch([selectedGroups, selectedStatuses, selectedUseStatuses, selectedAgencies, selectedKeeperGroups, yearFrom, yearTo], () => {
+  if (syncingFromRoute || mutatingSearchState) return;
+  page.value = 1;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}, { deep: true });
+
+watch(selectedTypes, () => {
+  if (syncingFromRoute || mutatingSearchState) return;
+  page.value = 1;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}, { deep: true });
+
+watch(page, () => {
+  if (syncingFromRoute || mutatingSearchState) return;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+});
+
+function currentFilters(): LawSearchFilters {
+  return {
+    law_type: currentTypes.value.length > 0 ? currentTypes.value : undefined,
+    status: selectedUseStatuses.value.length > 0 ? selectedUseStatuses.value : undefined,
+    change_status: selectedStatuses.value.length > 0 ? selectedStatuses.value : undefined,
+    agency: selectedAgencies.value.length > 0 ? selectedAgencies.value : undefined,
+    law_group: selectedGroups.value.length > 0 ? selectedGroups.value : undefined,
+    signer_group: selectedKeeperGroups.value.length > 0 ? selectedKeeperGroups.value : undefined,
+    year_from: yearFrom.value ? Number(yearFrom.value) : null,
+    year_to: yearTo.value ? Number(yearTo.value) : null,
+  };
+}
 
 function isTypeSelected(value: string): boolean {
   return selectedTypes.value.includes(value);
@@ -432,9 +551,120 @@ function toggleType(value: string): void {
   selectedTypes.value = next.size > 0 ? Array.from(next) : ['all'];
 }
 
+function doSearch(): void {
+  mutatingSearchState = true;
+  page.value = 1;
+  mutatingSearchState = false;
+  if (suggestTimer) {
+    clearTimeout(suggestTimer);
+    suggestTimer = null;
+  }
+  searchFocused.value = false;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}
+
+function clearFilters(): void {
+  mutatingSearchState = true;
+  selectedTypes.value = ['all'];
+  selectedGroups.value = [];
+  selectedStatuses.value = [];
+  selectedUseStatuses.value = [];
+  selectedAgencies.value = [];
+  selectedKeeperGroups.value = [];
+  yearFrom.value = null;
+  yearTo.value = null;
+  page.value = 1;
+  mutatingSearchState = false;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}
+
+function queueSuggest(): void {
+  if (suggestTimer) {
+    clearTimeout(suggestTimer);
+  }
+
+  suggestTimer = setTimeout(() => {
+    void searchStore.suggest(query.value);
+  }, 350);
+}
+
+function queueRouteUpdate(): void {
+  if (routeUpdateTimer) {
+    clearTimeout(routeUpdateTimer);
+  }
+  routeUpdateTimer = setTimeout(() => {
+    suppressNextRouteSearch = true;
+    void replaceRoute();
+  }, 120);
+}
+
+function queueHideSuggestions(): void {
+  hideSuggestionsTimer = setTimeout(() => {
+    searchFocused.value = false;
+  }, 120);
+}
+
+function applySuggestion(suggestion: LawSuggestion): void {
+  if (hideSuggestionsTimer) {
+    clearTimeout(hideSuggestionsTimer);
+  }
+  mutatingSearchState = true;
+  query.value = suggestion.title || query.value;
+  page.value = 1;
+  mutatingSearchState = false;
+  searchFocused.value = false;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}
+
+async function syncRouteAndSearch(): Promise<void> {
+  suppressNextRouteSearch = true;
+  await replaceRoute();
+  await runSearch();
+}
+
+async function replaceRoute(): Promise<void> {
+  const nextQuery: Record<string, string | string[]> = {};
+
+  if (query.value.trim() !== '') nextQuery.q = query.value.trim();
+  if (currentTypes.value.length > 0) nextQuery.type = currentTypes.value;
+  if (selectedGroups.value.length > 0) nextQuery.group = selectedGroups.value;
+  if (selectedStatuses.value.length > 0) nextQuery.change_status = selectedStatuses.value;
+  if (selectedUseStatuses.value.length > 0) nextQuery.status = selectedUseStatuses.value;
+  if (selectedAgencies.value.length > 0) nextQuery.agency = selectedAgencies.value;
+  if (selectedKeeperGroups.value.length > 0) nextQuery.signer_group = selectedKeeperGroups.value;
+  if (yearFrom.value) nextQuery.year_from = yearFrom.value;
+  if (yearTo.value) nextQuery.year_to = yearTo.value;
+  if (page.value > 1) nextQuery.page = String(page.value);
+
+  await router.replace({ path: '/database', query: nextQuery });
+}
+
+async function runSearch(): Promise<void> {
+  await searchStore.search(query.value.trim(), currentFilters(), page.value, PER_PAGE);
+  if (page.value > pageCount.value) {
+    page.value = pageCount.value;
+  }
+}
+
+function syncFromRoute(): void {
+  query.value = readString(route.query.q);
+  selectedTypes.value = readTypeArray(route.query.type);
+  selectedGroups.value = readStringArray(route.query.group);
+  selectedStatuses.value = readStringArray(route.query.change_status);
+  selectedUseStatuses.value = readStringArray(route.query.status);
+  selectedAgencies.value = readStringArray(route.query.agency);
+  selectedKeeperGroups.value = readStringArray(route.query.signer_group);
+  yearFrom.value = readNullableString(route.query.year_from);
+  yearTo.value = readNullableString(route.query.year_to);
+  page.value = readPositiveInt(route.query.page, 1);
+}
+
 function readTypeArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    const next = value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    const next = value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
     return next.length > 0 ? next : ['all'];
   }
 
@@ -447,7 +677,7 @@ function readTypeArray(value: unknown): string[] {
 
 function readStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+    return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
   }
 
   if (typeof value === 'string' && value.length > 0) {
@@ -457,30 +687,61 @@ function readStringArray(value: unknown): string[] {
   return [];
 }
 
-function doSearch(): void {
-  const selectedGroupValues = selectedGroups.value.length > 0 ? selectedGroups.value : undefined;
-  const selectedTypeValues = currentTypes.value.length > 0 ? currentTypes.value : undefined;
-
-  router.replace({
-    path: '/database',
-    query: {
-      ...(query.value ? { q: query.value } : {}),
-      ...(selectedTypeValues ? { type: selectedTypeValues } : {}),
-      ...(selectedGroupValues ? { group: selectedGroupValues } : {}),
-    },
-  });
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
-function clearFilters(): void {
-  selectedTypes.value = ['all'];
-  selectedGroups.value = [];
-  selectedStatuses.value = [];
-  selectedUseStatuses.value = [];
-  selectedAgencies.value = [];
-  selectedKeeperGroups.value = [];
-  yearFrom.value = '2560';
-  yearTo.value = '2568';
+function readNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
+
+function readPositiveInt(value: unknown, fallback: number): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function mapFacetOptions(buckets: FacetBucket[], labelResolver?: (value: string | null) => string): Array<{ label: string; value: string; count: number }> {
+  return buckets.map((bucket) => ({
+    label: labelResolver ? labelResolver(bucket.value) : bucket.value,
+    value: bucket.value,
+    count: bucket.count,
+  }));
+}
+
+function lawTypeLabel(value: string | null): string {
+  if (!value) return 'ไม่ระบุประเภท';
+  return LAW_TYPE_LABELS[value] ?? value;
+}
+
+function changeStatusLabel(value: string | null): string {
+  if (!value) return 'ไม่ระบุสถานะ';
+  return CHANGE_STATUS_LABELS[value] ?? value;
+}
+
+function statusLabel(value: string | null): string {
+  if (!value) return 'ไม่ระบุสถานะ';
+  return STATUS_LABELS[value] ?? value;
+}
+
+function extractYear(item: LawSearchResult): number {
+  const match = item.published_date?.match(/\d{4}/);
+  return match ? Number(match[0]) : 0;
+}
+
+onBeforeUnmount(() => {
+  if (suggestTimer) {
+    clearTimeout(suggestTimer);
+  }
+  if (hideSuggestionsTimer) {
+    clearTimeout(hideSuggestionsTimer);
+  }
+  if (routeUpdateTimer) {
+    clearTimeout(routeUpdateTimer);
+  }
+  searchStore.clearSuggestions();
+});
 </script>
 
 <style scoped>
@@ -490,26 +751,41 @@ function clearFilters(): void {
   padding: 28px 24px 34px;
 }
 
-.elaw-db-eyebrow {
-  color: #ab7f29;
-  border-color: rgba(171, 127, 41, 0.28);
-  background: rgba(255, 255, 255, 0.56);
-}
-
-.elaw-search-card {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(171, 127, 41, 0.22);
-  box-shadow: 0 18px 42px rgba(106, 77, 0, 0.08);
-}
-
-.elaw-db-results {
-  background: rgb(var(--v-theme-detail-surface));
-  border-radius: 18px;
-  padding: 24px !important;
-}
-
 .elaw-search-input :deep(.v-field__input) {
   min-height: 58px;
+}
+
+.elaw-search-shell {
+  position: relative;
+}
+
+.elaw-suggest-card {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  overflow: hidden;
+  border-radius: 12px !important;
+  background: rgb(var(--v-theme-detail-surface));
+}
+
+.elaw-suggest-item {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-top: 1px solid rgba(171, 127, 41, 0.14);
+  background: transparent;
+  text-align: left;
+}
+
+.elaw-suggest-item:first-of-type {
+  border-top: 0;
+}
+
+.elaw-suggest-item:hover {
+  background: rgba(255, 250, 236, 0.85);
 }
 
 .elaw-search-chip {
@@ -595,12 +871,41 @@ function clearFilters(): void {
   line-height: 1;
 }
 
-.elaw-group-select :deep(.v-field__input) {
-  min-height: 54px;
-  align-items: center;
+.law-result-card__title {
+  line-height: 1.5;
 }
 
-.elaw-group-select :deep(.v-chip) {
-  margin-block: 2px;
+.law-result-card__summary {
+  line-height: 1.6;
+}
+
+.law-result-card__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.law-snippet {
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.24);
+  padding: 8px 0 8px 12px;
+  color: rgba(0, 0, 0, 0.76);
+}
+
+.law-snippet :deep(mark) {
+  background: rgba(var(--v-theme-warning), 0.35);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.law-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  border: 1px dashed rgba(171, 127, 41, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 250, 236, 0.55);
 }
 </style>
