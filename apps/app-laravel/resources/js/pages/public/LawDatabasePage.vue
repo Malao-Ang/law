@@ -166,7 +166,7 @@
                 </v-expansion-panel>
 
                 <v-expansion-panel value="keeper-group">
-                  <v-expansion-panel-title>กลุ่มผู้รักษาการ</v-expansion-panel-title>
+                  <v-expansion-panel-title>กลุ่มผู้ออกคำสั่ง/ลงนาม</v-expansion-panel-title>
                   <v-expansion-panel-text>
                     <v-checkbox v-for="keeper in keeperGroupFilters" :key="keeper.value" v-model="selectedKeeperGroups"
                       :value="keeper.value" density="compact" hide-details class="mb-n1">

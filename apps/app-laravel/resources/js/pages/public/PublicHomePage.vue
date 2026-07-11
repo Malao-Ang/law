@@ -82,12 +82,13 @@ import type { DocumentType, DocumentVersion, PublicationScope } from '../../type
 
 const router = useRouter();
 
-function onSearch(query: string, types: string[]): void {
+function onSearch(query: string, types: string[], groups: string[]): void {
   router.push({
     path: '/database',
     query: {
       q: query || undefined,
       type: types.length > 0 ? types : undefined,
+      group: groups.length > 0 ? groups : undefined,
     },
   });
 }

@@ -17,19 +17,39 @@
       </p>
 
       <v-card flat rounded="xl" class="pa-5 pa-md-6 elaw-search-card">
-        <div class="mb-4">
-          <p class="text-caption mb-2 elaw-search-card__label">ประเภทเอกสาร</p>
-          <div class="d-flex flex-wrap ga-2">
-            <v-chip
-              v-for="type in docTypes"
-              :key="type.value"
-              :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
-              rounded="pill"
-              class="elaw-search-card__type-chip"
-              @click="toggleType(type.value)"
-            >
-              {{ type.label }}
-            </v-chip>
+        <div class="d-flex ga-6 mb-4 align-start flex-wrap">
+          <div class="flex-shrink-0">
+            <p class="text-caption mb-2 elaw-search-card__label">ประเภทเอกสาร</p>
+            <div class="d-flex flex-wrap ga-2">
+              <v-chip
+                v-for="type in docTypes"
+                :key="type.value"
+                :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
+                rounded="pill"
+                class="elaw-search-card__type-chip"
+                @click="toggleType(type.value)"
+              >
+                {{ type.label }}
+              </v-chip>
+            </div>
+          </div>
+          <div style="min-width: 220px; flex: 1 1 220px">
+            <p class="text-caption mb-2 elaw-search-card__label">กลุ่มกฎหมาย</p>
+            <v-select
+              v-model="selectedGroups"
+              :items="groupFilters"
+              item-title="label"
+              item-value="value"
+              label="เลือกได้หลายกลุ่ม"
+              variant="outlined"
+              density="compact"
+              rounded="lg"
+              hide-details
+              multiple
+              chips
+              closable-chips
+              bg-color="detail-surface"
+            />
           </div>
         </div>
 
@@ -79,11 +99,12 @@
 import { nextTick, ref } from 'vue';
 
 const emit = defineEmits<{
-  search: [query: string, types: string[]];
+  search: [query: string, types: string[], groups: string[]];
 }>();
 
 const query = ref('');
 const selectedTypes = ref<string[]>(['all']);
+const selectedGroups = ref<string[]>([]);
 const queryInput = ref<{ focus?: () => void } | null>(null);
 
 const docTypes = [
@@ -92,6 +113,17 @@ const docTypes = [
   { label: 'ข้อบังคับ', value: 'kho-bangkhab' },
   { label: 'ระเบียบ', value: 'rabiap' },
   { label: 'ประกาศ', value: 'prakat' },
+];
+
+const groupFilters = [
+  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'academic' },
+  { label: 'ด้านกิจการนิสิต', value: 'student-affairs' },
+  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'research-innovation' },
+  { label: 'ด้านบริการวิชาการ', value: 'academic-service' },
+  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'organization-admin' },
+  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'hr-discipline' },
+  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'finance-assets-risk' },
+  { label: 'ด้านอื่น ๆ', value: 'other' },
 ];
 
 const popularTags = [
@@ -123,7 +155,7 @@ function toggleType(value: string): void {
 
 function emitSearch(): void {
   const normalizedTypes = selectedTypes.value.includes('all') ? [] : selectedTypes.value;
-  emit('search', query.value, normalizedTypes);
+  emit('search', query.value, normalizedTypes, selectedGroups.value);
 }
 
 async function applyPopularTag(tag: string): Promise<void> {

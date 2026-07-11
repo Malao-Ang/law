@@ -19,10 +19,10 @@ export const vuetify = createVuetify({
           secondary: 'rgba(52, 48, 40, 1)',
           'primary-deep': '#0f2f68',
           'admin-primary': '#1e3a8a',
-          'doc-phrb': 'rgba(133, 77, 14, 1)',
-          'doc-rabiap': 'rgba(59, 130, 246, 1)',
-          'doc-kho-bangkhab': 'rgba(16, 185, 129, 1)',
-          'doc-prakat': 'rgba(251, 146, 60, 1)',
+          'doc-phrb': '#854D0E',        // พระราชบัญญัติ
+          'doc-rabiap': '#3B82F6',      // ระเบียบ
+          'doc-kho-bangkhab': '#10B981', // ข้อบังคับ
+          'doc-prakat': '#FB923C',      // ประกาศ
           accent: '#0f6b5d',
           warning: '#f9b74b',
           error: '#d74747',

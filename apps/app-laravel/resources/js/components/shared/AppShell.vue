@@ -15,10 +15,10 @@
     </template>
   </v-app-bar>
 
-  <v-navigation-drawer v-model="drawer" width="290">
-    <div class="pa-4 d-flex align-center ga-3">
+  <v-navigation-drawer v-model="drawer" :rail="rail" rail-width="72" width="290">
+    <div class="d-flex align-center ga-3" :class="rail ? 'pa-2 justify-center' : 'pa-4'">
       <v-avatar color="admin-primary" rounded="lg"><v-icon icon="mdi-bank-outline" /></v-avatar>
-      <div>
+      <div v-if="!rail">
         <p class="text-subtitle-2 font-weight-bold mb-0">LAWSPACE</p>
         <p class="text-caption text-medium-emphasis mb-0">ระบบจัดการฐานข้อมูลกฎหมาย</p>
       </div>
@@ -28,7 +28,7 @@
 
     <v-list nav density="comfortable">
       <template v-for="group in resolvedNavGroups" :key="group.label">
-        <v-list-subheader>{{ group.label }}</v-list-subheader>
+        <v-list-subheader v-if="!rail">{{ group.label }}</v-list-subheader>
         <v-list-item
           v-for="item in group.items"
           :key="item.label"
@@ -42,12 +42,18 @@
     </v-list>
 
     <template #append>
-      <v-list-item
-        prepend-icon="mdi-account-circle-outline"
-        title="ผู้ดูแลระบบ (Admin)"
-        subtitle="สายจัดการข้อมูล"
-        class="ma-2"
-      />
+      <v-list-item class="ma-2" rounded="lg">
+        <template #prepend>
+          <v-badge dot color="success" location="bottom end" offset-x="2" offset-y="2">
+            <v-avatar color="secondary" size="40"><span class="text-caption font-weight-bold">AD</span></v-avatar>
+          </v-badge>
+        </template>
+        <v-list-item-title class="text-body-2 font-weight-bold">ผู้ดูแลระบบ (Admin)</v-list-item-title>
+        <v-list-item-subtitle class="text-caption">ลงชื่อออก</v-list-item-subtitle>
+        <template #append>
+          <v-btn icon="mdi-logout" variant="text" size="small" />
+        </template>
+      </v-list-item>
     </template>
   </v-navigation-drawer>
 
@@ -55,16 +61,16 @@
     <div v-if="$slots.banner" class="px-6 pt-4">
       <slot name="banner" />
     </div>
-    <v-container fluid class="pa-6 app-shell__container" :class="{ 'app-shell__container--full-height': fullHeight }">
+    <v-container fluid class="pa-4  pt-6 app-shell__container" :class="{ 'app-shell__container--full-height': fullHeight }">
       <div v-if="!showTopNavigation" class="app-shell__page-header">
         <div class="app-shell__page-title">
           <div class="d-flex align-center ga-3 mb-2">
             <v-btn
-              icon="mdi-menu"
+              :icon="rail ? 'mdi-menu' : 'mdi-backburger'"
               size="small"
               variant="text"
               class="app-shell__drawer-toggle"
-              @click="drawer = !drawer"
+              @click="rail = !rail"
             />
             <v-breadcrumbs
               v-if="breadcrumbs.length"
@@ -73,12 +79,15 @@
               class="app-shell__breadcrumbs pa-0"
             />
           </div>
-          <h1 class="text-h5 font-weight-black mb-1">{{ title }}</h1>
+          <h1 v-if="title" class="text-h5 font-weight-black mb-1">{{ title }}</h1>
           <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
         </div>
 
-        <div v-if="$slots.actions" class="app-shell__page-actions">
+        <div v-if="$slots.actions || showBell" class="app-shell__page-actions">
           <slot name="actions" />
+          <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
+            <v-btn icon="mdi-bell-outline" variant="text" size="small" />
+          </v-badge>
         </div>
       </div>
 
@@ -88,8 +97,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+
+// Rail state persists across page changes (AppShell remounts per page) and reloads.
+const RAIL_KEY = 'lawspace.nav.rail';
 
 interface NavItem { label: string; icon: string; to?: string; exact?: boolean; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -102,11 +114,14 @@ const props = defineProps<{
   fullHeight?: boolean;
   hideTopBar?: boolean;
   showTopBar?: boolean;
+  showBell?: boolean;
 }>();
 
 const router = useRouter();
 const route = useRoute();
 const drawer = ref(true);
+const rail = ref(localStorage.getItem(RAIL_KEY) === '1');
+watch(rail, (v) => localStorage.setItem(RAIL_KEY, v ? '1' : '0'));
 const showTopNavigation = computed(() => props.showTopBar === true && props.hideTopBar !== true);
 
 const defaultNavGroups: NavGroup[] = [
@@ -114,21 +129,19 @@ const defaultNavGroups: NavGroup[] = [
     label: 'เมนูหลัก',
     items: [
       { label: 'หน้าแรก', icon: 'mdi-home-outline', to: '/admin' },
-      { label: 'รายงาน', icon: 'mdi-chart-box-outline', to: '/admin/reports' },
-      { label: 'หน้าเว็บผู้ใช้', icon: 'mdi-open-in-new', to: '/', exact: true },
-      { label: 'จัดการฉบับกฎหมาย', icon: 'mdi-file-document-multiple-outline' },
+      { label: 'จัดการตัวบทกฎหมาย', icon: 'mdi-file-document-multiple-outline', to: '/admin/laws' },
     ],
   },
   {
     label: 'การจัดการข้อมูล',
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
-      { label: 'การจัดการเอกสารเก่า', icon: 'mdi-archive-outline' },
+      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline' },
       { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline' },
     ],
   },
   {
-    label: 'พื้นที่งาน',
+    label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
       { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
@@ -159,8 +172,8 @@ function isActive(item: NavItem): boolean {
   flex: 0 0 auto;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 24px;
-  padding: 18px 20px;
+  margin-bottom: 4px;
+  padding: 0px 20px;
 }
 
 .app-shell__page-title {

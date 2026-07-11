@@ -45,6 +45,42 @@ class DraftHtmlWritebackTest extends TestCase
         $this->assertSame('ข้อความใหม่', $block['normalized_text']);
     }
 
+    public function test_saving_draft_html_writes_back_text_alignment(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_align_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        // TipTap renders alignment as an inline style on the block's own <p>
+        // element (the same node carrying data-block-id).
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="text-align:center">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertSame('center', $block['meta']['layout']['alignment'] ?? null);
+    }
+
+    public function test_saving_draft_html_clears_alignment_when_reverted(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_align2_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        // First center it, then revert (TipTap omits the style for the default 'left').
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="text-align:center">ข้อความ</p>',
+        ])->assertOk();
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertNull($block['meta']['layout']['alignment'] ?? null);
+    }
+
     public function test_block_without_matching_id_is_left_untouched(): void
     {
         $store = app(ReviewStore::class);

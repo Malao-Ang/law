@@ -1,15 +1,12 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
     subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
-    <template #actions>
-      <v-btn variant="outlined" @click="router.push(`/documents/${props.documentId}/review`)">
-        ย้อนกลับ
-      </v-btn>
-      <v-btn color="admin-primary" append-icon="mdi-arrow-right" :disabled="blockBusy"
-        @click="router.push(`/documents/${props.documentId}/law-info`)">
-        ถัดไป
-      </v-btn>
-    </template>
+    <WorkflowFooterBar
+      :step="3"
+      :next-disabled="blockBusy"
+      @back="router.push(`/documents/${props.documentId}/review`)"
+      @next="router.push(`/documents/${props.documentId}/law-info`)"
+    />
 
     <!-- Loading -->
     <div v-if="composeStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
@@ -25,6 +22,7 @@
     </div>
 
     <template v-else>
+      <WorkflowStepper :step="3" />
       <div class="rag-content-area">
         <!-- Selection action bar -->
         <div
@@ -79,12 +77,6 @@
                   />
                 </v-list>
               </v-menu>
-              <div class="rag-sec__actions">
-                <v-btn size="x-small" variant="outlined" prepend-icon="mdi-link-variant"
-                  @click="openRelationDialog('section', section.id, 'related')">เพิ่มความสัมพันธ์</v-btn>
-                <v-btn size="x-small" variant="outlined" color="error" prepend-icon="mdi-cancel"
-                  @click="openRelationDialog('section', section.id, 'repeals')">ยกเลิกมาตรา</v-btn>
-              </div>
             </div>
             <div class="rag-sec__flow">
               <div
@@ -104,8 +96,8 @@
                   :block="section.headBlock"
                   :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
                 />
-                <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="splitBlock(section.headBlock)">
+                <button class="rag-blockrow__split" :disabled="blockBusy" title="แยกบรรทัด"
+                  @click.prevent.stop="openLineSplit(section.headBlock)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -125,8 +117,8 @@
                   <span class="mdi mdi-check"></span>
                 </span>
                 <BlockFlow :block="child" />
-                <button class="rag-blockrow__split" :disabled="blockBusy" title="แบ่งบล็อก"
-                  @click.prevent.stop="splitBlock(child)">
+                <button class="rag-blockrow__split" :disabled="blockBusy" title="แยกบรรทัด"
+                  @click.prevent.stop="openLineSplit(child)">
                   <span class="mdi mdi-call-split" />
                 </button>
               </div>
@@ -148,12 +140,13 @@
           </div>
         </div>
 
-        <AddRelationDialog v-if="dialog" :scope="dialog.scope" :block-id="dialog.blockId" :default-type="dialog.type"
-          :exclude-document-id="props.documentId"
-          @close="dialog = null" @save="onRelationSaved" />
-
       </div>
     </template>
+    <SplitBlockDialog
+      v-model="splitDialog.open"
+      :block="splitDialog.block"
+      @confirm="onLineSplitConfirm"
+    />
   </AppShell>
 </template>
 
@@ -164,11 +157,13 @@ import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
-import type { DocumentBlock, LawRelation, RelationScope, RelationType } from '../../types/document';
+import type { DocumentBlock, LawRelation } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
+import WorkflowStepper from '../shared/WorkflowStepper.vue';
+import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
-import AddRelationDialog from '../shared/AddRelationDialog.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
+import SplitBlockDialog from './SplitBlockDialog.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
@@ -207,8 +202,8 @@ const allBlocks = computed<DocumentBlock[]>(() =>
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
+const splitDialog = ref<{ open: boolean; block: DocumentBlock | null }>({ open: false, block: null });
 const blockListEl = ref<HTMLElement | null>(null);
-const dialog = ref<{ scope: RelationScope; blockId: string | null; type: RelationType } | null>(null);
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -217,15 +212,6 @@ const blockPage = computed<Map<string, number>>(() => {
   });
   return map;
 });
-
-function openRelationDialog(scope: RelationScope, blockId: string | null, type: RelationType): void {
-  dialog.value = { scope, blockId, type };
-}
-
-async function onRelationSaved(relation: LawRelation): Promise<void> {
-  dialog.value = null;
-  await documentStore.saveRelations([...relations.value, relation]);
-}
 
 async function removeRelation(id: string): Promise<void> {
   await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
@@ -292,13 +278,91 @@ async function mergeSelected(): Promise<void> {
   }
 }
 
-async function splitBlock(block: DocumentBlock): Promise<void> {
+function blockLines(block: DocumentBlock): string[] {
+  return (block.approved_text || block.normalized_text || block.raw_text || '').split('\n');
+}
+
+function openLineSplit(block: DocumentBlock): void {
   if (blockBusy.value) return;
-  // Already a section head — nothing to promote.
-  if (block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type)) {
-    snackbar.success('บล็อกนี้เป็น section head อยู่แล้ว');
+  if (blockLines(block).length < 2) {
+    snackbar.success('บล็อกนี้มีบรรทัดเดียว ไม่สามารถแบ่งได้');
     return;
   }
+  splitDialog.value = { open: true, block };
+}
+
+async function onLineSplitConfirm(boundaries: number[]): Promise<void> {
+  const block = splitDialog.value.block;
+  splitDialog.value.open = false;
+  if (!block || boundaries.length === 0) return;
+
+  blockBusy.value = true;
+  try {
+    const lines = blockLines(block);
+    const pageNo = blockPage.value.get(block.block_id) ?? 1;
+    let tailId = block.block_id;
+    let consumed = 0;
+    for (const boundary of [...boundaries].sort((a, b) => a - b)) {
+      const res = await blockStore.split(props.documentId, tailId, {
+        page_no: pageNo,
+        before_text: lines.slice(consumed, boundary).join('\n'),
+        before_html: '',
+        after_text: lines.slice(boundary).join('\n'),
+        after_html: '',
+      });
+      tailId = res.second.block_id;
+      consumed = boundary;
+    }
+    await reloadBlocks();
+    snackbar.success('แยกบรรทัดออกเป็นบล็อกใหม่แล้ว');
+  } catch (e) {
+    snackbar.error(e instanceof Error ? e.message : 'แยกบรรทัดไม่สำเร็จ');
+    await reloadBlocks();
+  } finally {
+    blockBusy.value = false;
+  }
+}
+
+async function splitBlock(block: DocumentBlock): Promise<void> {
+  if (blockBusy.value) return;
+  const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type);
+
+  if (isHead) {
+    // Splitting a header detaches its body: the header stays its own section and
+    // the blocks under it start a NEW section (promote the first child to a head).
+    // Never merges into the previous section. Guarded by a confirmation dialog.
+    const section = sections.value.find((s) => s.headBlock.block_id === block.block_id);
+    const firstChild = section?.children[0];
+    if (!firstChild) {
+      snackbar.success('ไม่มีเนื้อหาใต้หัวข้อให้แยกออก');
+      return;
+    }
+    const confirmed = await Swal.fire({
+      title: 'คุณมั่นใจไหมที่ต้องการแยกหัวข้อหลักออก',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'แยกออก',
+      cancelButtonText: 'ยกเลิก',
+    });
+    if (!confirmed.isConfirmed) return;
+
+    blockBusy.value = true;
+    try {
+      const childHeadType = headTypeFor(firstChild);
+      firstChild.meta.chunk_type = childHeadType;    // optimistic → body becomes a new section
+      await persistChunkType(firstChild, childHeadType);
+      clearSelection();
+      snackbar.success('แยกหัวข้อหลักออกแล้ว');
+    } catch (e) {
+      snackbar.error(e instanceof Error ? e.message : 'แบ่ง section ไม่สำเร็จ');
+      await reloadBlocks();
+    } finally {
+      blockBusy.value = false;
+    }
+    return;
+  }
+
+  // Non-head block → promote it to a section head, splitting the section here.
   blockBusy.value = true;
   try {
     const headType = headTypeFor(block);
@@ -423,7 +487,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: keep page scroll locked; only rag-block-list should scroll */
 .rag-content-area {
   display: flex;
   flex-direction: column;
@@ -462,6 +525,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   padding-right: 4px;
+  padding-bottom: 60px;
   overscroll-behavior: contain;
 }
 
@@ -479,12 +543,6 @@ onBeforeUnmount(() => {
   gap: 10px;
   margin-bottom: 8px;
   flex-wrap: wrap;
-}
-
-.rag-sec__actions {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
 }
 
 .rag-sec__typechip {

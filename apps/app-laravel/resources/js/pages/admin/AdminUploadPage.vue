@@ -5,7 +5,7 @@
     subtitle="อัปโหลดไฟล์หลายรายการ แล้วติดตามสถานะการประมวลผลในคิว"
   >
     <div class="admin-upload-page mx-auto">
-      <v-card class="admin-upload-panel pa-6" flat border rounded="xl">
+      <v-card class="admin-upload-panel pa-6" flat border rounded="lg">
         <div class="d-flex flex-column flex-md-row align-md-center ga-4 mb-5">
           <div class="admin-upload-panel__icon">
             <v-icon icon="mdi-cloud-upload-outline" size="34" />
@@ -57,7 +57,7 @@
         </div>
       </v-card>
 
-      <v-card class="mt-5" flat border rounded="xl">
+      <v-card class="mt-5" flat border rounded="lg">
         <v-card-title class="d-flex flex-wrap align-center ga-3 pa-5">
           <div class="flex-grow-1">
             <div class="text-subtitle-1 font-weight-bold">คิวการนำเข้าเอกสาร</div>
@@ -148,6 +148,8 @@
           </div>
         </div>
       </v-card>
+
+      <DocumentPipelineTable class="mt-5" />
     </div>
   </AppShell>
 </template>
@@ -157,6 +159,7 @@ import { onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchStatus, uploadDocument } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
+import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
 import type { DocumentStatus, ScanExtractionMode } from '../../types/document';
 
 type UploadQueueStatus = DocumentStatus['status'] | 'pending' | 'uploading';
@@ -358,7 +361,7 @@ function fileIcon(fileName: string): string {
 }
 
 .admin-upload-empty {
-  background: #fffdfa;
+  background: #ffffff;
 }
 
 .admin-upload-queue {
@@ -370,7 +373,7 @@ function fileIcon(fileName: string): string {
 .admin-upload-queue__item {
   align-items: center;
   background: #ffffff;
-  border: 1px solid #eadfcb;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-left: 4px solid rgb(var(--v-theme-admin-primary));
   border-radius: 18px;
   display: flex;
@@ -399,7 +402,7 @@ function fileIcon(fileName: string): string {
 
 .admin-upload-queue__file-icon {
   align-items: center;
-  background: #f7f0e3;
+  background: rgba(var(--v-theme-admin-primary), 0.10);
   border-radius: 14px;
   color: rgb(var(--v-theme-admin-primary));
   display: inline-flex;

@@ -4,7 +4,15 @@
     title="นำเข้าเอกสารกฎหมาย"
     subtitle="ขั้นตอนที่ 4 จาก 5: ข้อมูลเอกสาร"
   >
-    <div class="mx-auto" style="max-width:860px">
+    <WorkflowFooterBar
+      :step="4"
+      next-label="บันทึกและเผยแพร่"
+      :next-loading="documentStore.saving || exporting"
+      @back="router.push(`/documents/${props.documentId}/rag`)"
+      @next="saveAndExport"
+    />
+    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
+      <WorkflowStepper :step="4" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -194,17 +202,6 @@
           </v-row>
         </v-card>
 
-        <div class="d-flex justify-space-between mt-6">
-          <v-btn variant="outlined" prepend-icon="mdi-arrow-left"
-            @click="router.push(`/documents/${props.documentId}/rag`)">
-            ย้อนกลับ
-          </v-btn>
-          <v-btn color="admin-primary" append-icon="mdi-arrow-right"
-            :loading="documentStore.saving || exporting"
-            @click="saveAndExport">
-            ถัดไป
-          </v-btn>
-        </div>
       </template>
     </div>
   </AppShell>
@@ -218,6 +215,8 @@ import { exportDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem, LawMeta } from '../../types/document';
 import { isPickableDocument } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
+import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
+import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
