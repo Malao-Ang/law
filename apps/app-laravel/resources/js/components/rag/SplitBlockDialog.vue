@@ -103,7 +103,7 @@ function confirm(): void {
   padding: 3px 0;
   cursor: pointer;
   color: rgb(var(--v-theme-primary));
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
   border: none;
   border-top: 1px dashed rgba(var(--v-theme-primary), 0.4);
   border-bottom: 1px dashed rgba(var(--v-theme-primary), 0.4);
@@ -111,7 +111,7 @@ function confirm(): void {
 
 .split-boundary.is-on {
   background: rgb(var(--v-theme-primary));
-  color: #fff;
+  color: rgb(var(--v-theme-on-primary));
   font-weight: 700;
 }
 </style>
