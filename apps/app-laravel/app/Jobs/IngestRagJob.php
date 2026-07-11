@@ -4,11 +4,13 @@ namespace App\Jobs;
 
 use App\Services\RagIngestService;
 use App\Services\ReviewStore;
+use App\Services\Search\LawIndexer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class IngestRagJob implements ShouldQueue
@@ -17,9 +19,18 @@ class IngestRagJob implements ShouldQueue
 
     public function __construct(public readonly string $documentId) {}
 
-    public function handle(RagIngestService $ragIngestService, ReviewStore $reviewStore): void
+    public function handle(RagIngestService $ragIngestService, LawIndexer $lawIndexer, ReviewStore $reviewStore): void
     {
         $result = $ragIngestService->ingest($this->documentId);
+
+        try {
+            $lawIndexer->index($this->documentId);
+        } catch (Throwable $exception) {
+            Log::warning('Law indexing failed (non-fatal)', [
+                'document_id' => $this->documentId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         $reviewStore->setStatus($this->documentId, [
             'status' => 'ingested',
