@@ -28,8 +28,9 @@
         {{ documentStore.error }}
       </v-alert>
 
+      <template v-else-if="documentStore.review">
       <v-alert
-        v-else-if="documentStore.review && meta.access_scope === 'private'"
+        v-if="meta.access_scope === 'private'"
         type="warning"
         variant="tonal"
         density="comfortable"
@@ -39,7 +40,6 @@
       </v-alert>
 
       <div
-        v-else-if="documentStore.review"
         class="lawx-grid"
         :class="{
           'is-toc-hidden': !tocOpen,
@@ -125,6 +125,7 @@
         <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" />
       </aside>
       </div>
+      </template>
 
       <ELawFooter />
     </v-main>
