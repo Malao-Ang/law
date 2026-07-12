@@ -34,7 +34,7 @@ class DocumentApiTest extends TestCase
             ]);
     }
 
-    public function test_upload_rejects_unsupported_scan_extraction_mode(): void
+    public function test_upload_accepts_landingai_scan_extraction_mode_and_passes_it_to_job(): void
     {
         Queue::fake();
 
@@ -43,8 +43,16 @@ class DocumentApiTest extends TestCase
             'scan_extraction_mode' => 'landingai',
         ]);
 
-        $response->assertStatus(422);
-        Queue::assertNotPushed(ExtractDocumentJob::class);
+        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
+        $documentId = (string) $response->json('document_id');
+
+        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
+            return $job->scanExtractionMode === 'landingai';
+        });
+
+        $this->getJson('/api/documents/'.$documentId)
+            ->assertOk()
+            ->assertJsonPath('scan_extraction_mode_requested', 'landingai');
     }
 
     public function test_upload_accepts_local_scan_extraction_mode_and_passes_it_to_job(): void

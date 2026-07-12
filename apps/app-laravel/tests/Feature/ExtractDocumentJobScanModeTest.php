@@ -66,7 +66,7 @@ class ExtractDocumentJobScanModeTest extends TestCase
         $this->assertSame('extract_document', $status['current_step']);
     }
 
-    public function test_docx_with_gemini_mode_still_uses_fast_path(): void
+    public function test_docx_with_standard_engine_and_gemini_mode_still_uses_fast_path(): void
     {
         require_once __DIR__.'/../Fixtures/Fast/build_test_docx.php';
 
@@ -90,13 +90,17 @@ class ExtractDocumentJobScanModeTest extends TestCase
             relativeFilePath: $stored['relative_path'],
             enableAiCorrection: false,
             scanExtractionMode: 'gemini',
-            extractionEngine: 'fast',
+            extractionEngine: 'standard',
         );
 
         $job->handle($client, $store, app(FastExtractionPipeline::class));
 
         $review = $store->getReviewDocument($documentId);
         $this->assertSame('docx', $review['source_type']);
+
+        $status = $store->getStatus($documentId);
+        $this->assertSame('done', $status['status']);
+        $this->assertSame('fast', $status['extraction_engine']);
 
         @unlink($tmpDocx);
     }
