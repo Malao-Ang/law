@@ -56,7 +56,7 @@
 
         <!-- Section list (e-Law style) -->
         <div ref="blockListEl" class="rag-block-list">
-          <div v-for="section in sections" :key="section.id" class="rag-sec">
+          <div v-for="section in sections" :key="section.id" :data-section-id="section.id" class="rag-sec">
             <div class="rag-sec__head">
               <v-menu location="bottom start" :close-on-content-click="true">
                 <template #activator="{ props: menuProps }">
@@ -252,6 +252,11 @@ async function goToLawInfo(): Promise<void> {
       confirmButtonText: 'ตกลง',
       confirmButtonColor: '#1a3673',
     });
+    // Scroll to and highlight the first untyped section so the user can fix it.
+    const firstMissingId = missing[0].id;
+    blockListEl.value
+      ?.querySelector<HTMLElement>(`[data-section-id="${firstMissingId}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
