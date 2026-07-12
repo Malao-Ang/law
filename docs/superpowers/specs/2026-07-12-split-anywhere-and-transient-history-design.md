@@ -86,12 +86,25 @@ Behaviour:
 
 - Wrap **merge** and **split** only. Before mutating, push
   `{ id, label, snapshot }` — label e.g. `รวม 3 บล็อก` / `แยกบล็อก`.
-- A history panel lists entries newest-first, each with a `ย้อน` button.
 - **Revert(entry):** POST the entry's snapshot to the restore endpoint, reload
   blocks, then truncate that entry and every newer one (the user jumped back
   past them).
 - Cleared explicitly on publish/save (`history.value = []`) and naturally empty
   after reload (it is only component state).
+
+### UI — right-side drawer (hidden by default)
+
+The history lives in a **right-side drawer**, not an always-visible panel:
+
+- **Hidden by default.** A toggle button lives in the workspace toolbar —
+  `mdi-history` icon with a count badge (number of history entries) so the user
+  knows history exists and can be opened. When there are 0 entries the button is
+  disabled/dimmed.
+- Clicking the icon opens the drawer from the right (`v-navigation-drawer`
+  `location="right"` `temporary`), which lists entries newest-first, each with a
+  `ย้อน` button. Clicking outside or the icon again closes it.
+- Drawer open/closed state is local UI state (`historyDrawer = ref(false)`);
+  it does not affect the history data itself.
 
 ## Backend — one new endpoint
 
@@ -108,7 +121,7 @@ existing granular block methods.
 ## Files touched
 
 - `resources/js/components/rag/SplitBlockDialog.vue` — atoms/sep model, emit pieces.
-- `resources/js/components/rag/RagManageWorkspace.vue` — pieces handler, history state + panel + revert, clear on publish.
+- `resources/js/components/rag/RagManageWorkspace.vue` — pieces handler, history state + right-side drawer + toolbar toggle icon (badge) + revert, clear on publish.
 - `resources/js/api/client.ts` + `stores/blockStore.ts` — `restoreBlocks` client call.
 - `app/Http/Controllers/Api/ReviewController.php` — `restoreBlocks`.
 - `app/Services/ReviewStore.php` — `restoreBlocks`.
