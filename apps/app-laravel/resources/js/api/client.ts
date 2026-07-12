@@ -199,6 +199,11 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
   });
 }
 
+export async function confirmEsign(documentId: string): Promise<void> {
+  await exportDocument(documentId);
+  await updateWorkflowProgress(documentId, 6);
+}
+
 export async function downloadWordExport(documentId: string): Promise<void> {
   const response = await fetch(`/api/documents/${documentId}/export-word`, {
     method: 'POST',

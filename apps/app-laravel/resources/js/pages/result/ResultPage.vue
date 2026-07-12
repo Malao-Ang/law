@@ -39,24 +39,61 @@
         <v-card border rounded="lg" class="mb-5 pa-6">
           <div class="d-flex align-center ga-3 mb-4">
             <v-icon icon="mdi-draw-pen" size="28" color="elaw-gold" />
-            <div class="text-subtitle-1 font-weight-bold">ส่งออกสำหรับ e-Sign</div>
+            <div class="text-subtitle-1 font-weight-bold">ส่งออกและลงนาม e-Sign</div>
           </div>
 
-          <v-alert v-if="esignExportedAt" type="success" variant="tonal" density="comfortable" class="mb-4">
-            ส่งออกแล้วเมื่อ {{ formatThaiDate(esignExportedAt) }}
-          </v-alert>
-          <v-alert v-if="exportError" type="error" variant="tonal" density="compact" class="mb-3">
-            {{ exportError }}
-          </v-alert>
+          <!-- Published -->
+          <template v-if="isPublished">
+            <v-alert type="success" variant="tonal" density="comfortable" class="mb-4" prepend-icon="mdi-check-decagram-outline">
+              เผยแพร่แล้ว — เอกสารนี้สามารถค้นหาได้บนหน้าสาธารณะ
+            </v-alert>
+            <v-btn color="primary" prepend-icon="mdi-earth" @click="router.push(`/law/${props.documentId}`)">
+              ดูหน้าเผยแพร่
+            </v-btn>
+          </template>
 
-          <v-btn
-            color="admin-primary"
-            prepend-icon="mdi-microsoft-word"
-            :loading="exporting"
-            @click="handleWordExport"
-          >
-            {{ esignExportedAt ? 'ส่งออกอีกครั้ง (Word)' : 'Export as Word for e-Sign' }}
-          </v-btn>
+          <!-- Exported, awaiting confirm -->
+          <template v-else-if="esignExportedAt">
+            <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
+              ส่งออกแล้วเมื่อ {{ formatThaiDate(esignExportedAt) }} — รอการยืนยันลงนาม
+            </v-alert>
+            <v-alert v-if="confirmError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ confirmError }}
+            </v-alert>
+            <div class="d-flex flex-wrap ga-3">
+              <v-btn
+                color="elaw-gold"
+                prepend-icon="mdi-check-circle-outline"
+                :loading="confirming"
+                @click="handleConfirmEsign"
+              >
+                ยืนยันลงนาม (เผยแพร่)
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                prepend-icon="mdi-microsoft-word"
+                :loading="exporting"
+                @click="handleWordExport"
+              >
+                ส่งออก Word อีกครั้ง
+              </v-btn>
+            </div>
+          </template>
+
+          <!-- Not yet exported -->
+          <template v-else>
+            <v-alert v-if="exportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ exportError }}
+            </v-alert>
+            <v-btn
+              color="admin-primary"
+              prepend-icon="mdi-microsoft-word"
+              :loading="exporting"
+              @click="handleWordExport"
+            >
+              Export as Word for e-Sign
+            </v-btn>
+          </template>
         </v-card>
 
         <v-card border rounded="lg" class="pa-6">
@@ -101,7 +138,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
+import { confirmEsign, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
 import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 
@@ -113,6 +150,8 @@ const review = ref<ReviewDocument | null>(null);
 const docStatus = ref<DocumentStatus | null>(null);
 const exporting = ref(false);
 const exportError = ref('');
+const confirming = ref(false);
+const confirmError = ref('');
 
 onMounted(async () => {
   try {
@@ -130,6 +169,7 @@ onMounted(async () => {
 const meta = computed<LawMeta | undefined>(() => review.value?.law_meta);
 const docTitle = computed(() => meta.value?.title || review.value?.source_file || props.documentId);
 const esignExportedAt = computed(() => docStatus.value?.esign_exported_at ?? null);
+const isPublished = computed(() => (docStatus.value?.workflow_completed_step ?? 0) >= 6);
 
 function formatThaiDate(iso: string): string {
   return new Date(iso).toLocaleString('th-TH');
@@ -138,7 +178,6 @@ function formatThaiDate(iso: string): string {
 async function handleWordExport(): Promise<void> {
   exporting.value = true;
   exportError.value = '';
-
   try {
     await downloadWordExport(props.documentId);
     docStatus.value = await fetchStatus(props.documentId);
@@ -146,6 +185,18 @@ async function handleWordExport(): Promise<void> {
     exportError.value = error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ';
   } finally {
     exporting.value = false;
+  }
+}
+
+async function handleConfirmEsign(): Promise<void> {
+  confirming.value = true;
+  confirmError.value = '';
+  try {
+    await confirmEsign(props.documentId);
+    await router.push(`/law/${props.documentId}`);
+  } catch (error) {
+    confirmError.value = error instanceof Error ? error.message : 'ยืนยันไม่สำเร็จ';
+    confirming.value = false;
   }
 }
 </script>
