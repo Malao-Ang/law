@@ -1,6 +1,5 @@
 <template>
-  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
-    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="" full-height>
     <WorkflowFooterBar
       :step="3"
       :next-disabled="blockBusy"
@@ -23,7 +22,7 @@
     </div>
 
     <template v-else>
-      <WorkflowStepper :step="3" />
+      <WorkflowStepper :step="3" description="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่" />
       <div class="rag-content-area">
         <!-- Selection action bar -->
         <div
@@ -124,9 +123,7 @@
                 </button>
               </div>
             </div>
-
-
-<div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
+            <div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
               <v-chip v-for="rel in sectionRelations(section.id)" :key="rel.id" size="small" closable
                 :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
                 :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
@@ -142,7 +139,63 @@
         </div>
 
       </div>
+
+      <!-- Floating history button -->
+      <v-tooltip text="ประวัติชั่วคราว" location="left">
+        <template #activator="{ props: tipProps }">
+          <v-badge
+            :content="history.length"
+            :model-value="history.length > 0"
+            color="error"
+            offset-x="10"
+            offset-y="10"
+            class="rag-history-fab"
+          >
+            <v-btn
+              v-bind="tipProps"
+              icon="mdi-history"
+              color="admin-primary"
+              size="large"
+              elevation="6"
+              :disabled="history.length === 0 || blockBusy"
+              @click="historyDrawer = !historyDrawer"
+            />
+          </v-badge>
+        </template>
+      </v-tooltip>
     </template>
+    <v-navigation-drawer
+      v-model="historyDrawer"
+      location="right"
+      temporary
+      width="360"
+    >
+      <div class="rag-history-drawer">
+        <div class="rag-history-drawer__head">
+          <div>
+            <div class="text-subtitle-1 font-weight-bold">ประวัติชั่วคราว</div>
+            <div class="text-caption text-medium-emphasis">ย้อนกลับได้เฉพาะการรวมและแยกบล็อกในรอบนี้</div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" @click="historyDrawer = false" />
+        </div>
+
+        <div v-if="history.length === 0" class="rag-history-drawer__empty">
+          <v-icon icon="mdi-history" size="24" color="medium-emphasis" />
+          <div class="text-body-2 text-medium-emphasis">ยังไม่มีประวัติให้ย้อนกลับ</div>
+        </div>
+
+        <div v-else class="rag-history-drawer__list">
+          <div v-for="entry in history" :key="entry.id" class="rag-history-drawer__item">
+            <div class="rag-history-drawer__meta">
+              <div class="text-body-2 font-weight-medium">{{ entry.label }}</div>
+            </div>
+            <v-btn size="small" variant="outlined" color="primary" :disabled="blockBusy" @click="restoreHistory(entry)">
+              ย้อน
+            </v-btn>
+          </div>
+        </div>
+      </div>
+    </v-navigation-drawer>
     <SplitBlockDialog
       v-model="splitDialog.open"
       :block="splitDialog.block"
@@ -177,6 +230,9 @@ const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 
+type PageBlocks = { page_no: number; blocks: DocumentBlock[] };
+type HistoryEntry = { id: string; label: string; snapshot: PageBlocks[] };
+
 const sections = computed(() => buildSections(composeStore.review));
 
 function containerType(section: LawSection): ChunkType | null {
@@ -205,6 +261,8 @@ const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const splitDialog = ref<{ open: boolean; block: DocumentBlock | null }>({ open: false, block: null });
 const blockListEl = ref<HTMLElement | null>(null);
+const history = ref<HistoryEntry[]>([]);
+const historyDrawer = ref(false);
 
 const blockPage = computed<Map<string, number>>(() => {
   const map = new Map<string, number>();
@@ -262,6 +320,7 @@ async function goToLawInfo(): Promise<void> {
 
   const progressed = await documentStore.completeWorkflowStep(3);
   if (!progressed) return;
+  history.value = [];
   router.push(`/documents/${props.documentId}/law-info`);
 }
 
@@ -282,6 +341,63 @@ function toggleBlock(blockId: string): void {
 
 function clearSelection(): void {
   selectedBlockIds.value = new Set();
+}
+
+function blockText(block: DocumentBlock): string {
+  return block.approved_text || block.normalized_text || block.raw_text || '';
+}
+
+function splitSeparator(block: DocumentBlock): '\n' | ' ' {
+  return blockText(block).includes('\n') ? '\n' : ' ';
+}
+
+function cloneHistorySnapshot(): PageBlocks[] {
+  return (composeStore.review?.pages ?? []).map((page) => ({
+    page_no: page.page_no,
+    blocks: JSON.parse(JSON.stringify(page.blocks)) as DocumentBlock[],
+  }));
+}
+
+function createHistoryId(): string {
+  return `history-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function pushHistory(label: string): string | null {
+  if (!composeStore.review) return null;
+
+  const id = createHistoryId();
+  history.value.unshift({
+    id,
+    label,
+    snapshot: cloneHistorySnapshot(),
+  });
+
+  return id;
+}
+
+function removeHistoryEntry(entryId: string | null): void {
+  if (!entryId) return;
+  history.value = history.value.filter((entry) => entry.id !== entryId);
+}
+
+async function restoreHistory(entry: HistoryEntry): Promise<void> {
+  if (blockBusy.value) return;
+
+  const entryIndex = history.value.findIndex((item) => item.id === entry.id);
+  if (entryIndex < 0) return;
+
+  blockBusy.value = true;
+  try {
+    await blockStore.restore(props.documentId, entry.snapshot);
+    await reloadBlocks();
+    history.value = history.value.slice(entryIndex + 1);
+    if (history.value.length === 0) historyDrawer.value = false;
+    snackbar.success('ย้อนประวัติการแก้ไขแล้ว');
+  } catch (e) {
+    snackbar.error(e instanceof Error ? e.message : 'ย้อนประวัติไม่สำเร็จ');
+  } finally {
+    blockBusy.value = false;
+  }
 }
 
 async function reloadBlocks(): Promise<void> {
@@ -309,6 +425,8 @@ async function persistChunkType(block: DocumentBlock, chunkType: ChunkType): Pro
 async function mergeSelected(): Promise<void> {
   const selected = allBlocks.value.filter((b) => selectedBlockIds.value.has(b.block_id));
   if (selected.length < 2 || blockBusy.value) return;
+
+  const historyId = pushHistory(`รวม ${selected.length} บล็อก`);
   blockBusy.value = true;
   try {
     // First selected becomes the container head; the rest become its children.
@@ -323,6 +441,7 @@ async function mergeSelected(): Promise<void> {
     clearSelection();
     snackbar.success('จัดกลุ่มเป็นคอนเทนเนอร์เดียวแล้ว');
   } catch (e) {
+    removeHistoryEntry(historyId);
     snackbar.error(e instanceof Error ? e.message : 'จัดกลุ่มไม่สำเร็จ');
     await reloadBlocks();
   } finally {
@@ -330,44 +449,38 @@ async function mergeSelected(): Promise<void> {
   }
 }
 
-function blockLines(block: DocumentBlock): string[] {
-  return (block.approved_text || block.normalized_text || block.raw_text || '').split('\n');
-}
-
 function openLineSplit(block: DocumentBlock): void {
   if (blockBusy.value) return;
-  if (blockLines(block).length < 2) {
-    snackbar.success('บล็อกนี้มีบรรทัดเดียว ไม่สามารถแบ่งได้');
-    return;
-  }
   splitDialog.value = { open: true, block };
 }
 
-async function onLineSplitConfirm(boundaries: number[]): Promise<void> {
+async function onLineSplitConfirm(pieces: string[]): Promise<void> {
   const block = splitDialog.value.block;
   splitDialog.value.open = false;
-  if (!block || boundaries.length === 0) return;
+  if (!block || pieces.length < 2) return;
 
+  const historyId = pushHistory('แยกบล็อก');
   blockBusy.value = true;
   try {
-    const lines = blockLines(block);
     const pageNo = blockPage.value.get(block.block_id) ?? 1;
+    const separator = splitSeparator(block);
     let tailId = block.block_id;
-    let consumed = 0;
-    for (const boundary of [...boundaries].sort((a, b) => a - b)) {
+
+    for (let index = 0; index < pieces.length - 1; index += 1) {
       const res = await blockStore.split(props.documentId, tailId, {
         page_no: pageNo,
-        before_text: lines.slice(consumed, boundary).join('\n'),
+        before_text: pieces[index],
         before_html: '',
-        after_text: lines.slice(boundary).join('\n'),
+        after_text: pieces.slice(index + 1).join(separator),
         after_html: '',
       });
       tailId = res.second.block_id;
-      consumed = boundary;
     }
+
     await reloadBlocks();
     snackbar.success('แยกบรรทัดออกเป็นบล็อกใหม่แล้ว');
   } catch (e) {
+    removeHistoryEntry(historyId);
     snackbar.error(e instanceof Error ? e.message : 'แยกบรรทัดไม่สำเร็จ');
     await reloadBlocks();
   } finally {
@@ -395,6 +508,8 @@ async function splitBlock(block: DocumentBlock): Promise<void> {
       showCancelButton: true,
       confirmButtonText: 'แยกออก',
       cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#1a3673',
+      cancelButtonColor: '#94a3b8',
     });
     if (!confirmed.isConfirmed) return;
 
@@ -502,23 +617,89 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.rag-history-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 78px;
+  z-index: 60;
+}
+
 .rag-selection-bar {
   background: #1a3673;
   color: #fff;
   flex: 0 0 auto;
-  min-height: 44px;
+  min-height: 0;
+  height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
   position: sticky;
   top: 0;
   visibility: hidden;
   z-index: 5;
+  transition: height 0.15s ease, opacity 0.15s ease;
 }
 
 .rag-selection-bar.is-visible {
+  min-height: 44px;
+  height: auto;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
+}
+
+.rag-history-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 16px;
+  gap: 14px;
+}
+
+.rag-history-drawer__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rag-history-drawer__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 18px;
+}
+
+.rag-history-drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.rag-history-drawer__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fbff;
+}
+
+.rag-history-drawer__meta {
+  min-width: 0;
 }
 
 .rag-block-list {

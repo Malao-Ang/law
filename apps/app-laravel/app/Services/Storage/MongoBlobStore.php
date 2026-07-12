@@ -2,6 +2,7 @@
 
 namespace App\Services\Storage;
 
+use Illuminate\Support\Facades\Cache;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
 use MongoDB\Driver\Exception\BulkWriteException;
@@ -34,6 +35,9 @@ final class MongoBlobStore
             ],
             ['upsert' => true],
         );
+        if ($kind === 'review' || $kind === 'status') {
+            Cache::forget('law-meta-list');
+        }
     }
 
     public function exists(string $kind, string $id): bool
@@ -62,6 +66,9 @@ final class MongoBlobStore
                         '_version' => 1,
                         'updated_at' => new UTCDateTime,
                     ]);
+                    if ($kind === 'review' || $kind === 'status') {
+                        Cache::forget('law-meta-list');
+                    }
 
                     return;
                 } catch (BulkWriteException) {
@@ -78,6 +85,10 @@ final class MongoBlobStore
             );
 
             if ($result->getMatchedCount() > 0) {
+                if ($kind === 'review' || $kind === 'status') {
+                    Cache::forget('law-meta-list');
+                }
+
                 return;
             }
         }

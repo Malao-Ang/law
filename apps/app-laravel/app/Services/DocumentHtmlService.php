@@ -9,6 +9,10 @@ use DOMXPath;
 
 class DocumentHtmlService
 {
+    public const TWIPS_PER_PX = 15;
+
+    public const A4_CONTENT_TWIPS = 9000;
+
     public function buildGeneratedHtml(array $document): string
     {
         $pages = is_array($document['pages'] ?? null) ? $document['pages'] : [];
@@ -338,6 +342,7 @@ class DocumentHtmlService
                     // TextAlign renders text-align on the wrapper element itself, which
                     // innerHtml() drops — capture it here so alignment survives writeback.
                     'alignment' => $this->extractInlineTextAlign($wrapper),
+                    'indent_left' => $this->extractInlineMarginLeftTwips($wrapper),
                 ],
                 'table' => $type === 'table' ? $this->extractTableData($wrapper) : null,
             ],
@@ -427,6 +432,29 @@ class DocumentHtmlService
         return null;
     }
 
+    private function extractInlineMarginLeftTwips(DOMElement $element): ?int
+    {
+        $style = $element->getAttribute('style');
+        if ($style === '') {
+            return null;
+        }
+
+        if (preg_match('/margin-left\s*:\s*(-?\d+(?:\.\d+)?)\s*(px|pt)\b/i', $style, $matches) !== 1) {
+            return null;
+        }
+
+        $value = (float) $matches[1];
+        if ($value <= 0) {
+            return null;
+        }
+
+        $twips = strtolower($matches[2]) === 'px'
+            ? $value * self::TWIPS_PER_PX
+            : $value * 20;
+
+        return (int) round($twips);
+    }
+
     private function findFirstDescendantTable(DOMNode $node): ?DOMElement
     {
         foreach ($node->childNodes as $child) {
@@ -443,7 +471,7 @@ class DocumentHtmlService
         return null;
     }
 
-    private function buildLayoutStyleAttribute(array $layout): string
+    public function buildLayoutStyleAttribute(array $layout): string
     {
         $styles = [];
         $alignment = $layout['alignment'] ?? null;
@@ -468,6 +496,10 @@ class DocumentHtmlService
             // indent) and would push the text outside the canvas.
             $marginPt = min((float) $indentLeft / 20, 200.0);
             $styles[] = 'margin-left:'.$marginPt.'pt';
+        }
+        $firstTabStop = $this->firstTabStopTwips($layout);
+        if (! is_numeric($indentLeft) && $firstTabStop !== null) {
+            $styles[] = 'padding-left:'.($firstTabStop / 20).'pt';
         }
         if (is_numeric($indentFirstLine)) {
             // First line indent (positive = indent, negative = hanging)
@@ -494,10 +526,27 @@ class DocumentHtmlService
         return $styles === [] ? '' : ' style="'.e(implode('; ', $styles)).'"';
     }
 
+    private function firstTabStopTwips(array $layout): ?int
+    {
+        $position = $layout['tabs'][0]['position'] ?? null;
+        if (! is_numeric($position) || (float) $position <= 0) {
+            return null;
+        }
+
+        return (int) round((float) $position);
+    }
+
     private function renderTextWithLayout(string $text, array $layout): string
     {
         if (! str_contains($text, "\t")) {
             return nl2br(e($text), false);
+        }
+
+        $promoteLeadingTab = ! is_numeric($layout['indent_left'] ?? null)
+            && $this->firstTabStopTwips($layout) !== null
+            && str_starts_with($text, "\t");
+        if ($promoteLeadingTab) {
+            $text = substr($text, 1);
         }
 
         $tabs = [];
@@ -515,7 +564,7 @@ class DocumentHtmlService
             if ($index >= count($parts) - 1) {
                 continue;
             }
-            $width = $tabs[$index] ?? 18.0;
+            $width = $tabs[$index + ($promoteLeadingTab ? 1 : 0)] ?? 18.0;
             $html .= '<span class="doc-tab" style="display:inline-block; width:'.$width.'pt;"></span>';
         }
 

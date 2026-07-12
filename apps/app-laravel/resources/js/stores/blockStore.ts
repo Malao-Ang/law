@@ -10,6 +10,7 @@ import {
   reorderBlocks,
   reprocessBlock,
   reprocessPageWithLandingAI,
+  restoreBlocks,
   splitBlock,
 } from '../api/client';
 import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
@@ -52,6 +53,13 @@ export const useBlockStore = defineStore('blocks', () => {
     blockIds: string[],
   ): Promise<{ status: string; block: DocumentBlock }> {
     return mergeBlocks(documentId, blockIds);
+  }
+
+  async function restore(
+    documentId: string,
+    pages: Array<{ page_no: number; blocks: DocumentBlock[] }>,
+  ): Promise<{ document_id: string; status: string }> {
+    return restoreBlocks(documentId, pages);
   }
 
   async function split(
@@ -98,5 +106,5 @@ export const useBlockStore = defineStore('blocks', () => {
     });
   }
 
-  return { patch, reprocess, patchLayout, remove, merge, split, create, reprocessPage, reorder, patchChunkType };
+  return { patch, reprocess, patchLayout, remove, merge, restore, split, create, reprocessPage, reorder, patchChunkType };
 });

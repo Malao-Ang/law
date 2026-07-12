@@ -359,6 +359,27 @@ class ReviewController extends Controller
         return response()->json(['document_id' => $documentId, 'status' => 'merged', 'block' => $merged]);
     }
 
+    public function restoreBlocks(Request $request, string $documentId): JsonResponse
+    {
+        $validated = $request->validate([
+            'pages' => 'required|array|min:1',
+            'pages.*.page_no' => 'required|integer|min:1',
+            'pages.*.blocks' => 'required|array',
+            'pages.*.blocks.*' => 'array',
+        ]);
+
+        try {
+            $this->reviewStore->restoreBlocks($documentId, $validated['pages']);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status' => 'restored',
+        ]);
+    }
+
     public function splitBlock(Request $request, string $documentId, string $blockId): JsonResponse
     {
         $validated = $request->validate([

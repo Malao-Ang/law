@@ -46,7 +46,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.status' => ['nullable', 'string', 'max:120'],
             'law_meta.law_type' => ['nullable', 'string', 'max:120'],
             'law_meta.law_group' => ['nullable', 'string', 'max:120'],
-            'law_meta.change_status' => ['nullable', 'string', 'in:new,amended,repealed,consolidated'],
+            'law_meta.change_status' => ['nullable', 'string', 'max:120'],
             'law_meta.agency' => ['nullable', 'string', 'max:255'],
             'law_meta.signer_group' => ['nullable', 'string', 'max:255'],
             'law_meta.promulgation_date' => ['nullable', 'string', 'max:120'],

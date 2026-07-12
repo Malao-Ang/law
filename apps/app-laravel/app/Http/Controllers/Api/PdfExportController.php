@@ -8,7 +8,7 @@ use App\Services\ReviewStore;
 use Illuminate\Http\Response;
 use RuntimeException;
 
-class WordExportController extends Controller
+class PdfExportController extends Controller
 {
     public function __construct(
         private readonly ReviewStore $reviewStore,
@@ -23,15 +23,23 @@ class WordExportController extends Controller
             abort(404, 'Document not found.');
         }
 
-        $content = $this->exportService->toDocx($document);
+        try {
+            $pdfBytes = $this->exportService->toPdf($document);
+        } catch (RuntimeException $exception) {
+            $status = $exception->getMessage() === 'PDF service unavailable' ? 503 : 500;
+
+            return response($exception->getMessage(), $status);
+        }
+
         $this->reviewStore->setStatus($documentId, [
             'esign_exported_at' => now()->toIso8601String(),
         ]);
+
         $filename = $this->exportService->safeFilenameBase($document);
 
-        return response($content, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'.docx"',
+        return response($pdfBytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'.pdf"',
         ]);
     }
 }

@@ -160,6 +160,97 @@ class BlockMutationTest extends TestCase
         $this->assertCount(4, $doc['pages'][0]['blocks']);
     }
 
+    public function test_split_heading_makes_tail_body_not_heading(): void
+    {
+        $this->store->writeReviewDocument($this->docId, [
+            'document_id' => $this->docId,
+            'source_file' => 'test.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => null,
+                'blocks' => [[
+                    'block_id' => 'h1',
+                    'type' => 'paragraph',
+                    'bbox' => null,
+                    'reading_order' => 1,
+                    'raw_text' => 'มาตรา ๕ ความว่า',
+                    'normalized_text' => 'มาตรา ๕ ความว่า',
+                    'ai_suggested_text' => '',
+                    'approved_text' => 'มาตรา ๕ ความว่า',
+                    'confidence' => 1.0,
+                    'needs_review' => false,
+                    'flags' => [],
+                    'meta' => [
+                        'reviewed_html' => '<p>มาตรา ๕ ความว่า</p>',
+                        'chunk_type' => 'SECTION',
+                    ],
+                ]],
+            ]],
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+        ]);
+
+        $response = $this->postJson("/api/documents/{$this->docId}/blocks/h1/split", [
+            'page_no' => 1,
+            'before_text' => 'มาตรา ๕',
+            'before_html' => '<p>มาตรา ๕</p>',
+            'after_text' => 'ความว่า',
+            'after_html' => '<p>ความว่า</p>',
+        ]);
+        $response->assertStatus(200)->assertJsonFragment(['status' => 'split']);
+
+        $blocks = $this->store->getReviewDocument($this->docId)['pages'][0]['blocks'];
+        $this->assertCount(2, $blocks);
+        $this->assertSame('SECTION', $blocks[0]['meta']['chunk_type'] ?? null);
+        $this->assertNull($blocks[1]['meta']['chunk_type'] ?? null);
+    }
+
+    public function test_restore_blocks_round_trips_after_merge(): void
+    {
+        $originalPages = $this->store->getReviewDocument($this->docId)['pages'];
+
+        $mergeResponse = $this->postJson("/api/documents/{$this->docId}/blocks/merge", [
+            'block_ids' => ['b1', 'b2'],
+        ]);
+        $mergeResponse->assertStatus(200)->assertJsonFragment(['status' => 'merged']);
+
+        $restoreResponse = $this->postJson("/api/documents/{$this->docId}/blocks/restore", [
+            'pages' => $originalPages,
+        ]);
+        $restoreResponse->assertStatus(200)->assertJsonFragment(['status' => 'restored']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $this->assertCount(3, $doc['pages'][0]['blocks']);
+        $this->assertSame(['b1', 'b2', 'b3'], array_column($doc['pages'][0]['blocks'], 'block_id'));
+        $this->assertSame('Block one', $doc['pages'][0]['blocks'][0]['approved_text']);
+        $this->assertSame('Block two', $doc['pages'][0]['blocks'][1]['approved_text']);
+    }
+
+    public function test_restore_blocks_round_trips_after_split(): void
+    {
+        $originalPages = $this->store->getReviewDocument($this->docId)['pages'];
+
+        $splitResponse = $this->postJson("/api/documents/{$this->docId}/blocks/b1/split", [
+            'page_no' => 1,
+            'before_text' => 'Block',
+            'before_html' => '<p>Block</p>',
+            'after_text' => 'one',
+            'after_html' => '<p>one</p>',
+        ]);
+        $splitResponse->assertStatus(200)->assertJsonFragment(['status' => 'split']);
+
+        $restoreResponse = $this->postJson("/api/documents/{$this->docId}/blocks/restore", [
+            'pages' => $originalPages,
+        ]);
+        $restoreResponse->assertStatus(200)->assertJsonFragment(['status' => 'restored']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $this->assertCount(3, $doc['pages'][0]['blocks']);
+        $this->assertSame(['b1', 'b2', 'b3'], array_column($doc['pages'][0]['blocks'], 'block_id'));
+        $this->assertSame('Block one', $doc['pages'][0]['blocks'][0]['approved_text']);
+    }
+
     public function test_create_block_inserts_after_target(): void
     {
         $response = $this->postJson("/api/documents/{$this->docId}/blocks", [

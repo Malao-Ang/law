@@ -158,7 +158,12 @@ class ReportController extends Controller
             'group' => ($r['law_groups'][0] ?? '') ?: 'ไม่ระบุ',
             'agency' => ($r['agencies'][0] ?? '') ?: 'ไม่ระบุ',
             'status' => $r['status'],
+            'meta_status' => trim((string) ($r['meta_status'] ?? '')),
             'date' => $r['updated_at'],
+            'section_count' => isset($r['section_count']) ? (int) $r['section_count'] : null,
+            'page_count' => (int) ($r['page_count'] ?? 0),
+            'parent_document_id' => $r['parent_document_id'] ?? null,
+            'workflow_completed_step' => isset($r['workflow_completed_step']) ? (int) $r['workflow_completed_step'] : null,
         ], array_values($rows));
     }
 }

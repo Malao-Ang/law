@@ -7,14 +7,7 @@
       @back="router.push('/admin/upload')"
       @next="saveAndContinue"
     />
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center py-3" style="flex-shrink:0">
-      <div>
-        <div class="text-subtitle-1 font-weight-bold">ตรวจทานเนื้อหาเอกสาร</div>
-        <div class="text-caption text-medium-emphasis">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</div>
-      </div>
-    </div>
-    <WorkflowStepper :step="2" />
+    <WorkflowStepper :step="2" description="อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ" />
 
     <v-alert
       v-if="props.locked"

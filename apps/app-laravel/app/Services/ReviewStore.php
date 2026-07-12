@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 class ReviewStore
@@ -137,48 +138,55 @@ class ReviewStore
      */
     public function listLawMeta(): array
     {
-        $rows = [];
-        foreach ($this->blob->allStatuses() as $status) {
-            $documentId = (string) ($status['document_id'] ?? '');
-            if ($documentId === '') {
-                continue;
+        return Cache::remember('law-meta-list', 180, function (): array {
+            $rows = [];
+            foreach ($this->blob->allStatuses() as $status) {
+                $documentId = (string) ($status['document_id'] ?? '');
+                if ($documentId === '') {
+                    continue;
+                }
+
+                $meta = [];
+                $review = $this->blob->read('review', $documentId);
+                if ($review !== null) {
+                    $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+                }
+
+                $groups = is_array($meta['law_groups'] ?? null) ? array_values(array_filter($meta['law_groups'], 'is_string')) : [];
+                if ($groups === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
+                    $groups = [(string) $meta['law_group']];
+                }
+
+                $agencies = is_array($meta['agencies'] ?? null) ? array_values(array_filter($meta['agencies'], 'is_string')) : [];
+                if ($agencies === [] && trim((string) ($meta['agency'] ?? '')) !== '') {
+                    $agencies = [(string) $meta['agency']];
+                }
+
+                $title = trim((string) ($meta['title'] ?? '')) ?: (string) ($status['source_file'] ?? $documentId);
+                $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+
+                $rows[] = [
+                    'document_id' => $documentId,
+                    'title' => $title,
+                    'status' => (string) ($status['status'] ?? 'unknown'),
+                    'updated_at' => $status['updated_at'] ?? null,
+                    'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
+                    'law_type' => trim((string) ($meta['law_type'] ?? '')),
+                    'meta_status' => trim((string) ($meta['status'] ?? '')),
+                    'change_status' => trim((string) ($meta['change_status'] ?? '')),
+                    'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
+                    'law_groups' => $groups,
+                    'agencies' => $agencies,
+                    'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
+                    'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
+                    'page_count' => is_array($review['summary'] ?? null) ? (int) ($review['summary']['page_count'] ?? 0) : 0,
+                    'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
+                    'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
+                ];
             }
 
-            $meta = [];
-            $review = $this->blob->read('review', $documentId);
-            if ($review !== null) {
-                $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
-            }
-
-            $groups = is_array($meta['law_groups'] ?? null) ? array_values(array_filter($meta['law_groups'], 'is_string')) : [];
-            if ($groups === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
-                $groups = [(string) $meta['law_group']];
-            }
-
-            $agencies = is_array($meta['agencies'] ?? null) ? array_values(array_filter($meta['agencies'], 'is_string')) : [];
-            if ($agencies === [] && trim((string) ($meta['agency'] ?? '')) !== '') {
-                $agencies = [(string) $meta['agency']];
-            }
-
-            $title = trim((string) ($meta['title'] ?? '')) ?: (string) ($status['source_file'] ?? $documentId);
-
-            $rows[] = [
-                'document_id' => $documentId,
-                'title' => $title,
-                'status' => (string) ($status['status'] ?? 'unknown'),
-                'updated_at' => $status['updated_at'] ?? null,
-                'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
-                'law_type' => trim((string) ($meta['law_type'] ?? '')),
-                'meta_status' => trim((string) ($meta['status'] ?? '')),
-                'change_status' => trim((string) ($meta['change_status'] ?? '')),
-                'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
-                'law_groups' => $groups,
-                'agencies' => $agencies,
-                'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
-            ];
-        }
-
-        return $rows;
+            return $rows;
+        });
     }
 
     /**
@@ -733,6 +741,44 @@ class ReviewStore
     }
 
     /**
+     * @param  array<int, array{page_no: int, blocks: array<int, array<string, mixed>>}>  $pages
+     */
+    public function restoreBlocks(string $documentId, array $pages): void
+    {
+        $pagesByNo = [];
+
+        foreach ($pages as $page) {
+            $pageNo = (int) ($page['page_no'] ?? 0);
+            if ($pageNo < 1 || ! is_array($page['blocks'] ?? null)) {
+                throw new RuntimeException('Invalid restore payload.');
+            }
+
+            $pagesByNo[$pageNo] = array_values($page['blocks']);
+        }
+
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($pagesByNo): void {
+            $restoredPages = [];
+
+            foreach (array_keys($document['pages'] ?? []) as $pageIndex) {
+                $pageNo = (int) ($document['pages'][$pageIndex]['page_no'] ?? 0);
+                if (! array_key_exists($pageNo, $pagesByNo)) {
+                    continue;
+                }
+
+                $document['pages'][$pageIndex]['blocks'] = $pagesByNo[$pageNo];
+                $restoredPages[$pageNo] = true;
+            }
+
+            if (count($restoredPages) !== count($pagesByNo)) {
+                throw new RuntimeException('One or more pages not found for restore.');
+            }
+
+            $this->recalculateSummary($document);
+            $this->markOutOfSync($document);
+        });
+    }
+
+    /**
      * @return array{first: array<string, mixed>, second: array<string, mixed>}
      */
     public function splitBlock(
@@ -763,7 +809,10 @@ class ReviewStore
                         $second = $block;
                         $second['block_id'] = $newId;
                         $second['approved_text'] = $afterText;
+                        $second['meta'] = is_array($block['meta'] ?? null) ? $block['meta'] : [];
                         $second['meta']['reviewed_html'] = $this->sanitizeHtml($afterHtml);
+                        // The tail of a split is body text, never a heading.
+                        unset($second['meta']['chunk_type']);
                         $newBlocks[] = $second;
 
                         $result = ['first' => $block, 'second' => $second];
@@ -1029,12 +1078,18 @@ class ReviewStore
                 // text-align on the block's own <p>, which innerHtml drops from reviewed_html).
                 $derivedAlignment = $byId[$bid]['meta']['layout']['alignment']
                     ?? $this->extractAlignmentHint((string) $meta['reviewed_html']);
+                $derivedIndentLeft = $byId[$bid]['meta']['layout']['indent_left'] ?? null;
                 $layout = is_array($meta['layout'] ?? null) ? $meta['layout'] : [];
                 if ($derivedAlignment !== null) {
                     $layout['alignment'] = $derivedAlignment;
                 } else {
                     // Reverting to the default (left) drops the style entirely — clear it.
                     unset($layout['alignment']);
+                }
+                if (is_numeric($derivedIndentLeft) && (float) $derivedIndentLeft > 0) {
+                    $layout['indent_left'] = (int) round((float) $derivedIndentLeft);
+                } else {
+                    unset($layout['indent_left']);
                 }
                 $meta['layout'] = $layout;
                 $block['meta'] = $meta;
@@ -1268,7 +1323,7 @@ class ReviewStore
                 }
 
                 $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
-                if ($chunkType === 'ARTICLE') {
+                if ($chunkType === 'ARTICLE' || $chunkType === 'CLAUSE') {
                     $count++;
                 }
             }

@@ -81,6 +81,39 @@ class DraftHtmlWritebackTest extends TestCase
         $this->assertNull($block['meta']['layout']['alignment'] ?? null);
     }
 
+    public function test_saving_draft_html_writes_back_margin_left_as_indent_left(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_indent_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="margin-left:48px">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertSame(720, $block['meta']['layout']['indent_left'] ?? null);
+    }
+
+    public function test_saving_draft_html_clears_indent_left_when_margin_is_removed(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_indent2_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="margin-left:48px">ข้อความ</p>',
+        ])->assertOk();
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertNull($block['meta']['layout']['indent_left'] ?? null);
+    }
+
     public function test_block_without_matching_id_is_left_untouched(): void
     {
         $store = app(ReviewStore::class);

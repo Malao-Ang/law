@@ -182,7 +182,7 @@ export interface LawMeta {
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
-  change_status?: 'new' | 'amended' | 'repealed' | 'consolidated' | null;
+  change_status?: string | null;   // canonical Thai label from config/lookups.change_statuses
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
   signer_group?: string | null;
@@ -371,7 +371,12 @@ export interface ReportDocument {
   group: string;
   agency: string;
   status: string;
+  meta_status: string;
   date: string | null;
+  section_count: number | null;
+  page_count: number;
+  parent_document_id: string | null;
+  workflow_completed_step: number | null;
 }
 
 export interface ReportSummary {

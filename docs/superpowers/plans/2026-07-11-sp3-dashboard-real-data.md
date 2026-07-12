@@ -44,7 +44,7 @@
 - `AdminStatCard.vue` is in `apps/app-laravel/resources/js/components/admin/AdminStatCard.vue` and accepts props: `icon: string`, `iconColor: string`, `iconBg: string`, `number: number`, `label: string`.
 - `AppShell.vue` is in `apps/app-laravel/resources/js/components/shared/AppShell.vue`.
 
-- [ ] **Step 1: Delete dashboardData.ts**
+- [x] **Step 1: Delete dashboardData.ts**
 
 Delete the file `apps/app-laravel/resources/js/data/dashboardData.ts`.
 
@@ -58,7 +58,7 @@ On Unix (Bash):
 rm apps/app-laravel/resources/js/data/dashboardData.ts
 ```
 
-- [ ] **Step 2: Delete DashboardMetricCard.vue**
+- [x] **Step 2: Delete DashboardMetricCard.vue**
 
 Delete the file `apps/app-laravel/resources/js/components/admin/DashboardMetricCard.vue`.
 
@@ -72,7 +72,7 @@ On Unix (Bash):
 rm apps/app-laravel/resources/js/components/admin/DashboardMetricCard.vue
 ```
 
-- [ ] **Step 3: Rewrite AdminDashboardPage.vue**
+- [x] **Step 3: Rewrite AdminDashboardPage.vue**
 
 Replace the entire contents of `apps/app-laravel/resources/js/pages/admin/AdminDashboardPage.vue` with:
 
@@ -194,13 +194,13 @@ const recentDocs = computed(() => summary.value.documents.slice(0, 5));
 </style>
 ```
 
-- [ ] **Step 4: Run TypeScript typecheck**
+- [x] **Step 4: Run TypeScript typecheck**
 
 ```bash
 cd apps/app-laravel && npm run typecheck
 ```
 
-Expected: no errors. If you see errors about missing `DashboardMetricCard` or `dashboardData` imports, verify Steps 1-3 were completed. Fix any TypeScript errors before proceeding.
+Observed on 2026-07-11: `npm run typecheck` passed with no errors.
 
 - [ ] **Step 5: Commit**
 
@@ -222,42 +222,44 @@ git commit -m "feat(dashboard): wire AdminDashboardPage to real MongoDB data via
 
 **Files:** No changes — run and verify only.
 
-- [ ] **Step 1: Run TypeScript typecheck**
+- [x] **Step 1: Run TypeScript typecheck**
 
 ```bash
 cd apps/app-laravel && npm run typecheck
 ```
 
-Expected: zero errors.
+Observed on 2026-07-11: `npm run typecheck` passed with zero errors.
 
-- [ ] **Step 2: Verify no remaining references to deleted files**
+- [x] **Step 2: Verify no remaining references to deleted files**
 
 ```bash
 grep -r "dashboardData\|DashboardMetricCard" apps/app-laravel/resources/js/
 ```
 
-Expected: no output (zero matches).
+Observed on 2026-07-11: no matches for `dashboardData` or `DashboardMetricCard` under `apps/app-laravel/resources/js`.
 
-- [ ] **Step 3: Run PHP test suite**
+- [x] **Step 3: Run PHP test suite**
 
 ```bash
 docker compose exec laravel-app php artisan test
 ```
 
-Expected: same pass count as before (backend unchanged — no new failures).
+Observed on 2026-07-11: `149 passed, 1 failed, 1 warning`. The same pre-existing backend failure remained:
+`DocumentApiTest > upload rejects unsupported scan extraction mode`.
 
-- [ ] **Step 4: Run pint on the PHP side (no-op check)**
+- [x] **Step 4: Run pint on the PHP side (no-op check)**
 
 ```bash
 docker compose exec laravel-app vendor/bin/pint --test
 ```
 
-Expected: no formatting issues (no PHP files were changed).
+Observed on 2026-07-11: `vendor/bin/pint --test` failed due to 10 pre-existing style issues in unrelated PHP files. No PHP files were changed for this dashboard task.
 
 - [ ] **Step 5: Manual smoke test**
 
 Navigate to `http://localhost:8000/admin` in a browser while the stack is running. Confirm:
 - 4 metric cards are visible and show numbers (not static "84", "216", "12", "12,402").
+Not performed in this run because no browser automation was used here.
 - The recent imports table shows real document rows (or the "ยังไม่มีเอกสาร" empty state if no docs exist).
 - No completeness bars or urgent alerts sections appear.
 - Clicking a row in the recent imports table navigates to `/documents/{id}/review`.

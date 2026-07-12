@@ -27,6 +27,7 @@
         </v-btn>
       </div>
       <v-divider />
+      <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
       <v-table class="recent-table">
         <thead>
           <tr>
@@ -37,36 +38,47 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="recentDocs.length === 0">
-            <td colspan="4" class="text-center pa-6 text-medium-emphasis">ยังไม่มีเอกสาร</td>
-          </tr>
-          <tr
-            v-for="doc in recentDocs"
-            :key="doc.id"
-            class="recent-row"
-            @click="router.push(`/documents/${doc.id}/review`)"
-          >
-            <td class="py-4 text-body-2 font-weight-medium" style="max-width: 320px">
-              <span class="recent-row__title">{{ doc.title }}</span>
-            </td>
-            <td>
-              <v-chip size="small" :color="STATUS_CHIP[doc.status] ?? 'default'" rounded="pill" variant="tonal">
-                {{ doc.status }}
-              </v-chip>
-            </td>
-            <td class="text-body-2">{{ (doc.date ?? '').slice(0, 10) }}</td>
-            <td>
-              <v-btn
-                variant="text"
-                size="small"
-                color="admin-primary"
-                prepend-icon="mdi-eye-outline"
-                class="text-none"
-              >
-                เปิดดู
-              </v-btn>
-            </td>
-          </tr>
+          <template v-if="loading">
+            <tr v-for="n in 3" :key="n">
+              <td><v-skeleton-loader type="text" width="260" /></td>
+              <td><v-skeleton-loader type="chip" width="80" /></td>
+              <td><v-skeleton-loader type="text" width="90" /></td>
+              <td><v-skeleton-loader type="text" width="60" /></td>
+            </tr>
+          </template>
+          <template v-else>
+            <tr v-if="recentDocs.length === 0">
+              <td colspan="4" class="text-center pa-6 text-medium-emphasis">ยังไม่มีเอกสาร</td>
+            </tr>
+            <tr
+              v-for="doc in recentDocs"
+              v-else
+              :key="doc.id"
+              class="recent-row"
+              @click="router.push(`/documents/${doc.id}/review`)"
+            >
+              <td class="py-4 text-body-2 font-weight-medium" style="max-width: 320px">
+                <span class="recent-row__title">{{ doc.title }}</span>
+              </td>
+              <td>
+                <v-chip size="small" :color="STATUS_CHIP[doc.status] ?? 'default'" rounded="pill" variant="tonal">
+                  {{ doc.status }}
+                </v-chip>
+              </td>
+              <td class="text-body-2">{{ (doc.date ?? '').slice(0, 10) }}</td>
+              <td>
+                <v-btn
+                  variant="text"
+                  size="small"
+                  color="admin-primary"
+                  prepend-icon="mdi-eye-outline"
+                  class="text-none"
+                >
+                  เปิดดู
+                </v-btn>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </v-table>
     </v-card>
@@ -92,6 +104,7 @@ const STATUS_CHIP: Record<string, string> = {
   failed: 'error',
 };
 
+const loading = ref(false);
 const summary = ref<ReportSummary>({
   totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0 },
   by_type: [],
@@ -102,7 +115,12 @@ const summary = ref<ReportSummary>({
 });
 
 onMounted(async () => {
-  summary.value = await fetchReportSummary();
+  loading.value = true;
+  try {
+    summary.value = await fetchReportSummary();
+  } finally {
+    loading.value = false;
+  }
 });
 
 const statCards = computed(() => [

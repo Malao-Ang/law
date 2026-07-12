@@ -120,6 +120,25 @@ class LawMetaTest extends TestCase
         $this->assertSame(['ข้อมูลส่วนบุคคล', 'PDPA'], $doc['law_meta']['keywords']);
     }
 
+    public function test_update_document_review_accepts_thai_change_status(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_lawmeta_change_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $response = $this->putJson("/api/documents/{$id}/document-review", [
+            'law_meta' => [
+                'change_status' => 'กฎหมายใหม่',
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('law_meta.change_status', 'กฎหมายใหม่');
+
+        $doc = $store->getReviewDocument($id);
+        $this->assertSame('กฎหมายใหม่', $doc['law_meta']['change_status']);
+    }
+
     public function test_public_access_scope_clears_permission_groups(): void
     {
         $store = app(ReviewStore::class);
@@ -185,7 +204,7 @@ class LawMetaTest extends TestCase
         $response->assertJsonPath('law_meta.permission_group_ids', [$group['id']]);
     }
 
-    public function test_section_count_is_derived_from_article_blocks_on_save(): void
+    public function test_section_count_is_derived_from_article_and_clause_blocks_on_save(): void
     {
         $store = app(ReviewStore::class);
         $id = 'doc_lawmeta_section_'.uniqid();
@@ -236,7 +255,7 @@ class LawMetaTest extends TestCase
                         'confidence' => 1.0,
                         'needs_review' => false,
                         'flags' => [],
-                        'meta' => ['chunk_type' => 'ARTICLE', 'layout' => ['tabs' => []], 'formatting' => []],
+                        'meta' => ['chunk_type' => 'CLAUSE', 'layout' => ['tabs' => []], 'formatting' => []],
                     ],
                 ],
             ]],

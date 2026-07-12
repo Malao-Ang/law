@@ -27,6 +27,20 @@ type ApiErrorPayload = {
   errors?: Record<string, string[]>;
 };
 
+export type SelectableOption = {
+  title: string;
+  value: string;
+  subtitle?: string;
+};
+
+export type LookupData = {
+  document_types: SelectableOption[];
+  statuses: SelectableOption[];
+  change_statuses: SelectableOption[];
+  agencies: SelectableOption[];
+  law_groups: SelectableOption[];
+};
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const response = await fetch(input, {
@@ -93,6 +107,10 @@ export function fetchReview(documentId: string): Promise<ReviewDocument> {
 
 export function fetchPreview(documentId: string): Promise<PreviewData> {
   return jsonRequest<PreviewData>(`/api/documents/${documentId}/preview`);
+}
+
+export function getLookups(): Promise<LookupData> {
+  return jsonRequest<LookupData>('/api/lookups');
 }
 
 export function saveDocumentReview(
@@ -204,15 +222,20 @@ export async function confirmEsign(documentId: string): Promise<void> {
   await updateWorkflowProgress(documentId, 6);
 }
 
-export async function downloadWordExport(documentId: string): Promise<void> {
-  const response = await fetch(`/api/documents/${documentId}/export-word`, {
+async function downloadBinaryExport(
+  documentId: string,
+  path: string,
+  accept: string,
+  fallbackName: string,
+): Promise<void> {
+  const response = await fetch(path, {
     method: 'POST',
-    headers: { Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    headers: { Accept: accept },
   });
 
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as ApiErrorPayload;
-    throw new Error(data.message ?? 'Word export failed');
+    throw new Error(data.message ?? `Export failed (${response.status})`);
   }
 
   const blob = await response.blob();
@@ -222,12 +245,30 @@ export async function downloadWordExport(documentId: string): Promise<void> {
 
   const disposition = response.headers.get('Content-Disposition') ?? '';
   const match = /filename="?([^";\n]+)"?/.exec(disposition);
-  anchor.download = match?.[1] ?? `document-${documentId}.docx`;
+  anchor.download = match?.[1] ?? fallbackName;
 
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export async function downloadPdfExport(documentId: string): Promise<void> {
+  return downloadBinaryExport(
+    documentId,
+    `/api/documents/${documentId}/export-pdf`,
+    'application/pdf',
+    `document-${documentId}.pdf`,
+  );
+}
+
+export async function downloadWordExport(documentId: string): Promise<void> {
+  return downloadBinaryExport(
+    documentId,
+    `/api/documents/${documentId}/export-word`,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    `document-${documentId}.docx`,
+  );
 }
 
 export function fetchLawFacets(): Promise<LawSearchFacets> {
@@ -287,6 +328,16 @@ export function mergeBlocks(
   return jsonRequest(`/api/documents/${documentId}/blocks/merge`, {
     method: 'POST',
     body: JSON.stringify({ block_ids: blockIds }),
+  });
+}
+
+export function restoreBlocks(
+  documentId: string,
+  pages: Array<{ page_no: number; blocks: DocumentBlock[] }>,
+): Promise<{ document_id: string; status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/restore`, {
+    method: 'POST',
+    body: JSON.stringify({ pages }),
   });
 }
 

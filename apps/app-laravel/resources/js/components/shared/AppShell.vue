@@ -159,6 +159,12 @@ const defaultNavGroups: NavGroup[] = [
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
+  {
+    label: 'ลิงก์ด่วน',
+    items: [
+      { label: 'กลับหน้าหลัก', icon: 'mdi-home-circle-outline', to: '/' },
+    ],
+  },
 ];
 
 const resolvedNavGroups = computed(() => props.navGroups ?? defaultNavGroups);

@@ -1,8 +1,7 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'เอกสารที่เกี่ยวข้อง']"
-    title="นำเข้าเอกสารกฎหมาย"
-    subtitle="ขั้นตอนที่ 5 จาก 6: เอกสารที่เกี่ยวข้อง"
+    title=""
   >
     <WorkflowFooterBar
       :step="5"
@@ -12,7 +11,7 @@
       @next="saveAndNext"
     />
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="5" />
+      <WorkflowStepper :step="5" description="เชื่อมโยงกฎหมายแม่และเอกสารที่เกี่ยวข้อง" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -126,7 +125,7 @@ async function saveAndNext(): Promise<void> {
   if (!saved) return;
   const relationProgressed = await documentStore.completeWorkflowStep(5);
   if (!relationProgressed) return;
-  router.push(`/documents/${props.documentId}/result`);
+  router.push(`/documents/${props.documentId}/permissions`);
 }
 
 onMounted(async () => {

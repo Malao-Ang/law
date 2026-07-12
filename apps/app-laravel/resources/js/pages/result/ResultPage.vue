@@ -47,7 +47,7 @@
             <v-alert type="success" variant="tonal" density="comfortable" class="mb-4" prepend-icon="mdi-check-decagram-outline">
               เผยแพร่แล้ว — เอกสารนี้สามารถค้นหาได้บนหน้าสาธารณะ
             </v-alert>
-            <v-btn color="primary" prepend-icon="mdi-earth" @click="router.push(`/law/${props.documentId}`)">
+            <v-btn color="admin-primary" prepend-icon="mdi-earth" @click="router.push(`/law/${props.documentId}`)">
               ดูหน้าเผยแพร่
             </v-btn>
           </template>
@@ -60,6 +60,12 @@
             <v-alert v-if="confirmError" type="error" variant="tonal" density="compact" class="mb-3">
               {{ confirmError }}
             </v-alert>
+            <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ pdfExportError }}
+            </v-alert>
+            <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ docxExportError }}
+            </v-alert>
             <div class="d-flex flex-wrap ga-3">
               <v-btn
                 color="elaw-gold"
@@ -70,9 +76,17 @@
                 ยืนยันลงนาม (เผยแพร่)
               </v-btn>
               <v-btn
+                color="admin-primary"
+                prepend-icon="mdi-file-pdf-box"
+                :loading="exportingPdf"
+                @click="handlePdfExport"
+              >
+                ส่งออก PDF อีกครั้ง
+              </v-btn>
+              <v-btn
                 variant="outlined"
                 prepend-icon="mdi-microsoft-word"
-                :loading="exporting"
+                :loading="exportingDocx"
                 @click="handleWordExport"
               >
                 ส่งออก Word อีกครั้ง
@@ -82,17 +96,30 @@
 
           <!-- Not yet exported -->
           <template v-else>
-            <v-alert v-if="exportError" type="error" variant="tonal" density="compact" class="mb-3">
-              {{ exportError }}
+            <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ pdfExportError }}
             </v-alert>
-            <v-btn
-              color="admin-primary"
-              prepend-icon="mdi-microsoft-word"
-              :loading="exporting"
-              @click="handleWordExport"
-            >
-              Export as Word for e-Sign
-            </v-btn>
+            <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ docxExportError }}
+            </v-alert>
+            <div class="d-flex flex-wrap ga-3">
+              <v-btn
+                color="admin-primary"
+                prepend-icon="mdi-file-pdf-box"
+                :loading="exportingPdf"
+                @click="handlePdfExport"
+              >
+                Export PDF for e-Sign
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                prepend-icon="mdi-microsoft-word"
+                :loading="exportingDocx"
+                @click="handleWordExport"
+              >
+                Export Word for e-Sign
+              </v-btn>
+            </div>
           </template>
         </v-card>
 
@@ -101,6 +128,7 @@
           <div class="d-flex flex-wrap ga-3">
             <v-btn
               variant="outlined"
+              color="admin-primary"
               prepend-icon="mdi-database-cog-outline"
               @click="router.push(`/documents/${props.documentId}/rag`)"
             >
@@ -108,6 +136,7 @@
             </v-btn>
             <v-btn
               variant="outlined"
+              color="admin-primary"
               prepend-icon="mdi-information-outline"
               @click="router.push(`/documents/${props.documentId}/law-info`)"
             >
@@ -115,6 +144,7 @@
             </v-btn>
             <v-btn
               variant="outlined"
+              color="admin-primary"
               prepend-icon="mdi-graph-outline"
               @click="router.push(`/documents/${props.documentId}/relations`)"
             >
@@ -122,6 +152,7 @@
             </v-btn>
             <v-btn
               variant="outlined"
+              color="admin-primary"
               prepend-icon="mdi-shield-lock-outline"
               @click="router.push(`/documents/${props.documentId}/permissions`)"
             >
@@ -129,7 +160,7 @@
             </v-btn>
             <v-btn
               variant="tonal"
-              color="primary"
+              color="admin-primary"
               prepend-icon="mdi-eye-outline"
               @click="router.push(`/law/${props.documentId}`)"
             >
@@ -145,7 +176,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { confirmEsign, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
+import { confirmEsign, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
 import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 
@@ -155,8 +186,10 @@ const router = useRouter();
 const loading = ref(true);
 const review = ref<ReviewDocument | null>(null);
 const docStatus = ref<DocumentStatus | null>(null);
-const exporting = ref(false);
-const exportError = ref('');
+const exportingPdf = ref(false);
+const exportingDocx = ref(false);
+const pdfExportError = ref('');
+const docxExportError = ref('');
 const confirming = ref(false);
 const confirmError = ref('');
 
@@ -183,15 +216,28 @@ function formatThaiDate(iso: string): string {
 }
 
 async function handleWordExport(): Promise<void> {
-  exporting.value = true;
-  exportError.value = '';
+  exportingDocx.value = true;
+  docxExportError.value = '';
   try {
     await downloadWordExport(props.documentId);
     docStatus.value = await fetchStatus(props.documentId);
   } catch (error) {
-    exportError.value = error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ';
+    docxExportError.value = error instanceof Error ? error.message : 'ส่งออก Word ไม่สำเร็จ';
   } finally {
-    exporting.value = false;
+    exportingDocx.value = false;
+  }
+}
+
+async function handlePdfExport(): Promise<void> {
+  exportingPdf.value = true;
+  pdfExportError.value = '';
+  try {
+    await downloadPdfExport(props.documentId);
+    docStatus.value = await fetchStatus(props.documentId);
+  } catch (error) {
+    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
+  } finally {
+    exportingPdf.value = false;
   }
 }
 

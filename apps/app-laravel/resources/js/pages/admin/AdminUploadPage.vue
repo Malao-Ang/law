@@ -69,19 +69,6 @@
       </v-card>
 
       <DocumentPipelineTable ref="pipelineTable" class="mt-5" />
-
-      <v-snackbar
-        :model-value="Boolean(errorMsg)"
-        color="error"
-        timeout="5000"
-        location="bottom right"
-        @update:model-value="dismissError"
-      >
-        {{ errorMsg }}
-        <template #actions>
-          <v-btn variant="text" color="white" @click="dismissError">ปิด</v-btn>
-        </template>
-      </v-snackbar>
     </div>
   </AppShell>
 </template>
@@ -92,11 +79,12 @@ import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
 import { uploadDocument } from '../../api/client';
 import type { ScanExtractionMode } from '../../types/document';
+import { useSnackbarStore } from '../../stores/snackbarStore';
 
+const snackbar = useSnackbarStore();
 const selectedFiles = ref<File[]>([]);
 const scanMode = ref<ScanExtractionMode>('gemini');
 const uploading = ref(false);
-const errorMsg = ref('');
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const scanModeOptions: Array<{ title: string; value: ScanExtractionMode }> = [
@@ -120,7 +108,7 @@ async function addFiles(value: File | File[] | null): Promise<void> {
         await pipelineTable.value?.load();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'อัปโหลดไม่สำเร็จ';
-        errorMsg.value = `${file.name}: ${message}`;
+        snackbar.error(`${file.name}: ${message}`);
       }
     }
   } finally {
@@ -137,10 +125,6 @@ function normalizeFiles(value: File | File[] | null): File[] {
 function extractionEngine(mode: ScanExtractionMode): 'standard' | 'fast' {
   return mode === 'local' ? 'fast' : 'standard';
 }
-
-function dismissError(): void {
-  errorMsg.value = '';
-}
 </script>
 
 <style scoped>
@@ -150,6 +134,7 @@ function dismissError(): void {
 
 .admin-upload-panel {
   background: #ffffff;
+  border-top: 3px solid rgb(var(--v-theme-admin-primary));
 }
 
 .admin-upload-panel__icon {
