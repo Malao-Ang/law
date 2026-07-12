@@ -121,6 +121,13 @@
               แก้ไขความสัมพันธ์
             </v-btn>
             <v-btn
+              variant="outlined"
+              prepend-icon="mdi-shield-lock-outline"
+              @click="router.push(`/documents/${props.documentId}/permissions`)"
+            >
+              จัดการสิทธิ์
+            </v-btn>
+            <v-btn
               variant="tonal"
               color="primary"
               prepend-icon="mdi-eye-outline"

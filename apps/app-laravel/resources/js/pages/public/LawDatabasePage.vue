@@ -280,23 +280,13 @@
               />
             </div>
 
-            <v-alert
-              v-if="searchStore.error"
-              type="warning"
-              variant="tonal"
-              density="comfortable"
-              class="mb-4"
-            >
-              {{ searchStore.error }}
-            </v-alert>
-
             <div v-if="searchStore.loading" class="d-flex justify-center py-10">
               <v-progress-circular indeterminate color="primary" />
             </div>
 
             <div v-else-if="sortedResults.length === 0" class="law-empty-state">
               <v-icon icon="mdi-file-search-outline" size="28" color="medium-emphasis" />
-              <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสารที่ตรงกับเงื่อนไขค้นหา</p>
+              <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสาร</p>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">

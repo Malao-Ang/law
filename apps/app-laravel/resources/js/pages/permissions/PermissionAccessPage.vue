@@ -6,7 +6,7 @@
   >
     <WorkflowFooterBar
       :step="6"
-      next-label="เผยแพร่"
+      next-label="บันทึกและดำเนินการต่อ"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"
       @back="router.push(`/documents/${props.documentId}/relations`)"
@@ -160,7 +160,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   createPermissionGroup,
-  exportDocument,
   fetchPermissionDirectory,
   fetchPermissionGroup,
   listPermissionGroups,
@@ -267,16 +266,7 @@ async function saveAndPublish(): Promise<void> {
   });
   if (!saved) return;
 
-  try {
-    await exportDocument(props.documentId);
-  } catch (error) {
-    documentStore.setSaveError(error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ — ลองอีกครั้ง');
-    return;
-  }
-
-  const progressed = await documentStore.completeWorkflowStep(6);
-  if (!progressed) return;
-  router.push(`/law/${props.documentId}`);
+  router.push(`/documents/${props.documentId}/result`);
 }
 
 onMounted(async () => {
