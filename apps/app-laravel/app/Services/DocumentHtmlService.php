@@ -343,6 +343,9 @@ class DocumentHtmlService
                     // innerHtml() drops — capture it here so alignment survives writeback.
                     'alignment' => $this->extractInlineTextAlign($wrapper),
                     'indent_left' => $this->extractInlineMarginLeftTwips($wrapper),
+                    // First-line indent (text-indent) is set on the wrapper by
+                    // FirstLineIndentExtension; signed twips (negative = hanging).
+                    'indent_first_line' => $this->extractInlineTextIndentTwips($wrapper),
                 ],
                 'table' => $type === 'table' ? $this->extractTableData($wrapper) : null,
             ],
@@ -445,6 +448,33 @@ class DocumentHtmlService
 
         $value = (float) $matches[1];
         if ($value <= 0) {
+            return null;
+        }
+
+        $twips = strtolower($matches[2]) === 'px'
+            ? $value * self::TWIPS_PER_PX
+            : $value * 20;
+
+        return (int) round($twips);
+    }
+
+    /**
+     * Signed first-line indent (text-indent) in twips. Positive = first-line
+     * indent, negative = hanging indent. Unlike margin-left, negative is valid.
+     */
+    private function extractInlineTextIndentTwips(DOMElement $element): ?int
+    {
+        $style = $element->getAttribute('style');
+        if ($style === '') {
+            return null;
+        }
+
+        if (preg_match('/text-indent\s*:\s*(-?\d+(?:\.\d+)?)\s*(px|pt)\b/i', $style, $matches) !== 1) {
+            return null;
+        }
+
+        $value = (float) $matches[1];
+        if ($value === 0.0) {
             return null;
         }
 

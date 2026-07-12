@@ -209,7 +209,13 @@ onMounted(async () => {
 const meta = computed<LawMeta | undefined>(() => review.value?.law_meta);
 const docTitle = computed(() => meta.value?.title || review.value?.source_file || props.documentId);
 const esignExportedAt = computed(() => docStatus.value?.esign_exported_at ?? null);
-const isPublished = computed(() => (docStatus.value?.workflow_completed_step ?? 0) >= 6);
+// Published = the RAG export actually ran and was indexed (searchable on /law).
+// Reaching workflow step 6 only means the permissions step was completed — the
+// document is not searchable until it has been exported/ingested.
+const isPublished = computed(() => {
+  const s = docStatus.value?.status;
+  return s === 'ingested' || s === 'exported';
+});
 
 function formatThaiDate(iso: string): string {
   return new Date(iso).toLocaleString('th-TH');

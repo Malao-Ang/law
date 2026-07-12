@@ -2,7 +2,7 @@
   <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:16px 24px 60px; background:#f8fafc; box-sizing:border-box">
     <WorkflowFooterBar
       :step="2"
-      next-label="บันทึก →"
+      next-label="บันทึก"
       :next-loading="documentStore.saving"
       @back="router.push('/admin/upload')"
       @next="saveAndContinue"

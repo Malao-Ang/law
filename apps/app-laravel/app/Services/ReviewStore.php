@@ -1091,6 +1091,18 @@ class ReviewStore
                 } else {
                     unset($layout['indent_left']);
                 }
+                // First-line indent (text-indent): positive → first-line, negative → hanging.
+                // FirstLineIndentExtension round-trips text-indent, so absence means removed.
+                $derivedFirstLine = $byId[$bid]['meta']['layout']['indent_first_line'] ?? null;
+                if (is_numeric($derivedFirstLine) && (float) $derivedFirstLine > 0) {
+                    $layout['indent_first_line'] = (int) round((float) $derivedFirstLine);
+                    unset($layout['indent_hanging']);
+                } elseif (is_numeric($derivedFirstLine) && (float) $derivedFirstLine < 0) {
+                    $layout['indent_hanging'] = (int) round(abs((float) $derivedFirstLine));
+                    unset($layout['indent_first_line']);
+                } else {
+                    unset($layout['indent_first_line'], $layout['indent_hanging']);
+                }
                 $meta['layout'] = $layout;
                 $block['meta'] = $meta;
                 unset($block);
