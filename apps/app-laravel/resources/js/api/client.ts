@@ -18,7 +18,7 @@
   UploadResponse,
   WorkflowProgressResponse,
 } from '../types/document';
-import type { LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
+import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
 
 type ApiErrorPayload = {
@@ -228,6 +228,10 @@ export async function downloadWordExport(documentId: string): Promise<void> {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export function fetchLawFacets(): Promise<LawSearchFacets> {
+  return jsonRequest<LawSearchFacets>('/api/laws/facets');
 }
 
 export function searchLaws(params: LawSearchParams): Promise<LawSearchResponse> {

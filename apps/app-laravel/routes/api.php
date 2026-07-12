@@ -18,6 +18,7 @@ Route::get('/health', HealthController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
 Route::post('/laws/search', [LawSearchController::class, 'search']);
+Route::get('/laws/facets', [LawSearchController::class, 'facets']);
 Route::post('/laws/suggest', [LawSuggestController::class, 'suggest']);
 Route::get('/permission-directory', PermissionDirectoryController::class);
 Route::get('/permission-groups', [PermissionGroupController::class, 'index']);
