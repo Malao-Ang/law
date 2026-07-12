@@ -87,13 +87,14 @@
           v-for="rel in relations"
           :key="rel.id"
           class="d-flex align-center ga-2 text-caption my-2"
-          :class="rel.type === 'repeals' ? 'text-error' : 'text-medium-emphasis'"
+          :class="relationRowClass(rel.type)"
         >
           <v-icon
-            :icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
+            :icon="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'"
             size="small"
           />
-          {{ rel.target_title }}<span v-if="rel.target_section"> · {{ rel.target_section }}</span>
+          <span class="font-weight-medium">{{ relationTypeLabel(rel.type) }}</span>
+          <span>{{ rel.target_title }}<span v-if="rel.target_section"> · {{ rel.target_section }}</span></span>
         </div>
       </v-card-text>
     </v-card>
@@ -101,7 +102,19 @@
 </template>
 
 <script setup lang="ts">
-import type { LawMeta, LawRelation } from '../../types/document';
+import type { LawMeta, LawRelation, RelationType } from '../../types/document';
+import {
+  RELATION_TYPE_ICONS,
+  relationTypeLabel,
+} from '../../types/lawRelation';
 
 defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[] }>();
+
+function relationRowClass(type: RelationType): string {
+  if (type === 'repeals') return 'text-error';
+  if (type === 'supersedes') return 'text-orange-darken-2';
+  if (type === 'amends') return 'text-teal';
+  if (type === 'issued_under') return 'text-deep-purple';
+  return 'text-medium-emphasis';
+}
 </script>

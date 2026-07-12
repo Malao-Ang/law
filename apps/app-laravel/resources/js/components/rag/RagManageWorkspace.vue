@@ -1,6 +1,6 @@
 <template>
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="จัดการเนื้อหา RAG" full-height
-    subtitle="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่">
+    subtitle="จัดกลุ่มบล็อกและประเภท chunk ก่อนดำเนินการต่อ">
     <WorkflowFooterBar
       :step="3"
       :next-disabled="blockBusy"
@@ -124,16 +124,6 @@
                 </button>
               </div>
             </div>
-
-
-<div v-if="sectionRelations(section.id).length" class="rag-sec__rels">
-              <v-chip v-for="rel in sectionRelations(section.id)" :key="rel.id" size="small" closable
-                :color="rel.type === 'repeals' ? 'error' : 'primary'" variant="tonal"
-                :prepend-icon="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'"
-                @click:close="removeRelation(rel.id)">
-                {{ rel.target_title }}{{ rel.target_section ? ' · ' + rel.target_section : '' }}
-              </v-chip>
-            </div>
           </div>
 
           <div v-if="sections.length === 0" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
@@ -158,11 +148,11 @@ import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
-import type { DocumentBlock, LawRelation } from '../../types/document';
+import type { DocumentBlock } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
 import WorkflowStepper from '../shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
-import { buildSections, relationsForSection, suggestChunkType, type LawSection } from '../../composables/useLawSections';
+import { buildSections, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import BlockFlow from '../shared/BlockFlow.vue';
 import SplitBlockDialog from './SplitBlockDialog.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
@@ -200,7 +190,6 @@ function containerTypeColor(section: LawSection): string | undefined {
 const allBlocks = computed<DocumentBlock[]>(() =>
   sections.value.flatMap(s => [s.headBlock, ...s.children]),
 );
-const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const selectedBlockIds = ref<Set<string>>(new Set());
 const blockBusy = ref(false);
 const splitDialog = ref<{ open: boolean; block: DocumentBlock | null }>({ open: false, block: null });
@@ -260,12 +249,12 @@ async function goToLawInfo(): Promise<void> {
   router.push(`/documents/${props.documentId}/law-info`);
 }
 
-async function removeRelation(id: string): Promise<void> {
-  await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
-}
-
-function sectionRelations(sectionId: string): LawRelation[] {
-  return relationsForSection(relations.value, sectionId);
+async function reloadBlocks(): Promise<void> {
+  const scrollTop = blockListEl.value?.scrollTop ?? 0;
+  await composeStore.fetch(props.documentId);
+  clearSelection();
+  await nextTick();
+  if (blockListEl.value) blockListEl.value.scrollTop = scrollTop;
 }
 
 function toggleBlock(blockId: string): void {
@@ -277,18 +266,6 @@ function toggleBlock(blockId: string): void {
 
 function clearSelection(): void {
   selectedBlockIds.value = new Set();
-}
-
-async function reloadBlocks(): Promise<void> {
-  // ponytail: Vuetify overlay focus-restore scrolls the list after DOM replace; pin scrollTop
-  const scrollTop = blockListEl.value?.scrollTop ?? 0;
-  await Promise.all([
-    composeStore.fetch(props.documentId),
-    documentStore.fetch(props.documentId),
-  ]);
-  clearSelection();
-  await nextTick();
-  if (blockListEl.value) blockListEl.value.scrollTop = scrollTop;
 }
 
 // A head chunk-type to assign when a block should start a section.
@@ -555,13 +532,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
   align-items: stretch;
-}
-
-.rag-sec__rels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
 }
 
 /* ponytail: custom checkbox grid layout — no Vuetify equivalent */

@@ -203,7 +203,7 @@ export interface LawMeta {
   permission_group_ids: string[];
 }
 
-export type RelationType = 'related' | 'repeals';
+export type RelationType = 'related' | 'repeals' | 'amends' | 'issued_under' | 'supersedes';
 export type RelationScope = 'document' | 'section';
 
 export interface LawRelation {
@@ -213,7 +213,10 @@ export interface LawRelation {
   type: RelationType;
   target_document_id: string | null;
   target_title: string;
+  /** Human-readable section label (e.g. "มาตรา ๕") — kept for display and external refs */
   target_section: string | null;
+  /** Precise target block when selected from catalog picker */
+  target_block_id: string | null;
   note: string | null;
   url: string | null;
 }

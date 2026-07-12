@@ -63,4 +63,49 @@ class RelationsTest extends TestCase
         $response->assertJsonPath('relations.0.target_section', 'มาตรา ๕');
         $response->assertJsonCount(1, 'relations');
     }
+
+    public function test_relations_support_extended_types_and_target_block_id(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_rel_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $response = $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [
+                [
+                    'id' => 'r-amend',
+                    'scope' => 'section',
+                    'block_id' => 'p1-b0001',
+                    'type' => 'amends',
+                    'target_document_id' => 'doc_target',
+                    'target_title' => 'พ.ร.บ. ฉบับแก้ไข',
+                    'target_section' => 'มาตรา ๒',
+                    'target_block_id' => 'p1-b0042',
+                    'note' => null,
+                    'url' => null,
+                ],
+                [
+                    'id' => 'r-supersedes',
+                    'scope' => 'document',
+                    'type' => 'supersedes',
+                    'target_title' => 'พ.ร.บ. ฉบับเก่า',
+                    'target_block_id' => 'p2-b0001',
+                ],
+                [
+                    'id' => 'r-issued',
+                    'scope' => 'document',
+                    'type' => 'issued_under',
+                    'target_title' => 'พ.ร.บ. แม่บท',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('relations.0.type', 'amends');
+        $response->assertJsonPath('relations.0.target_block_id', 'p1-b0042');
+        $response->assertJsonPath('relations.1.type', 'supersedes');
+        $response->assertJsonPath('relations.1.target_block_id', 'p2-b0001');
+        $response->assertJsonPath('relations.2.type', 'issued_under');
+        $response->assertJsonCount(3, 'relations');
+    }
 }

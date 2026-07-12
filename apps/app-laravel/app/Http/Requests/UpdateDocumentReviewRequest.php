@@ -74,10 +74,11 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.id' => ['nullable', 'string', 'max:64'],
             'relations.*.scope' => ['nullable', 'string', 'in:document,section'],
             'relations.*.block_id' => ['nullable', 'string', 'max:64'],
-            'relations.*.type' => ['nullable', 'string', 'in:related,repeals'],
+            'relations.*.type' => ['nullable', 'string', 'in:related,repeals,amends,issued_under,supersedes'],
             'relations.*.target_document_id' => ['nullable', 'string', 'max:128'],
             'relations.*.target_title' => ['nullable', 'string', 'max:255'],
             'relations.*.target_section' => ['nullable', 'string', 'max:120'],
+            'relations.*.target_block_id' => ['nullable', 'string', 'max:64'],
             'relations.*.note' => ['nullable', 'string', 'max:500'],
             'relations.*.url' => ['nullable', 'url', 'max:500'],
         ];

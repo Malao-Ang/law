@@ -58,6 +58,8 @@ The repo ships a minimal Nginx reverse proxy config (`infra/nginx/default.conf`)
 | `queue-worker` | `thai-ocr-queue-worker` | — | `php artisan queue:listen --tries=1 --timeout=1800` |
 | `ocr-service` | `thai-ocr-service` | 8010 | FastAPI + Docling + EasyOCR + LandingAI; runs as root to handle volume perms |
 | `redis` | `thai-ocr-redis` | 6379 | Laravel queue backend |
+| `mongo` | `thai-ocr-mongo` | 27017 | Document blob store (`MongoBlobStore`); data in volume `poc_mongo` |
+| `elasticsearch` | `thai-ocr-elasticsearch` | 9200 | Thai keyword search index (local dev, security off) |
 
 The shared `poc_storage` volume mounts as `/var/www/html/storage/app/poc` (Laravel) and `/data/poc` (Python). Laravel stores relative paths; `DocumentPipelineClient::toSharedPath()` rewrites them to absolute Python paths. Never construct these paths inline.
 

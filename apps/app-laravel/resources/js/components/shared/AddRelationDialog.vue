@@ -7,7 +7,7 @@
   >
     <v-card class="add-relation-dialog">
       <v-card-title class="d-flex align-center justify-space-between pr-2">
-        {{ defaultType === 'repeals' ? 'ยกเลิกมาตรา / กฎหมาย' : 'เพิ่มความสัมพันธ์' }}
+        {{ dialogTitle }}
         <v-btn icon variant="text" @click="$emit('close')">
           <v-icon icon="mdi-close" />
         </v-btn>
@@ -16,19 +16,16 @@
       <v-card-text>
         <div class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">ประเภท</div>
-          <div class="d-flex gap-2">
+          <div class="d-flex flex-wrap ga-2">
             <v-btn
+              v-for="relType in RELATION_TYPES"
+              :key="relType"
               size="small"
-              :color="form.type === 'related' ? 'primary' : ''"
-              :variant="form.type === 'related' ? 'flat' : 'outlined'"
-              @click="form.type = 'related'"
-            >เกี่ยวข้อง</v-btn>
-            <v-btn
-              size="small"
-              :color="form.type === 'repeals' ? 'primary' : ''"
-              :variant="form.type === 'repeals' ? 'flat' : 'outlined'"
-              @click="form.type = 'repeals'"
-            >ยกเลิก</v-btn>
+              :color="form.type === relType ? RELATION_TYPE_COLORS[relType] : ''"
+              :variant="form.type === relType ? 'flat' : 'outlined'"
+              :prepend-icon="RELATION_TYPE_ICONS[relType]"
+              @click="form.type = relType"
+            >{{ RELATION_TYPE_LABELS[relType] }}</v-btn>
           </div>
         </div>
 
@@ -97,6 +94,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from '../../types/document';
+import {
+  RELATION_TYPES,
+  RELATION_TYPE_COLORS,
+  RELATION_TYPE_ICONS,
+  RELATION_TYPE_LABELS,
+  relationTypeLabel,
+} from '../../types/lawRelation';
 import LawRelationColumnPicker from './LawRelationColumnPicker.vue';
 
 const props = defineProps<{
@@ -118,9 +122,15 @@ const form = ref<LawRelation>({
   type: props.defaultType ?? 'related',
   target_document_id: null,
   target_title: '',
-  target_section: '',
-  note: '',
-  url: '',
+  target_section: null,
+  target_block_id: null,
+  note: null,
+  url: null,
+});
+
+const dialogTitle = computed(() => {
+  const label = relationTypeLabel(form.value.type);
+  return form.value.type === 'related' ? 'เพิ่มความสัมพันธ์' : `เพิ่มความสัมพันธ์ — ${label}`;
 });
 
 const canSave = computed(() => {
@@ -133,8 +143,9 @@ const canSave = computed(() => {
 watch(mode, () => {
   form.value.target_title = '';
   form.value.target_document_id = null;
-  form.value.target_section = '';
-  form.value.url = '';
+  form.value.target_section = null;
+  form.value.target_block_id = null;
+  form.value.url = null;
   pickerTarget.value = null;
 });
 
@@ -142,13 +153,15 @@ watch(pickerTarget, (target) => {
   if (!target) {
     form.value.target_document_id = null;
     form.value.target_title = '';
-    form.value.target_section = '';
+    form.value.target_section = null;
+    form.value.target_block_id = null;
     return;
   }
 
   form.value.target_document_id = target.document_id;
   form.value.target_title = target.title;
-  form.value.target_section = target.section ?? '';
+  form.value.target_section = target.section;
+  form.value.target_block_id = target.block_id;
 });
 
 function save(): void {
@@ -159,6 +172,7 @@ function save(): void {
     ...form.value,
     target_title: form.value.target_title.trim(),
     target_section: targetSection !== '' ? targetSection : null,
+    target_block_id: mode.value === 'picker' ? (form.value.target_block_id || null) : null,
     target_document_id: form.value.target_document_id || null,
     url: form.value.url?.trim() || null,
     note: form.value.note?.trim() || null,

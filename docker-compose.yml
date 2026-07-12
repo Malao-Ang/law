@@ -159,15 +159,19 @@ services:
   mongo:
     image: mongo:7
     container_name: thai-ocr-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: poc
     ports:
       - "27017:27017"
     volumes:
       - poc_mongo:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 20s
 
 volumes:
   poc_storage:

@@ -1241,7 +1241,9 @@ class ReviewStore
                 continue;
             }
 
-            $type = ($entry['type'] ?? 'related') === 'repeals' ? 'repeals' : 'related';
+            $typeRaw = (string) ($entry['type'] ?? 'related');
+            $allowedTypes = ['related', 'repeals', 'amends', 'issued_under', 'supersedes'];
+            $type = in_array($typeRaw, $allowedTypes, true) ? $typeRaw : 'related';
             $scope = ($entry['scope'] ?? 'document') === 'section' ? 'section' : 'document';
 
             $clean[] = [
@@ -1253,6 +1255,7 @@ class ReviewStore
                     ? (string) $entry['target_document_id'] : null,
                 'target_title' => $title,
                 'target_section' => trim((string) ($entry['target_section'] ?? '')) ?: null,
+                'target_block_id' => trim((string) ($entry['target_block_id'] ?? '')) ?: null,
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
             ];

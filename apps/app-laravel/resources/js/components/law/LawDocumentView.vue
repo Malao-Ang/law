@@ -109,8 +109,13 @@
               กฎหมายที่เกี่ยวข้อง · {{ sectionRelations(section.id).length }}
             </v-btn>
             <ul v-show="expanded.has(section.id)" class="lawx-rel__list">
-              <li v-for="rel in sectionRelations(section.id)" :key="rel.id" :class="{ 'is-repeal': rel.type === 'repeals' }">
-                <span class="mdi" :class="rel.type === 'repeals' ? 'mdi-cancel' : 'mdi-link-variant'" />
+              <li
+                v-for="rel in sectionRelations(section.id)"
+                :key="rel.id"
+                :class="relationListClass(rel.type)"
+              >
+                <span class="mdi" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+                <span class="lawx-rel__type">{{ relationTypeLabel(rel.type) }}</span>
                 <a v-if="safeUrl(rel.url)" :href="safeUrl(rel.url) ?? ''" target="_blank" rel="noopener">{{ rel.target_title }}</a>
                 <span v-else>{{ rel.target_title }}</span>
                 <span v-if="rel.target_section" class="lawx-rel__sec">{{ rel.target_section }}</span>
@@ -136,7 +141,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { buildSections, buildTocGroups, relationsForSection, documentRelations } from '../../composables/useLawSections';
-import type { LawMeta, LawRelation } from '../../types/document';
+import type { LawMeta, LawRelation, RelationType } from '../../types/document';
+import {
+  RELATION_TYPE_ICONS,
+  relationTypeLabel,
+} from '../../types/lawRelation';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -218,6 +227,15 @@ function safeUrl(url: string | null): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+}
+
+function relationListClass(type: RelationType): Record<string, boolean> {
+  return {
+    'is-repeal': type === 'repeals',
+    'is-supersedes': type === 'supersedes',
+    'is-amends': type === 'amends',
+    'is-issued-under': type === 'issued_under',
+  };
 }
 
 function printPage(): void {
@@ -395,6 +413,10 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-rel__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .lawx-rel__list li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #334155; }
 .lawx-rel__list li.is-repeal { color: #dc2626; }
+.lawx-rel__list li.is-supersedes { color: #ea580c; }
+.lawx-rel__list li.is-amends { color: #0d9488; }
+.lawx-rel__list li.is-issued-under { color: #7c3aed; }
+.lawx-rel__type { font-size: 11px; font-weight: 600; color: #64748b; }
 .lawx-rel__sec { color: #64748b; font-size: 12px; }
 .lawx-rel__note { color: #94a3b8; font-size: 12px; }
 
