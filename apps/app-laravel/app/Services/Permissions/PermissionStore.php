@@ -2,29 +2,30 @@
 
 namespace App\Services\Permissions;
 
+use App\Services\Storage\MongoBlobStore;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class PermissionStore
 {
-    private string $basePath;
+    private const BLOB_KIND = 'data';
 
-    public function __construct(?string $basePath = null)
-    {
-        $this->basePath = $basePath ?? storage_path('app/poc/permissions');
-        $this->ensureDirectories();
-    }
+    private const GROUPS_ID = 'groups';
+
+    private const DIRECTORY_ID = 'directory';
+
+    public function __construct(private readonly MongoBlobStore $blob) {}
 
     /**
      * @return array{units: array<int, array<string, string|null>>, positions: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
      */
     public function directory(): array
     {
-        $path = $this->directoryPath();
-        if (! is_file($path)) {
-            $this->writeJson($path, $this->defaultDirectory());
+        $directory = $this->blob->read(self::BLOB_KIND, self::DIRECTORY_ID);
+        if ($directory === null) {
+            $directory = $this->defaultDirectory();
+            $this->blob->write(self::BLOB_KIND, self::DIRECTORY_ID, $directory);
         }
-
-        $directory = $this->readJson($path);
 
         return [
             'units' => array_values(array_filter((array) ($directory['units'] ?? []), 'is_array')),
@@ -64,18 +65,26 @@ class PermissionStore
      */
     public function createGroup(array $payload): array
     {
-        $groups = $this->readGroups();
         $normalized = $this->normalizeGroupPayload($payload);
-        $this->assertUniqueName($groups, $normalized['name']);
+        $group = null;
 
-        $group = array_merge($normalized, [
-            'id' => sprintf('pg_%s_%s', now()->format('Ymd_His'), substr(bin2hex(random_bytes(3)), 0, 6)),
-            'created_at' => now()->toIso8601String(),
-            'updated_at' => now()->toIso8601String(),
-        ]);
+        $this->blob->withLock(self::BLOB_KIND, self::GROUPS_ID, function (array &$groups) use ($normalized, &$group): void {
+            $groups = array_values(array_filter($groups, 'is_array'));
+            $this->assertUniqueName($groups, $normalized['name']);
 
-        $groups[] = $group;
-        $this->writeGroups($groups);
+            $timestamp = now()->toIso8601String();
+            $group = array_merge($normalized, [
+                'id' => sprintf('pg_%s_%s', now()->format('Ymd_His'), substr(bin2hex(random_bytes(3)), 0, 6)),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ]);
+
+            $groups[] = $group;
+        });
+
+        if ($group === null) {
+            throw new RuntimeException('PermissionStore: createGroup failed to persist group.');
+        }
 
         return $this->hydrateGroup($group);
     }
@@ -86,37 +95,48 @@ class PermissionStore
      */
     public function updateGroup(string $groupId, array $payload): ?array
     {
-        $groups = $this->readGroups();
-        $index = $this->groupIndex($groups, $groupId);
-        if ($index === null) {
+        $normalized = $this->normalizeGroupPayload($payload);
+        $group = null;
+
+        $this->blob->withLock(self::BLOB_KIND, self::GROUPS_ID, function (array &$groups) use ($groupId, $normalized, &$group): void {
+            $groups = array_values(array_filter($groups, 'is_array'));
+            $index = $this->groupIndex($groups, $groupId);
+            if ($index === null) {
+                return;
+            }
+
+            $this->assertUniqueName($groups, $normalized['name'], $groupId);
+
+            $group = array_merge($groups[$index], $normalized, [
+                'updated_at' => now()->toIso8601String(),
+            ]);
+
+            $groups[$index] = $group;
+        });
+
+        if ($group === null) {
             return null;
         }
-
-        $normalized = $this->normalizeGroupPayload($payload);
-        $this->assertUniqueName($groups, $normalized['name'], $groupId);
-
-        $group = array_merge($groups[$index], $normalized, [
-            'updated_at' => now()->toIso8601String(),
-        ]);
-
-        $groups[$index] = $group;
-        $this->writeGroups($groups);
 
         return $this->hydrateGroup($group);
     }
 
     public function deleteGroup(string $groupId): bool
     {
-        $groups = $this->readGroups();
-        $index = $this->groupIndex($groups, $groupId);
-        if ($index === null) {
-            return false;
-        }
+        $deleted = false;
 
-        array_splice($groups, $index, 1);
-        $this->writeGroups($groups);
+        $this->blob->withLock(self::BLOB_KIND, self::GROUPS_ID, function (array &$groups) use ($groupId, &$deleted): void {
+            $groups = array_values(array_filter($groups, 'is_array'));
+            $index = $this->groupIndex($groups, $groupId);
+            if ($index === null) {
+                return;
+            }
 
-        return true;
+            array_splice($groups, $index, 1);
+            $deleted = true;
+        });
+
+        return $deleted;
     }
 
     /**
@@ -197,11 +217,11 @@ class PermissionStore
     private function nullableTrimmedString(mixed $value): ?string
     {
         $text = trim((string) $value);
+
         return $text === '' ? null : $text;
     }
 
     /**
-     * @param  mixed  $ids
      * @param  array<int, array<string, string|null>>  $records
      * @return array<int, string>
      */
@@ -300,60 +320,7 @@ class PermissionStore
      */
     private function readGroups(): array
     {
-        $path = $this->groupsPath();
-        if (! is_file($path)) {
-            return [];
-        }
-
-        return array_values(array_filter($this->readJson($path), 'is_array'));
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $groups
-     */
-    private function writeGroups(array $groups): void
-    {
-        $this->writeJson($this->groupsPath(), array_values($groups));
-    }
-
-    /**
-     * @return array<string, mixed>|array<int, array<string, mixed>>
-     */
-    private function readJson(string $path): array
-    {
-        $raw = @file_get_contents($path);
-        if ($raw === false || trim($raw) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-        return is_array($decoded) ? $decoded : [];
-    }
-
-    /**
-     * @param  array<string, mixed>|array<int, array<string, mixed>>  $data
-     */
-    private function writeJson(string $path, array $data): void
-    {
-        $this->ensureDirectories();
-        file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
-    }
-
-    private function ensureDirectories(): void
-    {
-        if (! is_dir($this->basePath)) {
-            mkdir($this->basePath, 0777, true);
-        }
-    }
-
-    private function groupsPath(): string
-    {
-        return $this->basePath.'/groups.json';
-    }
-
-    private function directoryPath(): string
-    {
-        return $this->basePath.'/directory.json';
+        return array_values(array_filter($this->blob->read(self::BLOB_KIND, self::GROUPS_ID) ?? [], 'is_array'));
     }
 
     /**

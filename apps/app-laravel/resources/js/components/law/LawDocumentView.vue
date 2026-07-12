@@ -28,8 +28,9 @@
         {{ documentStore.error }}
       </v-alert>
 
+      <template v-else-if="documentStore.review">
       <v-alert
-        v-else-if="documentStore.review && meta.access_scope === 'private'"
+        v-if="meta.access_scope === 'private'"
         type="warning"
         variant="tonal"
         density="comfortable"
@@ -39,7 +40,6 @@
       </v-alert>
 
       <div
-        v-else-if="documentStore.review"
         class="lawx-grid"
         :class="{
           'is-toc-hidden': !tocOpen,
@@ -130,6 +130,7 @@
         <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" />
       </aside>
       </div>
+      </template>
 
       <ELawFooter />
     </v-main>
@@ -404,8 +405,8 @@ onBeforeUnmount(() => observer?.disconnect());
   box-shadow: 0 18px 38px rgba(148, 163, 184, 0.1);
 }
 
-.lawx-card__body { display: flex; gap: 16px; align-items: flex-start; }
-.lawx-card__badge { flex-shrink: 0; max-width: 160px; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
+.lawx-card__body { display: flex; flex-direction: column; gap: 10px; }
+.lawx-card__badge { align-self: flex-start; flex-shrink: 0; max-width: 100%; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .lawx-card__badge--chapter { background: #eef2ff; color: #4338ca; }
 .lawx-card__content { flex: 1; min-width: 0; }
 

@@ -29,8 +29,8 @@ export const STAGES: StageDef[] = [
   { key: 'rag',        label: 'จัดการ RAG',       color: 'admin-primary',    icon: 'mdi-database-cog-outline', action: { type: 'route', label: 'จัดการ RAG', to: (id) => `/documents/${id}/rag` } },
   { key: 'info',       label: 'กรอกข้อมูลเอกสาร',  color: 'doc-kho-bangkhab', icon: 'mdi-information-outline',   action: { type: 'route', label: 'กรอกข้อมูล', to: (id) => `/documents/${id}/law-info` } },
   { key: 'relation',   label: 'เพิ่มความสัมพันธ์', color: 'doc-rabiap',       icon: 'mdi-graph-outline',        action: { type: 'route', label: 'เพิ่มความสัมพันธ์', to: (id) => `/documents/${id}/relations` } },
-  { key: 'complete',   label: 'เสร็จสมบูรณ์',      color: 'success',          icon: 'mdi-check-decagram-outline', action: { type: 'advance', label: 'ส่งลงนาม e-Sign' } },
-  { key: 'wait_esign', label: 'รอลงนาม',          color: 'elaw-gold',        icon: 'mdi-draw-pen',             action: { type: 'advance', label: 'ยืนยันลงนาม' } },
+  { key: 'complete',   label: 'เสร็จสมบูรณ์',      color: 'success',          icon: 'mdi-check-decagram-outline', action: { type: 'route', label: 'ส่งลงนาม e-Sign', to: (id) => `/documents/${id}/result` } },
+  { key: 'wait_esign', label: 'รอลงนาม',          color: 'elaw-gold',        icon: 'mdi-draw-pen',             action: { type: 'route', label: 'ยืนยันลงนาม', to: (id) => `/documents/${id}/result` } },
   { key: 'public',     label: 'เผยแพร่แล้ว',       color: 'success',          icon: 'mdi-earth',                action: { type: 'route', label: 'ดูหน้าเผยแพร่', to: (id) => `/law/${id}` } },
 ];
 

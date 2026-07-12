@@ -18,13 +18,27 @@
   UploadResponse,
   WorkflowProgressResponse,
 } from '../types/document';
-import type { LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
+import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
 
 type ApiErrorPayload = {
   message?: string;
   error?: string;
   errors?: Record<string, string[]>;
+};
+
+export type SelectableOption = {
+  title: string;
+  value: string;
+  subtitle?: string;
+};
+
+export type LookupData = {
+  document_types: SelectableOption[];
+  statuses: SelectableOption[];
+  change_statuses: SelectableOption[];
+  agencies: SelectableOption[];
+  law_groups: SelectableOption[];
 };
 
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -93,6 +107,10 @@ export function fetchReview(documentId: string): Promise<ReviewDocument> {
 
 export function fetchPreview(documentId: string): Promise<PreviewData> {
   return jsonRequest<PreviewData>(`/api/documents/${documentId}/preview`);
+}
+
+export function getLookups(): Promise<LookupData> {
+  return jsonRequest<LookupData>('/api/lookups');
 }
 
 export function saveDocumentReview(
@@ -199,6 +217,64 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
   });
 }
 
+export async function confirmEsign(documentId: string): Promise<void> {
+  await exportDocument(documentId);
+  await updateWorkflowProgress(documentId, 6);
+}
+
+async function downloadBinaryExport(
+  documentId: string,
+  path: string,
+  accept: string,
+  fallbackName: string,
+): Promise<void> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { Accept: accept },
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    throw new Error(data.message ?? `Export failed (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^";\n]+)"?/.exec(disposition);
+  anchor.download = match?.[1] ?? fallbackName;
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadPdfExport(documentId: string): Promise<void> {
+  return downloadBinaryExport(
+    documentId,
+    `/api/documents/${documentId}/export-pdf`,
+    'application/pdf',
+    `document-${documentId}.pdf`,
+  );
+}
+
+export async function downloadWordExport(documentId: string): Promise<void> {
+  return downloadBinaryExport(
+    documentId,
+    `/api/documents/${documentId}/export-word`,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    `document-${documentId}.docx`,
+  );
+}
+
+export function fetchLawFacets(): Promise<LawSearchFacets> {
+  return jsonRequest<LawSearchFacets>('/api/laws/facets');
+}
+
 export function searchLaws(params: LawSearchParams): Promise<LawSearchResponse> {
   return jsonRequest<LawSearchResponse>('/api/laws/search', {
     method: 'POST',
@@ -252,6 +328,16 @@ export function mergeBlocks(
   return jsonRequest(`/api/documents/${documentId}/blocks/merge`, {
     method: 'POST',
     body: JSON.stringify({ block_ids: blockIds }),
+  });
+}
+
+export function restoreBlocks(
+  documentId: string,
+  pages: Array<{ page_no: number; blocks: DocumentBlock[] }>,
+): Promise<{ document_id: string; status: string }> {
+  return jsonRequest(`/api/documents/${documentId}/blocks/restore`, {
+    method: 'POST',
+    body: JSON.stringify({ pages }),
   });
 }
 

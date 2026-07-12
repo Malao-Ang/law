@@ -4,7 +4,7 @@
     title="จัดการตัวบทกฎหมาย"
     subtitle="จัดการกฎหมายทั้งหมด ค้นหา แก้ไข ความสัมพันธ์ และเวอร์ชัน"
   >
-
+    <!-- Type stat tabs -->
     <v-row class="mb-5">
       <v-col v-for="stat in typeStats" :key="stat.value" cols="6" sm="3">
         <v-card
@@ -36,7 +36,7 @@
     <div class="d-flex flex-wrap ga-3 mb-4 align-center">
       <v-text-field
         v-model="search"
-        placeholder="ค้นหาชื่อกฎหมาย / พ.ศ. / หน่วยงาน / เลขอ้างอิง"
+        placeholder="ค้นหาชื่อกฎหมาย / หน่วยงาน / หมวดหมู่"
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
         density="compact"
@@ -82,6 +82,7 @@
     </div>
 
     <v-card flat border rounded="lg">
+      <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
       <v-table density="comfortable">
         <thead>
           <tr>
@@ -94,11 +95,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="filteredLaws.length === 0">
+          <tr v-if="!loading && pagedLaws.length === 0">
             <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
           </tr>
-          <tr v-for="(law, idx) in filteredLaws" :key="law.id">
-            <td class="text-caption text-medium-emphasis">{{ idx + 1 }}</td>
+          <tr v-for="(law, idx) in pagedLaws" :key="law.id">
+            <td class="text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
             <td class="py-3" style="max-width: 400px">
               <div class="d-flex align-center ga-2 flex-wrap mb-1">
                 <span class="text-body-2 font-weight-bold">{{ law.title }}</span>
@@ -112,33 +113,28 @@
                   <v-icon size="11" icon="mdi-sitemap" />
                   มีกฎหมายลูก {{ law.childCount }} ฉบับ
                 </span>
-                <span v-if="law.amendCount">
-                  <v-icon size="11" icon="mdi-refresh" color="warning" />
-                  แก้ไขแล้ว {{ law.amendCount }} ครั้ง
+                <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
+                <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
+                <span v-if="law.pages > 0 || law.sections != null">
+                  <v-icon size="11" icon="mdi-file-multiple" />
+                  {{ law.pages }} หน้า<template v-if="law.sections != null"> / {{ law.sections }} ข้อ/มาตรา</template>
                 </span>
-                <span><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
-                <span><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
-                <span><v-icon size="11" icon="mdi-file-multiple" /> {{ law.pages }} หน้า / {{ law.sections }} ข้อ</span>
               </div>
             </td>
             <td>
-              <v-chip size="x-small" :color="typeColor(law.lawType)" rounded="pill">{{ law.lawType }}</v-chip>
+              <v-chip v-if="law.lawType" size="x-small" :color="typeColor(law.lawType)" rounded="pill">{{ law.lawType }}</v-chip>
             </td>
             <td>
-              <v-chip size="x-small" :color="statusColor(law.status)" rounded="pill">
+              <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
                 <v-icon start icon="mdi-circle" size="8" />
-                {{ law.status }}
+                {{ law.workflowStage }}
               </v-chip>
             </td>
-            <td class="text-caption">
-              <p class="mb-0">{{ law.editedAt }}</p>
-              <p class="text-medium-emphasis mb-0">โดย {{ law.editedBy }}</p>
-            </td>
+            <td class="text-caption">{{ law.editedAt }}</td>
             <td>
               <div class="d-flex ga-1">
-                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" />
-                <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" />
-                <v-btn icon="mdi-dots-vertical" size="x-small" variant="text" color="grey" />
+                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" :to="`/documents/${law.id}/review`" />
+                <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}`" />
               </div>
             </td>
           </tr>
@@ -147,177 +143,225 @@
 
       <v-divider />
       <div class="d-flex justify-space-between align-center pa-3">
-        <span class="text-caption text-medium-emphasis">กำลังแสดงผล {{ filteredLaws.length }} จากทั้งหมด 12,402 รายการ</span>
-        <v-pagination v-model="page" :length="45" :total-visible="5" rounded="circle" density="compact" />
+        <span class="text-caption text-medium-emphasis">
+          กำลังแสดงผล {{ filteredLaws.length.toLocaleString('th-TH') }} จากทั้งหมด {{ laws.length.toLocaleString('th-TH') }} รายการ
+        </span>
+        <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" rounded="circle" density="compact" />
       </div>
     </v-card>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { fetchReportSummary } from '../../api/client';
+import type { ReportSummary } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 
+const PAGE_SIZE = 20;
+
+const summary = ref<ReportSummary>({
+  totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0 },
+  by_type: [],
+  by_group: [],
+  by_agency: [],
+  by_year: [],
+  documents: [],
+});
+const loading = ref(false);
 const search = ref('');
 const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const sortOrder = ref('newest');
 const page = ref(1);
 
-const typeStats = [
-  { label: 'พระราชบัญญัติ', value: 'phrb', count: 124, delta: 4, color: 'doc-phrb', icon: 'mdi-bank-outline' },
-  { label: 'ข้อบังคับ', value: 'kho-bangkhab', count: 356, delta: 12, color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
-  { label: 'ระเบียบ', value: 'rabiap', count: 742, delta: 8, color: 'doc-rabiap', icon: 'mdi-folder-outline' },
-  { label: 'ประกาศ', value: 'prakat', count: 1218, delta: 24, color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
-];
+onMounted(async () => {
+  loading.value = true;
+  try {
+    summary.value = await fetchReportSummary();
+  } finally {
+    loading.value = false;
+  }
+});
 
-// Cards double as type filter tabs; clicking the active one clears the filter.
-const typeLabelByValue: Record<string, string> = {
-  phrb: 'พระราชบัญญัติ',
-  'kho-bangkhab': 'ข้อบังคับ',
-  rabiap: 'ระเบียบ',
-  prakat: 'ประกาศ',
+watch([search, filterType, filterStatus, sortOrder], () => {
+  page.value = 1;
+});
+
+const TYPE_META: Record<string, { color: string; icon: string }> = {
+  พระราชบัญญัติ: { color: 'doc-phrb', icon: 'mdi-bank-outline' },
+  ข้อบังคับ: { color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
+  ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
+  ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
+
+const thisMonthPrefix = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+
+// Only laws that have passed the info step (ข้อมูล = step 4) belong in this catalog.
+// Raw uploads still being processed / not yet filled in are hidden.
+const infoCompletedDocs = computed(() =>
+  summary.value.documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4),
+);
+
+const childCountMap = computed<Record<string, number>>(() => {
+  const map: Record<string, number> = {};
+  for (const doc of infoCompletedDocs.value) {
+    if (doc.parent_document_id) {
+      map[doc.parent_document_id] = (map[doc.parent_document_id] ?? 0) + 1;
+    }
+  }
+  return map;
+});
+
+function workflowStageLabel(doc: { status: string; meta_status: string; workflow_completed_step: number | null }): string {
+  if (doc.meta_status === 'ยกเลิก') return 'ยกเลิก';
+  const step = doc.workflow_completed_step ?? 0;
+  if (doc.status === 'exported' || doc.status === 'ingested') return 'เผยแพร่';
+  if (step >= 6) return 'พร้อมเผยแพร่';
+  if (step >= 5) return 'รอส่ง eSign';
+  if (step >= 4) return 'รอการเชื่อมโยงความสัมพันธ์';
+  if (doc.status === 'done') return 'ดำเนินการ';
+  return 'กำลังประมวลผล';
+}
+
+function workflowStageColor(stage: string): string {
+  if (stage === 'เผยแพร่') return 'success';
+  if (stage === 'พร้อมเผยแพร่') return 'admin-primary';
+  if (stage === 'รอส่ง eSign') return 'deep-purple';
+  if (stage === 'รอการเชื่อมโยงความสัมพันธ์') return 'orange';
+  if (stage === 'ยกเลิก') return 'error';
+  if (stage === 'ดำเนินการ') return 'teal';
+  return 'grey';
+}
+
+interface LawRow {
+  id: string;
+  title: string;
+  lawType: string;
+  metaStatus: string;
+  workflowStage: string;
+  isParent: boolean;
+  childCount: number;
+  org: string;
+  group: string;
+  pages: number;
+  sections: number | null;
+  editedAt: string;
+  rawDate: string;
+}
+
+const laws = computed<LawRow[]>(() =>
+  infoCompletedDocs.value.map((doc) => ({
+    id: doc.id,
+    title: doc.title,
+    lawType: doc.type !== 'ไม่ระบุ' ? doc.type : '',
+    metaStatus: doc.meta_status ?? '',
+    workflowStage: workflowStageLabel(doc),
+    isParent: (childCountMap.value[doc.id] ?? 0) > 0,
+    childCount: childCountMap.value[doc.id] ?? 0,
+    org: doc.agency !== 'ไม่ระบุ' ? doc.agency : '',
+    group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
+    pages: doc.page_count ?? 0,
+    sections: doc.section_count ?? null,
+    editedAt: doc.date
+      ? new Date(doc.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+      : '-',
+    rawDate: doc.date ?? '',
+  })),
+);
+
+// Count law types over the filtered (info-completed) list so cards match the table.
+const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
+  const counts = new Map<string, number>();
+  for (const law of laws.value) {
+    if (law.lawType) counts.set(law.lawType, (counts.get(law.lawType) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count);
+});
+
+const typeStats = computed(() =>
+  typeCounts.value.slice(0, 4).map((b) => ({
+    label: b.key,
+    value: b.key,
+    count: b.count,
+    delta: laws.value.filter((l) => l.lawType === b.key && l.rawDate.startsWith(thisMonthPrefix)).length,
+    ...(TYPE_META[b.key] ?? { color: 'grey', icon: 'mdi-file-document-outline' }),
+  })),
+);
 
 function toggleType(value: string): void {
   filterType.value = filterType.value === value ? null : value;
 }
 
-const filteredLaws = computed(() =>
-  laws.filter((law) => {
-    if (filterType.value && law.lawType !== typeLabelByValue[filterType.value]) return false;
-    if (filterStatus.value === 'active' && law.status !== 'มีผลบังคับใช้') return false;
-    if (search.value && !law.title.toLowerCase().includes(search.value.toLowerCase())) return false;
-    return true;
-  }),
-);
-
-const typeOptions = [
+const typeOptions = computed(() => [
   { label: 'ทุกประเภท', value: null },
-  { label: 'พระราชบัญญัติ', value: 'phrb' },
-  { label: 'ข้อบังคับ', value: 'kho-bangkhab' },
-  { label: 'ระเบียบ', value: 'rabiap' },
-  { label: 'ประกาศ', value: 'prakat' },
-];
+  ...typeCounts.value.map((b) => ({ label: b.key, value: b.key })),
+]);
 
 const statusOptions = [
   { label: 'ทุกสถานะ', value: null },
-  { label: 'มีผลบังคับใช้', value: 'active' },
-  { label: 'ยกเลิก', value: 'cancelled' },
-  { label: 'ร่าง', value: 'draft' },
+  { label: 'ดำเนินการ', value: 'ดำเนินการ' },
+  { label: 'รอการเชื่อมโยงความสัมพันธ์', value: 'รอการเชื่อมโยงความสัมพันธ์' },
+  { label: 'รอส่ง eSign', value: 'รอส่ง eSign' },
+  { label: 'พร้อมเผยแพร่', value: 'พร้อมเผยแพร่' },
+  { label: 'เผยแพร่', value: 'เผยแพร่' },
+  { label: 'ยกเลิก', value: 'ยกเลิก' },
 ];
 
 const sortOptions = [
   { label: 'ล่าสุด', value: 'newest' },
   { label: 'เก่าสุด', value: 'oldest' },
-  { label: 'ชื่อ A-Z', value: 'name' },
+  { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
-const laws = [
-  {
-    id: '1',
-    title: 'พระราชบัญญัติมหาวิทยาลัยบูรพา พ.ศ. 2550',
-    lawType: 'พระราชบัญญัติ',
-    status: 'มีผลบังคับใช้',
-    isParent: true,
-    childCount: 14,
-    amendCount: 3,
-    org: 'รัฐบาลดิจิทัล',
-    group: 'ดิจิทัลเพื่อเศรษฐกิจ',
-    pages: 20,
-    sections: 86,
-    editedAt: '14 มี.ค. 2566',
-    editedBy: 'Admin User',
-  },
-  {
-    id: '2',
-    title: 'ระเบียบคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562',
-    lawType: 'ระเบียบ',
-    status: 'มีผลบังคับใช้',
-    isParent: false,
-    childCount: 0,
-    amendCount: 0,
-    org: 'มหาวิทยาลัยบูรพา',
-    group: '1.6 โครงสร้างองค์กรฯ',
-    pages: 6,
-    sections: 14,
-    editedAt: '14 มี.ค. 2566',
-    editedBy: 'Admin User',
-  },
-  {
-    id: '3',
-    title: 'ข้อบังคับมหาวิทยาลัยบูรพา ว่าด้วยการบริหารงานบุคคล พ.ศ. 2563',
-    lawType: 'ข้อบังคับ',
-    status: 'มีผลบังคับใช้',
-    isParent: false,
-    childCount: 0,
-    amendCount: 0,
-    org: 'มหาวิทยาลัยบูรพา',
-    group: '1.1 การเงินและงบประมาณ',
-    pages: 5,
-    sections: 10,
-    editedAt: '14 มี.ค. 2566',
-    editedBy: 'Admin User',
-  },
-  {
-    id: '4',
-    title: 'ประกาศมหาวิทยาลัยบูรพา เรื่อง หลักเกณฑ์การขอตำแหน่งทางวิชาการ พ.ศ. 2568',
-    lawType: 'ประกาศ',
-    status: 'มีผลบังคับใช้',
-    isParent: false,
-    childCount: 0,
-    amendCount: 0,
-    org: 'มหาวิทยาลัยบูรพา',
-    group: '1.1 ด้านวิชาการ',
-    pages: 1,
-    sections: 0,
-    editedAt: '14 มี.ค. 2566',
-    editedBy: 'Admin User',
-  },
-];
+const filteredLaws = computed(() => {
+  let result = laws.value;
+  if (filterType.value) result = result.filter((l) => l.lawType === filterType.value);
+  if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
+  if (search.value.trim()) {
+    const q = search.value.trim().toLowerCase();
+    result = result.filter(
+      (l) => l.title.toLowerCase().includes(q) || l.org.toLowerCase().includes(q) || l.group.toLowerCase().includes(q),
+    );
+  }
+  if (sortOrder.value === 'oldest') return [...result].sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+  if (sortOrder.value === 'name') return [...result].sort((a, b) => a.title.localeCompare(b.title, 'th'));
+  return [...result].sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+});
+
+const pageCount = computed(() => Math.ceil(filteredLaws.value.length / PAGE_SIZE));
+const pagedLaws = computed(() => filteredLaws.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
 
 function typeColor(type: string): string {
-  return ({
-    พระราชบัญญัติ: 'doc-phrb',
-    ระเบียบ: 'doc-rabiap',
-    ข้อบังคับ: 'doc-kho-bangkhab',
-    ประกาศ: 'doc-prakat',
-  } as Record<string, string>)[type] ?? 'grey';
+  return TYPE_META[type]?.color ?? 'grey';
 }
 
-function statusColor(status: string): string {
-  return ({
-    'มีผลบังคับใช้': 'success',
-    ยกเลิก: 'error',
-    ร่าง: 'grey',
-  } as Record<string, string>)[status] ?? 'grey';
-}
 </script>
 
 <style scoped>
-/* Each card is a filter tab tinted by its document-type color (--accent = doc-* rgb triplet). */
 .type-tab {
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-top: 3px solid rgb(var(--accent));
   cursor: pointer;
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
-
 .type-tab:hover {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
 }
-
 .type-tab--active {
   background: rgba(var(--accent), 0.06);
   border: 1px solid rgb(var(--accent));
   border-top: 3px solid rgb(var(--accent));
 }
-
 .type-tab__icon {
   background: rgba(var(--accent), 0.14);
   color: rgb(var(--accent));
 }
-
 .type-tab__label {
   color: rgb(var(--accent));
 }

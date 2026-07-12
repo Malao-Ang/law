@@ -1,8 +1,7 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ข้อมูลเอกสาร']"
-    title="นำเข้าเอกสารกฎหมาย"
-    subtitle="ขั้นตอนที่ 4 จาก 6: ข้อมูลเอกสาร"
+    title=""
   >
     <WorkflowFooterBar
       :step="4"
@@ -12,7 +11,7 @@
       @next="saveAndNext"
     />
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="4" />
+      <WorkflowStepper :step="4" description="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -44,7 +43,9 @@
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
-                :items="DOC_TYPES"
+                :items="documentTypes"
+                item-title="title"
+                item-value="value"
                 label="ประเภทเอกสาร"
                 placeholder="- เลือกประเภทเอกสาร -"
                 variant="outlined"
@@ -52,10 +53,34 @@
                 required
               />
             </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.status"
+                :items="statuses"
+                item-title="title"
+                item-value="value"
+                label="สถานะการบังคับใช้"
+                placeholder="- เลือกสถานะ -"
+                variant="outlined"
+                clearable
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.change_status"
+                :items="changeStatuses"
+                item-title="title"
+                item-value="value"
+                label="สถานะการเปลี่ยนแปลง"
+                placeholder="- เลือกสถานะการเปลี่ยนแปลง -"
+                variant="outlined"
+                clearable
+              />
+            </v-col>
             <v-col cols="12">
               <v-autocomplete
                 v-model="form.law_groups"
-                :items="LAW_GROUP_OPTIONS"
+                :items="lawGroups"
                 item-title="title"
                 item-value="value"
                 label="กลุ่มกฎหมาย"
@@ -168,7 +193,7 @@
               </div>
               <v-autocomplete
                 v-model="form.agencies"
-                :items="AGENCY_OPTIONS"
+                :items="agencies"
                 item-title="title"
                 item-value="value"
                 label="หน่วยงานรับผิดชอบ"
@@ -207,6 +232,8 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import type { SelectableOption } from '../../api/client';
+import { useLookups } from '../../composables/useLookups';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
@@ -216,15 +243,8 @@ import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
-
-type SelectableOption = {
-  title: string;
-  value: string;
-  subtitle: string;
-};
-
-const DOC_TYPES = ['พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'คำสั่ง', 'มติ'];
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พ.ร.บ.'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
@@ -232,33 +252,6 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/ประกาศ/u, 'ประกาศ'],
   [/คำสั่ง/u, 'คำสั่ง'],
   [/มติ/u, 'มติ'],
-];
-const LAW_GROUP_OPTIONS: SelectableOption[] = [
-  { title: 'ด้านวิชาการ', value: 'ด้านวิชาการ', subtitle: 'นโยบายวิชาการ หลักสูตร และมาตรฐานการศึกษา' },
-  { title: 'การผลิตบัณฑิต', value: 'การผลิตบัณฑิต', subtitle: 'การจัดการเรียนการสอนและการพัฒนาผู้เรียน' },
-  { title: 'การเรียนรู้ตลอดชีวิต', value: 'การเรียนรู้ตลอดชีวิต', subtitle: 'หลักสูตรระยะสั้นและการบริการวิชาการต่อเนื่อง' },
-  { title: 'การบริหารหลักสูตร', value: 'การบริหารหลักสูตร', subtitle: 'การเปิด ปรับปรุง และกำกับดูแลหลักสูตร' },
-  { title: 'ด้านกิจการนิสิต', value: 'ด้านกิจการนิสิต', subtitle: 'สวัสดิการ วินัย และกิจกรรมพัฒนานิสิต' },
-  { title: 'ด้านบริหารบุคคล', value: 'ด้านบริหารบุคคล', subtitle: 'การสรรหา แต่งตั้ง สิทธิประโยชน์ และวินัยบุคลากร' },
-  { title: 'ด้านการเงินและงบประมาณ', value: 'ด้านการเงินและงบประมาณ', subtitle: 'งบประมาณ รายรับ รายจ่าย และการควบคุมทางการเงิน' },
-  { title: 'ด้านทรัพย์สินและจัดซื้อจัดจ้าง', value: 'ด้านทรัพย์สินและจัดซื้อจัดจ้าง', subtitle: 'พัสดุ ทรัพย์สิน และกระบวนการจัดซื้อจัดจ้าง' },
-  { title: 'ด้านเทคโนโลยีสารสนเทศ', value: 'ด้านเทคโนโลยีสารสนเทศ', subtitle: 'ระบบสารสนเทศ ความมั่นคงปลอดภัย และข้อมูลดิจิทัล' },
-  { title: 'ด้านกฎหมายและนิติการ', value: 'ด้านกฎหมายและนิติการ', subtitle: 'งานนิติการ การตีความ และการกำกับตามกฎหมาย' },
-  { title: 'ด้านความร่วมมือระหว่างประเทศ', value: 'ด้านความร่วมมือระหว่างประเทศ', subtitle: 'ความร่วมมือ หน่วยงานคู่สัญญา และกิจการต่างประเทศ' },
-  { title: 'อื่นๆ', value: 'อื่นๆ', subtitle: 'รายการที่ไม่อยู่ในหมวดหลักของระบบ' },
-];
-const AGENCY_OPTIONS: SelectableOption[] = [
-  { title: 'มหาวิทยาลัยบูรพา', value: 'มหาวิทยาลัยบูรพา', subtitle: 'หน่วยงานหลักระดับสถาบัน' },
-  { title: 'สำนักงานอธิการบดี', value: 'สำนักงานอธิการบดี', subtitle: 'งานบริหารกลางและสนับสนุนผู้บริหาร' },
-  { title: 'กองกลาง', value: 'กองกลาง', subtitle: 'สารบรรณ งานธุรการ และงานอำนวยการกลาง' },
-  { title: 'กองคลัง', value: 'กองคลัง', subtitle: 'การเงิน บัญชี งบประมาณ และเบิกจ่าย' },
-  { title: 'กองพัสดุ', value: 'กองพัสดุ', subtitle: 'จัดซื้อจัดจ้างและบริหารพัสดุ' },
-  { title: 'กองกิจการนิสิต', value: 'กองกิจการนิสิต', subtitle: 'สวัสดิการและกิจกรรมนิสิต' },
-  { title: 'สำนักวิชาการ', value: 'สำนักวิชาการ', subtitle: 'งานวิชาการ หลักสูตร และมาตรฐานการศึกษา' },
-  { title: 'บัณฑิตวิทยาลัย', value: 'บัณฑิตวิทยาลัย', subtitle: 'กำกับดูแลการศึกษาระดับบัณฑิตศึกษา' },
-  { title: 'กระทรวงการคลัง', value: 'กระทรวงการคลัง', subtitle: 'หน่วยงานภายนอกด้านการคลังและงบประมาณ' },
-  { title: 'สำนักนายกรัฐมนตรี', value: 'สำนักนายกรัฐมนตรี', subtitle: 'หน่วยงานภายนอกด้านนโยบายและงานบริหารราชการ' },
-  { title: 'กระทรวงสาธารณสุข', value: 'กระทรวงสาธารณสุข', subtitle: 'หน่วยงานภายนอกด้านสาธารณสุขและสุขภาพ' },
 ];
 
 const EMPTY: LawMeta = {
@@ -407,6 +400,9 @@ async function saveAndNext(): Promise<void> {
   router.push(`/documents/${props.documentId}/relations`);
 }
 
-onMounted(() => documentStore.fetch(props.documentId));
+onMounted(() => {
+  void loadLookups();
+  void documentStore.fetch(props.documentId);
+});
 onBeforeUnmount(() => documentStore.reset());
 </script>

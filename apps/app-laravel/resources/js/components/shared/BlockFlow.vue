@@ -6,34 +6,14 @@
 import { computed } from 'vue';
 import DOMPurify from 'dompurify';
 import type { DocumentBlock } from '../../types/document';
+import { layoutToScreenStyle, shouldUseLeadingTabPadding } from '../../utils/layoutStyle';
 
 const props = defineProps<{
   block: DocumentBlock;
   overrideText?: string | null;
 }>();
 
-const style = computed<Record<string, string>>(() => {
-  const layout = (props.block.meta.layout ?? {}) as Record<string, unknown>;
-  const nextStyle: Record<string, string> = {};
-
-  if (typeof layout.indent_left === 'number' && layout.indent_left > 0) {
-    nextStyle.marginLeft = `${Math.min(layout.indent_left / 20, 200)}pt`;
-  } else if (typeof layout.indent_level === 'number' && layout.indent_level > 0) {
-    nextStyle.marginLeft = `${layout.indent_level * 24}px`;
-  }
-
-  if (typeof layout.indent_first_line === 'number' && layout.indent_first_line !== 0) {
-    nextStyle.textIndent = `${layout.indent_first_line / 20}pt`;
-  } else if (typeof layout.indent_hanging === 'number' && layout.indent_hanging > 0) {
-    nextStyle.textIndent = `-${layout.indent_hanging / 20}pt`;
-  }
-
-  if (typeof layout.alignment === 'string' && layout.alignment !== '') {
-    nextStyle.textAlign = layout.alignment;
-  }
-
-  return nextStyle;
-});
+const style = computed<Record<string, string>>(() => layoutToScreenStyle(props.block.meta.layout));
 
 function escapeHtml(text: string): string {
   return text
@@ -83,7 +63,11 @@ const bodyHtml = computed<string>(() => {
   }
 
   const raw = props.overrideText ?? (block.approved_text || block.normalized_text || block.raw_text || '');
-  let html = escapeHtml(raw)
+  const text = shouldUseLeadingTabPadding(block.meta.layout) && raw.startsWith('\t')
+    ? raw.slice(1)
+    : raw;
+
+  let html = escapeHtml(text)
     .replaceAll('\n', '<br>')
     .replaceAll('\t', '<span class="bf-tab"></span>');
 
@@ -114,7 +98,7 @@ const bodyHtml = computed<string>(() => {
 
 .block-flow :deep(.bf-tab) {
   display: inline-block;
-  width: 36px;
+  width: 24px;
 }
 
 .block-flow :deep(.bf-img) {

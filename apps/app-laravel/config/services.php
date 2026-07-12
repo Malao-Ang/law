@@ -37,4 +37,8 @@ return [
         'normalize_autocorrect_min_confidence' => env('OCR_NORMALIZE_AUTOCORRECT_MIN_CONFIDENCE', 1.0),
     ],
 
+    'pdf' => [
+        'base_url' => env('PDF_SERVICE_URL', 'http://pdf-service:3001'),
+    ],
+
 ];

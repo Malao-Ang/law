@@ -280,23 +280,13 @@
               />
             </div>
 
-            <v-alert
-              v-if="searchStore.error"
-              type="warning"
-              variant="tonal"
-              density="comfortable"
-              class="mb-4"
-            >
-              {{ searchStore.error }}
-            </v-alert>
-
             <div v-if="searchStore.loading" class="d-flex justify-center py-10">
               <v-progress-circular indeterminate color="primary" />
             </div>
 
             <div v-else-if="sortedResults.length === 0" class="law-empty-state">
               <v-icon icon="mdi-file-search-outline" size="28" color="medium-emphasis" />
-              <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสารที่ตรงกับเงื่อนไขค้นหา</p>
+              <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสาร</p>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
@@ -370,12 +360,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { fetchLawFacets } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
-import type { FacetBucket, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
+import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 
 const PER_PAGE = 20;
@@ -405,6 +396,7 @@ const STATUS_LABELS: Record<string, string> = {
 const router = useRouter();
 const route = useRoute();
 const searchStore = useLawSearchStore();
+const baseFacets = ref<LawSearchFacets | null>(null);
 
 const query = ref('');
 const selectedTypes = ref<string[]>(['all']);
@@ -432,14 +424,21 @@ const currentTypes = computed(() => selectedTypes.value.includes('all') ? [] : s
 const pageCount = computed(() => Math.max(1, Math.ceil(searchStore.total / PER_PAGE)));
 const showSuggestions = computed(() => searchFocused.value && query.value.trim().length >= 2 && (searchStore.suggesting || searchStore.suggestions.length > 0));
 
-const typeFilters = computed(() => mapFacetOptions(searchStore.facets.law_type, lawTypeLabel));
-const groupFilters = computed(() => mapFacetOptions(searchStore.facets.law_group));
-const agencyFilters = computed(() => mapFacetOptions(searchStore.facets.agency));
-const keeperGroupFilters = computed(() => mapFacetOptions(searchStore.facets.signer_group));
-const changeStatusFilters = computed(() => mapFacetOptions(searchStore.facets.change_status, changeStatusLabel));
-const useStatusFilters = computed(() => mapFacetOptions(searchStore.facets.status, statusLabel));
+function effectiveFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[] {
+  const fromSearch = searchStore.facets[key];
+  if (fromSearch.length > 0) return fromSearch;
+  return baseFacets.value?.[key] ?? [];
+}
+
+const typeFilters = computed(() => mapFacetOptions(effectiveFacet('law_type'), lawTypeLabel));
+const groupFilters = computed(() => mapFacetOptions(effectiveFacet('law_group')));
+const agencyFilters = computed(() => mapFacetOptions(effectiveFacet('agency')));
+const keeperGroupFilters = computed(() => mapFacetOptions(effectiveFacet('signer_group')));
+const changeStatusFilters = computed(() => mapFacetOptions(effectiveFacet('change_status'), changeStatusLabel));
+const useStatusFilters = computed(() => mapFacetOptions(effectiveFacet('status'), statusLabel));
 const years = computed(() => {
-  const values = searchStore.facets.years.map((bucket) => String(bucket.year));
+  const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
+  const values = yearBuckets.map((bucket) => String(bucket.year));
   if (yearFrom.value) values.push(yearFrom.value);
   if (yearTo.value) values.push(yearTo.value);
 
@@ -729,6 +728,10 @@ function extractYear(item: LawSearchResult): number {
   const match = item.published_date?.match(/\d{4}/);
   return match ? Number(match[0]) : 0;
 }
+
+onMounted(() => {
+  fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
+});
 
 onBeforeUnmount(() => {
   if (suggestTimer) {

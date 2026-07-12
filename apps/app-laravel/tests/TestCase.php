@@ -12,6 +12,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
         try {
             app(MongoBlobStore::class)->truncate();
+            app('mongo.blob.permissions')->truncate();
         } catch (\Exception) {
             // MongoDB not reachable — tests that need it will fail naturally
         }

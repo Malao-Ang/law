@@ -81,6 +81,90 @@ class DraftHtmlWritebackTest extends TestCase
         $this->assertNull($block['meta']['layout']['alignment'] ?? null);
     }
 
+    public function test_saving_draft_html_writes_back_margin_left_as_indent_left(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_indent_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="margin-left:48px">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertSame(720, $block['meta']['layout']['indent_left'] ?? null);
+    }
+
+    public function test_saving_draft_html_clears_indent_left_when_margin_is_removed(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_indent2_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="margin-left:48px">ข้อความ</p>',
+        ])->assertOk();
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $block = $doc['pages'][0]['blocks'][0];
+        $this->assertNull($block['meta']['layout']['indent_left'] ?? null);
+    }
+
+    public function test_saving_draft_html_writes_back_first_line_indent(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_fli_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        // FirstLineIndentExtension renders first-line indent as inline text-indent.
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="text-indent:18pt">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $layout = $doc['pages'][0]['blocks'][0]['meta']['layout'];
+        // 18pt → 360 twips (×20).
+        $this->assertSame(360, $layout['indent_first_line'] ?? null);
+    }
+
+    public function test_saving_draft_html_writes_negative_text_indent_as_hanging(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_hang_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="text-indent:-18pt">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $layout = $doc['pages'][0]['blocks'][0]['meta']['layout'];
+        $this->assertSame(360, $layout['indent_hanging'] ?? null);
+        $this->assertArrayNotHasKey('indent_first_line', $layout);
+    }
+
+    public function test_saving_draft_html_clears_first_line_indent_when_removed(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_fli2_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001" style="text-indent:18pt">ข้อความ</p>',
+        ])->assertOk();
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001">ข้อความ</p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $layout = $doc['pages'][0]['blocks'][0]['meta']['layout'];
+        $this->assertArrayNotHasKey('indent_first_line', $layout);
+    }
+
     public function test_block_without_matching_id_is_left_untouched(): void
     {
         $store = app(ReviewStore::class);

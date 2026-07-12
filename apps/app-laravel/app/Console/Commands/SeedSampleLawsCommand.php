@@ -23,9 +23,9 @@ class SeedSampleLawsCommand extends Command
         $samples = [
             [
                 'title' => 'พระราชบัญญัติภาษีที่ดินและสิ่งปลูกสร้าง พ.ศ. ๒๕๖๒',
-                'law_type' => 'phrb',
-                'status' => 'active',
-                'change_status' => 'new',
+                'law_type' => 'พ.ร.บ.',
+                'status' => 'มีผลบังคับใช้',
+                'change_status' => 'กฎหมายใหม่',
                 'agency' => 'กระทรวงการคลัง',
                 'law_group' => 'ภาษี',
                 'signer_group' => 'คณะรัฐมนตรี',
@@ -35,9 +35,9 @@ class SeedSampleLawsCommand extends Command
             ],
             [
                 'title' => 'ระเบียบว่าด้วยการรักษาความปลอดภัย พ.ศ. ๒๕๖๔',
-                'law_type' => 'rabiap',
-                'status' => 'active',
-                'change_status' => 'amended',
+                'law_type' => 'ระเบียบ',
+                'status' => 'มีผลบังคับใช้',
+                'change_status' => 'ปรับปรุงทั้งฉบับ',
                 'agency' => 'สำนักนายกรัฐมนตรี',
                 'law_group' => 'ความมั่นคง',
                 'signer_group' => 'คณะกรรมการความปลอดภัย',
@@ -47,9 +47,9 @@ class SeedSampleLawsCommand extends Command
             ],
             [
                 'title' => 'ประกาศกระทรวงสาธารณสุข พ.ศ. ๒๕๖๕',
-                'law_type' => 'prakat',
-                'status' => 'active',
-                'change_status' => 'new',
+                'law_type' => 'ประกาศ',
+                'status' => 'มีผลบังคับใช้',
+                'change_status' => 'กฎหมายใหม่',
                 'agency' => 'กระทรวงสาธารณสุข',
                 'law_group' => 'สาธารณสุข',
                 'signer_group' => 'รัฐมนตรีว่าการ',

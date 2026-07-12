@@ -24,6 +24,7 @@ services:
       && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
+      - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
       - ./apps/app-laravel:/var/www/html
       - poc_storage:/var/www/html/storage/app/poc
@@ -38,6 +39,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      pdf-service:
+        condition: service_started
     ports:
       - "8000:8000"
 
@@ -84,6 +87,7 @@ services:
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
       - QUEUE_CONNECTION=redis
+      - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
       - ./apps/app-laravel:/var/www/html
       - poc_storage:/var/www/html/storage/app/poc
@@ -100,6 +104,8 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+      pdf-service:
+        condition: service_started
 
   ocr-service:
     build:
@@ -128,6 +134,14 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
+
+  pdf-service:
+    build:
+      context: ./apps/pdf-service
+    container_name: thai-ocr-pdf-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
 
   redis:
     image: redis:7-alpine

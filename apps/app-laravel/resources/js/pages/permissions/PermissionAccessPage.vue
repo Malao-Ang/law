@@ -1,20 +1,19 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'กำหนดสิทธิ์การเข้าถึง']"
-    title="นำเข้าเอกสารกฎหมาย"
-    subtitle="ขั้นตอนที่ 6 จาก 6: กำหนดสิทธิ์การเข้าถึง"
+    title=""
   >
     <WorkflowFooterBar
       :step="6"
-      next-label="เผยแพร่"
+      next-label="บันทึกและดำเนินการต่อ"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"
       @back="router.push(`/documents/${props.documentId}/relations`)"
       @next="saveAndPublish"
     />
 
-    <div class="mx-auto" style="max-width:960px; padding-bottom:60px">
-      <WorkflowStepper :step="6" />
+    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
+      <WorkflowStepper :step="6" description="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -160,9 +159,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   createPermissionGroup,
-  exportDocument,
   fetchPermissionDirectory,
   fetchPermissionGroup,
+  fetchStatus,
   listPermissionGroups,
 } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -267,20 +266,23 @@ async function saveAndPublish(): Promise<void> {
   });
   if (!saved) return;
 
-  try {
-    await exportDocument(props.documentId);
-  } catch (error) {
-    documentStore.setSaveError(error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ — ลองอีกครั้ง');
-    return;
-  }
-
-  const progressed = await documentStore.completeWorkflowStep(6);
-  if (!progressed) return;
-  router.push(`/law/${props.documentId}`);
+  await documentStore.completeWorkflowStep(6);
+  router.push(`/documents/${props.documentId}/result`);
 }
 
 onMounted(async () => {
   await documentStore.fetch(props.documentId);
+
+  try {
+    const status = await fetchStatus(props.documentId);
+    if ((status.workflow_completed_step ?? 0) >= 6) {
+      router.push(`/documents/${props.documentId}/result`);
+      return;
+    }
+  } catch {
+    // non-fatal: proceed normally
+  }
+
   scope.value = documentStore.review?.law_meta?.access_scope === 'private' ? 'private' : 'public';
   selectedGroupIds.value = [...(documentStore.review?.law_meta?.permission_group_ids ?? [])];
   await loadPermissionResources();
