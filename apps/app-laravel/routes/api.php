@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\UploadController;
+use App\Http\Controllers\Api\WordExportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -43,6 +44,7 @@ Route::patch('/documents/{documentId}/blocks/{blockId}/size', [ReviewController:
 Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewController::class, 'reprocess']);
 Route::post('/documents/{documentId}/pages/{pageNo}/reprocess', [ReviewController::class, 'reprocessPage']);
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store']);
+Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);

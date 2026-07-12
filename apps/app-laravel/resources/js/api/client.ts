@@ -199,6 +199,32 @@ export function exportDocument(documentId: string): Promise<ExportResponse> {
   });
 }
 
+export async function downloadWordExport(documentId: string): Promise<void> {
+  const response = await fetch(`/api/documents/${documentId}/export-word`, {
+    method: 'POST',
+    headers: { Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    throw new Error(data.message ?? 'Word export failed');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^";\n]+)"?/.exec(disposition);
+  anchor.download = match?.[1] ?? `document-${documentId}.docx`;
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export function searchLaws(params: LawSearchParams): Promise<LawSearchResponse> {
   return jsonRequest<LawSearchResponse>('/api/laws/search', {
     method: 'POST',

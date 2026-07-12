@@ -126,7 +126,7 @@ async function saveAndNext(): Promise<void> {
   if (!saved) return;
   const relationProgressed = await documentStore.completeWorkflowStep(5);
   if (!relationProgressed) return;
-  router.push(`/documents/${props.documentId}/permissions`);
+  router.push(`/documents/${props.documentId}/result`);
 }
 
 onMounted(async () => {

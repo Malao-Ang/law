@@ -16,8 +16,20 @@
     </div>
     <WorkflowStepper :step="2" />
 
+    <v-alert
+      v-if="props.locked"
+      type="warning"
+      variant="tonal"
+      density="compact"
+      class="mx-0 my-2"
+      style="flex-shrink:0"
+      prepend-icon="mdi-lock-outline"
+    >
+      เอกสารนี้ผ่านขั้นตอน e-Sign แล้ว — ไม่สามารถแก้ไขเนื้อหาได้
+    </v-alert>
+
     <!-- Toolbar -->
-    <div v-if="editor" class="d-flex flex-wrap align-center ga-1 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">
+    <div v-if="editor && !props.locked" class="d-flex flex-wrap align-center ga-1 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">
       <!-- Row 1: History + Heading -->
       <span class="text-caption text-medium-emphasis mr-1">ย้อนกลับ</span>
       <v-btn icon="mdi-undo" variant="text" size="small" :disabled="!editor.can().undo()" title="Undo" @click="editor.chain().focus().undo().run()" />
@@ -116,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue';
+import { computed, onBeforeUnmount, watchEffect } from 'vue';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { EditorContent, useEditor } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
@@ -140,7 +152,7 @@ import { useReviewUiStore } from '../../stores/reviewUiStore';
 import WorkflowStepper from '../shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 
-const props = defineProps<{ documentId: string }>();
+const props = defineProps<{ documentId: string; locked?: boolean }>();
 
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
@@ -181,6 +193,12 @@ const editor = useEditor({
     scheduleAutoSave();
     scheduleTableSync();
   },
+});
+
+watchEffect(() => {
+  if (editor.value) {
+    editor.value.setEditable(!(props.locked ?? false));
+  }
 });
 
 

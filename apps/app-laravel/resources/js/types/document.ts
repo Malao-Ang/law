@@ -294,6 +294,7 @@ export interface DocumentStatus {
   workflow_completed_step?: number | null;
   workflow_current_step?: number | null;
   workflow_updated_at?: string | null;
+  esign_exported_at?: string | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;
