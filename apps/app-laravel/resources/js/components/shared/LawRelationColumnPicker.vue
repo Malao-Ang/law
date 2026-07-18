@@ -28,6 +28,7 @@
         v-model="globalSearch"
         density="compact"
         hide-details
+        single-line
         placeholder="ค้นหา..."
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
@@ -48,6 +49,7 @@
           v-model="searchCol1"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -72,7 +74,9 @@
               class="law-rel-col__chev"
             />
           </button>
-          <div v-if="filteredCol1.length === 0" class="law-rel-col__empty">ไม่พบรายการ</div>
+          <div v-if="filteredCol1.length === 0" class="law-rel-col__empty">
+            {{ documentsLoaded ? 'ไม่พบรายการ' : 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย' }}
+          </div>
         </div>
       </div>
 
@@ -83,6 +87,7 @@
           v-model="searchCol2"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -131,6 +136,7 @@
           v-model="searchCol3"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -184,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
@@ -195,6 +201,8 @@ import {
 } from '../../composables/useLawCatalog';
 import type { DocumentListItem, LawCatalogSection, LawRelationTarget } from '../../types/document';
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 const props = defineProps<{
   excludeDocumentId?: string | null;
   modelValue?: LawRelationTarget | null;
@@ -204,7 +212,8 @@ const emit = defineEmits<{
   'update:modelValue': [value: LawRelationTarget | null];
 }>();
 
-const loading = ref(true);
+const loading = ref(false);
+const documentsLoaded = ref(false);
 const documents = ref<DocumentListItem[]>([]);
 const selectedRoot = ref<DocumentListItem | null>(null);
 const selectedChild = ref<DocumentListItem | null>(null);
@@ -220,14 +229,18 @@ const searchCol1 = ref('');
 const searchCol2 = ref('');
 const searchCol3 = ref('');
 
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const catalogQuery = computed(() => globalSearch.value.trim() || searchCol1.value.trim());
+
 const filteredCol1 = computed(() => {
+  if (!documentsLoaded.value) return [];
   const roots = rootDocuments(documents.value, props.excludeDocumentId);
-  const query = globalSearch.value.trim() || searchCol1.value.trim();
-  return filterByQuery(roots, query) as DocumentListItem[];
+  return filterByQuery(roots, catalogQuery.value) as DocumentListItem[];
 });
 
 const filteredCol2 = computed(() => {
-  if (!selectedRoot.value) return [];
+  if (!selectedRoot.value || !documentsLoaded.value) return [];
   const children = childDocuments(documents.value, selectedRoot.value.document_id, props.excludeDocumentId);
   const query = globalSearch.value.trim() || searchCol2.value.trim();
   return filterByQuery(children, query) as DocumentListItem[];
@@ -285,16 +298,36 @@ function hasChildren(documentId: string): boolean {
 }
 
 async function loadDocuments(): Promise<void> {
+  if (loading.value || documentsLoaded.value) return;
+
   loading.value = true;
   try {
     const res = await listDocuments();
     documents.value = res.documents;
+    documentsLoaded.value = true;
   } catch {
     documents.value = [];
+    documentsLoaded.value = false;
   } finally {
     loading.value = false;
   }
 }
+
+function scheduleCatalogSearch(): void {
+  if (searchDebounceTimer !== null) {
+    clearTimeout(searchDebounceTimer);
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null;
+    if (!catalogQuery.value) return;
+    void loadDocuments();
+  }, SEARCH_DEBOUNCE_MS);
+}
+
+watch([globalSearch, searchCol1], () => {
+  scheduleCatalogSearch();
+});
 
 async function loadSections(documentId: string): Promise<void> {
   if (sectionsCache.has(documentId)) {
@@ -412,8 +445,10 @@ function goBack(): void {
   }
 }
 
-onMounted(() => {
-  void loadDocuments();
+onBeforeUnmount(() => {
+  if (searchDebounceTimer !== null) {
+    clearTimeout(searchDebounceTimer);
+  }
 });
 </script>
 
@@ -426,9 +461,30 @@ onMounted(() => {
 
 .law-rel-picker__toolbar {
   display: grid;
-  grid-template-columns: auto 1fr minmax(140px, 220px);
+  grid-template-columns: auto 1fr minmax(120px, 160px);
   gap: 12px;
   align-items: center;
+}
+
+.law-rel-picker__global-search :deep(.v-field),
+.law-rel-col__search :deep(.v-field) {
+  --v-input-control-height: 32px;
+  min-height: 32px !important;
+  font-size: 0.8125rem;
+}
+
+.law-rel-picker__global-search :deep(.v-field__input),
+.law-rel-col__search :deep(.v-field__input) {
+  min-height: 32px !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 0.8125rem;
+}
+
+.law-rel-picker__global-search :deep(.v-icon),
+.law-rel-col__search :deep(.v-icon) {
+  font-size: 16px;
+  opacity: 0.7;
 }
 
 .law-rel-picker__crumbs {
@@ -483,7 +539,8 @@ onMounted(() => {
 }
 
 .law-rel-col__search {
-  margin: 8px;
+  margin: 6px 8px;
+  flex: 0 0 auto;
 }
 
 .law-rel-col__list {
