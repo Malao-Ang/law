@@ -191,6 +191,8 @@
       :block-id="relationDialog.blockId"
       :default-type="relationDialog.defaultType"
       :exclude-document-id="props.documentId"
+      :existing-relations="relations"
+      :section-labels="sectionLabels"
       @close="closeRelationDialog"
       @save="onRelationSave"
     />
@@ -239,6 +241,9 @@ const relationDialog = ref<{
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const sections = computed(() => buildSections(documentStore.review));
+const sectionLabels = computed<Record<string, string>>(() =>
+  Object.fromEntries(sections.value.map((section) => [section.id, section.badge])),
+);
 const documentLevelRelations = computed(() => documentRelations(relations.value));
 
 const sectionRelationEntries = computed(() =>

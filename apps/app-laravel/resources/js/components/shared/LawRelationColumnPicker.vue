@@ -28,6 +28,7 @@
         v-model="globalSearch"
         density="compact"
         hide-details
+        single-line
         placeholder="ค้นหา..."
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
@@ -48,6 +49,7 @@
           v-model="searchCol1"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -85,6 +87,7 @@
           v-model="searchCol2"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -133,6 +136,7 @@
           v-model="searchCol3"
           density="compact"
           hide-details
+          single-line
           placeholder="ค้นหา..."
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -457,9 +461,30 @@ onBeforeUnmount(() => {
 
 .law-rel-picker__toolbar {
   display: grid;
-  grid-template-columns: auto 1fr minmax(140px, 220px);
+  grid-template-columns: auto 1fr minmax(120px, 160px);
   gap: 12px;
   align-items: center;
+}
+
+.law-rel-picker__global-search :deep(.v-field),
+.law-rel-col__search :deep(.v-field) {
+  --v-input-control-height: 32px;
+  min-height: 32px !important;
+  font-size: 0.8125rem;
+}
+
+.law-rel-picker__global-search :deep(.v-field__input),
+.law-rel-col__search :deep(.v-field__input) {
+  min-height: 32px !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 0.8125rem;
+}
+
+.law-rel-picker__global-search :deep(.v-icon),
+.law-rel-col__search :deep(.v-icon) {
+  font-size: 16px;
+  opacity: 0.7;
 }
 
 .law-rel-picker__crumbs {
@@ -514,7 +539,8 @@ onBeforeUnmount(() => {
 }
 
 .law-rel-col__search {
-  margin: 8px;
+  margin: 6px 8px;
+  flex: 0 0 auto;
 }
 
 .law-rel-col__list {

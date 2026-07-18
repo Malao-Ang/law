@@ -14,6 +14,49 @@
       </v-card-title>
 
       <v-card-text>
+        <section class="existing-relations mb-5">
+          <div class="d-flex align-center ga-2 mb-2">
+            <v-icon icon="mdi-link-variant" color="primary" size="18" />
+            <span class="text-subtitle-2 font-weight-bold">ความสัมพันธ์ที่มีอยู่ของกฎหมายนี้</span>
+            <v-chip size="x-small" color="primary" variant="tonal">
+              {{ existingRelations.length }}
+            </v-chip>
+          </div>
+
+          <div v-if="existingRelations.length" class="existing-relations__list">
+            <div
+              v-for="relation in existingRelations"
+              :key="relation.id"
+              class="existing-relations__row"
+            >
+              <div class="d-flex align-center ga-2 flex-wrap">
+                <v-chip
+                  size="x-small"
+                  :color="RELATION_TYPE_COLORS[relation.type]"
+                  variant="tonal"
+                  :prepend-icon="RELATION_TYPE_ICONS[relation.type]"
+                >
+                  {{ relationTypeLabel(relation.type) }}
+                </v-chip>
+                <v-chip size="x-small" variant="outlined">
+                  {{ relationSourceLabel(relation) }}
+                </v-chip>
+              </div>
+              <div class="existing-relations__target">
+                {{ formatRelationTarget(relation) }}
+              </div>
+              <div v-if="relation.note" class="text-caption text-medium-emphasis">
+                {{ relation.note }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="existing-relations__empty text-body-2 text-medium-emphasis">
+            ยังไม่มีความสัมพันธ์
+          </div>
+        </section>
+
+        <v-divider class="mb-5" />
+
         <div class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">ประเภท</div>
           <div class="d-flex flex-wrap ga-2">
@@ -99,6 +142,7 @@ import {
   RELATION_TYPE_COLORS,
   RELATION_TYPE_ICONS,
   RELATION_TYPE_LABELS,
+  formatRelationTarget,
   relationTypeLabel,
 } from '../../types/lawRelation';
 import LawRelationColumnPicker from './LawRelationColumnPicker.vue';
@@ -108,12 +152,15 @@ const props = defineProps<{
   blockId?: string | null;
   defaultType?: RelationType;
   excludeDocumentId?: string | null;
+  existingRelations?: LawRelation[];
+  sectionLabels?: Record<string, string>;
 }>();
 
 const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 
 const mode = ref<'picker' | 'text'>('picker');
 const pickerTarget = ref<LawRelationTarget | null>(null);
+const existingRelations = computed(() => props.existingRelations ?? []);
 
 const form = ref<LawRelation>({
   id: crypto.randomUUID(),
@@ -139,6 +186,12 @@ const canSave = computed(() => {
   }
   return pickerTarget.value !== null && pickerTarget.value.title.trim() !== '';
 });
+
+function relationSourceLabel(relation: LawRelation): string {
+  if (relation.scope === 'document') return 'ทั้งเอกสาร';
+  if (!relation.block_id) return 'มาตรา / ข้อ';
+  return props.sectionLabels?.[relation.block_id] ?? 'มาตรา / ข้อ';
+}
 
 watch(mode, () => {
   form.value.target_title = '';
@@ -183,5 +236,39 @@ function save(): void {
 <style scoped>
 .add-relation-dialog :deep(.v-card-text) {
   padding-top: 8px;
+}
+
+.existing-relations {
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.existing-relations__list {
+  display: flex;
+  max-height: 220px;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.existing-relations__row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.existing-relations__target {
+  color: #334155;
+  font-size: 14px;
+}
+
+.existing-relations__empty {
+  padding: 8px 2px 2px;
 }
 </style>
