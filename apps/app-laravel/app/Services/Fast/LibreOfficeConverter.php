@@ -17,13 +17,23 @@ class LibreOfficeConverter
 
     public function convertToDocx(string $inputPath): string
     {
-        if (! file_exists($inputPath)) {
-            throw new RuntimeException("Input file does not exist: {$inputPath}");
-        }
-
         $ext = strtolower(pathinfo($inputPath, PATHINFO_EXTENSION));
         if ($ext === 'docx') {
             return $inputPath;
+        }
+
+        return $this->convert($inputPath, 'docx', 'docx');
+    }
+
+    public function convertToPdf(string $inputPath): string
+    {
+        return $this->convert($inputPath, 'pdf', 'pdf');
+    }
+
+    private function convert(string $inputPath, string $targetFormat, string $targetExt): string
+    {
+        if (! file_exists($inputPath)) {
+            throw new RuntimeException("Input file does not exist: {$inputPath}");
         }
 
         $outDir = sys_get_temp_dir().'/libreoffice-'.bin2hex(random_bytes(8));
@@ -34,7 +44,7 @@ class LibreOfficeConverter
         $cmd = [
             $this->binary,
             '--headless',
-            '--convert-to', 'docx',
+            '--convert-to', $targetFormat,
             '--outdir', $outDir,
             $inputPath,
         ];
@@ -45,7 +55,7 @@ class LibreOfficeConverter
         }
 
         $base = pathinfo($inputPath, PATHINFO_FILENAME);
-        $outPath = "{$outDir}/{$base}.docx";
+        $outPath = "{$outDir}/{$base}.{$targetExt}";
 
         if (! file_exists($outPath)) {
             throw new RuntimeException("Converted file not found at {$outPath}");

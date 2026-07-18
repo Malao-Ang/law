@@ -27,6 +27,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl \
     libreoffice-core \
     libreoffice-writer \
+    fontconfig \
+    fonts-thai-tlwg \
     imagemagick \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -49,6 +51,8 @@ WORKDIR /var/www/html
 COPY . .
 
 COPY --from=frontend /var/www/html/public/build ./public/build
+
+RUN mkdir -p /usr/share/fonts/truetype/th-sarabun-psk && fc-cache -f
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,target=/tmp/composer-cache \

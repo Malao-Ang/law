@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
+use App\Services\Fast\LibreOfficeConverter;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
@@ -20,6 +19,7 @@ class DocumentExportService
 
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
+        private readonly LibreOfficeConverter $libreOffice,
     ) {}
 
     public function buildHtml(array $document): string
@@ -64,26 +64,41 @@ class DocumentExportService
 
     public function toPdf(array $document): string
     {
-        $endpoint = rtrim((string) config('services.pdf.base_url', 'http://pdf-service:3001'), '/').'/render';
-
+        $docxPath = $this->buildDocxFile($document);
+        $pdfPath = null;
         try {
-            $response = Http::timeout(120)
-                ->accept('application/pdf')
-                ->post($endpoint, ['html' => $this->buildHtml($document)]);
-        } catch (ConnectionException) {
-            throw new RuntimeException('PDF service unavailable');
-        }
+            $pdfPath = $this->libreOffice->convertToPdf($docxPath);
+            $bytes = file_get_contents($pdfPath);
+            if ($bytes === false || $bytes === '') {
+                throw new RuntimeException('PDF service unavailable');
+            }
 
-        if (! $response->successful()) {
-            throw new RuntimeException('PDF rendering failed');
+            return $bytes;
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('PDF service unavailable', 0, $exception);
+        } finally {
+            @unlink($docxPath);
+            if ($pdfPath !== null) {
+                @unlink($pdfPath);
+                @rmdir(dirname($pdfPath));
+            }
         }
-
-        return $response->body();
     }
 
     public function toDocx(array $document): string
     {
+        $docxPath = $this->buildDocxFile($document);
+        $content = (string) file_get_contents($docxPath);
+        @unlink($docxPath);
+
+        return $content;
+    }
+
+    private function buildDocxFile(array $document): string
+    {
         $phpWord = new PhpWord;
+        $phpWord->setDefaultFontName('TH Sarabun PSK');
+        $phpWord->setDefaultFontSize(16);
         $section = $phpWord->addSection([
             'paperSize' => 'A4',
             'marginTop' => 1440,
@@ -128,13 +143,10 @@ class DocumentExportService
         }
 
         $docxPath = $tempPath.'.docx';
-        IOFactory::createWriter($phpWord, 'Word2007')->save($docxPath);
-        $content = (string) file_get_contents($docxPath);
-
         @unlink($tempPath);
-        @unlink($docxPath);
+        IOFactory::createWriter($phpWord, 'Word2007')->save($docxPath);
 
-        return $content;
+        return $docxPath;
     }
 
     /**

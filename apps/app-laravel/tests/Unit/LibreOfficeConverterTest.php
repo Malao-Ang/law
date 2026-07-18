@@ -66,4 +66,36 @@ class LibreOfficeConverterTest extends TestCase
         @rmdir(dirname($result));
         @rmdir($tmpDir);
     }
+
+    public function test_builds_correct_command_for_pdf(): void
+    {
+        $tmpDir = sys_get_temp_dir().'/libreoffice-pdf-test-'.uniqid('', true);
+        mkdir($tmpDir);
+        $docxPath = $tmpDir.'/test.docx';
+        file_put_contents($docxPath, 'fake docx');
+
+        $captured = '';
+        $converter = new LibreOfficeConverter(
+            binary: 'libreoffice',
+            commandRunner: function (array $cmd) use (&$captured): int {
+                $captured = implode(' ', $cmd);
+                $base = pathinfo($cmd[count($cmd) - 1], PATHINFO_FILENAME);
+                $outDir = $cmd[array_search('--outdir', $cmd, true) + 1];
+                file_put_contents("{$outDir}/{$base}.pdf", '%PDF-1.7 fake');
+
+                return 0;
+            },
+        );
+
+        $result = $converter->convertToPdf($docxPath);
+
+        $this->assertStringContainsString('--convert-to pdf', $captured);
+        $this->assertFileExists($result);
+        $this->assertStringEndsWith('.pdf', $result);
+
+        @unlink($result);
+        @unlink($docxPath);
+        @rmdir(dirname($result));
+        @rmdir($tmpDir);
+    }
 }

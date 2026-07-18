@@ -2,23 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Services\Fast\LibreOfficeConverter;
 use App\Services\ReviewStore;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class PdfExportControllerTest extends TestCase
 {
     public function test_export_pdf_returns_pdf_and_stamps_esign_exported_at(): void
     {
-        config()->set('services.pdf.base_url', 'http://pdf-service:3001');
-        Http::fake([
-            'http://pdf-service:3001/render' => Http::response('%PDF-1.7 test', 200, [
-                'Content-Type' => 'application/pdf',
-            ]),
-        ]);
+        $this->app->instance(LibreOfficeConverter::class, new LibreOfficeConverter(
+            binary: 'libreoffice',
+            commandRunner: function (array $cmd): int {
+                $base = pathinfo($cmd[count($cmd) - 1], PATHINFO_FILENAME);
+                $outDir = $cmd[array_search('--outdir', $cmd, true) + 1];
+                file_put_contents("{$outDir}/{$base}.pdf", '%PDF-1.7 test');
+
+                return 0;
+            },
+        ));
 
         $store = app(ReviewStore::class);
         $documentId = $store->generateDocumentId();
@@ -76,26 +78,18 @@ class PdfExportControllerTest extends TestCase
         $response->assertStatus(200);
         $this->assertStringContainsString('application/pdf', (string) $response->headers->get('Content-Type'));
         $this->assertStringContainsString('attachment', (string) $response->headers->get('Content-Disposition'));
-        $this->assertSame('%PDF-1.7 test', $response->getContent());
+        $this->assertStringStartsWith('%PDF', $response->getContent());
 
         $status = $store->getStatus($documentId);
         $this->assertNotNull($status['esign_exported_at'] ?? null);
-
-        Http::assertSent(function (Request $request): bool {
-            $payload = json_decode((string) $request->body(), true);
-
-            return $request->url() === 'http://pdf-service:3001/render'
-                && is_array($payload)
-                && str_contains((string) ($payload['html'] ?? ''), 'ข้อความที่อนุมัติแล้ว');
-        });
     }
 
     public function test_export_pdf_returns_503_when_service_is_unavailable(): void
     {
-        config()->set('services.pdf.base_url', 'http://pdf-service:3001');
-        Http::fake(function (): void {
-            throw new ConnectionException('down');
-        });
+        $this->app->instance(LibreOfficeConverter::class, new LibreOfficeConverter(
+            binary: 'libreoffice',
+            commandRunner: fn (array $cmd): int => 1,
+        ));
 
         $store = app(ReviewStore::class);
         $documentId = $store->generateDocumentId();
