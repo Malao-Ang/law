@@ -35,7 +35,26 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Review document not found.'], 404);
         }
 
-        return response()->json($this->decorateReviewPayload($documentId, $review));
+        $response = response()->json($this->decorateReviewPayload($documentId, $review));
+
+        return $this->withRevalidation($response);
+    }
+
+    /**
+     * Tag the response with a content ETag and force revalidation. The browser then
+     * sends If-None-Match on reload / new tab; if the document is unchanged we return
+     * 304 with no body — no re-download, no client re-parse of a large JSON payload.
+     */
+    private function withRevalidation(JsonResponse $response): JsonResponse
+    {
+        $response->setEtag(md5((string) $response->getContent()));
+        $response->setPrivate();
+        $response->headers->addCacheControlDirective('must-revalidate');
+        $response->headers->addCacheControlDirective('max-age', '0');
+
+        $response->isNotModified(request());
+
+        return $response;
     }
 
     public function preview(string $documentId): JsonResponse
@@ -46,10 +65,16 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Review document not found.'], 404);
         }
 
-        $html = $this->documentHtmlService->buildGeneratedHtml($review);
         $documentReview = is_array($review['document_review'] ?? null) ? $review['document_review'] : [];
+        // getReviewDocument() guarantees document_review is in sync, so generated_html
+        // (written by syncDocumentReview) is current — reuse it instead of rebuilding the
+        // whole document's HTML a second time. Fall back to a build only if it's missing.
+        $html = (string) ($documentReview['generated_html'] ?? '');
+        if ($html === '') {
+            $html = $this->documentHtmlService->buildGeneratedHtml($review);
+        }
 
-        return response()->json([
+        $response = response()->json([
             'document_id' => $documentId,
             'html' => $html,
             'draft_html' => $documentReview['draft_html'] ?? $html,
@@ -58,6 +83,8 @@ class ReviewController extends Controller
             'source_file' => $review['source_file'] ?? null,
             'source_type' => $review['source_type'] ?? null,
         ]);
+
+        return $this->withRevalidation($response);
     }
 
     /**

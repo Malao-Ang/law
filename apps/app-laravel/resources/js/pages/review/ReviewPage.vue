@@ -23,6 +23,7 @@ import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue
 import { fetchStatus } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
+import { getPreviewCached } from '../../stores/reviewCache';
 import type { DocumentStatus } from '../../types/document';
 
 const props = defineProps<{
@@ -41,6 +42,8 @@ onMounted(async () => {
     fetchStatus(props.documentId).catch(() => null),
   ]);
   docStatus.value = status;
+  // Warm the preview HTML in the background so the next step feels instant.
+  void getPreviewCached(props.documentId).catch(() => undefined);
 });
 
 onUnmounted(() => {

@@ -23,7 +23,7 @@
       <div v-else-if="previewStore.error" class="d-flex flex-column align-center ga-3 pa-12">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
         <v-alert type="error" variant="tonal">{{ previewStore.error }}</v-alert>
-        <v-btn variant="outlined" @click="previewStore.fetch(documentId)">โหลดใหม่</v-btn>
+        <v-btn variant="outlined" @click="previewStore.fetch(documentId, true)">โหลดใหม่</v-btn>
       </div>
       <article
         v-else
