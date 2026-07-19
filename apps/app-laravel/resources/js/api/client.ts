@@ -244,8 +244,13 @@ async function downloadBinaryExport(
   anchor.href = url;
 
   const disposition = response.headers.get('Content-Disposition') ?? '';
-  const match = /filename="?([^";\n]+)"?/.exec(disposition);
-  anchor.download = match?.[1] ?? fallbackName;
+  const starMatch = /filename\*=utf-8''([^;\n]+)/i.exec(disposition);
+  if (starMatch) {
+    anchor.download = decodeURIComponent(starMatch[1]);
+  } else {
+    const match = /filename="?([^";\n]+)"?/.exec(disposition);
+    anchor.download = match?.[1] ?? fallbackName;
+  }
 
   document.body.appendChild(anchor);
   anchor.click();
