@@ -252,7 +252,6 @@ const PAGE_WIDTH_MM = 210;
 const PAGE_MIN_HEIGHT_MM = 297;
 const MM_TO_CSS_PX = 96 / 25.4;
 const PAGE_HEIGHT_PX = PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX;
-const GAP_PX = 28;
 const fontSizePresets = [12, 14, 16, 18, 20, 22, 24, 28, 36] as const;
 const zoomPresets = [75, 100, 125, 150] as const;
 const DEFAULT_PAGE_MARGINS: PageMargins = {
@@ -354,6 +353,7 @@ const pageBreakPositionsPx = computed<number[]>(() => {
   const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
   const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
   const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
+  if (pageContentHeightPx <= 0) return [];
   const total = pageHeightPx.value;
   const breaks: number[] = [];
   let y = marginTopPx + pageContentHeightPx;
