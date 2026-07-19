@@ -155,6 +155,7 @@
     <div class="editor-shell-scroll flex-grow-1" style="min-height:0" @click.stop>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
+          <ReviewRuler v-if="editor && !props.locked" class="a4-ruler" :editor="editor" :content-mm="contentMm" />
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -195,6 +196,7 @@ import { useReviewUiStore } from '../../stores/reviewUiStore';
 import type { PageMargins } from '../../types/document';
 import WorkflowStepper from '../shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
+import ReviewRuler from './ReviewRuler.vue';
 
 type MarginPreset = 'normal' | 'narrow' | 'wide' | 'custom';
 type MarginKey = keyof PageMargins;
@@ -297,6 +299,10 @@ const fontSizePresetValue = computed<string>(() => (
 ));
 
 const selectedMarginPreset = computed<MarginPreset>(() => detectMarginPreset(pageMargins.value));
+
+const contentMm = computed<number>(() => (
+  PAGE_WIDTH_MM - twipsToMm(pageMargins.value.left) - twipsToMm(pageMargins.value.right)
+));
 
 const editorStageStyle = computed<CSSProperties>(() => {
   const scale = zoomPercent.value / 100;
@@ -745,6 +751,16 @@ function formatMillimeters(value: number): string {
   box-shadow: 0 0 0 1px #e2e8f0, 0 18px 48px rgba(15, 23, 42, 0.08);
   box-sizing: border-box;
   transform-origin: top center;
+  position: relative;
+}
+
+/* Ruler sits just above the page, spanning the text column (page width minus margins) */
+.a4-ruler {
+  position: absolute;
+  top: 0;
+  left: var(--page-margin-left);
+  right: var(--page-margin-right);
+  transform: translateY(calc(-100% - 6px));
 }
 
 .editor-shell-content {

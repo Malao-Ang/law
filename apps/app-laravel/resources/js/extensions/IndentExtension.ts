@@ -8,6 +8,7 @@ declare module '@tiptap/core' {
     indent: {
       increaseIndent: () => ReturnType;
       decreaseIndent: () => ReturnType;
+      setIndentLevel: (level: number) => ReturnType;
     };
   }
 }
@@ -77,6 +78,20 @@ export const IndentExtension = Extension.create({
               if (current > 0) {
                 tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: current - 1 });
               }
+            }
+          });
+          if (dispatch) dispatch(tr);
+          return true;
+        },
+
+      setIndentLevel:
+        (level: number) =>
+        ({ tr, state, dispatch }) => {
+          const clamped = Math.max(0, Math.min(MAX_INDENT, Math.round(level)));
+          const { from, to } = state.selection;
+          state.doc.nodesBetween(from, to, (node, pos) => {
+            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, indent: clamped });
             }
           });
           if (dispatch) dispatch(tr);
