@@ -6,6 +6,7 @@ use App\Services\Fast\LibreOfficeConverter;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
+use DOMXPath;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
@@ -124,7 +125,13 @@ class DocumentExportService
 
         $tempImages = [];
 
-        foreach ($this->orderedBlocks($document) as $block) {
+        foreach ($this->orderedExportNodes($document) as $node) {
+            if (($node['type'] ?? null) === 'page_break') {
+                $section->addPageBreak();
+                continue;
+            }
+
+            $block = is_array($node['block'] ?? null) ? $node['block'] : [];
             $type = (string) ($block['type'] ?? '');
             $table = $this->normalizeTable($block);
             $isTable = $type === 'table' && $table !== null && ($table['cells'] ?? []) !== [];
@@ -329,6 +336,64 @@ class DocumentExportService
         return $ordered;
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function orderedExportNodes(array $document): array
+    {
+        $orderedBlocks = $this->orderedBlocks($document);
+        $blocksById = [];
+        foreach ($orderedBlocks as $block) {
+            $blockId = (string) ($block['block_id'] ?? '');
+            if ($blockId !== '') {
+                $blocksById[$blockId] = $block;
+            }
+        }
+
+        $draftHtml = trim((string) ($document['document_review']['draft_html'] ?? ''));
+        if ($draftHtml === '') {
+            return array_map(static fn (array $block): array => ['type' => 'block', 'block' => $block], $orderedBlocks);
+        }
+
+        $dom = $this->loadHtmlFragment($draftHtml);
+        $xpath = new DOMXPath($dom);
+        $elements = $xpath->query('//*[@data-block-id or @data-page-break]');
+        if ($elements === false) {
+            return array_map(static fn (array $block): array => ['type' => 'block', 'block' => $block], $orderedBlocks);
+        }
+
+        $nodes = [];
+        $seenBlockIds = [];
+
+        foreach ($elements as $element) {
+            if (! $element instanceof DOMElement || $this->hasTrackedAncestor($element)) {
+                continue;
+            }
+
+            if ($element->hasAttribute('data-page-break')) {
+                $nodes[] = ['type' => 'page_break'];
+                continue;
+            }
+
+            $blockId = trim((string) $element->getAttribute('data-block-id'));
+            if ($blockId === '' || isset($seenBlockIds[$blockId]) || ! isset($blocksById[$blockId])) {
+                continue;
+            }
+
+            $seenBlockIds[$blockId] = true;
+            $nodes[] = ['type' => 'block', 'block' => $blocksById[$blockId]];
+        }
+
+        foreach ($orderedBlocks as $block) {
+            $blockId = (string) ($block['block_id'] ?? '');
+            if ($blockId !== '' && ! isset($seenBlockIds[$blockId])) {
+                $nodes[] = ['type' => 'block', 'block' => $block];
+            }
+        }
+
+        return $nodes;
+    }
+
     private function renderBlockHtml(array $block): string
     {
         $table = $this->normalizeTable($block);
@@ -399,18 +464,19 @@ class DocumentExportService
 
     private function appendTable(object $section, array $tableData): void
     {
-        $table = $section->addTable();
+        $table = $section->addTable(['width' => 5000, 'unit' => 'pct']);
         $rows = (array) ($tableData['cells'] ?? []);
         $totalColumns = 0;
         $borderStyle = [
-            'borderTopSize' => 8,
-            'borderTopColor' => '000000',
-            'borderBottomSize' => 8,
-            'borderBottomColor' => '000000',
-            'borderLeftSize' => 8,
-            'borderLeftColor' => '000000',
-            'borderRightSize' => 8,
-            'borderRightColor' => '000000',
+            'borderTopSize' => 8,    'borderTopColor' => '000000',
+            'borderBottomSize' => 8, 'borderBottomColor' => '000000',
+            'borderLeftSize' => 8,   'borderLeftColor' => '000000',
+            'borderRightSize' => 8,  'borderRightColor' => '000000',
+            'paddingTop' => 60,
+            'paddingBottom' => 60,
+            'paddingLeft' => 108,
+            'paddingRight' => 108,
+            'valign' => 'top',
         ];
 
         foreach ($rows as $row) {
@@ -550,6 +616,17 @@ class DocumentExportService
         }
 
         return array_filter($style, static fn (mixed $value): bool => $value !== null && $value !== false);
+    }
+
+    private function hasTrackedAncestor(DOMElement $element): bool
+    {
+        for ($parent = $element->parentNode; $parent instanceof DOMElement; $parent = $parent->parentNode) {
+            if ($parent->hasAttribute('data-block-id') || $parent->hasAttribute('data-page-break')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function collectRuns(DOMNode $node, array $context, array &$runs): void
