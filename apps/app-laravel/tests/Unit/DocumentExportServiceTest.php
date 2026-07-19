@@ -208,6 +208,40 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('h3 { font-size: 16pt;', $html);
     }
 
+    public function test_docx_embeds_image_blocks(): void
+    {
+        $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'img1',
+                    'type' => 'image',
+                    'reading_order' => 1,
+                    'meta' => ['image' => ['data_uri' => $png, 'display_width_px' => 120]],
+                ]],
+            ]],
+        ];
+
+        $bytes = $this->makeService()->toDocx($document);
+
+        $tmp = tempnam(sys_get_temp_dir(), 'docx_img_').'.docx';
+        file_put_contents($tmp, $bytes);
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($tmp) === true);
+        $hasMedia = false;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            if (str_starts_with((string) $zip->getNameIndex($i), 'word/media/')) {
+                $hasMedia = true;
+                break;
+            }
+        }
+        $zip->close();
+        @unlink($tmp);
+
+        $this->assertTrue($hasMedia, 'expected an embedded image under word/media/');
+    }
+
     public function test_to_pdf_renders_docx_via_libreoffice(): void
     {
         $converter = new LibreOfficeConverter(

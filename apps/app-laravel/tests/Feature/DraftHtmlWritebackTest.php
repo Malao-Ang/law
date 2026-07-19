@@ -165,6 +165,22 @@ class DraftHtmlWritebackTest extends TestCase
         $this->assertArrayNotHasKey('indent_first_line', $layout);
     }
 
+    public function test_saving_draft_html_preserves_font_size_span(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_wb_fs_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'draft_html' => '<p data-block-id="p1-b0001"><span style="font-size: 20pt">ข้อความ</span></p>',
+        ])->assertOk();
+
+        $doc = $store->getReviewDocument($id);
+        $html = (string) ($doc['pages'][0]['blocks'][0]['meta']['reviewed_html'] ?? '');
+        $this->assertStringContainsString('font-size', $html);
+        $this->assertStringContainsString('20pt', $html);
+    }
+
     public function test_block_without_matching_id_is_left_untouched(): void
     {
         $store = app(ReviewStore::class);
