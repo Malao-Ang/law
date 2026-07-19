@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
-use App\Services\Fast\LibreOfficeConverter;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
@@ -19,7 +20,6 @@ class DocumentExportService
 
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
-        private readonly LibreOfficeConverter $libreOffice,
     ) {}
 
     public function buildHtml(array $document): string
@@ -64,41 +64,26 @@ class DocumentExportService
 
     public function toPdf(array $document): string
     {
-        $docxPath = $this->buildDocxFile($document);
-        $pdfPath = null;
-        try {
-            $pdfPath = $this->libreOffice->convertToPdf($docxPath);
-            $bytes = file_get_contents($pdfPath);
-            if ($bytes === false || $bytes === '') {
-                throw new RuntimeException('PDF service unavailable');
-            }
+        $endpoint = rtrim((string) config('services.pdf.base_url', 'http://pdf-service:3001'), '/').'/render';
 
-            return $bytes;
-        } catch (\Throwable $exception) {
-            throw new RuntimeException('PDF service unavailable', 0, $exception);
-        } finally {
-            @unlink($docxPath);
-            if ($pdfPath !== null) {
-                @unlink($pdfPath);
-                @rmdir(dirname($pdfPath));
-            }
+        try {
+            $response = Http::timeout(120)
+                ->accept('application/pdf')
+                ->post($endpoint, ['html' => $this->buildHtml($document)]);
+        } catch (ConnectionException) {
+            throw new RuntimeException('PDF service unavailable');
         }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('PDF rendering failed');
+        }
+
+        return $response->body();
     }
 
     public function toDocx(array $document): string
     {
-        $docxPath = $this->buildDocxFile($document);
-        $content = (string) file_get_contents($docxPath);
-        @unlink($docxPath);
-
-        return $content;
-    }
-
-    private function buildDocxFile(array $document): string
-    {
         $phpWord = new PhpWord;
-        $phpWord->setDefaultFontName('TH Sarabun PSK');
-        $phpWord->setDefaultFontSize(16);
         $section = $phpWord->addSection([
             'paperSize' => 'A4',
             'marginTop' => 1440,
@@ -143,10 +128,13 @@ class DocumentExportService
         }
 
         $docxPath = $tempPath.'.docx';
-        @unlink($tempPath);
         IOFactory::createWriter($phpWord, 'Word2007')->save($docxPath);
+        $content = (string) file_get_contents($docxPath);
 
-        return $docxPath;
+        @unlink($tempPath);
+        @unlink($docxPath);
+
+        return $content;
     }
 
     /**
@@ -176,12 +164,21 @@ class DocumentExportService
 
     public function safeFilenameBase(array $document): string
     {
+        $sourceFile = trim((string) ($document['source_file'] ?? ''));
         $lawMeta = is_array($document['law_meta'] ?? null) ? $document['law_meta'] : [];
-        $rawTitle = trim((string) ($lawMeta['title'] ?? $document['source_file'] ?? 'document'));
-        $baseName = pathinfo($rawTitle, PATHINFO_FILENAME) ?: 'document';
-        $safeName = (string) preg_replace('/[^a-zA-Z0-9_\-\.]/u', '_', $baseName);
+        $lawTitle = trim((string) ($lawMeta['title'] ?? ''));
 
-        return trim($safeName, '._-') ?: 'document';
+        $rawTitle = $sourceFile !== '' ? $sourceFile : ($lawTitle !== '' ? $lawTitle : 'document');
+
+        // Strip filesystem-illegal chars (including path separators) before extension removal
+        $cleaned = (string) preg_replace('/[\/\\\\:*?"<>|\x00-\x1F]/u', '', $rawTitle);
+        $baseName = pathinfo($cleaned, PATHINFO_FILENAME) ?: 'document';
+
+        // Collapse runs of whitespace to one space
+        $safeName = (string) preg_replace('/\s+/u', ' ', $baseName);
+        $safeName = trim($safeName);
+
+        return $safeName !== '' ? $safeName : 'document';
     }
 
     /**
