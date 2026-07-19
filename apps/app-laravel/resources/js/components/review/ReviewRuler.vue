@@ -1,5 +1,8 @@
 <template>
   <div ref="trackEl" class="review-ruler">
+    <span v-if="props.currentPage" class="review-ruler__page-badge">
+      หน้า {{ props.currentPage }}{{ props.totalPages ? ` / ${props.totalPages}` : '' }}
+    </span>
     <span
       v-for="tick in ticks"
       :key="tick.mm"
@@ -35,7 +38,12 @@ import {
   offsetToMm,
 } from './rulerMath';
 
-const props = defineProps<{ editor: Editor; contentMm: number }>();
+const props = defineProps<{
+  editor: Editor;
+  contentMm: number;
+  currentPage?: number;
+  totalPages?: number;
+}>();
 
 const trackEl = ref<HTMLElement | null>(null);
 const activeIndentLevel = ref(0);
@@ -147,5 +155,20 @@ onBeforeUnmount(() => {
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-top: 8px solid #2563eb;
+}
+
+.review-ruler__page-badge {
+  position: absolute;
+  left: -76px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: #1a56db;
+  background: #e8f0fe;
+  border: 1px solid #4285f4;
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 </style>

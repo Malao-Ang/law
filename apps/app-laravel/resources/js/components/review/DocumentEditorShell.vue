@@ -163,13 +163,18 @@
       <span class="text-caption text-medium-emphasis">ลากมุมเพื่อปรับขนาด</span>
     </div>
 
-    <div class="editor-shell-scroll flex-grow-1" style="min-height:0" @click.stop>
+    <div class="editor-shell-scroll flex-grow-1" style="min-height:0" @click.stop @scroll="onScroll">
       <div
         v-if="editor && !props.locked"
         class="ruler-stage"
         :style="rulerStageStyle"
       >
-        <ReviewRuler :editor="editor" :content-mm="contentMm" />
+        <ReviewRuler
+          :editor="editor"
+          :content-mm="contentMm"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+        />
       </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
@@ -365,6 +370,21 @@ const pageBreakPositionsPx = computed<number[]>(() => {
 });
 
 const totalPages = computed<number>(() => pageBreakPositionsPx.value.length + 1);
+
+const scrollTopPx = ref(0);
+
+const currentPage = computed<number>(() => {
+  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
+  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
+  const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
+  const scaledPageHeight = pageContentHeightPx * (zoomPercent.value / 100);
+  if (scaledPageHeight <= 0) return 1;
+  return Math.min(totalPages.value, Math.floor(scrollTopPx.value / scaledPageHeight) + 1);
+});
+
+function onScroll(e: Event): void {
+  scrollTopPx.value = (e.target as HTMLElement).scrollTop;
+}
 
 const editorStageStyle = computed<CSSProperties>(() => {
   const scale = zoomPercent.value / 100;
