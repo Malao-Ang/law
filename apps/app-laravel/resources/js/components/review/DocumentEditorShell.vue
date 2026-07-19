@@ -42,6 +42,7 @@
         <option value="'TH Sarabun New', 'Sarabun', sans-serif">TH Sarabun New</option>
         <option value="'TH Sarabun PSK', 'Sarabun', sans-serif">TH Sarabun PSK</option>
         <option value="'TH SarabunIT9', 'Sarabun', sans-serif">TH SarabunIT9</option>
+        <option value="'CordiaNew', 'Sarabun', sans-serif">CordiaNew</option>
         <option value="'Sarabun', sans-serif">Sarabun</option>
       </select>
 
@@ -669,6 +670,7 @@ function normalizeFontFamilyValue(value: string): string {
     "'TH Sarabun New', 'Sarabun', sans-serif",
     "'TH Sarabun PSK', 'Sarabun', sans-serif",
     "'TH SarabunIT9', 'Sarabun', sans-serif",
+    "'CordiaNew', 'Sarabun', sans-serif",
     "'Sarabun', sans-serif",
   ]) {
     if (stripFontFamily(option) === normalized) {
