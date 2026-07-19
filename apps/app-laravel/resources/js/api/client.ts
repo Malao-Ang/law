@@ -17,6 +17,7 @@
   UpdateDocumentReviewResponse,
   UploadResponse,
   WorkflowProgressResponse,
+  PageMargins,
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
@@ -120,6 +121,7 @@ export function saveDocumentReview(
     approved_by?: string;
     notes?: string;
     reset_to_generated?: boolean;
+    page_margins?: Partial<PageMargins>;
     law_meta?: Partial<LawMeta>;
     relations?: LawRelation[];
   },

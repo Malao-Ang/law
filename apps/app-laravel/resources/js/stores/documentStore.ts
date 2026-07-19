@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { saveDocumentReview, updateWorkflowProgress } from '../api/client';
 import { getReviewCached, invalidateReview, setReview } from './reviewCache';
-import type { DocumentReviewState, LawMeta, LawRelation, ReviewDocument } from '../types/document';
+import type { DocumentReviewState, LawMeta, LawRelation, PageMargins, ReviewDocument } from '../types/document';
 
 export const useDocumentStore = defineStore('document', () => {
   const documentId = ref('');
@@ -30,6 +30,7 @@ export const useDocumentStore = defineStore('document', () => {
     approved_by?: string;
     notes?: string;
     reset_to_generated?: boolean;
+    page_margins?: Partial<PageMargins>;
   }): Promise<DocumentReviewState | null> {
     saving.value = true;
     saveError.value = '';
@@ -38,6 +39,9 @@ export const useDocumentStore = defineStore('document', () => {
       const shouldInvalidate = Object.prototype.hasOwnProperty.call(payload, 'draft_html') || payload.reset_to_generated;
       if (review.value) {
         review.value.document_review = res.document_review;
+        if (res.compose_state) {
+          review.value.compose_state = res.compose_state;
+        }
         if (!shouldInvalidate) {
           setReview(documentId.value, review.value);
         }

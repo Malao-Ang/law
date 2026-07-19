@@ -172,9 +172,17 @@ export interface DocumentMetadata {
   signatory_position: string;
 }
 
+export interface PageMargins {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface ComposeState {
   font_family: ThaiFont;
   font_size_pt: number;
+  page_margins: PageMargins;
   metadata: DocumentMetadata;
 }
 
