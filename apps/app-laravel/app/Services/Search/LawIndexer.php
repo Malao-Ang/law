@@ -41,6 +41,10 @@ class LawIndexer
             $docs[] = $this->buildDoc($documentId, $chunk, $meta);
         }
 
+        if (! $this->client->indexExists()) {
+            $this->client->createIndex(LawIndexDefinition::definition());
+        }
+
         $this->client->deleteByLawId($documentId);
         $this->client->bulkIndex($docs);
     }
