@@ -354,20 +354,7 @@ const contentMm = computed<number>(() => (
   PAGE_WIDTH_MM - twipsToMm(pageMargins.value.left) - twipsToMm(pageMargins.value.right)
 ));
 
-const pageBreakPositionsPx = computed<number[]>(() => {
-  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
-  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
-  const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
-  if (pageContentHeightPx <= 0) return [];
-  const total = pageHeightPx.value;
-  const breaks: number[] = [];
-  let y = marginTopPx + pageContentHeightPx;
-  while (y < total - 8) {
-    breaks.push(y);
-    y += pageContentHeightPx;
-  }
-  return breaks;
-});
+const pageBreakPositionsPx = ref<number[]>([]);
 
 const totalPages = computed<number>(() => pageBreakPositionsPx.value.length + 1);
 
@@ -689,6 +676,38 @@ function attachPageObserver(): void {
 function refreshPageHeight(): void {
   if (!pageFrameRef.value) return;
   pageHeightPx.value = Math.max(pageFrameRef.value.offsetHeight, PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX);
+  refreshPageBreaks();
+}
+
+function refreshPageBreaks(): void {
+  const frame = pageFrameRef.value;
+  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
+  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
+  const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
+
+  if (pageContentHeightPx <= 0) {
+    pageBreakPositionsPx.value = [];
+    return;
+  }
+
+  // Honour explicit page break nodes: place the gap overlay at the element's top edge.
+  if (frame) {
+    const els = Array.from(frame.querySelectorAll('[data-page-break]')) as HTMLElement[];
+    if (els.length > 0) {
+      pageBreakPositionsPx.value = els.map(el => el.offsetTop);
+      return;
+    }
+  }
+
+  // Fall back: evenly-spaced breaks based on content height.
+  const total = pageHeightPx.value;
+  const breaks: number[] = [];
+  let y = marginTopPx + pageContentHeightPx;
+  while (y < total - 8) {
+    breaks.push(y);
+    y += pageContentHeightPx;
+  }
+  pageBreakPositionsPx.value = breaks;
 }
 
 function hasPendingSave(): boolean {
@@ -937,21 +956,10 @@ function formatMillimeters(value: number): string {
 }
 
 .editor-shell-content :deep(.ProseMirror [data-page-break]) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12pt 0;
-  color: #94a3b8;
-  font-size: 10pt;
-  font-family: sans-serif;
-}
-
-.editor-shell-content :deep(.ProseMirror [data-page-break])::before,
-.editor-shell-content :deep(.ProseMirror [data-page-break])::after {
-  content: '';
-  flex: 1;
-  height: 0;
-  border-top: 1.5px dashed #cbd5e1;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  visibility: hidden;
 }
 
 .editor-shell-content :deep(.ProseMirror ul),

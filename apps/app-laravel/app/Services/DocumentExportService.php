@@ -552,6 +552,8 @@ class DocumentExportService
         $style = [
             'spaceAfter' => 0,
             'widowControl' => true,
+            'line' => 444,      // 1.85× (auto = 240 units per 1×)
+            'lineRule' => 'auto',
         ];
 
         if ($isHeading) {
