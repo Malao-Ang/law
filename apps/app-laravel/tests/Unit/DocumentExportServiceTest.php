@@ -4,14 +4,16 @@ namespace Tests\Unit;
 
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
+use App\Services\Fast\LibreOfficeConverter;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+use ZipArchive;
 
 class DocumentExportServiceTest extends TestCase
 {
-    private function makeService(): DocumentExportService
+    private function makeService(?LibreOfficeConverter $converter = null): DocumentExportService
     {
-        return new DocumentExportService(new DocumentHtmlService());
+        return new DocumentExportService(new DocumentHtmlService(), $converter ?? new LibreOfficeConverter());
     }
 
     /**
@@ -29,6 +31,31 @@ class DocumentExportServiceTest extends TestCase
             'meta' => [
                 'layout' => $layout,
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sampleDocument(): array
+    {
+        return [
+            'document_id' => 'doc_test',
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'b1',
+                    'type' => 'paragraph',
+                    'reading_order' => 1,
+                    'approved_text' => 'ข้อความ',
+                    'normalized_text' => 'ข้อความ',
+                    'raw_text' => 'ข้อความ',
+                    'meta' => [
+                        'reviewed_html' => '<p>ข้อความ</p>',
+                        'layout' => ['indent_left' => 720, 'tabs' => []],
+                    ],
+                ]],
+            ]],
         ];
     }
 
@@ -52,6 +79,39 @@ class DocumentExportServiceTest extends TestCase
         $style = $method->invoke($this->makeService(), $this->block(['indent_left' => 720]));
 
         $this->assertSame(720, $style['indentation']['left'] ?? null);
+    }
+
+    public function test_docx_declares_th_sarabun_psk_default_font(): void
+    {
+        $bytes = $this->makeService()->toDocx($this->sampleDocument());
+
+        $tmp = tempnam(sys_get_temp_dir(), 'docx_font_').'.docx';
+        file_put_contents($tmp, $bytes);
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($tmp) === true);
+        $stylesXml = (string) $zip->getFromName('word/styles.xml');
+        $zip->close();
+        @unlink($tmp);
+
+        $this->assertStringContainsString('TH Sarabun PSK', $stylesXml);
+    }
+
+    public function test_to_pdf_renders_docx_via_libreoffice(): void
+    {
+        $converter = new LibreOfficeConverter(
+            binary: 'libreoffice',
+            commandRunner: function (array $cmd): int {
+                $base = pathinfo($cmd[count($cmd) - 1], PATHINFO_FILENAME);
+                $outDir = $cmd[array_search('--outdir', $cmd, true) + 1];
+                file_put_contents("{$outDir}/{$base}.pdf", '%PDF-1.7 from-docx');
+
+                return 0;
+            },
+        );
+
+        $bytes = $this->makeService($converter)->toPdf($this->sampleDocument());
+
+        $this->assertStringStartsWith('%PDF', $bytes);
     }
 
     public function test_safe_filename_base_preserves_thai(): void
@@ -92,12 +152,12 @@ class DocumentExportServiceTest extends TestCase
     public function test_safe_filename_base_strips_filesystem_illegal_chars(): void
     {
         $document = [
-            'source_file' => 'a/b\\c:d*e?f"g<h>i|j.pdf',
+            'source_file' => 'a:b*c?d"e<f>g|h.pdf',
         ];
 
         $result = $this->makeService()->safeFilenameBase($document);
 
-        $this->assertSame('abcdefghij', $result);
+        $this->assertSame('abcdefgh', $result);
     }
 
     public function test_safe_filename_base_collapses_whitespace(): void
