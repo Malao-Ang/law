@@ -242,6 +242,29 @@ class DocumentExportServiceTest extends TestCase
         $this->assertTrue($hasMedia, 'expected an embedded image under word/media/');
     }
 
+    public function test_blockHtmlOrFallback_emits_font_size_from_formatting(): void
+    {
+        $block = [
+            'block_id' => 'p1-b0001',
+            'type' => 'paragraph',
+            'reading_order' => 1,
+            'approved_text' => 'ข้อความ',
+            'normalized_text' => 'ข้อความ',
+            'meta' => [
+                'reviewed_html' => '',
+                'formatting' => ['font_size_pt' => 14.0],
+                'layout' => [],
+            ],
+        ];
+
+        $method = new ReflectionMethod(DocumentExportService::class, 'blockHtmlOrFallback');
+        $method->setAccessible(true);
+
+        $html = $method->invoke($this->makeService(), $block);
+
+        $this->assertStringContainsString('font-size: 14pt', $html);
+    }
+
     public function test_to_pdf_renders_docx_via_libreoffice(): void
     {
         $converter = new LibreOfficeConverter(

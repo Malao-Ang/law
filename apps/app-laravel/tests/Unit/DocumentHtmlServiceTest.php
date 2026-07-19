@@ -104,6 +104,15 @@ class DocumentHtmlServiceTest extends TestCase
         $this->assertStringContainsString('padding-left:72pt', $style);
     }
 
+    public function test_applyFormatting_wraps_font_size_pt_in_span(): void
+    {
+        $html = $this->makeService()->buildBlockHtml(
+            $this->block(['bold' => false, 'italic' => false, 'underline' => false, 'font_size_pt' => 14.0]),
+        );
+
+        $this->assertStringContainsString('<span style="font-size: 14pt">', $html);
+    }
+
     public function test_build_block_html_does_not_double_render_promoted_leading_tab(): void
     {
         $html = $this->makeService()->buildBlockHtml([

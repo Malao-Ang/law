@@ -352,8 +352,15 @@ class DocumentExportService
         }
 
         $text = (string) ($block['approved_text'] ?? $block['normalized_text'] ?? $block['raw_text'] ?? '');
+        $fontSize = isset($block['meta']['formatting']['font_size_pt'])
+            ? (float) $block['meta']['formatting']['font_size_pt']
+            : null;
+        $inner = $this->escapeHtmlWithBreaks($text);
+        if ($fontSize !== null && $fontSize > 0) {
+            $inner = '<span style="font-size: '.$fontSize.'pt">'.$inner.'</span>';
+        }
 
-        return '<p>'.$this->escapeHtmlWithBreaks($text).'</p>';
+        return '<p>'.$inner.'</p>';
     }
 
     private function normalizeTable(array $block): ?array

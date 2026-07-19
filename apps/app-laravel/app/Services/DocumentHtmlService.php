@@ -616,6 +616,11 @@ class DocumentHtmlService
             $html = '<strong>'.$html.'</strong>';
         }
 
+        $fontSize = isset($formatting['font_size_pt']) ? (float) $formatting['font_size_pt'] : null;
+        if ($fontSize !== null && $fontSize > 0) {
+            $html = '<span style="font-size: '.$fontSize.'pt">'.$html.'</span>';
+        }
+
         return $html;
     }
 
