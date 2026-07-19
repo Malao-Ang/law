@@ -154,9 +154,15 @@
     </div>
 
     <div class="editor-shell-scroll flex-grow-1" style="min-height:0" @click.stop>
+      <div
+        v-if="editor && !props.locked"
+        class="ruler-stage"
+        :style="rulerStageStyle"
+      >
+        <ReviewRuler :editor="editor" :content-mm="contentMm" />
+      </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
-          <ReviewRuler v-if="editor && !props.locked" class="a4-ruler" :editor="editor" :content-mm="contentMm" />
           <div
             v-for="(topPx, i) in pageBreakPositionsPx"
             :key="i"
@@ -337,6 +343,20 @@ const editorStageStyle = computed<CSSProperties>(() => {
   return {
     width: `${widthPx}px`,
     height: `${heightPx}px`,
+    marginTop: '12px',
+  };
+});
+
+const rulerStageStyle = computed<CSSProperties>(() => {
+  const scale = zoomPercent.value / 100;
+  const pageWidthPx = PAGE_WIDTH_MM * MM_TO_CSS_PX;
+  const leftPx = twipsToMm(pageMargins.value.left) * MM_TO_CSS_PX;
+  const rightPx = twipsToMm(pageMargins.value.right) * MM_TO_CSS_PX;
+
+  return {
+    width: `${pageWidthPx * scale}px`,
+    paddingLeft: `${leftPx * scale}px`,
+    paddingRight: `${rightPx * scale}px`,
   };
 });
 
@@ -757,12 +777,23 @@ function formatMillimeters(value: number): string {
 
 .editor-shell-scroll {
   overflow: auto;
-  padding: 24px;
+  padding: 0 24px 24px;
 }
 
 .editor-stage {
   margin: 0 auto;
   position: relative;
+}
+
+.ruler-stage {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 auto;
+  box-sizing: border-box;
+  background: #f8fafc;
+  padding-top: 4px;
+  padding-bottom: 6px;
 }
 
 .a4-page {
@@ -778,15 +809,6 @@ function formatMillimeters(value: number): string {
   box-sizing: border-box;
   transform-origin: top center;
   position: relative;
-}
-
-/* Ruler sits just above the page, spanning the text column (page width minus margins) */
-.a4-ruler {
-  position: absolute;
-  top: 0;
-  left: var(--page-margin-left);
-  right: var(--page-margin-right);
-  transform: translateY(calc(-100% - 6px));
 }
 
 .a4-page-break {
