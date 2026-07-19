@@ -889,7 +889,7 @@ function formatMillimeters(value: number): string {
 
 .editor-shell-content :deep(.ProseMirror) {
   min-height: calc(297mm - var(--page-margin-top) - var(--page-margin-bottom));
-  font-family: 'Sarabun', sans-serif;
+  font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16pt;
   line-height: 1.85;
   color: #1e293b;
