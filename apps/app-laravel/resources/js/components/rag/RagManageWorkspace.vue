@@ -229,7 +229,9 @@ const sections = computed(() => buildSections(composeStore.review));
 
 function containerType(section: LawSection): ChunkType | null {
   const stored = section.headBlock.meta.chunk_type as ChunkType | null | undefined;
-  return stored ?? suggestChunkType(section.headBlock);
+  if (stored) return stored;
+  if (section.isHeader) return 'TITLE';
+  return suggestChunkType(section.headBlock);
 }
 
 function containerTypeLabel(section: LawSection): string {
@@ -268,14 +270,14 @@ async function goToLawInfo(): Promise<void> {
 
   // Auto-persist suggestions for untyped head blocks.
   const toPersist = sections.value.filter(
-    (s) => !s.headBlock.meta.chunk_type && suggestChunkType(s.headBlock),
+    (s) => !s.headBlock.meta.chunk_type && containerType(s),
   );
   if (toPersist.length > 0) {
     blockBusy.value = true;
     try {
       await Promise.all(
         toPersist.map((s) => {
-          const suggested = suggestChunkType(s.headBlock)!;
+          const suggested = containerType(s)!;
           s.headBlock.meta.chunk_type = suggested;
           const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
           return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggested);
