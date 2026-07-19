@@ -204,8 +204,8 @@ final class ParagraphParser
                 }
                 if ($szEl !== null) {
                     $val = WordXml::wordAttr($szEl, 'val');
-                    if ($val !== null && $val !== '') {
-                        $fontSize = (int) $val / 2.0;
+                    if ($val !== null && is_numeric($val)) {
+                        $fontSize = (float) $val / 2.0;
                     }
                 }
             }
