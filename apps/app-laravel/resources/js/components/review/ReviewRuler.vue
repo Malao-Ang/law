@@ -1,6 +1,6 @@
 <template>
   <div ref="trackEl" class="review-ruler">
-    <span v-if="props.currentPage" class="review-ruler__page-badge">
+    <span v-if="props.currentPage != null" class="review-ruler__page-badge">
       หน้า {{ props.currentPage }}{{ props.totalPages ? ` / ${props.totalPages}` : '' }}
     </span>
     <span

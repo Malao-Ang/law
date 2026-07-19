@@ -374,12 +374,10 @@ const totalPages = computed<number>(() => pageBreakPositionsPx.value.length + 1)
 const scrollTopPx = ref(0);
 
 const currentPage = computed<number>(() => {
-  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
-  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
-  const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
-  const scaledPageHeight = pageContentHeightPx * (zoomPercent.value / 100);
-  if (scaledPageHeight <= 0) return 1;
-  return Math.min(totalPages.value, Math.floor(scrollTopPx.value / scaledPageHeight) + 1);
+  const scale = zoomPercent.value / 100;
+  const scaled = pageBreakPositionsPx.value.map(y => y * scale);
+  const idx = scaled.findIndex(y => scrollTopPx.value < y);
+  return idx === -1 ? totalPages.value : idx + 1;
 });
 
 function onScroll(e: Event): void {
