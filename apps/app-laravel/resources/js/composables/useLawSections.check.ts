@@ -70,4 +70,31 @@ function assert(cond: boolean, msg: string): void {
   assert(s[0].children.length === 0, 'region stops before the promoted head, got ' + s[0].children.length);
 }
 
+// 4. divider at index 0 → no image before it → no header section
+{
+  n = 0;
+  const s = buildSections(
+    doc([
+      mk({ approved_text: '----' }),
+      mk({ type: 'image' }),
+      mk({ approved_text: 'มาตรา ๑ ข้อความ' }),
+    ]),
+  );
+  assert(!s.some((x) => x.isHeader), 'no header section when divider precedes the image');
+}
+
+// 5. image only AFTER the first divider → not part of the header region
+{
+  n = 0;
+  const s = buildSections(
+    doc([
+      mk({ approved_text: 'บันทึกข้อความ' }),
+      mk({ approved_text: '----' }),
+      mk({ type: 'image' }),
+      mk({ approved_text: 'มาตรา ๑ ข้อความ' }),
+    ]),
+  );
+  assert(!s.some((x) => x.isHeader), 'no header section when the image is after the divider');
+}
+
 console.log('OK: all header-grouping checks passed');

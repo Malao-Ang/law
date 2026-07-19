@@ -20,6 +20,10 @@ export interface TocGroup {
 const HEAD_RE = /^(คำปรารภ|บทเฉพาะกาล|หมวด\s*[๐-๙0-9]+|ส่วนที่\s*[๐-๙0-9]+|มาตรา\s*[๐-๙0-9]+(?:\/[๐-๙0-9]+)?|ข้อ\s*[๐-๙0-9]+(?:\.[๐-๙0-9]+)*)/u;
 const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะกาล)\s*/u;
 
+// Structural heading chunk-types: assigning one makes a block a section head,
+// so the following blocks group under it without merging text.
+const HEAD_CHUNK_TYPE_SET = new Set<string>(HEAD_CHUNK_TYPES);
+
 // A block that "displays as a divider": its text is only a run of dashes/underscores.
 const DIVIDER_RE = /^[-–—_─]{2,}\s*$/u;
 
@@ -41,10 +45,6 @@ function headerRegionEnd(blocks: DocumentBlock[]): number {
   }
   return dividerIdx;
 }
-
-// Structural heading chunk-types: assigning one makes a block a section head,
-// so the following blocks group under it without merging text.
-const HEAD_CHUNK_TYPE_SET = new Set<string>(HEAD_CHUNK_TYPES);
 
 function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();
