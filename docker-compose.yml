@@ -18,8 +18,8 @@ services:
       sh -c "git config --global --add safe.directory '*'
       && mkdir -p storage/app/poc
       && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot
-      && test -f vendor/autoload.php
-      && php artisan config:clear
+      && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
+      && php artisan optimize
       && touch storage/app/poc/.vendor_ready
       && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
     environment:
@@ -27,7 +27,10 @@ services:
       - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
       - poc_storage:/var/www/html/storage/app/poc
+      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
     env_file:
       - .env
     depends_on:
@@ -90,7 +93,10 @@ services:
       - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
       - poc_storage:/var/www/html/storage/app/poc
+      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
     env_file:
       - .env
     depends_on:
@@ -191,3 +197,5 @@ volumes:
   poc_storage:
   es_data:
   poc_mongo:
+  laravel_vendor:
+  laravel_bootstrap_cache:
