@@ -69,7 +69,7 @@ class DocumentExportService
   p { margin: 0 0 8px; }
   .block { font-family: '.self::EXPORT_FONT_STACK.'; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { vertical-align: top; }
+  th, td { vertical-align: top; border: 1px solid #000; padding: 4pt 6pt; }
 </style>
 </head>
 <body>'.implode('', $blocks).'</body>
