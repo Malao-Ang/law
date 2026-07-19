@@ -16,9 +16,9 @@
       <v-card-text>
         <section class="existing-relations mb-5">
           <div class="d-flex align-center ga-2 mb-2">
-            <v-icon icon="mdi-link-variant" color="primary" size="18" />
+            <v-icon icon="mdi-link-variant" color="admin-primary" size="18" />
             <span class="text-subtitle-2 font-weight-bold">ความสัมพันธ์ที่มีอยู่ของกฎหมายนี้</span>
-            <v-chip size="x-small" color="primary" variant="tonal">
+            <v-chip size="x-small" color="admin-primary" variant="tonal">
               {{ existingRelations.length }}
             </v-chip>
           </div>
@@ -59,7 +59,7 @@
 
         <div class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">ประเภท</div>
-          <div class="d-flex flex-wrap ga-2">
+          <div class="d-flex flex-wrap ga-3">
             <v-btn
               v-for="relType in RELATION_TYPES"
               :key="relType"
@@ -74,16 +74,16 @@
 
         <div class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">เป้าหมาย</div>
-          <div class="d-flex gap-2">
+          <div class="d-flex ga-3">
             <v-btn
               size="small"
-              :color="mode === 'picker' ? 'primary' : ''"
+              :color="mode === 'picker' ? 'admin-primary' : ''"
               :variant="mode === 'picker' ? 'flat' : 'outlined'"
               @click="mode = 'picker'"
             >เลือกจากคลังกฎหมาย</v-btn>
             <v-btn
               size="small"
-              :color="mode === 'text' ? 'primary' : ''"
+              :color="mode === 'text' ? 'admin-primary' : ''"
               :variant="mode === 'text' ? 'flat' : 'outlined'"
               @click="mode = 'text'"
             >พิมพ์เอง</v-btn>
@@ -125,10 +125,10 @@
         />
       </v-card-text>
 
-      <v-card-actions>
+      <v-card-actions class="pa-4 ga-2">
         <v-spacer />
         <v-btn @click="$emit('close')">ยกเลิก</v-btn>
-        <v-btn color="primary" :disabled="!canSave" @click="save">เพิ่ม</v-btn>
+        <v-btn color="admin-primary" :disabled="!canSave" @click="save">เพิ่ม</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

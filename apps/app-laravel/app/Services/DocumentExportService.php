@@ -16,6 +16,12 @@ use RuntimeException;
 class DocumentExportService
 {
     private const EXPORT_FONT_STACK = "'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif";
+    private const DEFAULT_PAGE_MARGINS = [
+        'top' => 1440,
+        'bottom' => 1440,
+        'left' => 1800,
+        'right' => 1800,
+    ];
 
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
@@ -25,6 +31,14 @@ class DocumentExportService
     public function buildHtml(array $document): string
     {
         $blocks = [];
+        $pageMargins = $this->pageMarginsFromDocument($document);
+        $pageMarginCss = sprintf(
+            '%smm %smm %smm %smm',
+            $this->formatMillimeters($this->twipsToMillimeters($pageMargins['top'])),
+            $this->formatMillimeters($this->twipsToMillimeters($pageMargins['right'])),
+            $this->formatMillimeters($this->twipsToMillimeters($pageMargins['bottom'])),
+            $this->formatMillimeters($this->twipsToMillimeters($pageMargins['left'])),
+        );
 
         foreach ($this->orderedBlocks($document) as $block) {
             $blockId = $this->escapeHtml((string) ($block['block_id'] ?? ''));
@@ -42,16 +56,16 @@ class DocumentExportService
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 2.54cm 3.17cm; }
+  @page { size: A4; margin: '.$pageMarginCss.'; }
   @font-face {
     font-family: "TH Sarabun PSK";
     src: local("TH Sarabun PSK"), local("THSarabunPSK"), local("TH Sarabun New"), local("THSarabunNew"), local("Sarabun");
   }
-  body { margin: 0; padding: 0; font-family: '.self::EXPORT_FONT_STACK.'; }
+  body { margin: 0; padding: 0; font-family: '.self::EXPORT_FONT_STACK.'; font-size: 16pt; line-height: 1.85; }
   * { box-sizing: border-box; }
-  h1 { font-size: 20px; font-weight: 700; margin: 16px 0 8px; }
-  h2 { font-size: 17px; font-weight: 700; margin: 14px 0 7px; }
-  h3 { font-size: 15px; font-weight: 700; margin: 12px 0 6px; }
+  h1 { font-size: 22pt; font-weight: 700; margin: 16pt 0 8pt; }
+  h2 { font-size: 18pt; font-weight: 700; margin: 14pt 0 7pt; }
+  h3 { font-size: 16pt; font-weight: 700; margin: 12pt 0 6pt; }
   p { margin: 0 0 8px; }
   .block { font-family: '.self::EXPORT_FONT_STACK.'; }
   table { width: 100%; border-collapse: collapse; }
@@ -99,12 +113,13 @@ class DocumentExportService
         $phpWord = new PhpWord;
         $phpWord->setDefaultFontName('TH Sarabun PSK');
         $phpWord->setDefaultFontSize(16);
+        $pageMargins = $this->pageMarginsFromDocument($document);
         $section = $phpWord->addSection([
             'paperSize' => 'A4',
-            'marginTop' => 1440,
-            'marginBottom' => 1440,
-            'marginLeft' => 1800,
-            'marginRight' => 1800,
+            'marginTop' => $pageMargins['top'],
+            'marginBottom' => $pageMargins['bottom'],
+            'marginLeft' => $pageMargins['left'],
+            'marginRight' => $pageMargins['right'],
         ]);
 
         foreach ($this->orderedBlocks($document) as $block) {
@@ -176,12 +191,20 @@ class DocumentExportService
 
     public function safeFilenameBase(array $document): string
     {
+        $sourceFile = trim((string) ($document['source_file'] ?? ''));
         $lawMeta = is_array($document['law_meta'] ?? null) ? $document['law_meta'] : [];
-        $rawTitle = trim((string) ($lawMeta['title'] ?? $document['source_file'] ?? 'document'));
-        $baseName = pathinfo($rawTitle, PATHINFO_FILENAME) ?: 'document';
-        $safeName = (string) preg_replace('/[^a-zA-Z0-9_\-\.]/u', '_', $baseName);
+        $lawTitle = trim((string) ($lawMeta['title'] ?? ''));
 
-        return trim($safeName, '._-') ?: 'document';
+        $rawTitle = $sourceFile !== '' ? $sourceFile : ($lawTitle !== '' ? $lawTitle : 'document');
+        $baseName = pathinfo($rawTitle, PATHINFO_FILENAME) ?: 'document';
+
+        // Keep Thai and all printable Unicode; strip only filesystem-illegal chars and control chars
+        $safeName = (string) preg_replace('/[\/\\\\:*?"<>|\x00-\x1F]/u', '', $baseName);
+        // Collapse runs of whitespace to one space
+        $safeName = (string) preg_replace('/\s+/u', ' ', $safeName);
+        $safeName = trim($safeName);
+
+        return $safeName !== '' ? $safeName : 'document';
     }
 
     /**
@@ -444,9 +467,9 @@ class DocumentExportService
         }
         if (in_array($tag, ['h1', 'h2', 'h3'], true) && $next['fontSize'] === null) {
             $next['fontSize'] = match ($tag) {
-                'h1' => '20px',
-                'h2' => '17px',
-                default => '15px',
+                'h1' => '22pt',
+                'h2' => '18pt',
+                default => '16pt',
             };
         }
 
@@ -525,6 +548,34 @@ class DocumentExportService
         }
 
         return $parsed;
+    }
+
+    /**
+     * @return array{top: int, bottom: int, left: int, right: int}
+     */
+    private function pageMarginsFromDocument(array $document): array
+    {
+        $composeState = is_array($document['compose_state'] ?? null) ? $document['compose_state'] : [];
+        $pageMargins = is_array($composeState['page_margins'] ?? null) ? $composeState['page_margins'] : [];
+
+        return [
+            'top' => max(0, (int) ($pageMargins['top'] ?? self::DEFAULT_PAGE_MARGINS['top'])),
+            'bottom' => max(0, (int) ($pageMargins['bottom'] ?? self::DEFAULT_PAGE_MARGINS['bottom'])),
+            'left' => max(0, (int) ($pageMargins['left'] ?? self::DEFAULT_PAGE_MARGINS['left'])),
+            'right' => max(0, (int) ($pageMargins['right'] ?? self::DEFAULT_PAGE_MARGINS['right'])),
+        ];
+    }
+
+    private function twipsToMillimeters(int $twips): float
+    {
+        return ($twips / 1440) * 25.4;
+    }
+
+    private function formatMillimeters(float $millimeters): string
+    {
+        $formatted = number_format($millimeters, 2, '.', '');
+
+        return rtrim(rtrim($formatted, '0'), '.');
     }
 
     private function toPointSize(mixed $size): ?float

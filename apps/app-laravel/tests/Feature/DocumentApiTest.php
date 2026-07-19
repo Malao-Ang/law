@@ -433,6 +433,12 @@ class DocumentApiTest extends TestCase
         $this->putJson('/api/documents/'.$documentId.'/document-review', [
             'font_family' => 'angsana',
             'font_size_pt' => 18,
+            'page_margins' => [
+                'top' => 720,
+                'bottom' => 900,
+                'left' => 1080,
+                'right' => 1260,
+            ],
             'metadata' => [
                 'subject' => 'ประกาศแต่งตั้ง',
                 'recipient' => 'ผู้อำนวยการกองกลาง',
@@ -444,12 +450,20 @@ class DocumentApiTest extends TestCase
             ])
             ->assertJsonPath('compose_state.font_family', 'angsana')
             ->assertJsonPath('compose_state.font_size_pt', 18)
+            ->assertJsonPath('compose_state.page_margins.top', 720)
+            ->assertJsonPath('compose_state.page_margins.bottom', 900)
+            ->assertJsonPath('compose_state.page_margins.left', 1080)
+            ->assertJsonPath('compose_state.page_margins.right', 1260)
             ->assertJsonPath('compose_state.metadata.subject', 'ประกาศแต่งตั้ง');
 
         $review = $store->getReviewDocument($documentId);
 
         $this->assertSame('angsana', $review['compose_state']['font_family']);
         $this->assertSame(18, $review['compose_state']['font_size_pt']);
+        $this->assertSame(720, $review['compose_state']['page_margins']['top']);
+        $this->assertSame(900, $review['compose_state']['page_margins']['bottom']);
+        $this->assertSame(1080, $review['compose_state']['page_margins']['left']);
+        $this->assertSame(1260, $review['compose_state']['page_margins']['right']);
         $this->assertSame('ประกาศแต่งตั้ง', $review['compose_state']['metadata']['subject']);
         $this->assertSame('ผู้อำนวยการกองกลาง', $review['compose_state']['metadata']['recipient']);
         $this->assertNotEmpty($review['document_review']['draft_html']);

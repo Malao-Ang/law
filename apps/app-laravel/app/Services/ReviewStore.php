@@ -394,6 +394,13 @@ class ReviewStore
                 $document['compose_state']['font_size_pt'] = (int) $payload['font_size_pt'];
             }
 
+            if (array_key_exists('page_margins', $payload) && is_array($payload['page_margins'])) {
+                $document['compose_state']['page_margins'] = $this->normalizePageMargins(
+                    $payload['page_margins'],
+                    is_array($document['compose_state']['page_margins'] ?? null) ? $document['compose_state']['page_margins'] : [],
+                );
+            }
+
             if (array_key_exists('metadata', $payload) && is_array($payload['metadata'])) {
                 $document['compose_state']['metadata'] = array_merge(
                     is_array($document['compose_state']['metadata'] ?? null) ? $document['compose_state']['metadata'] : [],
@@ -425,6 +432,24 @@ class ReviewStore
         });
 
         return $returnPayload;
+    }
+
+    /**
+     * Merge fields into law_meta under a blob lock.
+     * Setting access_scope='public' automatically clears permission_group_ids.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    public function patchLawMeta(string $documentId, array $fields): void
+    {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields): void {
+            $this->ensureLawMetaDefaults($document);
+            if (($fields['access_scope'] ?? null) === 'public') {
+                $fields['permission_group_ids'] = [];
+            }
+            $document['law_meta'] = array_merge($document['law_meta'], $fields);
+            $this->ensureLawMetaDefaults($document);
+        });
     }
 
     /**
@@ -1181,12 +1206,15 @@ class ReviewStore
     {
         $compose = is_array($document['compose_state'] ?? null) ? $document['compose_state'] : [];
         $metadata = is_array($compose['metadata'] ?? null) ? $compose['metadata'] : [];
+        $pageMargins = is_array($compose['page_margins'] ?? null) ? $compose['page_margins'] : [];
 
         $document['compose_state'] = array_merge([
             'font_family' => 'sarabun',
             'font_size_pt' => 16,
+            'page_margins' => $this->normalizePageMargins(),
             'metadata' => [],
         ], $compose, [
+            'page_margins' => $this->normalizePageMargins($pageMargins),
             'metadata' => array_merge([
                 'department' => '',
                 'doc_number' => '',
@@ -1201,6 +1229,30 @@ class ReviewStore
                 'signatory_position' => '',
             ], $metadata),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $pageMargins
+     * @param  array<string, mixed>  $fallback
+     * @return array{top: int, bottom: int, left: int, right: int}
+     */
+    private function normalizePageMargins(array $pageMargins = [], array $fallback = []): array
+    {
+        $defaults = [
+            'top' => 1440,
+            'bottom' => 1440,
+            'left' => 1800,
+            'right' => 1800,
+        ];
+
+        $merged = array_merge($defaults, $fallback, $pageMargins);
+
+        return [
+            'top' => max(0, (int) ($merged['top'] ?? $defaults['top'])),
+            'bottom' => max(0, (int) ($merged['bottom'] ?? $defaults['bottom'])),
+            'left' => max(0, (int) ($merged['left'] ?? $defaults['left'])),
+            'right' => max(0, (int) ($merged['right'] ?? $defaults['right'])),
+        ];
     }
 
     /**

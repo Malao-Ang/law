@@ -17,6 +17,7 @@
   UpdateDocumentReviewResponse,
   UploadResponse,
   WorkflowProgressResponse,
+  PageMargins,
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
@@ -120,6 +121,7 @@ export function saveDocumentReview(
     approved_by?: string;
     notes?: string;
     reset_to_generated?: boolean;
+    page_margins?: Partial<PageMargins>;
     law_meta?: Partial<LawMeta>;
     relations?: LawRelation[];
   },
@@ -244,8 +246,13 @@ async function downloadBinaryExport(
   anchor.href = url;
 
   const disposition = response.headers.get('Content-Disposition') ?? '';
-  const match = /filename="?([^";\n]+)"?/.exec(disposition);
-  anchor.download = match?.[1] ?? fallbackName;
+  const starMatch = /filename\*=utf-8''([^;\n]+)/i.exec(disposition);
+  if (starMatch) {
+    anchor.download = decodeURIComponent(starMatch[1]);
+  } else {
+    const match = /filename="?([^";\n]+)"?/.exec(disposition);
+    anchor.download = match?.[1] ?? fallbackName;
+  }
 
   document.body.appendChild(anchor);
   anchor.click();

@@ -52,7 +52,9 @@ COPY . .
 
 COPY --from=frontend /var/www/html/public/build ./public/build
 
-RUN mkdir -p /usr/share/fonts/truetype/th-sarabun-psk && fc-cache -f
+COPY docker/fonts/ /usr/share/fonts/truetype/th-sarabun-psk/
+COPY docker/fontconfig/local.conf /etc/fonts/local.conf
+RUN fc-cache -f
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,target=/tmp/composer-cache \
