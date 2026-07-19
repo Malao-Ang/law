@@ -66,6 +66,9 @@
             <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">
               {{ docxExportError }}
             </v-alert>
+            <v-alert v-if="originalPdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ originalPdfExportError }}
+            </v-alert>
             <div class="d-flex flex-wrap ga-3">
               <v-btn
                 color="elaw-gold"
@@ -91,6 +94,15 @@
               >
                 ส่งออก Word อีกครั้ง
               </v-btn>
+              <v-btn
+                size="small"
+                variant="outlined"
+                prepend-icon="mdi-file-word-box"
+                :loading="exportingOriginalPdf"
+                @click="handleOriginalPdfExport"
+              >
+                PDF ตรงจาก Word
+              </v-btn>
             </div>
           </template>
 
@@ -101,6 +113,9 @@
             </v-alert>
             <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">
               {{ docxExportError }}
+            </v-alert>
+            <v-alert v-if="originalPdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
+              {{ originalPdfExportError }}
             </v-alert>
             <div class="d-flex flex-wrap ga-3">
               <v-btn
@@ -118,6 +133,15 @@
                 @click="handleWordExport"
               >
                 Export Word for e-Sign
+              </v-btn>
+              <v-btn
+                size="small"
+                variant="outlined"
+                prepend-icon="mdi-file-word-box"
+                :loading="exportingOriginalPdf"
+                @click="handleOriginalPdfExport"
+              >
+                PDF ตรงจาก Word
               </v-btn>
             </div>
           </template>
@@ -176,7 +200,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { confirmEsign, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
+import { confirmEsign, downloadOriginalPdfExport, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
 import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 
@@ -188,8 +212,10 @@ const review = ref<ReviewDocument | null>(null);
 const docStatus = ref<DocumentStatus | null>(null);
 const exportingPdf = ref(false);
 const exportingDocx = ref(false);
+const exportingOriginalPdf = ref(false);
 const pdfExportError = ref('');
 const docxExportError = ref('');
+const originalPdfExportError = ref('');
 const confirming = ref(false);
 const confirmError = ref('');
 
@@ -244,6 +270,18 @@ async function handlePdfExport(): Promise<void> {
     pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
   } finally {
     exportingPdf.value = false;
+  }
+}
+
+async function handleOriginalPdfExport(): Promise<void> {
+  exportingOriginalPdf.value = true;
+  originalPdfExportError.value = '';
+  try {
+    await downloadOriginalPdfExport(props.documentId);
+  } catch (error) {
+    originalPdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ตรงจาก Word ไม่สำเร็จ';
+  } finally {
+    exportingOriginalPdf.value = false;
   }
 }
 

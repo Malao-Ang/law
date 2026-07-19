@@ -50,6 +50,7 @@ Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewControl
 Route::post('/documents/{documentId}/pages/{pageNo}/reprocess', [ReviewController::class, 'reprocessPage']);
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, 'store']);
+Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);

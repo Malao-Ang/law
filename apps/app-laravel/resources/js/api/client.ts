@@ -269,6 +269,15 @@ export async function downloadPdfExport(documentId: string): Promise<void> {
   );
 }
 
+export async function downloadOriginalPdfExport(documentId: string): Promise<void> {
+  return downloadBinaryExport(
+    documentId,
+    `/api/documents/${documentId}/export-pdf-original`,
+    'application/pdf',
+    `document-${documentId}.pdf`,
+  );
+}
+
 export async function downloadWordExport(documentId: string): Promise<void> {
   return downloadBinaryExport(
     documentId,
