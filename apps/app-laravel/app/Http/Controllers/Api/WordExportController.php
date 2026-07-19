@@ -7,6 +7,7 @@ use App\Services\DocumentExportService;
 use App\Services\ReviewStore;
 use Illuminate\Http\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class WordExportController extends Controller
 {
@@ -27,11 +28,18 @@ class WordExportController extends Controller
         $this->reviewStore->setStatus($documentId, [
             'esign_exported_at' => now()->toIso8601String(),
         ]);
-        $filename = $this->exportService->safeFilenameBase($document);
+
+        $filenameWithExt = $this->exportService->safeFilenameBase($document).'.docx';
+        $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $filenameWithExt)) ?: 'document.docx';
+        $disposition = HeaderUtils::makeDisposition(
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+            $filenameWithExt,
+            $asciiFallback,
+        );
 
         return response($content, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'.docx"',
+            'Content-Disposition' => $disposition,
         ]);
     }
 }

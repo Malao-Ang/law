@@ -7,6 +7,7 @@ use App\Services\DocumentExportService;
 use App\Services\ReviewStore;
 use Illuminate\Http\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class PdfExportController extends Controller
 {
@@ -35,11 +36,17 @@ class PdfExportController extends Controller
             'esign_exported_at' => now()->toIso8601String(),
         ]);
 
-        $filename = $this->exportService->safeFilenameBase($document);
+        $filenameWithExt = $this->exportService->safeFilenameBase($document).'.pdf';
+        $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $filenameWithExt)) ?: 'document.pdf';
+        $disposition = HeaderUtils::makeDisposition(
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+            $filenameWithExt,
+            $asciiFallback,
+        );
 
         return response($pdfBytes, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'.pdf"',
+            'Content-Disposition' => $disposition,
         ]);
     }
 }

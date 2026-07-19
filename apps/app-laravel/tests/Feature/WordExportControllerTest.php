@@ -14,14 +14,14 @@ class WordExportControllerTest extends TestCase
         $documentId = $store->generateDocumentId();
 
         $store->storeUpload(
-            UploadedFile::fake()->create('law.pdf', 64, 'application/pdf'),
+            UploadedFile::fake()->create('ประกาศ (2).pdf', 64, 'application/pdf'),
             $documentId,
         );
 
         $store->setStatus($documentId, ['status' => 'done']);
         $store->writeReviewDocument($documentId, [
             'document_id' => $documentId,
-            'source_file' => 'law.pdf',
+            'source_file' => 'ประกาศ (2).pdf',
             'source_type' => 'pdf',
             'language' => 'th',
             'summary' => [
@@ -64,10 +64,10 @@ class WordExportControllerTest extends TestCase
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             (string) $response->headers->get('Content-Type'),
         );
-        $this->assertStringContainsString(
-            'attachment',
-            (string) $response->headers->get('Content-Disposition'),
-        );
+        $disposition = (string) $response->headers->get('Content-Disposition');
+        $this->assertStringContainsString('attachment', $disposition);
+        $this->assertStringContainsString("filename*=utf-8''", strtolower($disposition));
+        $this->assertStringContainsString('%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8', $disposition);
 
         $status = $store->getStatus($documentId);
         $this->assertNotNull($status['esign_exported_at'] ?? null);
