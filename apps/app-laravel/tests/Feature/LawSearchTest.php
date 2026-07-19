@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Jobs\IngestRagJob;
+use App\Services\ExportService;
 use App\Services\RagIngestService;
+use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchService;
 use Tests\TestCase;
@@ -23,7 +25,16 @@ class LawSearchTest extends TestCase
         $indexer->shouldReceive('index')->once()->with($documentId);
         $this->app->instance(LawIndexer::class, $indexer);
 
-        (new IngestRagJob($documentId))->handle(app(RagIngestService::class), app(LawIndexer::class), app(\App\Services\ReviewStore::class));
+        $exportService = \Mockery::mock(ExportService::class);
+        $exportService->shouldNotReceive('export');
+
+        $store = app(ReviewStore::class);
+        // Ensure export file exists so auto-build is skipped
+        $exportPath = $store->absolutePath($store->exportRelativePath($documentId));
+        @mkdir(dirname($exportPath), 0775, true);
+        file_put_contents($exportPath, json_encode(['chunks' => []]));
+
+        (new IngestRagJob($documentId))->handle(app(RagIngestService::class), app(LawIndexer::class), $store, $exportService);
 
         $this->assertTrue(true);
     }

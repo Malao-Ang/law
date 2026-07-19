@@ -35,6 +35,10 @@ class LawSearchController extends Controller
         $yearCounts = [];
 
         foreach ($store->listLawMeta() as $row) {
+            if (($row['status'] ?? '') !== 'ingested' || ($row['access_scope'] ?? '') !== 'public') {
+                continue;
+            }
+
             $this->tally($termCounts['law_type'], $row['law_type'] ?? '');
             $this->tally($termCounts['status'], $row['meta_status'] ?? '');
             $this->tally($termCounts['change_status'], $row['change_status'] ?? '');

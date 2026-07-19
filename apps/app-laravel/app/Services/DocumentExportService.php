@@ -122,12 +122,19 @@ class DocumentExportService
             'marginRight' => $pageMargins['right'],
         ]);
 
+        $tempImages = [];
+
         foreach ($this->orderedBlocks($document) as $block) {
+            $type = (string) ($block['type'] ?? '');
             $table = $this->normalizeTable($block);
-            $isTable = (string) ($block['type'] ?? '') === 'table' && $table !== null && ($table['cells'] ?? []) !== [];
+            $isTable = $type === 'table' && $table !== null && ($table['cells'] ?? []) !== [];
 
             if ($isTable) {
                 $this->appendTable($section, $table);
+                continue;
+            }
+
+            if ($type === 'image' && $this->appendImage($section, $block, $tempImages)) {
                 continue;
             }
 
@@ -161,7 +168,105 @@ class DocumentExportService
         @unlink($tempPath);
         IOFactory::createWriter($phpWord, 'Word2007')->save($docxPath);
 
+        // Image bytes are embedded during save(); only now is it safe to remove temp files.
+        foreach ($tempImages as $tempImage) {
+            @unlink($tempImage);
+        }
+
         return $docxPath;
+    }
+
+    /**
+     * Append an image block to the section. Returns false when the image cannot be
+     * resolved so the caller can fall back to text rendering.
+     *
+     * @param  array<string, mixed>  $block
+     * @param  list<string>  $tempImages  collects temp files to unlink after save()
+     */
+    private function appendImage(object $section, array $block, array &$tempImages): bool
+    {
+        $imgMeta = is_array($block['meta']['image'] ?? null) ? $block['meta']['image'] : [];
+        [$path, $isTemp] = $this->resolveImagePath($imgMeta, is_array($block['meta'] ?? null) ? $block['meta'] : []);
+        if ($path === null) {
+            return false;
+        }
+
+        try {
+            $style = [
+                'alignment' => $this->mapAlignment((string) ($block['meta']['layout']['alignment'] ?? 'center')) ?? Jc::CENTER,
+            ];
+            $widthPt = $this->imageWidthPt($imgMeta, $path);
+            if ($widthPt !== null) {
+                $style['width'] = $widthPt;
+            }
+
+            $section->addImage($path, $style);
+        } catch (\Throwable) {
+            if ($isTemp) {
+                @unlink($path);
+            }
+
+            return false;
+        }
+
+        if ($isTemp) {
+            $tempImages[] = $path;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $imgMeta
+     * @param  array<string, mixed>  $meta
+     * @return array{0: string|null, 1: bool}  [absolute path | null, isTempFile]
+     */
+    private function resolveImagePath(array $imgMeta, array $meta): array
+    {
+        $dataUri = (string) ($imgMeta['data_uri'] ?? '');
+        if (str_starts_with($dataUri, 'data:image/')) {
+            $comma = strpos($dataUri, ',');
+            if ($comma !== false) {
+                $bytes = base64_decode(substr($dataUri, $comma + 1), true);
+                if ($bytes !== false && $bytes !== '') {
+                    $tmp = tempnam(sys_get_temp_dir(), 'esign_img_');
+                    if ($tmp !== false && file_put_contents($tmp, $bytes) !== false) {
+                        return [$tmp, true];
+                    }
+                }
+            }
+        }
+
+        $srcPath = (string) ($imgMeta['src_path'] ?? $meta['image_path'] ?? '');
+        if ($srcPath !== '') {
+            $absolute = storage_path('app/poc/'.ltrim(str_replace('\\', '/', $srcPath), '/'));
+            if (is_file($absolute)) {
+                return [$absolute, false];
+            }
+        }
+
+        return [null, false];
+    }
+
+    /**
+     * @param  array<string, mixed>  $imgMeta
+     */
+    private function imageWidthPt(array $imgMeta, string $path): ?float
+    {
+        // Clamp to the A4 text column (~6.25in) so wide images do not overflow the page.
+        $maxWidthPt = 6.25 * 72;
+
+        $displayPx = (int) ($imgMeta['display_width_px'] ?? 0);
+        if ($displayPx > 0) {
+            return min($displayPx * 0.75, $maxWidthPt);
+        }
+
+        $size = @getimagesize($path);
+        if ($size !== false && isset($size[0]) && (int) $size[0] > 0) {
+            return min(((int) $size[0]) * 0.75, $maxWidthPt);
+        }
+
+        return null;
     }
 
     /**

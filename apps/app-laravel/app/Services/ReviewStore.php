@@ -1500,7 +1500,7 @@ class ReviewStore
             'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
             'span', 'div', 'sub', 'sup'];
         /** @var string[] $allowedStyleProps */
-        static $allowedStyleProps = ['margin-left', 'text-indent', 'text-align'];
+        static $allowedStyleProps = ['margin-left', 'text-indent', 'text-align', 'font-size', 'font-family'];
 
         $toReplace = [];
         $children = [];
@@ -1571,8 +1571,13 @@ class ReviewStore
             if ($value === '') {
                 continue;
             }
-            // Only allow safe CSS values: numbers with units, or alignment keywords
-            if (! preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
+            if ($prop === 'font-family') {
+                // Allow font-name lists only: letters, digits, spaces, commas, quotes, hyphens.
+                if (! preg_match('/^[\p{L}\p{N}\s,\'"\-]+$/u', $value)) {
+                    continue;
+                }
+            } elseif (! preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
+                // Only allow safe CSS values: numbers with units, or alignment keywords
                 continue;
             }
             $safe[] = $prop.': '.$value;
