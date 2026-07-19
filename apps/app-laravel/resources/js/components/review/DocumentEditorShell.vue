@@ -149,6 +149,16 @@
       <v-btn icon="mdi-table-split-cell" variant="text" size="small" title="แยกเซลล์" @click="editor.chain().focus().splitCell().run()" />
 
       <v-divider vertical class="mx-1" style="height:18px; align-self:center" />
+      <span class="text-caption text-medium-emphasis mr-1">หน้า</span>
+      <v-btn
+        icon="mdi-format-page-break"
+        variant="text"
+        size="small"
+        title="แบ่งหน้า"
+        @click="editor.chain().focus().insertPageBreak().run()"
+      />
+
+      <v-divider vertical class="mx-1" style="height:18px; align-self:center" />
       <span class="text-caption text-medium-emphasis mr-1">รูปภาพ</span>
       <span class="text-caption text-medium-emphasis">ลากมุมเพื่อปรับขนาด</span>
     </div>
@@ -163,15 +173,6 @@
       </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
-          <div
-            v-for="(topPx, i) in pageBreakPositionsPx"
-            :key="i"
-            class="a4-page-break"
-            :style="{ top: `${topPx}px` }"
-          >
-            <span class="a4-page-break__label">หน้า {{ i + 1 }}</span>
-            <span class="a4-page-break__label a4-page-break__label--next">หน้า {{ i + 2 }}</span>
-          </div>
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -205,6 +206,7 @@ import { IndentExtension } from '../../extensions/IndentExtension';
 import { FirstLineIndentExtension } from '../../extensions/FirstLineIndentExtension';
 import { LineHeightExtension } from '../../extensions/LineHeightExtension';
 import { FontSizeExtension } from '../../extensions/FontSizeExtension';
+import { PageBreakExtension } from '../../extensions/PageBreakExtension';
 import { ResizableImageExtension } from '../../extensions/ResizableImageExtension';
 import { TableWithBlockIdExtension } from '../../extensions/TableWithBlockIdExtension';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -259,21 +261,6 @@ let pendingReviewPayload: ReviewSavePayload = {};
 const tableWidths = new Map<string, number>();
 const pageFrameRef = ref<HTMLElement | null>(null);
 const pageHeightPx = ref(PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX);
-const pageBreakPositionsPx = computed<number[]>(() => {
-  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
-  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
-  const pageContentHeightPx = (297 * MM_TO_CSS_PX) - marginTopPx - marginBottomPx;
-  const totalHeightPx = pageHeightPx.value;
-  const positions: number[] = [];
-  let y = marginTopPx + pageContentHeightPx;
-
-  while (y < totalHeightPx - marginBottomPx - 8) {
-    positions.push(y);
-    y += pageContentHeightPx;
-  }
-
-  return positions;
-});
 const zoomPercent = ref<number>(100);
 const activeHeadingLevel = ref<string>('0');
 const activeFontFamilyOption = ref<string>('');
@@ -297,6 +284,7 @@ const editor = useEditor({
     FirstLineIndentExtension,
     BlockIdExtension,
     LineHeightExtension,
+    PageBreakExtension,
     ResizableImageExtension.configure({ inline: true, allowBase64: true, documentId: props.documentId }),
     TableWithBlockIdExtension.configure({ resizable: true }),
     TableRow,
@@ -811,32 +799,6 @@ function formatMillimeters(value: number): string {
   position: relative;
 }
 
-.a4-page-break {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  border-top: 1.5px dashed #94a3b8;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.a4-page-break__label {
-  position: absolute;
-  top: 3px;
-  left: var(--page-margin-left);
-  font-size: 8pt;
-  color: #94a3b8;
-  user-select: none;
-  font-family: sans-serif;
-  line-height: 1;
-}
-
-.a4-page-break__label--next {
-  left: auto;
-  right: var(--page-margin-right);
-}
-
 .editor-shell-content {
   width: 100%;
   height: 100%;
@@ -871,6 +833,24 @@ function formatMillimeters(value: number): string {
 
 .editor-shell-content :deep(.ProseMirror p) {
   margin: 0 0 8pt;
+}
+
+.editor-shell-content :deep(.ProseMirror [data-page-break]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12pt 0;
+  color: #94a3b8;
+  font-size: 10pt;
+  font-family: sans-serif;
+}
+
+.editor-shell-content :deep(.ProseMirror [data-page-break])::before,
+.editor-shell-content :deep(.ProseMirror [data-page-break])::after {
+  content: '';
+  flex: 1;
+  height: 0;
+  border-top: 1.5px dashed #cbd5e1;
 }
 
 .editor-shell-content :deep(.ProseMirror ul),
