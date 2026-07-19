@@ -173,6 +173,31 @@
       </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
+          <!-- Gap overlays — pointer-events:none, visual only -->
+          <div
+            v-for="(topPx, i) in pageBreakPositionsPx"
+            :key="`gap-${i}`"
+            class="page-gap"
+            :style="{ top: `${topPx}px` }"
+          >
+            <div class="page-gap__label">
+              <span class="page-gap__line" />
+              <span>หน้า {{ i + 2 }}</span>
+              <span class="page-gap__line" />
+            </div>
+          </div>
+
+          <!-- Corner page numbers -->
+          <div
+            v-for="(topPx, i) in pageBreakPositionsPx"
+            :key="`pn-${i}`"
+            class="page-corner-number"
+            :style="{ top: `${topPx - 20}px` }"
+          >{{ i + 1 }}</div>
+          <div class="page-corner-number" :style="{ top: `${pageHeightPx - 20}px` }">
+            {{ totalPages }}
+          </div>
+
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -226,6 +251,8 @@ type ReviewSavePayload = {
 const PAGE_WIDTH_MM = 210;
 const PAGE_MIN_HEIGHT_MM = 297;
 const MM_TO_CSS_PX = 96 / 25.4;
+const PAGE_HEIGHT_PX = PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX;
+const GAP_PX = 28;
 const fontSizePresets = [12, 14, 16, 18, 20, 22, 24, 28, 36] as const;
 const zoomPresets = [75, 100, 125, 150] as const;
 const DEFAULT_PAGE_MARGINS: PageMargins = {
@@ -322,6 +349,22 @@ const selectedMarginPreset = computed<MarginPreset>(() => detectMarginPreset(pag
 const contentMm = computed<number>(() => (
   PAGE_WIDTH_MM - twipsToMm(pageMargins.value.left) - twipsToMm(pageMargins.value.right)
 ));
+
+const pageBreakPositionsPx = computed<number[]>(() => {
+  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
+  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
+  const pageContentHeightPx = PAGE_HEIGHT_PX - marginTopPx - marginBottomPx;
+  const total = pageHeightPx.value;
+  const breaks: number[] = [];
+  let y = marginTopPx + pageContentHeightPx;
+  while (y < total - 8) {
+    breaks.push(y);
+    y += pageContentHeightPx;
+  }
+  return breaks;
+});
+
+const totalPages = computed<number>(() => pageBreakPositionsPx.value.length + 1);
 
 const editorStageStyle = computed<CSSProperties>(() => {
   const scale = zoomPercent.value / 100;
@@ -766,6 +809,7 @@ function formatMillimeters(value: number): string {
 .editor-shell-scroll {
   overflow: auto;
   padding: 0 24px 24px;
+  background: #e8eaed;
 }
 
 .editor-stage {
@@ -793,10 +837,49 @@ function formatMillimeters(value: number): string {
   min-height: 297mm;
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
   background: #fff;
-  box-shadow: 0 0 0 1px #e2e8f0, 0 18px 48px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, .3), 0 4px 8px rgba(60, 64, 67, .15);
   box-sizing: border-box;
   transform-origin: top center;
   position: relative;
+}
+
+.page-gap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: #e8eaed;
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-gap__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #5f6368;
+  font-family: sans-serif;
+}
+
+.page-gap__line {
+  display: block;
+  width: 60px;
+  height: 1px;
+  background: #bdc1c6;
+}
+
+.page-corner-number {
+  position: absolute;
+  right: 12px;
+  font-size: 9px;
+  color: #9aa0a6;
+  font-family: sans-serif;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .editor-shell-content {
