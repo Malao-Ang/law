@@ -428,6 +428,24 @@ class ReviewStore
     }
 
     /**
+     * Merge fields into law_meta under a blob lock.
+     * Setting access_scope='public' automatically clears permission_group_ids.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    public function patchLawMeta(string $documentId, array $fields): void
+    {
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields): void {
+            $this->ensureLawMetaDefaults($document);
+            if (($fields['access_scope'] ?? null) === 'public') {
+                $fields['permission_group_ids'] = [];
+            }
+            $document['law_meta'] = array_merge($document['law_meta'], $fields);
+            $this->ensureLawMetaDefaults($document);
+        });
+    }
+
+    /**
      * Patch layout metadata on a block without touching approved_text.
      *
      * Supported keys include indent level, marker level, alignment,
