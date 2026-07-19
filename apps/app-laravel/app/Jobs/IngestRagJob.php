@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\ExportService;
 use App\Services\RagIngestService;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
@@ -19,8 +20,13 @@ class IngestRagJob implements ShouldQueue
 
     public function __construct(public readonly string $documentId) {}
 
-    public function handle(RagIngestService $ragIngestService, LawIndexer $lawIndexer, ReviewStore $reviewStore): void
+    public function handle(RagIngestService $ragIngestService, LawIndexer $lawIndexer, ReviewStore $reviewStore, ExportService $exportService): void
     {
+        $exportPath = $reviewStore->absolutePath($reviewStore->exportRelativePath($this->documentId));
+        if (! is_file($exportPath)) {
+            $exportService->export($this->documentId);
+        }
+
         $result = $ragIngestService->ingest($this->documentId);
 
         try {
