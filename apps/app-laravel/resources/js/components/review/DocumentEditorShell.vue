@@ -157,6 +157,15 @@
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
           <ReviewRuler v-if="editor && !props.locked" class="a4-ruler" :editor="editor" :content-mm="contentMm" />
+          <div
+            v-for="(topPx, i) in pageBreakPositionsPx"
+            :key="i"
+            class="a4-page-break"
+            :style="{ top: `${topPx}px` }"
+          >
+            <span class="a4-page-break__label">หน้า {{ i + 1 }}</span>
+            <span class="a4-page-break__label a4-page-break__label--next">หน้า {{ i + 2 }}</span>
+          </div>
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -244,6 +253,21 @@ let pendingReviewPayload: ReviewSavePayload = {};
 const tableWidths = new Map<string, number>();
 const pageFrameRef = ref<HTMLElement | null>(null);
 const pageHeightPx = ref(PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX);
+const pageBreakPositionsPx = computed<number[]>(() => {
+  const marginTopPx = twipsToMm(pageMargins.value.top) * MM_TO_CSS_PX;
+  const marginBottomPx = twipsToMm(pageMargins.value.bottom) * MM_TO_CSS_PX;
+  const pageContentHeightPx = (297 * MM_TO_CSS_PX) - marginTopPx - marginBottomPx;
+  const totalHeightPx = pageHeightPx.value;
+  const positions: number[] = [];
+  let y = marginTopPx + pageContentHeightPx;
+
+  while (y < totalHeightPx - marginBottomPx - 8) {
+    positions.push(y);
+    y += pageContentHeightPx;
+  }
+
+  return positions;
+});
 const zoomPercent = ref<number>(100);
 const activeHeadingLevel = ref<string>('0');
 const activeFontFamilyOption = ref<string>('');
@@ -763,6 +787,32 @@ function formatMillimeters(value: number): string {
   left: var(--page-margin-left);
   right: var(--page-margin-right);
   transform: translateY(calc(-100% - 6px));
+}
+
+.a4-page-break {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px dashed #94a3b8;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.a4-page-break__label {
+  position: absolute;
+  top: 3px;
+  left: var(--page-margin-left);
+  font-size: 8pt;
+  color: #94a3b8;
+  user-select: none;
+  font-family: sans-serif;
+  line-height: 1;
+}
+
+.a4-page-break__label--next {
+  left: auto;
+  right: var(--page-margin-right);
 }
 
 .editor-shell-content {

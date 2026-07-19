@@ -102,6 +102,38 @@ class DocumentExportServiceTest extends TestCase
         $this->assertSame(720, $style['indentation']['left'] ?? null);
     }
 
+    public function test_paragraph_style_includes_widow_control(): void
+    {
+        $method = new ReflectionMethod(DocumentExportService::class, 'paragraphStyleForBlock');
+        $method->setAccessible(true);
+
+        $style = $method->invoke($this->makeService(), [
+            'block_id' => 'b1',
+            'type' => 'paragraph',
+            'reading_order' => 1,
+            'approved_text' => 'ข้อความ',
+            'meta' => ['layout' => []],
+        ]);
+
+        $this->assertTrue($style['widowControl'] ?? false, 'widowControl must be true for paragraphs');
+    }
+
+    public function test_heading_style_keeps_with_next(): void
+    {
+        $method = new ReflectionMethod(DocumentExportService::class, 'paragraphStyleForBlock');
+        $method->setAccessible(true);
+
+        $style = $method->invoke($this->makeService(), [
+            'block_id' => 'h1',
+            'type' => 'section_header',
+            'reading_order' => 1,
+            'approved_text' => 'หัวข้อ',
+            'meta' => ['layout' => []],
+        ]);
+
+        $this->assertTrue($style['keepWithNext'] ?? false, 'keepWithNext must be true for section_header');
+    }
+
     public function test_docx_declares_th_sarabun_psk_default_font(): void
     {
         $bytes = $this->makeService()->toDocx($this->sampleDocument());
@@ -132,12 +164,31 @@ class DocumentExportServiceTest extends TestCase
         $this->assertSame(12.0, $this->fontStyleForRun($runs[0])['size'] ?? null);
     }
 
+    public function test_parse_html_runs_normalizes_font_stack_to_first_name(): void
+    {
+        $runs = $this->makeService()->parseHtmlRuns(
+            '<span style="font-family: \'TH Sarabun PSK\', \'Sarabun\', sans-serif">hello</span>',
+        );
+
+        $this->assertCount(1, $runs);
+        $this->assertSame('TH Sarabun PSK', $runs[0]['fontFamily'] ?? null);
+    }
+
+    public function test_parse_html_runs_strips_quotes_from_single_font_name(): void
+    {
+        $runs = $this->makeService()->parseHtmlRuns('<span style=\'font-family: "Sarabun"\'>hello</span>');
+
+        $this->assertCount(1, $runs);
+        $this->assertSame('Sarabun', $runs[0]['fontFamily'] ?? null);
+    }
+
     public function test_plain_paragraph_run_uses_docx_default_font_size(): void
     {
         $runs = $this->makeService()->parseHtmlRuns('<p>ข้อความปกติ</p>');
 
         $this->assertCount(1, $runs);
         $this->assertArrayNotHasKey('size', $this->fontStyleForRun($runs[0]));
+        $this->assertSame('TH Sarabun PSK', $this->fontStyleForRun($runs[0])['name'] ?? null);
 
         $stylesXml = $this->readDocxXml($this->makeService()->toDocx($this->sampleDocument()), 'word/styles.xml');
 
@@ -206,6 +257,65 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('h1 { font-size: 22pt;', $html);
         $this->assertStringContainsString('h2 { font-size: 18pt;', $html);
         $this->assertStringContainsString('h3 { font-size: 16pt;', $html);
+    }
+
+    public function test_build_html_includes_page_break_css(): void
+    {
+        $html = $this->makeService()->buildHtml([
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'b1',
+                    'type' => 'paragraph',
+                    'reading_order' => 1,
+                    'approved_text' => 'ข้อความ',
+                    'normalized_text' => 'ข้อความ',
+                    'raw_text' => 'ข้อความ',
+                    'meta' => ['layout' => []],
+                ]],
+            ]],
+        ]);
+
+        $this->assertStringContainsString('page-break-inside: avoid', $html);
+        $this->assertStringContainsString('orphans:', $html);
+        $this->assertStringContainsString('widows:', $html);
+        $this->assertStringContainsString('page-break-after: avoid', $html);
+    }
+
+    public function test_docx_table_cells_include_borders_and_sarabun_font(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'tbl1',
+                    'type' => 'table',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'table' => [
+                            'cells' => [
+                                [
+                                    ['text' => 'หัวข้อ 1', 'colspan' => 1, 'rowspan' => 1, 'alignment' => 'center'],
+                                    ['text' => 'หัวข้อ 2', 'colspan' => 1, 'rowspan' => 1, 'alignment' => 'center'],
+                                ],
+                                [
+                                    ['text' => 'ข้อมูล A', 'colspan' => 1, 'rowspan' => 1, 'alignment' => 'left'],
+                                    ['text' => 'ข้อมูล B', 'colspan' => 1, 'rowspan' => 1, 'alignment' => 'left'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('<w:tbl>', $documentXml);
+        $this->assertStringContainsString('<w:tcBorders>', $documentXml);
+        $this->assertStringContainsString('w:val="single"', $documentXml);
+        $this->assertStringContainsString('w:sz="8"', $documentXml);
+        $this->assertStringContainsString('TH Sarabun PSK', $documentXml);
     }
 
     public function test_docx_embeds_image_blocks(): void

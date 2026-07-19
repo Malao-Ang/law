@@ -63,11 +63,11 @@ class DocumentExportService
   }
   body { margin: 0; padding: 0; font-family: '.self::EXPORT_FONT_STACK.'; font-size: 16pt; line-height: 1.85; }
   * { box-sizing: border-box; }
-  h1 { font-size: 22pt; font-weight: 700; margin: 16pt 0 8pt; }
-  h2 { font-size: 18pt; font-weight: 700; margin: 14pt 0 7pt; }
-  h3 { font-size: 16pt; font-weight: 700; margin: 12pt 0 6pt; }
+  h1 { font-size: 22pt; font-weight: 700; margin: 16pt 0 8pt; page-break-after: avoid; break-after: avoid; }
+  h2 { font-size: 18pt; font-weight: 700; margin: 14pt 0 7pt; page-break-after: avoid; break-after: avoid; }
+  h3 { font-size: 16pt; font-weight: 700; margin: 12pt 0 6pt; page-break-after: avoid; break-after: avoid; }
   p { margin: 0 0 8px; }
-  .block { font-family: '.self::EXPORT_FONT_STACK.'; }
+  .block { font-family: '.self::EXPORT_FONT_STACK.'; page-break-inside: avoid; break-inside: avoid; orphans: 3; widows: 3; }
   table { width: 100%; border-collapse: collapse; }
   th, td { vertical-align: top; border: 1px solid #000; padding: 4pt 6pt; }
 </style>
@@ -402,6 +402,16 @@ class DocumentExportService
         $table = $section->addTable();
         $rows = (array) ($tableData['cells'] ?? []);
         $totalColumns = 0;
+        $borderStyle = [
+            'borderTopSize' => 8,
+            'borderTopColor' => '000000',
+            'borderBottomSize' => 8,
+            'borderBottomColor' => '000000',
+            'borderLeftSize' => 8,
+            'borderLeftColor' => '000000',
+            'borderRightSize' => 8,
+            'borderRightColor' => '000000',
+        ];
 
         foreach ($rows as $row) {
             $columnCount = 0;
@@ -419,14 +429,14 @@ class DocumentExportService
 
             foreach ((array) $rowCells as $cellData) {
                 while (($pendingMerges[$columnIndex] ?? 0) > 0) {
-                    $row->addCell(null, ['vMerge' => CellStyle::VMERGE_CONTINUE]);
+                    $row->addCell(null, array_merge($borderStyle, ['vMerge' => CellStyle::VMERGE_CONTINUE]));
                     $pendingMerges[$columnIndex]--;
                     $columnIndex++;
                 }
 
                 $colspan = max(1, (int) ($cellData['colspan'] ?? 1));
                 $rowspan = max(1, (int) ($cellData['rowspan'] ?? 1));
-                $style = [];
+                $style = $borderStyle;
 
                 if ($colspan > 1) {
                     $style['gridSpan'] = $colspan;
@@ -438,7 +448,7 @@ class DocumentExportService
                 $cell = $row->addCell(null, $style);
                 $cell->addText(
                     (string) ($cellData['text'] ?? ''),
-                    [],
+                    ['name' => 'TH Sarabun PSK', 'size' => 16],
                     [
                         'alignment' => $this->mapAlignment((string) ($cellData['alignment'] ?? '')) ?? Jc::LEFT,
                         'spaceAfter' => 0,
@@ -456,10 +466,10 @@ class DocumentExportService
 
             while ($columnIndex < $totalColumns) {
                 if (($pendingMerges[$columnIndex] ?? 0) > 0) {
-                    $row->addCell(null, ['vMerge' => CellStyle::VMERGE_CONTINUE]);
+                    $row->addCell(null, array_merge($borderStyle, ['vMerge' => CellStyle::VMERGE_CONTINUE]));
                     $pendingMerges[$columnIndex]--;
                 } else {
-                    $row->addCell();
+                    $row->addCell(null, $borderStyle);
                 }
                 $columnIndex++;
             }
@@ -472,9 +482,15 @@ class DocumentExportService
     private function paragraphStyleForBlock(array $block): array
     {
         $layout = is_array($block['meta']['layout'] ?? null) ? $block['meta']['layout'] : [];
+        $isHeading = ($block['type'] ?? '') === 'section_header';
         $style = [
             'spaceAfter' => 0,
+            'widowControl' => true,
         ];
+
+        if ($isHeading) {
+            $style['keepWithNext'] = true;
+        }
 
         $alignment = $this->mapAlignment((string) ($layout['alignment'] ?? ''));
         if ($alignment !== null) {
@@ -526,9 +542,7 @@ class DocumentExportService
         ];
 
         $fontFamily = trim((string) ($run['fontFamily'] ?? ''));
-        if ($fontFamily !== '') {
-            $style['name'] = $fontFamily;
-        }
+        $style['name'] = $fontFamily !== '' ? $fontFamily : 'TH Sarabun PSK';
 
         $fontSize = $this->toPointSize($run['fontSize'] ?? null);
         if ($fontSize !== null) {
@@ -587,18 +601,20 @@ class DocumentExportService
 
         foreach ($this->parseInlineStyle((string) $node->getAttribute('style')) as $property => $value) {
             if ($property === 'font-family' && $value !== '') {
-                $next['fontFamily'] = trim($value, '\'"');
+                $first = explode(',', $value)[0];
+                $next['fontFamily'] = trim($first, '\'" ');
             }
             if ($property === 'font-size' && $value !== '') {
                 $next['fontSize'] = $value;
             }
-            if ($property === 'font-weight' && ($value === 'bold' || (is_numeric($value) && (int) $value >= 600))) {
+            $valueLower = strtolower($value);
+            if ($property === 'font-weight' && ($valueLower === 'bold' || (is_numeric($valueLower) && (int) $valueLower >= 600))) {
                 $next['bold'] = true;
             }
-            if ($property === 'font-style' && $value === 'italic') {
+            if ($property === 'font-style' && $valueLower === 'italic') {
                 $next['italic'] = true;
             }
-            if ($property === 'text-decoration' && str_contains($value, 'underline')) {
+            if ($property === 'text-decoration' && str_contains($valueLower, 'underline')) {
                 $next['underline'] = true;
             }
         }
@@ -652,7 +668,7 @@ class DocumentExportService
             }
 
             $property = strtolower(trim($property));
-            $value = strtolower(trim($value));
+            $value = trim($value);
 
             if ($property !== '' && $value !== '') {
                 $parsed[$property] = $value;
