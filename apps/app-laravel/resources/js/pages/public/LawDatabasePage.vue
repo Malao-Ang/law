@@ -430,6 +430,10 @@ const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
   resolution: ['resolution', 'มติ'],
 };
 
+// The only law types shown in the filter, in display order (พ.ร.บ. / ประกาศ /
+// ข้อบังคับ / ระเบียบ). Any other stored type (คำสั่ง, มติ, …) is hidden.
+const LAW_TYPE_ORDER = ['phrb', 'prakat', 'kho-bangkhab', 'rabiap'];
+
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
   academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
   'student-affairs': 'ด้านกิจการนิสิต',
@@ -480,18 +484,34 @@ function effectiveFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[
   return baseFacets.value?.[key] ?? [];
 }
 
-function staticFacet(key: keyof Omit<LawSearchFacets, 'years'>, knownValues: string[]): FacetBucket[] {
-  const live = effectiveFacet(key);
-  const liveMap = new Map(live.map((b) => [b.value, b.count]));
-  return knownValues.map((v) => ({ value: v, count: liveMap.get(v) ?? 0 }));
+// Build filter options from the REAL facet buckets (values actually present in
+// the data), merged by a canonical key so aliases (e.g. 'phrb' / 'พ.ร.บ.' /
+// 'พระราชบัญญัติ') collapse into one option with the summed count. When a
+// whitelist is given the output is exactly that fixed set in order (unknown
+// values hidden, missing values shown with count 0); otherwise every distinct
+// canonical value present in the data is shown.
+function canonicalFacetOptions(
+  key: keyof Omit<LawSearchFacets, 'years'>,
+  canonicalize: (value: string) => string,
+  labelResolver: (value: string | null) => string,
+  whitelist?: string[],
+): Array<{ label: string; value: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const bucket of effectiveFacet(key)) {
+    const canonical = canonicalize(bucket.value);
+    if (!canonical || (whitelist && !whitelist.includes(canonical))) continue;
+    counts.set(canonical, (counts.get(canonical) ?? 0) + bucket.count);
+  }
+  const values = whitelist ?? Array.from(counts.keys());
+  return values.map((value) => ({ label: labelResolver(value), value, count: counts.get(value) ?? 0 }));
 }
 
-const typeFilters = computed(() => mapFacetOptions(staticFacet('law_type', Object.keys(LAW_TYPE_LABELS)), lawTypeLabel));
+const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER));
 const groupFilters = computed(() => mapFacetOptions(effectiveFacet('law_group')));
 const agencyFilters = computed(() => mapFacetOptions(effectiveFacet('agency')));
 const keeperGroupFilters = computed(() => mapFacetOptions(effectiveFacet('signer_group')));
-const changeStatusFilters = computed(() => mapFacetOptions(staticFacet('change_status', Object.keys(CHANGE_STATUS_LABELS)), changeStatusLabel));
-const useStatusFilters = computed(() => mapFacetOptions(staticFacet('status', Object.keys(STATUS_LABELS)), statusLabel));
+const changeStatusFilters = computed(() => canonicalFacetOptions('change_status', (value) => value, changeStatusLabel));
+const useStatusFilters = computed(() => canonicalFacetOptions('status', (value) => value, statusLabel));
 const years = computed(() => {
   const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
   const values = yearBuckets.map((bucket) => String(bucket.year));

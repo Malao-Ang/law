@@ -30,9 +30,9 @@ class LawSearchController extends Controller
                 ));
 
                 return response()->json([
-                    'total'   => ($esResult['total'] ?? 0) + count($supplement),
+                    'total' => ($esResult['total'] ?? 0) + count($supplement),
                     'results' => array_merge($esResult['results'] ?? [], $supplement),
-                    'facets'  => $esResult['facets'] ?? $fileBased['facets'],
+                    'facets' => $esResult['facets'] ?? $fileBased['facets'],
                 ]);
             }
         } catch (\Throwable $exception) {
@@ -50,12 +50,15 @@ class LawSearchController extends Controller
         $page = max(1, (int) ($params['page'] ?? 1));
         $perPage = max(1, (int) ($params['per_page'] ?? 20));
 
-        $rows = array_values(array_filter($store->listLawMeta(), function (array $row) use ($q, $filters): bool {
+        $rows = array_values(array_filter($store->listLawMeta(), function (array $row) use ($q, $filters, $store): bool {
             if (($row['status'] ?? '') !== 'ingested' || ($row['access_scope'] ?? '') !== 'public') {
                 return false;
             }
-            if ($q !== '' && ! str_contains(mb_strtolower((string) ($row['title'] ?? '')), $q)) {
-                return false;
+            if ($q !== '') {
+                $titleMatch = str_contains(mb_strtolower((string) ($row['title'] ?? '')), $q);
+                if (! $titleMatch && ! $this->contentMatches((string) ($row['document_id'] ?? ''), $q, $store)) {
+                    return false;
+                }
             }
             foreach (['law_type', 'change_status', 'signer_group'] as $field) {
                 $want = $filters[$field] ?? null;
@@ -79,21 +82,104 @@ class LawSearchController extends Controller
         $paged = array_slice($rows, ($page - 1) * $perPage, $perPage);
 
         $results = array_map(fn (array $r): array => [
-            'law_id'        => $r['document_id'],
-            'title'         => $r['title'],
-            'law_type'      => $r['law_type'],
-            'status'        => $r['meta_status'],
+            'law_id' => $r['document_id'],
+            'title' => $r['title'],
+            'law_type' => $r['law_type'],
+            'status' => $r['meta_status'],
             'change_status' => $r['change_status'],
-            'summary'       => null,
+            'summary' => null,
             'published_date' => $r['promulgation_date'] ?? null,
-            'agency'        => $r['agencies'][0] ?? null,
-            'signer_group'  => $r['signer_group'],
-            'snippets'      => [],
+            'agency' => $r['agencies'][0] ?? null,
+            'signer_group' => $r['signer_group'],
+            'snippets' => $this->makeFileBasedSnippets($r['document_id'], $q, $store, (string) ($r['title'] ?? '')),
         ], $paged);
 
         $facets = $this->computeFileBasedFacets($rows);
 
         return compact('total', 'results', 'facets');
+    }
+
+    /**
+     * Per-request memo of export chunks so content search + snippet building
+     * read each export file only once.
+     *
+     * @var array<string, array<int, array<string, mixed>>>
+     */
+    private array $exportChunkCache = [];
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadExportChunks(string $documentId, ReviewStore $store): array
+    {
+        if (! array_key_exists($documentId, $this->exportChunkCache)) {
+            $chunks = [];
+            $exportPath = $store->absolutePath($store->exportRelativePath($documentId));
+            if ($documentId !== '' && is_file($exportPath)) {
+                $export = json_decode((string) file_get_contents($exportPath), true) ?: [];
+                $chunks = is_array($export['chunks'] ?? null) ? $export['chunks'] : [];
+            }
+            // ponytail: O(n) export-file reads per search; move to ES-only if the
+            // doc set grows large enough that this fallback dominates latency.
+            $this->exportChunkCache[$documentId] = $chunks;
+        }
+
+        return $this->exportChunkCache[$documentId];
+    }
+
+    /** True when $q (already lowercased) appears in any export chunk text. */
+    private function contentMatches(string $documentId, string $q, ReviewStore $store): bool
+    {
+        if ($q === '') {
+            return false;
+        }
+
+        foreach ($this->loadExportChunks($documentId, $store) as $chunk) {
+            if (mb_stripos((string) ($chunk['text'] ?? ''), $q) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function makeFileBasedSnippets(string $documentId, string $q, ReviewStore $store, string $title): array
+    {
+        if ($q === '') {
+            return [];
+        }
+
+        $snippets = [];
+        foreach ($this->loadExportChunks($documentId, $store) as $chunk) {
+            $text = (string) ($chunk['text'] ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $pos = mb_stripos($text, $q);
+            if ($pos === false) {
+                continue;
+            }
+            $start = max(0, $pos - 60);
+            $end = min(mb_strlen($text), $pos + mb_strlen($q) + 100);
+            $excerpt = ($start > 0 ? '…' : '').mb_substr($text, $start, $end - $start).($end < mb_strlen($text) ? '…' : '');
+            $snippets[] = (string) preg_replace('/('.preg_quote($q, '/').')/iu', '<mark>$1</mark>', $excerpt);
+            if (count($snippets) >= 2) {
+                break;
+            }
+        }
+        if ($snippets !== []) {
+            return $snippets;
+        }
+
+        // Fall back to title highlight when export is absent or query is only in title
+        if ($title !== '' && mb_stripos($title, $q) !== false) {
+            return [(string) preg_replace('/('.preg_quote($q, '/').')/iu', '<mark>$1</mark>', $title)];
+        }
+
+        return [];
     }
 
     /**

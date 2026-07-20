@@ -86,10 +86,52 @@ class LawSearchTest extends TestCase
         ])->assertOk();
     }
 
-    public function test_search_endpoint_returns_503_when_es_unavailable(): void
+    public function test_search_falls_back_to_file_based_when_es_unavailable(): void
     {
         $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('no route to host')));
 
-        $this->postJson('/api/laws/search', ['q' => 'x'])->assertStatus(503);
+        // ES down but the file-based path still answers (200, not 503).
+        $this->postJson('/api/laws/search', ['q' => 'x'])
+            ->assertOk()
+            ->assertJsonPath('total', 0);
+    }
+
+    public function test_file_based_search_matches_document_content_not_just_title(): void
+    {
+        // ES unavailable → controller uses the file-based fallback.
+        $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('es down')));
+
+        $store = app(ReviewStore::class);
+        $documentId = 'law_content_'.uniqid();
+
+        $store->setStatus($documentId, ['status' => 'ingested']);
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'pages' => [],
+            'law_meta' => [
+                'title' => 'ระเบียบทั่วไปว่าด้วยการเงิน',
+                'law_type' => 'ระเบียบ',
+                'status' => 'มีผลบังคับใช้',
+                'access_scope' => 'public',
+            ],
+        ]);
+
+        // The query word lives ONLY in the body, never in the title.
+        $exportPath = $store->absolutePath($store->exportRelativePath($documentId));
+        @mkdir(dirname($exportPath), 0775, true);
+        file_put_contents($exportPath, json_encode([
+            'chunks' => [['chunk_id' => 'c1', 'text' => 'ผู้เสียภาษีที่ดินและสิ่งปลูกสร้างต้องยื่นแบบภายในกำหนด']],
+        ]));
+
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', ['q' => 'ภาษีที่ดิน'])
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('results.0.law_id', $documentId);
+
+        // Snippet is highlighted around the matched content.
+        $snippet = $response->json('results.0.snippets.0');
+        $this->assertStringContainsString('<mark>', (string) $snippet);
     }
 }
