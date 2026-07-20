@@ -26,19 +26,28 @@ class LawIndexer
     /** Read the export JSON + law_meta for one law and (re)index its chunks. Idempotent. */
     public function index(string $documentId): void
     {
-        $exportPath = $this->store->absolutePath($this->store->exportRelativePath($documentId));
-        if (! is_file($exportPath)) {
-            return;
-        }
-        $export = json_decode((string) file_get_contents($exportPath), true) ?: [];
-        $chunks = $export['chunks'] ?? [];
-
         $review = $this->store->getReviewDocument($documentId) ?? [];
         $meta = $review['law_meta'] ?? [];
 
         $docs = [];
-        foreach ($chunks as $chunk) {
-            $docs[] = $this->buildDoc($documentId, $chunk, $meta);
+        $exportPath = $this->store->absolutePath($this->store->exportRelativePath($documentId));
+        if (is_file($exportPath)) {
+            $export = json_decode((string) file_get_contents($exportPath), true) ?: [];
+            foreach ($export['chunks'] ?? [] as $chunk) {
+                $docs[] = $this->buildDoc($documentId, $chunk, $meta);
+            }
+        }
+
+        // Always index at least one metadata doc so the law appears in ES search
+        // even when the export has no text chunks.
+        if ($docs === []) {
+            $docs[] = $this->buildDoc($documentId, [
+                'chunk_id'     => $documentId . '_meta',
+                'page_no'      => 1,
+                'block_ids'    => [],
+                'section_path' => null,
+                'text'         => '',
+            ], $meta);
         }
 
         if (! $this->client->indexExists()) {

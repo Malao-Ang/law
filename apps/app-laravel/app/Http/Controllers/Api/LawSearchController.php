@@ -15,18 +15,31 @@ class LawSearchController extends Controller
     {
         $params = $request->validated();
 
+        // File-based is authoritative: it reads status files directly and always
+        // reflects the current publish state without depending on ES being up-to-date.
+        $fileBased = $this->fileBasedSearch($params, $store);
+
         try {
-            $result = $service->search($params);
-            // ES has real results → use them (better scoring + snippets)
-            if (($result['total'] ?? 0) > 0) {
-                return response()->json($result);
+            $esResult = $service->search($params);
+            if (($esResult['total'] ?? 0) > 0) {
+                // ES has scored results; supplement with any ingested docs ES missed
+                $esLawIds = array_fill_keys(array_column($esResult['results'] ?? [], 'law_id'), true);
+                $supplement = array_values(array_filter(
+                    $fileBased['results'],
+                    fn (array $r): bool => ! isset($esLawIds[$r['law_id']]),
+                ));
+
+                return response()->json([
+                    'total'   => ($esResult['total'] ?? 0) + count($supplement),
+                    'results' => array_merge($esResult['results'] ?? [], $supplement),
+                    'facets'  => $esResult['facets'] ?? $fileBased['facets'],
+                ]);
             }
         } catch (\Throwable $exception) {
             Log::warning('Law search failed, falling back to file-based', ['error' => $exception->getMessage()]);
         }
 
-        // ES returned 0 or is unavailable → file-based fallback always works
-        return response()->json($this->fileBasedSearch($params, $store));
+        return response()->json($fileBased);
     }
 
     /** @param array<string,mixed> $params */
