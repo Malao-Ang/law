@@ -298,7 +298,7 @@
                 rounded="lg"
                 class="pa-4 law-result-card"
                 style="cursor: pointer"
-                @click="router.push({ name: 'law', params: { documentId: law.law_id }, query: query.trim() ? { q: query } : {} })"
+                @click="router.push({ name: 'law', params: { documentId: law.law_id } })"
               >
                 <div class="d-flex flex-wrap align-center ga-2 mb-3">
                   <v-chip size="x-small" color="primary" rounded="pill">{{ lawTypeLabel(law.law_type) }}</v-chip>

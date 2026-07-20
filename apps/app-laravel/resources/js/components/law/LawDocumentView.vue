@@ -139,7 +139,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { buildSections, buildTocGroups, relationsForSection, documentRelations } from '../../composables/useLawSections';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
@@ -154,35 +154,7 @@ import ELawNavbar from '../shared/ELawNavbar.vue';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
-const route = useRoute();
 const documentStore = useDocumentStore();
-
-// ponytail: CSS Custom Highlight API — degrades silently on unsupported browsers
-function applySearchHighlight(q: string): void {
-  if (!('highlights' in CSS)) return;
-  CSS.highlights.delete('search-q');
-  const term = q.trim().toLowerCase();
-  if (!term) return;
-  const root = document.querySelector('.lawx-doc');
-  if (!root) return;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const ranges: Range[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = (node.textContent ?? '').toLowerCase();
-    let idx = 0;
-    while ((idx = text.indexOf(term, idx)) !== -1) {
-      const r = document.createRange();
-      r.setStart(node, idx);
-      r.setEnd(node, idx + term.length);
-      ranges.push(r);
-      idx += term.length;
-    }
-  }
-  if (!ranges.length) return;
-  CSS.highlights.set('search-q', new Highlight(...ranges));
-  (ranges[0].startContainer.parentElement ?? root as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
 
 onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
@@ -324,7 +296,6 @@ watch(sections, async (value) => {
   activeId.value = value[0]?.id ?? '';
   await nextTick();
   setupObserver();
-  applySearchHighlight(String(route.query.q ?? ''));
 }, { immediate: true });
 
 watch(() => props.documentId, () => {
@@ -332,15 +303,10 @@ watch(() => props.documentId, () => {
   infoOpen.value = true;
 });
 
-onBeforeUnmount(() => {
-  observer?.disconnect();
-  if ('highlights' in CSS) CSS.highlights.delete('search-q');
-});
+onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <style scoped>
-::highlight(search-q) { background-color: #fef08a; }
-
 .lawx {
   min-height: 100vh;
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
