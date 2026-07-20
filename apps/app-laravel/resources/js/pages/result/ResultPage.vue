@@ -42,6 +42,31 @@
             <div class="text-subtitle-1 font-weight-bold">ส่งออกและลงนาม e-Sign</div>
           </div>
 
+          <!-- Confirm-error dialog -->
+          <v-dialog v-model="showConfirmErrorDialog" max-width="480" persistent>
+            <v-card rounded="lg" class="pa-2">
+              <v-card-title class="d-flex align-center ga-2 pa-4">
+                <v-icon icon="mdi-alert-circle-outline" color="error" />
+                <span>เผยแพร่ไม่สำเร็จ</span>
+              </v-card-title>
+              <v-card-text class="pa-4 pt-0">
+                <p class="text-body-2 text-medium-emphasis mb-3">{{ confirmErrorMessage }}</p>
+                <v-alert type="info" variant="tonal" density="compact">
+                  ตรวจสอบว่าเอกสารมีข้อมูลครบถ้วน จากนั้นลองอีกครั้ง หรือไปที่ฐานข้อมูลเพื่อตรวจสอบสถานะ
+                </v-alert>
+              </v-card-text>
+              <v-card-actions class="pa-4 pt-0 d-flex flex-wrap ga-2">
+                <v-btn color="elaw-gold" :loading="confirming" prepend-icon="mdi-refresh" @click="retryConfirm">
+                  ลองอีกครั้ง
+                </v-btn>
+                <v-btn variant="outlined" prepend-icon="mdi-database-search-outline" @click="goToDatabase">
+                  ไปที่ฐานข้อมูล
+                </v-btn>
+                <v-btn variant="text" :disabled="confirming" @click="showConfirmErrorDialog = false">ปิด</v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
+
           <!-- Published -->
           <template v-if="isPublished">
             <v-alert type="success" variant="tonal" density="comfortable" class="mb-4" prepend-icon="mdi-check-decagram-outline">
@@ -87,9 +112,6 @@
           <template v-else-if="esignExportedAt">
             <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
               ส่งออกแล้วเมื่อ {{ formatThaiDate(esignExportedAt) }} — รอการยืนยันลงนาม
-            </v-alert>
-            <v-alert v-if="confirmError" type="error" variant="tonal" density="compact" class="mb-3">
-              {{ confirmError }}
             </v-alert>
             <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
               {{ pdfExportError }}
@@ -250,7 +272,8 @@ const pdfExportError = ref('');
 const docxExportError = ref('');
 const originalPdfExportError = ref('');
 const confirming = ref(false);
-const confirmError = ref('');
+const showConfirmErrorDialog = ref(false);
+const confirmErrorMessage = ref('');
 
 onMounted(async () => {
   try {
@@ -321,14 +344,24 @@ async function handleOriginalPdfExport(): Promise<void> {
 
 async function handleConfirmEsign(): Promise<void> {
   confirming.value = true;
-  confirmError.value = '';
   try {
     await confirmEsign(props.documentId);
-    await router.push(`/law/${props.documentId}`);
+    await router.push('/database');
   } catch (error) {
-    confirmError.value = error instanceof Error ? error.message : 'ยืนยันไม่สำเร็จ';
+    confirmErrorMessage.value = error instanceof Error ? error.message : 'ยืนยันไม่สำเร็จ';
+    showConfirmErrorDialog.value = true;
     confirming.value = false;
   }
+}
+
+async function retryConfirm(): Promise<void> {
+  showConfirmErrorDialog.value = false;
+  await handleConfirmEsign();
+}
+
+function goToDatabase(): void {
+  showConfirmErrorDialog.value = false;
+  void router.push('/database');
 }
 </script>
 
