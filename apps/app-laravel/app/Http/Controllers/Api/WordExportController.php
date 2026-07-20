@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\IngestRagJob;
 use App\Services\DocumentExportService;
 use App\Services\ReviewStore;
 use Illuminate\Http\Response;
@@ -30,7 +29,6 @@ class WordExportController extends Controller
             'esign_exported_at' => now()->toIso8601String(),
         ]);
         $this->reviewStore->patchLawMeta($documentId, ['access_scope' => 'public']);
-        IngestRagJob::dispatch($documentId);
 
         $filenameWithExt = $this->exportService->safeFilenameBase($document).'.docx';
         $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $filenameWithExt)) ?: 'document.docx';
