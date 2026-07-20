@@ -45,7 +45,7 @@ services:
       pdf-service:
         condition: service_started
     ports:
-      - "8000:8000"
+      - "${APP_HOST_PORT:-8000}:8000"
 
   laravel-vite:
     image: node:20-bookworm-slim
@@ -65,7 +65,7 @@ services:
       - ./apps/app-laravel:/var/www/html
       - /tmp/app-laravel-vite-cache:/tmp/app-laravel-vite-cache
     ports:
-      - "5173:5173"
+      - "${VITE_HOST_PORT:-5173}:5173"
     depends_on:
       - laravel-app
 
@@ -128,7 +128,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8010:8010"
+      - "${OCR_HOST_PORT:-8010}:8010"
     user: "0:0"  # Run as root to handle volume permissions
     # Uncomment the deploy block below when using Dockerfile.gpu.
     # Requires nvidia-container-toolkit installed in WSL2:
@@ -147,13 +147,13 @@ services:
     container_name: thai-ocr-pdf-service
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "${PDF_HOST_PORT:-3001}:3001"
 
   redis:
     image: redis:7-alpine
     container_name: thai-ocr-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
@@ -169,7 +169,7 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
+      - "${ELASTIC_HOST_PORT:-9200}:9200"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
@@ -177,17 +177,17 @@ services:
       retries: 12
 
   mongo:
-    image: mongo:7
+    image: ${MONGO_IMAGE:-mongo:7}
     container_name: thai-ocr-mongo
     restart: unless-stopped
     environment:
       MONGO_INITDB_DATABASE: poc
     ports:
-      - "27017:27017"
+      - "${MONGO_HOST_PORT:-27017}:27017"
     volumes:
       - poc_mongo:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" || mongo --quiet --eval \"db.adminCommand('ping').ok\""]
       interval: 10s
       timeout: 5s
       retries: 12
