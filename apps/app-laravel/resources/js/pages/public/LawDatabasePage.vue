@@ -368,7 +368,6 @@ import { fetchLawFacets, getLookups } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
-import type { LookupData } from '../../api/client';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 
@@ -777,41 +776,10 @@ function readSortValue(value: unknown): SortValue {
 }
 
 function mapFacetOptions(
-  key: keyof Omit<LawSearchFacets, 'years'>,
+  buckets: FacetBucket[],
   labelResolver?: (value: string | null) => string,
-  selectedValues: string[] = [],
 ): Array<{ label: string; value: string; count: number }> {
-  const options = new Map<string, { value: string; count: number }>();
-  const baseBuckets = baseFacets.value?.[key] ?? [];
-  const searchBuckets = searchStore.facets[key];
-  const addBuckets = (buckets: Array<{ value: string; count: number }>, replaceExisting: boolean): void => {
-    const counts = new Map<string, number>();
-
-    for (const bucket of buckets) {
-      const value = key === 'law_type' ? canonicalLawTypeValue(bucket.value) : bucket.value;
-      if (value) {
-        counts.set(value, (counts.get(value) ?? 0) + bucket.count);
-      }
-    }
-
-    for (const [value, count] of counts) {
-      if (replaceExisting || !options.has(value)) {
-        options.set(value, { value, count });
-      }
-    }
-  };
-
-  addBuckets(baseBuckets, false);
-  addBuckets(searchBuckets, true);
-
-  for (const value of selectedValues) {
-    const normalized = key === 'law_type' ? canonicalLawTypeValue(value) : value;
-    if (normalized && !options.has(normalized)) {
-      options.set(normalized, { value: normalized, count: 0 });
-    }
-  }
-
-  return Array.from(options.values()).map((bucket) => ({
+  return buckets.map((bucket) => ({
     label: labelResolver ? labelResolver(bucket.value) : bucket.value,
     value: bucket.value,
     count: bucket.count,
