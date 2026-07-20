@@ -134,4 +134,33 @@ class LawSearchTest extends TestCase
         $snippet = $response->json('results.0.snippets.0');
         $this->assertStringContainsString('<mark>', (string) $snippet);
     }
+
+    public function test_file_based_search_matches_review_block_content_without_export_file(): void
+    {
+        // ES unavailable → file-based fallback.
+        $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('es down')));
+
+        $store = app(ReviewStore::class);
+        $documentId = 'law_noexport_'.uniqid();
+
+        $store->setStatus($documentId, ['status' => 'ingested']);
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public'],
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    ['block_id' => 'b1', 'type' => 'paragraph', 'approved_text' => 'ภาควิชานิเทศศาสตร์และการสื่อสาร'],
+                ],
+            ]],
+        ]);
+
+        // Deliberately NO export file written — content must come from review blocks.
+        cache()->forget('law-meta-list');
+
+        $this->postJson('/api/laws/search', ['q' => 'นิเทศศาสตร์'])
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('results.0.law_id', $documentId);
+    }
 }

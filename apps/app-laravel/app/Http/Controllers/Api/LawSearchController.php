@@ -119,12 +119,44 @@ class LawSearchController extends Controller
                 $export = json_decode((string) file_get_contents($exportPath), true) ?: [];
                 $chunks = is_array($export['chunks'] ?? null) ? $export['chunks'] : [];
             }
-            // ponytail: O(n) export-file reads per search; move to ES-only if the
+            // An ingested doc can lack an export file (e.g. published via a path
+            // that didn't persist one) — read searchable text straight from the
+            // review blocks so content search works regardless.
+            if ($chunks === [] && $documentId !== '') {
+                $chunks = $this->chunksFromReview($documentId, $store);
+            }
+            // ponytail: O(n) export/review reads per search; move to ES-only if the
             // doc set grows large enough that this fallback dominates latency.
             $this->exportChunkCache[$documentId] = $chunks;
         }
 
         return $this->exportChunkCache[$documentId];
+    }
+
+    /**
+     * Fallback text source: concatenate block text from the review document.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function chunksFromReview(string $documentId, ReviewStore $store): array
+    {
+        try {
+            $document = $store->getReviewDocument($documentId);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $texts = [];
+        foreach ($document['pages'] ?? [] as $page) {
+            foreach ($page['blocks'] ?? [] as $block) {
+                $text = trim((string) ($block['approved_text'] ?? $block['ai_suggested_text'] ?? $block['normalized_text'] ?? $block['raw_text'] ?? ''));
+                if ($text !== '') {
+                    $texts[] = $text;
+                }
+            }
+        }
+
+        return $texts === [] ? [] : [['chunk_id' => $documentId.'_review', 'text' => implode("\n", $texts)]];
     }
 
     /** True when $q (already lowercased) appears in any export chunk text. */
