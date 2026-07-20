@@ -16,7 +16,9 @@
           <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
             @click="printPage()">พิมพ์</v-btn>
           <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
-            @click="printPage()">ดาวน์โหลด PDF</v-btn>
+            :loading="exportingPdf"
+            :disabled="exportingPdf"
+            @click="downloadPdf()">ดาวน์โหลด PDF</v-btn>
         </div>
       </div>
 
@@ -29,6 +31,10 @@
       </v-alert>
 
       <template v-else-if="documentStore.review">
+      <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
+        {{ pdfExportError }}
+      </v-alert>
+
       <v-alert
         v-if="meta.access_scope === 'private'"
         type="warning"
@@ -147,6 +153,7 @@ import {
   RELATION_TYPE_ICONS,
   relationTypeLabel,
 } from '../../types/lawRelation';
+import { downloadPdfExport } from '../../api/client';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -155,6 +162,8 @@ import ELawNavbar from '../shared/ELawNavbar.vue';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const exportingPdf = ref(false);
+const pdfExportError = ref('');
 
 onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
@@ -241,6 +250,21 @@ function relationListClass(type: RelationType): Record<string, boolean> {
 
 function printPage(): void {
   window.print();
+}
+
+async function downloadPdf(): Promise<void> {
+  if (exportingPdf.value) return;
+
+  exportingPdf.value = true;
+  pdfExportError.value = '';
+  try {
+    await downloadPdfExport(props.documentId);
+    await documentStore.fetch(props.documentId, true);
+  } catch (error) {
+    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
+  } finally {
+    exportingPdf.value = false;
+  }
 }
 
 const sectionEls = ref<Record<string, HTMLElement>>({});
@@ -409,6 +433,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-card__badge { align-self: flex-start; flex-shrink: 0; max-width: 100%; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .lawx-card__badge--chapter { background: #eef2ff; color: #4338ca; }
 .lawx-card__content { flex: 1; min-width: 0; }
+.lawx-card__content :deep(.block-flow) { font-size: 13px; line-height: 1.72; }
+.lawx-card__content :deep(table) { font-size: 12px; }
 
 .lawx-rel { margin-top: 12px; border-top: 1px dashed #d7dee7; padding-top: 10px; }
 .lawx-rel__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

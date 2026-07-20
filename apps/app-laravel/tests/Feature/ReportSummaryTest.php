@@ -9,9 +9,9 @@ class ReportSummaryTest extends TestCase
 {
     /** Seed a done document with the given law_meta. */
     // ponytail: renamed public to avoid collision with parent seed()
-    private function seedDocument(ReviewStore $store, string $id, array $meta): void
+    private function seedDocument(ReviewStore $store, string $id, array $meta, string $status = 'done'): void
     {
-        $store->setStatus($id, ['status' => 'done', 'source_file' => $id.'.docx']);
+        $store->setStatus($id, ['status' => $status, 'source_file' => $id.'.docx']);
         $store->writeReviewDocument($id, [
             'document_id' => $id,
             'source_file' => $id.'.docx',
@@ -39,13 +39,13 @@ class ReportSummaryTest extends TestCase
         $this->seedDocument($store, 'd3_'.uniqid(), [
             'law_type' => 'ประกาศ', 'agencies' => [$agency],
             'law_groups' => ['ด้านวิชาการ'], 'promulgation_date' => 'ไม่มีปี',
-        ]);
+        ], 'ingested');
 
         $res = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency));
         $res->assertOk();
 
         $res->assertJsonPath('totals.all', 3);
-        $res->assertJsonPath('totals.published', 3);
+        $res->assertJsonPath('totals.published', 1);
 
         $byType = collect($res->json('by_type'))->keyBy('key');
         $this->assertSame(2, $byType['พระราชบัญญัติ']['count']);

@@ -10,7 +10,6 @@ use DOMXPath;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
-use PhpOffice\PhpWord\Style\Cell as CellStyle;
 use PhpOffice\PhpWord\Style\Tab;
 use RuntimeException;
 
@@ -43,9 +42,12 @@ class DocumentExportService
 
         foreach ($this->orderedBlocks($document) as $block) {
             $blockId = $this->escapeHtml((string) ($block['block_id'] ?? ''));
+            $type = (string) ($block['type'] ?? '');
             $layout = is_array($block['meta']['layout'] ?? null) ? $block['meta']['layout'] : [];
+            $blockClass = $type === 'table' ? 'block block--table' : 'block';
             $blocks[] = sprintf(
-                '<div class="block" data-block-id="%s"%s>%s</div>',
+                '<div class="%s" data-block-id="%s"%s>%s</div>',
+                $blockClass,
                 $blockId,
                 $this->documentHtmlService->buildLayoutStyleAttribute($layout),
                 $this->renderBlockHtml($block),
@@ -69,8 +71,10 @@ class DocumentExportService
   h3 { font-size: 16pt; font-weight: 700; margin: 12pt 0 6pt; page-break-after: avoid; break-after: avoid; }
   p { margin: 0 0 8px; }
   .block { font-family: '.self::EXPORT_FONT_STACK.'; page-break-inside: avoid; break-inside: avoid; orphans: 3; widows: 3; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { vertical-align: top; border: 1px solid #000; padding: 4pt 6pt; }
+  .block--table { page-break-inside: auto; break-inside: auto; }
+  table { width: 100%; border-collapse: collapse; page-break-inside: auto; break-inside: auto; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  th, td { vertical-align: top; border: 1pt solid #000; padding: 4pt 6pt; }
 </style>
 </head>
 <body>'.implode('', $blocks).'</body>
@@ -398,12 +402,7 @@ class DocumentExportService
     {
         $table = $this->normalizeTable($block);
         if ((string) ($block['type'] ?? '') === 'table' && $table !== null && ($table['cells'] ?? []) !== []) {
-            $html = trim((string) ($table['html'] ?? ''));
-            if ($html !== '') {
-                return $html;
-            }
-
-            return $this->buildTableHtml($table);
+            return $this->buildTableHtml($this->pageSafeTableRows((array) $table['cells']));
         }
 
         return $this->blockHtmlOrFallback($block);
@@ -433,39 +432,38 @@ class DocumentExportService
         return $this->documentHtmlService->normalizeTablePayload($block['meta']['table'] ?? null);
     }
 
-    private function buildTableHtml(array $table): string
+    /**
+     * @param  array<int, array<int, array<string, mixed>>>  $rows
+     */
+    private function buildTableHtml(array $rows): string
     {
-        $rows = [];
+        $htmlRows = [];
 
-        foreach ((array) ($table['cells'] ?? []) as $row) {
+        foreach ($rows as $row) {
             $cells = [];
             foreach ((array) $row as $cell) {
                 $text = $this->escapeHtml((string) ($cell['text'] ?? ''));
                 $colspan = max(1, (int) ($cell['colspan'] ?? 1));
-                $rowspan = max(1, (int) ($cell['rowspan'] ?? 1));
                 $alignment = (string) ($cell['alignment'] ?? '');
                 $style = $alignment !== '' ? ' style="text-align:'.$this->escapeHtml($alignment).';"' : '';
                 $attrs = '';
                 if ($colspan > 1) {
                     $attrs .= ' colspan="'.$colspan.'"';
                 }
-                if ($rowspan > 1) {
-                    $attrs .= ' rowspan="'.$rowspan.'"';
-                }
 
                 $cells[] = sprintf('<td%s%s>%s</td>', $attrs, $style, nl2br($text));
             }
 
-            $rows[] = '<tr>'.implode('', $cells).'</tr>';
+            $htmlRows[] = '<tr>'.implode('', $cells).'</tr>';
         }
 
-        return '<table><tbody>'.implode('', $rows).'</tbody></table>';
+        return '<table><tbody>'.implode('', $htmlRows).'</tbody></table>';
     }
 
     private function appendTable(object $section, array $tableData): void
     {
         $table = $section->addTable(['width' => 5000, 'unit' => 'pct']);
-        $rows = (array) ($tableData['cells'] ?? []);
+        $rows = $this->pageSafeTableRows((array) ($tableData['cells'] ?? []));
         $totalColumns = 0;
         $borderStyle = [
             'borderTopSize' => 8,    'borderTopColor' => '000000',
@@ -487,28 +485,16 @@ class DocumentExportService
             $totalColumns = max($totalColumns, $columnCount);
         }
 
-        $pendingMerges = [];
-
         foreach ($rows as $rowCells) {
-            $row = $table->addRow();
+            $row = $table->addRow(null, ['cantSplit' => true]);
             $columnIndex = 0;
 
             foreach ((array) $rowCells as $cellData) {
-                while (($pendingMerges[$columnIndex] ?? 0) > 0) {
-                    $row->addCell(null, array_merge($borderStyle, ['vMerge' => CellStyle::VMERGE_CONTINUE]));
-                    $pendingMerges[$columnIndex]--;
-                    $columnIndex++;
-                }
-
                 $colspan = max(1, (int) ($cellData['colspan'] ?? 1));
-                $rowspan = max(1, (int) ($cellData['rowspan'] ?? 1));
                 $style = $borderStyle;
 
                 if ($colspan > 1) {
                     $style['gridSpan'] = $colspan;
-                }
-                if ($rowspan > 1) {
-                    $style['vMerge'] = CellStyle::VMERGE_RESTART;
                 }
 
                 $cell = $row->addCell(null, $style);
@@ -521,25 +507,112 @@ class DocumentExportService
                     ],
                 );
 
+                $columnIndex += $colspan;
+            }
+
+            while ($columnIndex < $totalColumns) {
+                $row->addCell(null, $borderStyle);
+                $columnIndex++;
+            }
+        }
+    }
+
+    /**
+     * LibreOffice can drop or overlap vertically merged table cells when a table
+     * crosses a PDF page boundary. For export, expand rowspans into normal cells
+     * so pagination happens between complete physical rows with stable borders.
+     *
+     * @param  array<int, array<int, array<string, mixed>>>  $rows
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    private function pageSafeTableRows(array $rows): array
+    {
+        $expandedRows = [];
+        $activeMerges = [];
+
+        foreach ($rows as $sourceRow) {
+            $sourceCells = array_values(array_filter((array) $sourceRow, 'is_array'));
+            $sourceIndex = 0;
+            $columnIndex = 0;
+            $nextMerges = [];
+            $expandedRow = [];
+
+            while ($sourceIndex < count($sourceCells) || $this->hasActiveMergeAtOrAfter($activeMerges, $columnIndex)) {
+                if (isset($activeMerges[$columnIndex])) {
+                    $merge = $activeMerges[$columnIndex];
+                    $cell = $this->pageSafeCell((array) ($merge['cell'] ?? []));
+                    $expandedRow[] = $cell;
+
+                    $colspan = max(1, (int) ($cell['colspan'] ?? 1));
+                    $remaining = max(0, (int) ($merge['remaining'] ?? 0) - 1);
+                    if ($remaining > 0) {
+                        for ($offset = 0; $offset < $colspan; $offset++) {
+                            $nextMerges[$columnIndex + $offset] = [
+                                'remaining' => $remaining,
+                                'cell' => $cell,
+                            ];
+                        }
+                    }
+
+                    $columnIndex += $colspan;
+                    continue;
+                }
+
+                if ($sourceIndex >= count($sourceCells)) {
+                    break;
+                }
+
+                $rawCell = (array) $sourceCells[$sourceIndex++];
+                $cell = $this->pageSafeCell($rawCell);
+                $expandedRow[] = $cell;
+
+                $colspan = max(1, (int) ($cell['colspan'] ?? 1));
+                $rowspan = max(1, (int) ($rawCell['rowspan'] ?? 1));
                 if ($rowspan > 1) {
                     for ($offset = 0; $offset < $colspan; $offset++) {
-                        $pendingMerges[$columnIndex + $offset] = $rowspan - 1;
+                        $nextMerges[$columnIndex + $offset] = [
+                            'remaining' => $rowspan - 1,
+                            'cell' => $cell,
+                        ];
                     }
                 }
 
                 $columnIndex += $colspan;
             }
 
-            while ($columnIndex < $totalColumns) {
-                if (($pendingMerges[$columnIndex] ?? 0) > 0) {
-                    $row->addCell(null, array_merge($borderStyle, ['vMerge' => CellStyle::VMERGE_CONTINUE]));
-                    $pendingMerges[$columnIndex]--;
-                } else {
-                    $row->addCell(null, $borderStyle);
-                }
-                $columnIndex++;
+            if ($expandedRow !== []) {
+                $expandedRows[] = $expandedRow;
+            }
+
+            $activeMerges = $nextMerges;
+        }
+
+        return $expandedRows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $cell
+     * @return array<string, mixed>
+     */
+    private function pageSafeCell(array $cell): array
+    {
+        $cell['rowspan'] = 1;
+
+        return $cell;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $activeMerges
+     */
+    private function hasActiveMergeAtOrAfter(array $activeMerges, int $columnIndex): bool
+    {
+        foreach (array_keys($activeMerges) as $mergeColumnIndex) {
+            if ((int) $mergeColumnIndex >= $columnIndex) {
+                return true;
             }
         }
+
+        return false;
     }
 
     /**

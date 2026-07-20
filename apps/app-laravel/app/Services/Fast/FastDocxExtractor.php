@@ -13,6 +13,8 @@ use DOMElement;
 
 class FastDocxExtractor
 {
+    private const DEDUP_MIN_TEXT_LENGTH = 30;
+
     public function __construct(
         private readonly ?ParagraphParser $paragraphParser = null,
         private readonly ?TableParser $tableParser = null,
@@ -88,22 +90,7 @@ class FastDocxExtractor
         // Remove blocks whose raw_text is an exact duplicate of an earlier text block.
         // Thai .doc files commonly embed the same paragraph twice (e.g. original + red
         // "proposed" annotation), which produces identical RAG chunks.
-        $seenTexts = [];
-        $blocks = array_values(array_filter($blocks, static function (array $block) use (&$seenTexts): bool {
-            if (in_array($block['type'], ['image', 'table'], true)) {
-                return true;
-            }
-            $text = $block['raw_text'] ?? '';
-            if (mb_strlen((string) $text) < 30) {
-                return true;
-            }
-            if (isset($seenTexts[$text])) {
-                return false;
-            }
-            $seenTexts[$text] = true;
-
-            return true;
-        }));
+        $blocks = self::deduplicateBlocks($blocks);
 
         $reviewRequiredCount = count(array_filter($blocks, static fn (array $block): bool => (bool) ($block['needs_review'] ?? false)));
 
@@ -131,6 +118,34 @@ class FastDocxExtractor
                 'path' => ['fast:php:docx'],
             ],
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @return array<int, array<string, mixed>>
+     */
+    public static function deduplicateBlocks(array $blocks): array
+    {
+        $seenTexts = [];
+
+        return array_values(array_filter($blocks, static function (array $block) use (&$seenTexts): bool {
+            if (in_array((string) ($block['type'] ?? ''), ['image', 'table'], true)) {
+                return true;
+            }
+
+            $text = (string) ($block['raw_text'] ?? '');
+            if (mb_strlen($text) < self::DEDUP_MIN_TEXT_LENGTH) {
+                return true;
+            }
+
+            if (isset($seenTexts[$text])) {
+                return false;
+            }
+
+            $seenTexts[$text] = true;
+
+            return true;
+        }));
     }
 
     /**

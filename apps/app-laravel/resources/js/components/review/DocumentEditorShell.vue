@@ -881,7 +881,7 @@ function formatMillimeters(value: number): string {
 
 .editor-shell-content :deep(.ProseMirror th),
 .editor-shell-content :deep(.ProseMirror td) {
-  border: 1px solid #8e9aa2;
+  border: 1pt solid #000;
   padding: 7pt 10pt;
   vertical-align: top;
   position: relative;

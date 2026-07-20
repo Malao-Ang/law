@@ -364,10 +364,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchLawFacets } from '../../api/client';
+import { fetchLawFacets, getLookups } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
+import type { LookupData } from '../../api/client';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 
@@ -375,11 +376,18 @@ const PER_PAGE = 20;
 
 const LAW_TYPE_LABELS: Record<string, string> = {
   phrb: 'พ.ร.บ.',
+  'พ.ร.บ.': 'พ.ร.บ.',
+  พระราชบัญญัติ: 'พ.ร.บ.',
   'kho-bangkhab': 'ข้อบังคับ',
+  ข้อบังคับ: 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
+  ระเบียบ: 'ระเบียบ',
   prakat: 'ประกาศ',
+  ประกาศ: 'ประกาศ',
   command: 'คำสั่ง',
+  คำสั่ง: 'คำสั่ง',
   resolution: 'มติ',
+  มติ: 'มติ',
 };
 
 const CHANGE_STATUS_LABELS: Record<string, string> = {
@@ -391,9 +399,50 @@ const CHANGE_STATUS_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'มีผลบังคับใช้',
+  มีผลบังคับใช้: 'มีผลบังคับใช้',
   cancelled: 'ยกเลิก',
+  ยกเลิก: 'ยกเลิก',
   draft: 'ร่าง',
+  ร่าง: 'ร่าง',
 };
+
+const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
+  phrb: 'phrb',
+  'พ.ร.บ.': 'phrb',
+  พระราชบัญญัติ: 'phrb',
+  'kho-bangkhab': 'kho-bangkhab',
+  ข้อบังคับ: 'kho-bangkhab',
+  rabiap: 'rabiap',
+  ระเบียบ: 'rabiap',
+  prakat: 'prakat',
+  ประกาศ: 'prakat',
+  command: 'command',
+  คำสั่ง: 'command',
+  resolution: 'resolution',
+  มติ: 'resolution',
+};
+
+const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
+  phrb: ['phrb', 'พ.ร.บ.', 'พระราชบัญญัติ'],
+  'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
+  rabiap: ['rabiap', 'ระเบียบ'],
+  prakat: ['prakat', 'ประกาศ'],
+  command: ['command', 'คำสั่ง'],
+  resolution: ['resolution', 'มติ'],
+};
+
+const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
+  academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
+  'student-affairs': 'ด้านกิจการนิสิต',
+  'research-innovation': 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
+  'academic-service': 'ด้านบริการวิชาการ',
+  'organization-admin': 'ด้านโครงสร้างองค์กรและระบบการบริหาร',
+  'hr-discipline': 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
+  'finance-assets-risk': 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
+  other: 'ด้านอื่น ๆ',
+};
+
+type SortValue = 'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest';
 
 const router = useRouter();
 const route = useRoute();
@@ -409,7 +458,7 @@ const selectedAgencies = ref<string[]>([]);
 const selectedKeeperGroups = ref<string[]>([]);
 const yearFrom = ref<string | null>(null);
 const yearTo = ref<string | null>(null);
-const sortBy = ref<'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest'>('relevance');
+const sortBy = ref<SortValue>('relevance');
 const page = ref(1);
 const filterPanels = ref(['change-status', 'use-status', 'year']);
 const searchFocused = ref(false);
@@ -523,9 +572,14 @@ watch(page, () => {
   void syncRouteAndSearch();
 });
 
+watch(sortBy, () => {
+  if (syncingFromRoute || mutatingSearchState) return;
+  void replaceRoute();
+});
+
 function currentFilters(): LawSearchFilters {
   return {
-    law_type: currentTypes.value.length > 0 ? currentTypes.value : undefined,
+    law_type: currentTypes.value.length > 0 ? expandLawTypeFilterValues(currentTypes.value) : undefined,
     status: selectedUseStatuses.value.length > 0 ? selectedUseStatuses.value : undefined,
     change_status: selectedStatuses.value.length > 0 ? selectedStatuses.value : undefined,
     agency: selectedAgencies.value.length > 0 ? selectedAgencies.value : undefined,
@@ -644,6 +698,7 @@ async function replaceRoute(): Promise<void> {
   if (selectedKeeperGroups.value.length > 0) nextQuery.signer_group = selectedKeeperGroups.value;
   if (yearFrom.value) nextQuery.year_from = yearFrom.value;
   if (yearTo.value) nextQuery.year_to = yearTo.value;
+  if (sortBy.value !== 'relevance') nextQuery.sort = sortBy.value;
   if (page.value > 1) nextQuery.page = String(page.value);
 
   await router.replace({ path: '/database', query: nextQuery });
@@ -659,24 +714,27 @@ async function runSearch(): Promise<void> {
 function syncFromRoute(): void {
   query.value = readString(route.query.q);
   selectedTypes.value = readTypeArray(route.query.type);
-  selectedGroups.value = readStringArray(route.query.group);
+  selectedGroups.value = uniqueStrings(readStringArray(route.query.group).map(normalizeLawGroupValue));
   selectedStatuses.value = readStringArray(route.query.change_status);
   selectedUseStatuses.value = readStringArray(route.query.status);
   selectedAgencies.value = readStringArray(route.query.agency);
   selectedKeeperGroups.value = readStringArray(route.query.signer_group);
   yearFrom.value = readNullableString(route.query.year_from);
   yearTo.value = readNullableString(route.query.year_to);
+  sortBy.value = readSortValue(route.query.sort);
   page.value = readPositiveInt(route.query.page, 1);
 }
 
 function readTypeArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    const next = value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+    const next = uniqueStrings(value
+      .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      .map(canonicalLawTypeValue));
     return next.length > 0 ? next : ['all'];
   }
 
   if (typeof value === 'string' && value.length > 0) {
-    return [value];
+    return [canonicalLawTypeValue(value)];
   }
 
   return ['all'];
@@ -709,12 +767,74 @@ function readPositiveInt(value: unknown, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function mapFacetOptions(buckets: FacetBucket[], labelResolver?: (value: string | null) => string): Array<{ label: string; value: string; count: number }> {
-  return buckets.map((bucket) => ({
+function readSortValue(value: unknown): SortValue {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const allowed = sortOptions.map((option) => option.value);
+
+  return typeof raw === 'string' && allowed.includes(raw as SortValue)
+    ? raw as SortValue
+    : 'relevance';
+}
+
+function mapFacetOptions(
+  key: keyof Omit<LawSearchFacets, 'years'>,
+  labelResolver?: (value: string | null) => string,
+  selectedValues: string[] = [],
+): Array<{ label: string; value: string; count: number }> {
+  const options = new Map<string, { value: string; count: number }>();
+  const baseBuckets = baseFacets.value?.[key] ?? [];
+  const searchBuckets = searchStore.facets[key];
+  const addBuckets = (buckets: Array<{ value: string; count: number }>, replaceExisting: boolean): void => {
+    const counts = new Map<string, number>();
+
+    for (const bucket of buckets) {
+      const value = key === 'law_type' ? canonicalLawTypeValue(bucket.value) : bucket.value;
+      if (value) {
+        counts.set(value, (counts.get(value) ?? 0) + bucket.count);
+      }
+    }
+
+    for (const [value, count] of counts) {
+      if (replaceExisting || !options.has(value)) {
+        options.set(value, { value, count });
+      }
+    }
+  };
+
+  addBuckets(baseBuckets, false);
+  addBuckets(searchBuckets, true);
+
+  for (const value of selectedValues) {
+    const normalized = key === 'law_type' ? canonicalLawTypeValue(value) : value;
+    if (normalized && !options.has(normalized)) {
+      options.set(normalized, { value: normalized, count: 0 });
+    }
+  }
+
+  return Array.from(options.values()).map((bucket) => ({
     label: labelResolver ? labelResolver(bucket.value) : bucket.value,
     value: bucket.value,
     count: bucket.count,
   }));
+}
+
+function canonicalLawTypeValue(value: string): string {
+  return LAW_TYPE_CANONICAL_VALUES[value] ?? value;
+}
+
+function expandLawTypeFilterValues(values: string[]): string[] {
+  return Array.from(new Set(values.flatMap((value) => {
+    const canonical = canonicalLawTypeValue(value);
+    return LAW_TYPE_FILTER_ALIASES[canonical] ?? [canonical];
+  })));
+}
+
+function normalizeLawGroupValue(value: string): string {
+  return LAW_GROUP_ALIAS_VALUES[value] ?? value;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function lawTypeLabel(value: string | null): string {

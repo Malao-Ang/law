@@ -282,6 +282,36 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('page-break-after: avoid', $html);
     }
 
+    public function test_build_html_allows_tables_to_break_only_between_rows(): void
+    {
+        $html = $this->makeService()->buildHtml([
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'tbl1',
+                    'type' => 'table',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'layout' => [],
+                        'table' => [
+                            'cells' => [
+                                [['text' => 'หัวข้อ', 'colspan' => 1, 'rowspan' => 2]],
+                                [['text' => 'ข้อมูล', 'colspan' => 1, 'rowspan' => 1]],
+                            ],
+                        ],
+                    ],
+                ]],
+            ]],
+        ]);
+
+        $this->assertStringContainsString('class="block block--table"', $html);
+        $this->assertStringContainsString('.block--table { page-break-inside: auto; break-inside: auto; }', $html);
+        $this->assertStringContainsString('tr { page-break-inside: avoid; break-inside: avoid; }', $html);
+        $this->assertStringContainsString('border: 1pt solid #000', $html);
+        $this->assertStringNotContainsString('rowspan=', $html);
+        $this->assertSame(2, substr_count($html, 'หัวข้อ'));
+    }
+
     public function test_docx_table_cells_include_borders_and_sarabun_font(): void
     {
         $document = [
@@ -315,7 +345,41 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('<w:tcBorders>', $documentXml);
         $this->assertStringContainsString('w:val="single"', $documentXml);
         $this->assertStringContainsString('w:sz="8"', $documentXml);
+        $this->assertStringContainsString('<w:cantSplit w:val="1"/>', $documentXml);
         $this->assertStringContainsString('TH Sarabun PSK', $documentXml);
+    }
+
+    public function test_docx_expands_rowspan_tables_for_page_safe_pdf_export(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'tbl1',
+                    'type' => 'table',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'table' => [
+                            'cells' => [
+                                [
+                                    ['text' => 'รวมช่อง', 'colspan' => 1, 'rowspan' => 2],
+                                    ['text' => 'แถวแรก', 'colspan' => 1, 'rowspan' => 1],
+                                ],
+                                [
+                                    ['text' => 'แถวสอง', 'colspan' => 1, 'rowspan' => 1],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringNotContainsString('w:vMerge', $documentXml);
+        $this->assertStringContainsString('<w:cantSplit w:val="1"/>', $documentXml);
+        $this->assertSame(2, substr_count($documentXml, 'รวมช่อง'));
     }
 
     public function test_docx_embeds_image_blocks(): void
@@ -350,6 +414,42 @@ class DocumentExportServiceTest extends TestCase
         @unlink($tmp);
 
         $this->assertTrue($hasMedia, 'expected an embedded image under word/media/');
+    }
+
+    public function test_docx_respects_page_break_nodes_from_draft_html(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    [
+                        'block_id' => 'b1',
+                        'type' => 'paragraph',
+                        'reading_order' => 1,
+                        'approved_text' => 'หน้าแรก',
+                        'normalized_text' => 'หน้าแรก',
+                        'raw_text' => 'หน้าแรก',
+                        'meta' => ['reviewed_html' => '<p data-block-id="b1">หน้าแรก</p>', 'layout' => []],
+                    ],
+                    [
+                        'block_id' => 'b2',
+                        'type' => 'paragraph',
+                        'reading_order' => 2,
+                        'approved_text' => 'หน้าสอง',
+                        'normalized_text' => 'หน้าสอง',
+                        'raw_text' => 'หน้าสอง',
+                        'meta' => ['reviewed_html' => '<p data-block-id="b2">หน้าสอง</p>', 'layout' => []],
+                    ],
+                ],
+            ]],
+            'document_review' => [
+                'draft_html' => '<p data-block-id="b1">หน้าแรก</p><div data-page-break="" style="page-break-after: always">แบ่งหน้า</div><p data-block-id="b2">หน้าสอง</p>',
+            ],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('w:type="page"', $documentXml);
     }
 
     public function test_blockHtmlOrFallback_emits_font_size_from_formatting(): void

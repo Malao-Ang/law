@@ -83,13 +83,13 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 
 const snackbar = useSnackbarStore();
 const selectedFiles = ref<File[]>([]);
-const scanMode = ref<ScanExtractionMode>('gemini');
+const scanMode = ref<ScanExtractionMode>('local');
 const uploading = ref(false);
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const scanModeOptions: Array<{ title: string; value: ScanExtractionMode }> = [
-  { title: 'Gemini Vision', value: 'gemini' },
   { title: 'OCR Library (Local)', value: 'local' },
+  { title: 'Gemini Vision', value: 'gemini' },
 ];
 
 async function addFiles(value: File | File[] | null): Promise<void> {

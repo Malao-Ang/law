@@ -67,6 +67,25 @@ class LawSearchTest extends TestCase
             ->assertJsonPath('results.0.snippets.0', '<mark>ภาษี</mark>');
     }
 
+    public function test_search_endpoint_accepts_thai_change_status_filter(): void
+    {
+        $this->mock(LawSearchService::class, function ($mock): void {
+            $mock->shouldReceive('search')
+                ->once()
+                ->with(\Mockery::on(fn (array $params): bool => ($params['filters']['change_status'] ?? null) === ['กฎหมายใหม่']))
+                ->andReturn([
+                    'total' => 0,
+                    'results' => [],
+                    'facets' => [],
+                ]);
+        });
+
+        $this->postJson('/api/laws/search', [
+            'q' => '',
+            'filters' => ['change_status' => ['กฎหมายใหม่']],
+        ])->assertOk();
+    }
+
     public function test_search_endpoint_returns_503_when_es_unavailable(): void
     {
         $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('no route to host')));
