@@ -3,7 +3,8 @@ import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 
 const port = Number(process.env.PORT || 5173);
-const hmrPort = Number(process.env.HMR_PORT || port);
+const publicHost = process.env.VITE_DEV_SERVER_HOST || process.env.HMR_HOST || 'localhost';
+const publicPort = Number(process.env.VITE_HOST_PORT || process.env.HMR_PORT || port);
 const cacheDir = process.env.VITE_CACHE_DIR || '/tmp/app-laravel-vite-cache';
 
 export default defineConfig({
@@ -29,10 +30,15 @@ export default defineConfig({
         host: '0.0.0.0',
         port,
         strictPort: true,
+        origin: `http://${publicHost}:${publicPort}`,
+        allowedHosts: [publicHost],
+        cors: {
+            origin: `http://${publicHost}:${process.env.APP_HOST_PORT || 8000}`,
+        },
         hmr: {
-            host: process.env.HMR_HOST || 'localhost',
+            host: publicHost,
             protocol: 'ws',
-            port: hmrPort,
+            port: publicPort,
         },
         watch: {
             // Native fs watch (inotify) fails with EIO over the Docker Desktop

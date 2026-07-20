@@ -17,13 +17,14 @@ fi
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-docker-compose up -d laravel-app laravel-vite queue-worker ocr-service redis mongo elasticsearch
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build \
+  laravel-app laravel-vite queue-worker ocr-service pdf-service redis mongo elasticsearch
 
 echo "✅ Dev stack is running"
-echo "   - Frontend HMR: http://localhost:5173"
-echo "   - Backend:      http://localhost:8000"
-echo "   - OCR Service:  http://localhost:8010"
-echo "   - MongoDB:      mongodb://localhost:27017/poc"
-echo "   - Elasticsearch: http://localhost:9200"
+echo "   - Frontend HMR: http://${VITE_DEV_SERVER_HOST:-localhost}:${VITE_HOST_PORT:-5173}"
+echo "   - Backend:      http://localhost:${APP_HOST_PORT:-8500}"
+echo "   - OCR Service:  http://localhost:${OCR_HOST_PORT:-8010}"
+echo "   - MongoDB:      mongodb://localhost:${MONGO_HOST_PORT:-27017}/poc"
+echo "   - Elasticsearch: http://localhost:${ELASTIC_HOST_PORT:-9200}"
 echo ""
 echo "💡 Edit Vue/CSS files and Vite will hot reload automatically."

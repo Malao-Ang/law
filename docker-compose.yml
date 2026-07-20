@@ -1,36 +1,31 @@
-# Thai OCR POC - Optimized for faster builds
-# For best performance, run with BuildKit enabled:
-#   export DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1
-#   docker-compose build
+# Thai OCR POC - deployment runtime compose.
+#
+# Production/deploy:
+#   docker compose up -d --build
+#
+# Development with bind mounts and Vite HMR:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 services:
   laravel-app:
+    image: ${LARAVEL_IMAGE:-thai-ocr-laravel-app:local}
     build:
       context: ./apps/app-laravel
       dockerfile: Dockerfile
     container_name: thai-ocr-laravel-app
     working_dir: /var/www/html
-    # Sentinel: delete .vendor_ready before boot, recreate after.
-    # queue-worker waits for this file so it never starts with a partial vendor.
-    # Composer dependencies are baked into the image / vendor volume; do not
-    # rerun composer install on every start against an unstable bind mount.
     command: >
-      sh -c "git config --global --add safe.directory '*'
-      && mkdir -p storage/app/poc
-      && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot
-      && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
+      sh -c "mkdir -p storage/app/poc
+      && rm -f storage/app/poc/.vendor_ready
       && php artisan optimize
       && touch storage/app/poc/.vendor_ready
       && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
+    restart: unless-stopped
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
       - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
-      - ./apps/app-laravel:/var/www/html
-      - laravel_vendor:/var/www/html/vendor
-      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
       - poc_storage:/var/www/html/storage/app/poc
-      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
     env_file:
       - .env
     depends_on:
@@ -45,31 +40,10 @@ services:
       pdf-service:
         condition: service_started
     ports:
-      - "${APP_HOST_PORT:-8000}:8000"
-
-  laravel-vite:
-    image: node:20-bookworm-slim
-    container_name: thai-ocr-laravel-vite
-    working_dir: /var/www/html
-    command: >
-      sh -c "test -x node_modules/.bin/vite
-      || { echo 'Missing apps/app-laravel/node_modules/.bin/vite. Run: cd apps/app-laravel && npm install'; exit 1; }
-      && npm run dev -- --host 0.0.0.0 --port 5173"
-    environment:
-      - PORT=5173
-      - HMR_PORT=5173
-      - HMR_HOST=localhost
-      - CHOKIDAR_USEPOLLING=true
-      - VITE_CACHE_DIR=/tmp/app-laravel-vite-cache
-    volumes:
-      - ./apps/app-laravel:/var/www/html
-      - /tmp/app-laravel-vite-cache:/tmp/app-laravel-vite-cache
-    ports:
-      - "${VITE_HOST_PORT:-5173}:5173"
-    depends_on:
-      - laravel-app
+      - "${APP_HOST_PORT:-8500}:8000"
 
   queue-worker:
+    image: ${LARAVEL_IMAGE:-thai-ocr-laravel-app:local}
     build:
       context: ./apps/app-laravel
       dockerfile: Dockerfile
@@ -87,16 +61,13 @@ services:
       && echo 'Waiting for vendor install to complete...'
       && until [ -f storage/app/poc/.vendor_ready ]; do sleep 2; done
       && php artisan queue:work --tries=2 --backoff=10 --timeout=1800"
+    restart: unless-stopped
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
       - QUEUE_CONNECTION=redis
       - PDF_SERVICE_URL=http://pdf-service:3001
     volumes:
-      - ./apps/app-laravel:/var/www/html
-      - laravel_vendor:/var/www/html/vendor
-      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
       - poc_storage:/var/www/html/storage/app/poc
-      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
     env_file:
       - .env
     depends_on:
@@ -114,6 +85,7 @@ services:
         condition: service_started
 
   ocr-service:
+    image: ${OCR_IMAGE:-thai-ocr-service:local}
     build:
       context: ./apps/ocr-service
       # GPU (recommended when NVIDIA driver + nvidia-container-toolkit are present):
@@ -122,8 +94,8 @@ services:
       dockerfile: Dockerfile.simple
     container_name: thai-ocr-service
     working_dir: /app
+    restart: unless-stopped
     volumes:
-      - ./apps/ocr-service:/app
       - poc_storage:/data/poc
     env_file:
       - .env
@@ -142,6 +114,7 @@ services:
     #           capabilities: [gpu]
 
   pdf-service:
+    image: ${PDF_IMAGE:-thai-ocr-pdf-service:local}
     build:
       context: ./apps/pdf-service
     container_name: thai-ocr-pdf-service
@@ -197,5 +170,3 @@ volumes:
   poc_storage:
   es_data:
   poc_mongo:
-  laravel_vendor:
-  laravel_bootstrap_cache:

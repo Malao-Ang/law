@@ -21,35 +21,35 @@ goto :end
 echo 📦 Building all services with BuildKit cache...
 set DOCKER_BUILDKIT=1
 set COMPOSE_DOCKER_CLI_BUILD=1
-docker-compose build --parallel
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build --parallel
 goto :start_services
 
 :build_ocr
 echo 📦 Building OCR service with BuildKit cache...
 set DOCKER_BUILDKIT=1
 set COMPOSE_DOCKER_CLI_BUILD=1
-docker-compose build ocr-service
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build ocr-service
 goto :start_services
 
 :build_laravel
 echo 📦 Building Laravel app with BuildKit cache...
 set DOCKER_BUILDKIT=1
 set COMPOSE_DOCKER_CLI_BUILD=1
-docker-compose build laravel-app
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build laravel-app
 goto :start_services
 
 :restart_vite
 echo 📦 Restarting Vite (no rebuild needed for Node image)...
-docker-compose restart laravel-vite
+docker compose -f docker-compose.yml -f docker-compose.dev.yml restart laravel-vite
 goto :start_services
 
 :start_services
 echo ✅ Build complete! Starting services...
-docker-compose up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 echo 🔥 Hot reload is now active!
 echo    - Frontend: http://localhost:5173
-echo    - Backend: http://localhost:8000
+echo    - Backend: http://localhost:8500
 echo    - OCR Service: http://localhost:8010
 echo.
 echo 💡 Tips:

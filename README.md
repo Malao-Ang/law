@@ -371,7 +371,7 @@ APP_NAME=ThaiLegalOcrPoc
 APP_ENV=local
 APP_KEY=
 APP_DEBUG=true
-APP_URL=http://localhost:8000
+APP_URL=http://localhost:8500
 
 LOG_CHANNEL=stack
 LOG_LEVEL=debug
@@ -423,15 +423,25 @@ The project is optimized for fast development with:
 #### Quick Start (Development)
 
 ```bash
-# Start all services with hot reload
-docker-compose up -d
-
-# Or use the dedicated compose script for the frontend dev stack
+# Start all services with bind mounts and Vite hot reload
 ./scripts/compose-dev.sh
 
+# Equivalent raw compose command
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
 # Frontend: http://localhost:5173 (auto-reloads on file changes)
-# Backend: http://localhost:8000
+# Backend: http://localhost:8500
 # OCR Service: http://localhost:8010
+```
+
+#### Quick Start (Deploy)
+
+```bash
+# Build images and start runtime services only. This does not start Vite.
+./scripts/compose-deploy.sh
+
+# Equivalent raw compose command
+docker compose -f docker-compose.yml up -d --build
 ```
 
 #### Fast Rebuild Commands
@@ -1342,13 +1352,13 @@ docker compose --env-file .env logs -f laravel-app queue-worker ocr-service
 ```
 
 หลังจากระบบขึ้นแล้ว:
-- Upload / Review UI: `http://localhost:8000`
+- Upload / Review UI: `http://localhost:8500`
 - Vite dev server: `http://localhost:5173`
 - OCR service health: `http://localhost:8010/health`
 
 ### 27.3 ทดสอบ flow พื้นฐาน
 
-1. เปิด `http://localhost:8000`
+1. เปิด `http://localhost:8500`
 2. Upload ไฟล์ `DOCX`, `PDF text`, หรือ `PDF scan`
 3. รอ status เป็น `done`
 4. กด `ตรวจสอบเอกสาร` เพื่อเปิด `/documents/{documentId}/review`
