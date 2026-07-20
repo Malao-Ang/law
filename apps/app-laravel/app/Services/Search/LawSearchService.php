@@ -183,6 +183,14 @@ class LawSearchService
                 }
             }
 
+            if ($snippets === []) {
+                foreach (['text', 'title'] as $field) {
+                    foreach ($hit['highlight'][$field] ?? [] as $fragment) {
+                        $snippets[] = $fragment;
+                    }
+                }
+            }
+
             if ($snippets === [] && isset($source['text'])) {
                 $snippets[] = mb_substr((string) $source['text'], 0, 200);
             }
