@@ -47,9 +47,40 @@
             <v-alert type="success" variant="tonal" density="comfortable" class="mb-4" prepend-icon="mdi-check-decagram-outline">
               เผยแพร่แล้ว — เอกสารนี้สามารถค้นหาได้บนหน้าสาธารณะ
             </v-alert>
-            <v-btn color="admin-primary" prepend-icon="mdi-earth" @click="router.push(`/law/${props.documentId}`)">
-              ดูหน้าเผยแพร่
-            </v-btn>
+            <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">{{ pdfExportError }}</v-alert>
+            <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">{{ docxExportError }}</v-alert>
+            <div class="d-flex flex-wrap ga-3">
+              <v-btn color="admin-primary" prepend-icon="mdi-earth" @click="router.push(`/law/${props.documentId}`)">
+                ดูหน้าเผยแพร่
+              </v-btn>
+              <v-btn
+                color="admin-primary"
+                variant="outlined"
+                prepend-icon="mdi-file-pdf-box"
+                :loading="exportingPdf"
+                @click="handlePdfExport"
+              >
+                ส่งออก PDF
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                prepend-icon="mdi-microsoft-word"
+                :loading="exportingDocx"
+                @click="handleWordExport"
+              >
+                ส่งออก Word
+              </v-btn>
+              <v-btn
+                v-if="canExportOriginalPdf"
+                size="small"
+                variant="outlined"
+                prepend-icon="mdi-file-word-box"
+                :loading="exportingOriginalPdf"
+                @click="handleOriginalPdfExport"
+              >
+                PDF ตรงจาก Word
+              </v-btn>
+            </div>
           </template>
 
           <!-- Exported, awaiting confirm -->

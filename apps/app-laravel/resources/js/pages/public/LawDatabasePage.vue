@@ -729,20 +729,21 @@ function extractYear(item: LawSearchResult): number {
   return match ? Number(match[0]) : 0;
 }
 
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
   fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
+  refreshTimer = setInterval(() => {
+    void runSearch();
+    fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
+  }, 30_000);
 });
 
 onBeforeUnmount(() => {
-  if (suggestTimer) {
-    clearTimeout(suggestTimer);
-  }
-  if (hideSuggestionsTimer) {
-    clearTimeout(hideSuggestionsTimer);
-  }
-  if (routeUpdateTimer) {
-    clearTimeout(routeUpdateTimer);
-  }
+  if (suggestTimer) clearTimeout(suggestTimer);
+  if (hideSuggestionsTimer) clearTimeout(hideSuggestionsTimer);
+  if (routeUpdateTimer) clearTimeout(routeUpdateTimer);
+  if (refreshTimer) clearInterval(refreshTimer);
   searchStore.clearSuggestions();
 });
 </script>

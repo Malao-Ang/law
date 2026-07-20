@@ -11,15 +11,116 @@ use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
 {
-    public function search(LawSearchRequest $request, LawSearchService $service): JsonResponse
+    public function search(LawSearchRequest $request, LawSearchService $service, ReviewStore $store): JsonResponse
     {
         try {
             return response()->json($service->search($request->validated()));
         } catch (\Throwable $exception) {
-            Log::warning('Law search failed', ['error' => $exception->getMessage()]);
+            Log::warning('Law search failed, falling back to file-based', ['error' => $exception->getMessage()]);
 
-            return response()->json(['message' => 'ค้นหาไม่พร้อมใช้งาน'], 503);
+            return response()->json($this->fileBasedSearch($request->validated(), $store));
         }
+    }
+
+    /** @param array<string,mixed> $params */
+    private function fileBasedSearch(array $params, ReviewStore $store): array
+    {
+        $q = mb_strtolower(trim((string) ($params['q'] ?? '')));
+        $filters = is_array($params['filters'] ?? null) ? $params['filters'] : [];
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = max(1, (int) ($params['per_page'] ?? 20));
+
+        $rows = array_values(array_filter($store->listLawMeta(), function (array $row) use ($q, $filters): bool {
+            if (($row['status'] ?? '') !== 'ingested' || ($row['access_scope'] ?? '') !== 'public') {
+                return false;
+            }
+            if ($q !== '' && ! str_contains(mb_strtolower((string) ($row['title'] ?? '')), $q)) {
+                return false;
+            }
+            foreach (['law_type', 'change_status', 'signer_group'] as $field) {
+                $want = $filters[$field] ?? null;
+                if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
+                    return false;
+                }
+            }
+            $wantAgency = $filters['agency'] ?? null;
+            if (! empty($wantAgency) && array_intersect((array) $wantAgency, $row['agencies'] ?? []) === []) {
+                return false;
+            }
+            $wantGroup = $filters['law_group'] ?? null;
+            if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        $total = count($rows);
+        $paged = array_slice($rows, ($page - 1) * $perPage, $perPage);
+
+        $results = array_map(fn (array $r): array => [
+            'law_id'        => $r['document_id'],
+            'title'         => $r['title'],
+            'law_type'      => $r['law_type'],
+            'status'        => $r['meta_status'],
+            'change_status' => $r['change_status'],
+            'summary'       => null,
+            'published_date' => $r['promulgation_date'] ?? null,
+            'agency'        => $r['agencies'][0] ?? null,
+            'signer_group'  => $r['signer_group'],
+            'snippets'      => [],
+        ], $paged);
+
+        $facets = $this->computeFileBasedFacets($rows);
+
+        return compact('total', 'results', 'facets');
+    }
+
+    /**
+     * @param  array<int, array<string,mixed>>  $rows
+     * @return array<string, mixed>
+     */
+    private function computeFileBasedFacets(array $rows): array
+    {
+        $termFields = ['law_type' => 'law_type', 'status' => 'meta_status', 'change_status' => 'change_status', 'signer_group' => 'signer_group'];
+        $facets = [];
+
+        foreach ($termFields as $key => $field) {
+            $counts = [];
+            foreach ($rows as $r) {
+                $v = (string) ($r[$field] ?? '');
+                if ($v !== '') {
+                    $counts[$v] = ($counts[$v] ?? 0) + 1;
+                }
+            }
+            arsort($counts);
+            $facets[$key] = array_values(array_map(
+                fn (string $v, int $c): array => ['value' => $v, 'count' => $c],
+                array_keys($counts), array_values($counts),
+            ));
+        }
+
+        $agencyCounts = [];
+        $groupCounts = [];
+        foreach ($rows as $r) {
+            foreach ((array) ($r['agencies'] ?? []) as $a) {
+                if ($a !== '') {
+                    $agencyCounts[(string) $a] = ($agencyCounts[(string) $a] ?? 0) + 1;
+                }
+            }
+            foreach ((array) ($r['law_groups'] ?? []) as $g) {
+                if ($g !== '') {
+                    $groupCounts[(string) $g] = ($groupCounts[(string) $g] ?? 0) + 1;
+                }
+            }
+        }
+        arsort($agencyCounts);
+        arsort($groupCounts);
+        $facets['agency'] = array_values(array_map(fn ($v, $c) => ['value' => $v, 'count' => $c], array_keys($agencyCounts), array_values($agencyCounts)));
+        $facets['law_group'] = array_values(array_map(fn ($v, $c) => ['value' => $v, 'count' => $c], array_keys($groupCounts), array_values($groupCounts)));
+        $facets['years'] = [];
+
+        return $facets;
     }
 
     public function facets(ReviewStore $store): JsonResponse
