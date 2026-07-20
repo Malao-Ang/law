@@ -156,7 +156,7 @@ class LawSearchController extends Controller
         $yearCounts = [];
 
         foreach ($store->listLawMeta() as $row) {
-            if (($row['status'] ?? '') !== 'ingested' || ($row['access_scope'] ?? '') !== 'public') {
+            if (($row['access_scope'] ?? '') === 'private') {
                 continue;
             }
 

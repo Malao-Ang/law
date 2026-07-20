@@ -432,12 +432,18 @@ function effectiveFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[
   return baseFacets.value?.[key] ?? [];
 }
 
-const typeFilters = computed(() => mapFacetOptions(effectiveFacet('law_type'), lawTypeLabel));
+function staticFacet(key: keyof Omit<LawSearchFacets, 'years'>, knownValues: string[]): FacetBucket[] {
+  const live = effectiveFacet(key);
+  const liveMap = new Map(live.map((b) => [b.value, b.count]));
+  return knownValues.map((v) => ({ value: v, count: liveMap.get(v) ?? 0 }));
+}
+
+const typeFilters = computed(() => mapFacetOptions(staticFacet('law_type', Object.keys(LAW_TYPE_LABELS)), lawTypeLabel));
 const groupFilters = computed(() => mapFacetOptions(effectiveFacet('law_group')));
 const agencyFilters = computed(() => mapFacetOptions(effectiveFacet('agency')));
 const keeperGroupFilters = computed(() => mapFacetOptions(effectiveFacet('signer_group')));
-const changeStatusFilters = computed(() => mapFacetOptions(effectiveFacet('change_status'), changeStatusLabel));
-const useStatusFilters = computed(() => mapFacetOptions(effectiveFacet('status'), statusLabel));
+const changeStatusFilters = computed(() => mapFacetOptions(staticFacet('change_status', Object.keys(CHANGE_STATUS_LABELS)), changeStatusLabel));
+const useStatusFilters = computed(() => mapFacetOptions(staticFacet('status', Object.keys(STATUS_LABELS)), statusLabel));
 const years = computed(() => {
   const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
   const values = yearBuckets.map((bucket) => String(bucket.year));
