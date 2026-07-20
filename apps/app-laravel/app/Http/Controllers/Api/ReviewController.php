@@ -210,11 +210,20 @@ class ReviewController extends Controller
         $completedStep = (int) $validated['completed_step'];
         $currentStep = min($completedStep + 1, 6);
 
-        $this->reviewStore->setStatus($documentId, [
+        $patch = [
             'workflow_completed_step' => $completedStep,
             'workflow_current_step' => $currentStep,
             'workflow_updated_at' => now()->toIso8601String(),
-        ]);
+        ];
+
+        // Step 6 = e-Sign confirmed → mark published immediately so the document
+        // appears in the law list without waiting for the async IngestRagJob.
+        if ($completedStep >= 6) {
+            $patch['status'] = 'ingested';
+            $patch['esign_confirmed_at'] = now()->toIso8601String();
+        }
+
+        $this->reviewStore->setStatus($documentId, $patch);
 
         return response()->json([
             'document_id' => $documentId,
