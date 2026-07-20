@@ -13,13 +13,20 @@ class LawSearchController extends Controller
 {
     public function search(LawSearchRequest $request, LawSearchService $service, ReviewStore $store): JsonResponse
     {
+        $params = $request->validated();
+
         try {
-            return response()->json($service->search($request->validated()));
+            $result = $service->search($params);
+            // ES has real results → use them (better scoring + snippets)
+            if (($result['total'] ?? 0) > 0) {
+                return response()->json($result);
+            }
         } catch (\Throwable $exception) {
             Log::warning('Law search failed, falling back to file-based', ['error' => $exception->getMessage()]);
-
-            return response()->json($this->fileBasedSearch($request->validated(), $store));
         }
+
+        // ES returned 0 or is unavailable → file-based fallback always works
+        return response()->json($this->fileBasedSearch($params, $store));
     }
 
     /** @param array<string,mixed> $params */

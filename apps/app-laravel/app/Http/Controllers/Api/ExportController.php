@@ -41,7 +41,18 @@ class ExportController extends Controller
             return response()->json(['message' => $exception->getMessage()], 404);
         }
 
-        $ingestResult = $this->ragIngestService->ingest($documentId);
+        $ingestPath = null;
+        $chunkCount = 0;
+        try {
+            $ingestResult = $this->ragIngestService->ingest($documentId);
+            $ingestPath = $ingestResult['ingest_path'];
+            $chunkCount = $ingestResult['chunk_count'];
+        } catch (Throwable $exception) {
+            Log::warning('RAG ingest failed (non-fatal)', [
+                'document_id' => $documentId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         try {
             $this->lawIndexer->index($documentId);
@@ -52,14 +63,17 @@ class ExportController extends Controller
             ]);
         }
 
-        $this->reviewStore->setStatus($documentId, [
+        $statusPatch = [
             'status' => 'ingested',
             'current_step' => 'rag_ingested',
             'progress' => 100,
             'export_path' => $result['export_path'],
-            'ingest_path' => $ingestResult['ingest_path'],
-            'ingested_chunk_count' => $ingestResult['chunk_count'],
-        ]);
+            'ingested_chunk_count' => $chunkCount,
+        ];
+        if ($ingestPath !== null) {
+            $statusPatch['ingest_path'] = $ingestPath;
+        }
+        $this->reviewStore->setStatus($documentId, $statusPatch);
 
         $response = array_merge($result, ['rag_status' => 'ingested']);
 
