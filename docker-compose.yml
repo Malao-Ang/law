@@ -16,7 +16,7 @@ services:
     working_dir: /var/www/html
     command: >
       sh -c "mkdir -p storage/app/poc
-      && rm -f storage/app/poc/.vendor_ready
+      && rm -f storage/app/poc/.vendor_ready public/hot
       && php artisan optimize
       && touch storage/app/poc/.vendor_ready
       && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"

@@ -8,7 +8,7 @@ services:
     command: >
       sh -c "git config --global --add safe.directory '*'
       && mkdir -p storage/app/poc
-      && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot
+      && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot public/hot
       && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
       && php artisan optimize
       && touch storage/app/poc/.vendor_ready
