@@ -156,7 +156,7 @@
                 :loading="exportingPdf"
                 @click="handlePdfExport"
               >
-                Export PDF for e-Sign
+                ส่งออก PDF สำหรับ e-Sign
               </v-btn>
               <v-btn
                 variant="outlined"
@@ -164,7 +164,7 @@
                 :loading="exportingDocx"
                 @click="handleWordExport"
               >
-                Export Word for e-Sign
+                ส่งออก Word สำหรับ e-Sign
               </v-btn>
               <v-btn
                 v-if="canExportOriginalPdf"
