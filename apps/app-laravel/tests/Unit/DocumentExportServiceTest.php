@@ -418,6 +418,44 @@ class DocumentExportServiceTest extends TestCase
         $this->assertTrue($hasMedia, 'expected an embedded image under word/media/');
     }
 
+    public function test_inline_image_keeps_position_from_draft_html(): void
+    {
+        $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    [
+                        'block_id' => 'img1',
+                        'type' => 'image',
+                        'reading_order' => 1,
+                        'meta' => ['image' => ['data_uri' => $png, 'display_width_px' => 120]],
+                    ],
+                    [
+                        'block_id' => 't2',
+                        'type' => 'paragraph',
+                        'reading_order' => 2,
+                        'approved_text' => 'ท้ายเอกสาร',
+                        'normalized_text' => 'ท้ายเอกสาร',
+                        'meta' => ['reviewed_html' => '<p data-block-id="t2">ท้ายเอกสาร</p>', 'layout' => []],
+                    ],
+                ],
+            ]],
+            // TipTap serializes an inline image as <img data-block-id> nested in a <p>.
+            'document_review' => [
+                'draft_html' => '<p><img data-block-id="img1"></p><p data-block-id="t2">ท้ายเอกสาร</p>',
+            ],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $drawingPos = strpos($documentXml, '<w:pict');
+        $tailPos = strpos($documentXml, 'ท้ายเอกสาร');
+        $this->assertNotFalse($drawingPos, 'expected an inline image drawing in the document');
+        $this->assertNotFalse($tailPos, 'expected the trailing paragraph text in the document');
+        $this->assertLessThan($tailPos, $drawingPos, 'image must keep its in-flow position, not land at the end/footer');
+    }
+
     public function test_docx_respects_page_break_nodes_from_draft_html(): void
     {
         $document = [

@@ -397,24 +397,49 @@ class DocumentExportService
                 continue;
             }
 
-            $blockId = trim((string) $element->getAttribute('data-block-id'));
-            if ($blockId !== '') {
-                if (isset($seenBlockIds[$blockId]) || ! isset($blocksById[$blockId])) {
+            $selfId = trim((string) $element->getAttribute('data-block-id'));
+            if ($selfId !== '') {
+                if (isset($seenBlockIds[$selfId]) || ! isset($blocksById[$selfId])) {
                     continue;
                 }
-                $seenBlockIds[$blockId] = true;
+                $seenBlockIds[$selfId] = true;
                 // Capture the element HTML from draft_html so font/formatting edits
                 // made in the whole-doc editor (not yet flushed to reviewed_html) appear in the PDF.
                 $nodes[] = [
                     'type' => 'block',
-                    'block' => $blocksById[$blockId],
+                    'block' => $blocksById[$selfId],
                     'draft_html' => (string) $dom->saveHTML($element),
                 ];
                 continue;
             }
 
-            // No block id and no visible text → a blank line the reviewer added.
-            if (trim($element->textContent) === '') {
+            $matched = [];
+            foreach ($element->getElementsByTagName('*') as $descendant) {
+                if (! $descendant instanceof DOMElement) {
+                    continue;
+                }
+
+                $descendantId = trim((string) $descendant->getAttribute('data-block-id'));
+                if (
+                    $descendantId !== ''
+                    && isset($blocksById[$descendantId])
+                    && ! isset($seenBlockIds[$descendantId])
+                    && ! in_array($descendantId, $matched, true)
+                ) {
+                    $matched[] = $descendantId;
+                }
+            }
+
+            if ($matched !== []) {
+                foreach ($matched as $blockId) {
+                    $seenBlockIds[$blockId] = true;
+                    $nodes[] = ['type' => 'block', 'block' => $blocksById[$blockId]];
+                }
+                continue;
+            }
+
+            // No block id and no visible text/media → a blank line the reviewer added.
+            if (trim($element->textContent) === '' && $element->getElementsByTagName('img')->length === 0) {
                 $nodes[] = ['type' => 'blank'];
             }
         }
