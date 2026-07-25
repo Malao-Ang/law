@@ -38,7 +38,7 @@
       <v-divider vertical class="mx-1" style="height:18px; align-self:center" />
       <span class="text-caption text-medium-emphasis mr-1">แบบอักษร</span>
       <select class="toolbar-select toolbar-select--font" :value="activeFontFamilyOption" @change="setFontFamily($event)">
-        <option value="">ค่าเริ่มต้น</option>
+        <option value="">ค่าเริ่มต้น (TH Sarabun New)</option>
         <option value="'TH Sarabun New', 'Sarabun', sans-serif">TH Sarabun New</option>
         <option value="'TH Sarabun PSK', 'Sarabun', sans-serif">TH Sarabun PSK</option>
         <option value="'TH SarabunIT9', 'Sarabun', sans-serif">TH SarabunIT9</option>
@@ -809,7 +809,7 @@ function formatMillimeters(value: number): string {
 
 .editor-shell-content :deep(.ProseMirror) {
   min-height: calc(297mm - var(--page-margin-top) - var(--page-margin-bottom));
-  font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-family: 'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16pt;
   line-height: 1.85;
   color: #1e293b;
