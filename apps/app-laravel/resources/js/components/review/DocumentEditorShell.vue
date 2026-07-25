@@ -1,23 +1,22 @@
 <template>
   <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:0; background:#f8fafc; box-sizing:border-box">
-    <div class="review-dialog__header">
+    <div class="review-page__header">
+      <v-btn icon="mdi-arrow-left" variant="text" size="small" title="กลับ" @click="emit('close')" />
       <div class="min-width-0">
         <h2 class="text-h6 font-weight-bold mb-0">ตรวจทานเนื้อหาเอกสาร</h2>
         <p class="text-body-2 text-medium-emphasis mb-0">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</p>
       </div>
-      <v-btn icon="mdi-close" variant="text" @click="emit('close')" />
     </div>
 
-    <v-alert
+    <div
       v-if="showCautionBanner"
-      type="warning"
-      variant="tonal"
-      density="compact"
       class="review-locked-alert"
-      prepend-icon="mdi-alert-outline"
     >
-      กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
-    </v-alert>
+      <v-icon icon="mdi-alert-outline" size="20" class="review-locked-alert__icon" />
+      <span class="review-locked-alert__text">
+        กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
+      </span>
+    </div>
 
     <div
       v-if="editor && !props.locked"
@@ -187,7 +186,7 @@
       </template>
     </v-alert>
 
-    <div class="review-dialog__footer">
+    <div class="review-page__footer">
       <span class="text-caption text-medium-emphasis">
         {{ charCount.toLocaleString('th-TH') }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด
       </span>
@@ -766,25 +765,48 @@ function formatMillimeters(value: number): string {
 </script>
 
 <style scoped>
-.review-dialog__header {
+.review-page__header {
   align-items: center;
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   flex-shrink: 0;
-  gap: 16px;
-  justify-content: space-between;
-  padding: 12px 24px;
+  gap: 12px;
+  padding: 10px 16px;
 }
 
 .review-locked-alert {
+  align-items: flex-start;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  display: flex;
   flex-shrink: 0;
+  gap: 10px;
+  line-height: 1.5;
   margin: 12px 24px 0;
+  min-height: 44px;
+  overflow: visible;
+  padding: 10px 14px;
   position: relative;
   z-index: 20;
 }
 
-.review-dialog__footer {
+.review-locked-alert__icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.review-locked-alert__text {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.review-page__footer {
   align-items: center;
   background: #fff;
   border-top: 1px solid #e2e8f0;
