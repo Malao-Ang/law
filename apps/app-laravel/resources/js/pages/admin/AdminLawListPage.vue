@@ -16,10 +16,9 @@
         v-for="stat in statCards"
         :key="stat.type"
         flat
-        border
         rounded="lg"
         class="flex-1-1 pa-5 adm-stat-card"
-        style="min-width: 180px"
+        :style="`min-width:180px; border:1px solid rgba(var(--v-theme-${stat.color}),0.35); border-top:3px solid rgb(var(--v-theme-${stat.color}))`"
       >
         <div class="d-flex align-center ga-3 mb-3">
           <div class="adm-stat-icon" :style="`--stat-color: rgb(var(--v-theme-${stat.color}))`">
@@ -35,7 +34,9 @@
           </div>
         </div>
         <div class="d-flex align-end ga-1">
-          <span class="text-h4 font-weight-bold">{{ stat.count.toLocaleString('th-TH') }}</span>
+          <span class="text-h4 font-weight-bold" :style="`color:rgb(var(--v-theme-${stat.color}))`">
+            {{ stat.count.toLocaleString('th-TH') }}
+          </span>
           <span class="text-body-2 text-medium-emphasis mb-1">ฉบับ</span>
         </div>
       </v-card>
