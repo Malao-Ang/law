@@ -1,10 +1,57 @@
+<script setup lang="ts">
+import { nextTick, ref } from 'vue';
+import FilterTypeBadge from './FilterTypeBadge.vue';
+
+const emit = defineEmits<{
+  search: [query: string, types: string[], groups: string[]];
+}>();
+
+const query = ref('');
+const selectedType = ref('ทั้งหมด');
+const selectedGroups = ref<string[]>([]);
+const queryInput = ref<{ focus?: () => void } | null>(null);
+
+const typeOptions = ['ทั้งหมด', 'พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
+
+const typeToValue: Record<string, string> = {
+  'พ.ร.บ.': 'phrb',
+  'ข้อบังคับ': 'kho-bangkhab',
+  'ระเบียบ': 'rabiap',
+  'ประกาศ': 'prakat',
+};
+
+const groupFilters = [
+  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร' },
+  { label: 'ด้านกิจการนิสิต', value: 'ด้านกิจการนิสิต' },
+  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์' },
+  { label: 'ด้านบริการวิชาการ', value: 'ด้านบริการวิชาการ' },
+  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'ด้านโครงสร้างองค์กรและระบบการบริหาร' },
+  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ' },
+  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง' },
+  { label: 'ด้านอื่น ๆ', value: 'ด้านอื่น ๆ' },
+];
+
+const popularTags = ['อัตราเบิกค่าใช้จ่ายเดินทาง', 'กองทุนสร้างเสริมสุขภาพ', 'โครงสร้างสถาบันวิจัย'];
+
+function emitSearch(): void {
+  const types = selectedType.value === 'ทั้งหมด' ? [] : [typeToValue[selectedType.value] ?? selectedType.value];
+  emit('search', query.value, types, selectedGroups.value);
+}
+
+async function applyPopularTag(tag: string): Promise<void> {
+  query.value = tag;
+  await nextTick();
+  queryInput.value?.focus?.();
+}
+</script>
+
 <template>
   <section class="elaw-hero">
     <v-container class="elaw-hero__container" style="max-width: 980px">
       <div class="d-flex justify-center">
-        <v-chip class="elaw-hero__eyebrow" size="small" rounded="pill" variant="outlined">
+        <div class="elaw-hero__eyebrow">
           แพลตฟอร์มสืบค้นกฎหมายสำหรับทุกคน
-        </v-chip>
+        </div>
       </div>
 
       <h1 class="text-center font-weight-black mb-3 elaw-hero__title">
@@ -19,22 +66,11 @@
       <v-card flat rounded="xl" class="pa-5 pa-md-6 elaw-search-card">
         <div class="d-flex ga-6 mb-4 align-start flex-wrap">
           <div class="flex-shrink-0">
-            <p class="text-caption mb-2 elaw-search-card__label">ประเภทเอกสาร</p>
-            <div class="d-flex flex-wrap ga-2">
-              <v-chip
-                v-for="type in docTypes"
-                :key="type.value"
-                :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
-                rounded="pill"
-                class="elaw-search-card__type-chip"
-                @click="toggleType(type.value)"
-              >
-                {{ type.label }}
-              </v-chip>
-            </div>
+            <p class="elaw-search-card__label mb-2">1. ประเภทเอกสาร:</p>
+            <FilterTypeBadge v-model="selectedType" :options="typeOptions" />
           </div>
           <div style="min-width: 220px; flex: 1 1 220px">
-            <p class="text-caption mb-2 elaw-search-card__label">กลุ่มกฎหมาย</p>
+            <p class="elaw-search-card__label mb-2">2. กลุ่มกฎหมาย:</p>
             <v-select
               v-model="selectedGroups"
               :items="groupFilters"
@@ -64,11 +100,25 @@
               variant="outlined"
               rounded="xl"
               bg-color="detail-surface"
-              append-inner-icon="mdi-magnify"
               class="elaw-search-card__query"
-              @click:append-inner="emitSearch"
               @keydown.enter="emitSearch"
-            />
+            >
+              <template #prepend-inner>
+                <v-icon icon="mdi-magnify" size="18" color="#3c2900" />
+              </template>
+              <template #append-inner>
+                <v-btn
+                  color="#ab7f29"
+                  variant="flat"
+                  rounded="lg"
+                  size="small"
+                  class="elaw-search-card__search-btn"
+                  @click="emitSearch"
+                >
+                  ค้นหาทันที
+                </v-btn>
+              </template>
+            </v-text-field>
           </div>
         </div>
 
@@ -95,88 +145,6 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { nextTick, ref } from 'vue';
-
-const emit = defineEmits<{
-  search: [query: string, types: string[], groups: string[]];
-}>();
-
-const query = ref('');
-const selectedTypes = ref<string[]>(['all']);
-const selectedGroups = ref<string[]>([]);
-const queryInput = ref<{ focus?: () => void } | null>(null);
-
-const docTypes = [
-  { label: 'ทั้งหมด', value: 'all' },
-  { label: 'พ.ร.บ.', value: 'phrb' },
-  { label: 'ข้อบังคับ', value: 'kho-bangkhab' },
-  { label: 'ระเบียบ', value: 'rabiap' },
-  { label: 'ประกาศ', value: 'prakat' },
-];
-
-const groupFilters = [
-  {
-    label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
-    value: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
-  },
-  { label: 'ด้านกิจการนิสิต', value: 'ด้านกิจการนิสิต' },
-  {
-    label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
-    value: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
-  },
-  { label: 'ด้านบริการวิชาการ', value: 'ด้านบริการวิชาการ' },
-  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'ด้านโครงสร้างองค์กรและระบบการบริหาร' },
-  {
-    label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
-    value: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
-  },
-  {
-    label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
-    value: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
-  },
-  { label: 'ด้านอื่น ๆ', value: 'ด้านอื่น ๆ' },
-];
-
-const popularTags = [
-  'อัตราเบิกค่าใช้จ่ายเดินทาง',
-  'กองทุนสร้างเสริมสุขภาพ',
-  'โครงสร้างสถาบันวิจัย',
-];
-
-function isTypeSelected(value: string): boolean {
-  return selectedTypes.value.includes(value);
-}
-
-function toggleType(value: string): void {
-  if (value === 'all') {
-    selectedTypes.value = ['all'];
-    return;
-  }
-
-  const next = new Set(selectedTypes.value);
-  next.delete('all');
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-
-  selectedTypes.value = next.size > 0 ? Array.from(next) : ['all'];
-}
-
-function emitSearch(): void {
-  const normalizedTypes = selectedTypes.value.includes('all') ? [] : selectedTypes.value;
-  emit('search', query.value, normalizedTypes, selectedGroups.value);
-}
-
-async function applyPopularTag(tag: string): Promise<void> {
-  query.value = tag;
-  await nextTick();
-  queryInput.value?.focus?.();
-}
-</script>
-
 <style scoped>
 .elaw-hero {
   background: linear-gradient(180deg, #f8f7f1 8%, #fff4b5 100%);
@@ -193,9 +161,16 @@ async function applyPopularTag(tag: string): Promise<void> {
 }
 
 .elaw-hero__eyebrow {
-  border-color: #d9c9ab;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
+  border: 1px solid #d9c9ab;
+  border-radius: 9999px;
   color: rgb(var(--v-theme-primary));
   background: rgba(255, 255, 255, 0.82);
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  margin-bottom: 16px;
 }
 
 .elaw-hero__title {
@@ -221,19 +196,17 @@ async function applyPopularTag(tag: string): Promise<void> {
 
 .elaw-search-card__label {
   color: #7d705a;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
 }
 
-.elaw-search-card__type-chip {
-  min-height: 40px;
-  border-color: #decfb8;
-  color: #7f6440;
-  background: #fffdfa;
-}
-
-.elaw-search-card__type-chip.v-chip--variant-flat {
-  border-color: #bf9139;
-  color: #8f6718;
-  background: #fff2cf;
+.elaw-search-card__search-btn {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff !important;
+  margin-right: -4px;
 }
 
 .elaw-search-card__search-row {

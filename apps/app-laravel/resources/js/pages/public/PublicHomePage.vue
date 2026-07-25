@@ -4,68 +4,108 @@
     <v-main>
       <ELawHeroSearch id="about" @search="onSearch" />
 
-      <v-container id="knowledge" class="d-flex flex-column ga-14 elaw-home-sections">
-        <section>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <h2 class="text-h6 font-weight-bold">กฎหมายล่าสุด</h2>
-            <v-btn variant="text" size="small" color="secondary" append-icon="mdi-arrow-right" @click="goToDatabase()">
-              ดูเพิ่มเติม
-            </v-btn>
+      <div id="knowledge" class="elaw-home-sections">
+        <!-- Section: กฎหมายอัพเดทล่าสุด -->
+        <section class="elaw-home-section">
+          <div class="elaw-section-header">
+            <div class="elaw-section-header__left">
+              <div class="elaw-section-heading">
+                <span class="elaw-section-heading__bar" />
+                <h2 class="elaw-section-heading__text">กฎหมายอัพเดทล่าสุด</h2>
+              </div>
+              <p class="elaw-section-heading__sub">รวบรวมพระราชบัญญัติ กฎกระทรวง ระเบียบ ข้อบังคับ และประกาศต่าง ๆ ที่มีการเปลี่ยนแปลงล่าสุด</p>
+            </div>
+            <div class="elaw-section-header__right">
+              <div class="elaw-filter-tabs">
+                <button
+                  v-for="tab in updateTabs"
+                  :key="tab.label"
+                  type="button"
+                  class="elaw-filter-tab"
+                  :class="{ 'elaw-filter-tab--active': activeUpdateTab === tab.label }"
+                  @click="activeUpdateTab = tab.label"
+                >{{ tab.label }}</button>
+              </div>
+              <a class="elaw-section-link" @click.prevent="goToDatabase()">ดูทั้งหมด →</a>
+            </div>
           </div>
-          <v-row>
+          <v-row class="mt-2">
             <v-col
               v-for="doc in latestDocs.slice(0, 3)"
               :key="doc._id"
               cols="12"
               md="4"
             >
-              <DocumentVersionCard :version="doc" variant="rectangle" />
+              <ELawLawCard
+                :title="doc.metadata.title"
+                :doc-type="toDocType(doc.metadata.documentType)"
+                :description="doc.metadata.summary"
+                :department="doc.metadata.ownerAgencyId"
+              />
             </v-col>
           </v-row>
         </section>
 
-        <section>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <h2 class="text-h6 font-weight-bold">ระเบียบ</h2>
-            <v-btn variant="text" size="small" color="secondary" append-icon="mdi-arrow-right" @click="goToDatabase('rabiap')">
-              ดูเพิ่มเติม
-            </v-btn>
+        <!-- Section: ระเบียบ -->
+        <section class="elaw-home-section">
+          <div class="elaw-section-header">
+            <div class="elaw-section-header__left">
+              <div class="elaw-section-heading">
+                <span class="elaw-section-heading__bar elaw-section-heading__bar--rabiap" />
+                <h2 class="elaw-section-heading__text">ระเบียบ</h2>
+              </div>
+            </div>
+            <a class="elaw-section-link" @click.prevent="goToDatabase('rabiap')">ดูทั้งหมด →</a>
           </div>
-          <v-row>
+          <v-row class="mt-2">
             <v-col
               v-for="doc in rabiapDocs.slice(0, 3)"
               :key="doc._id"
               cols="12"
               md="4"
             >
-              <DocumentVersionCard :version="doc" variant="rectangle" />
+              <ELawLawCard
+                :title="doc.metadata.title"
+                :doc-type="toDocType(doc.metadata.documentType)"
+                :description="doc.metadata.summary"
+                :department="doc.metadata.ownerAgencyId"
+              />
             </v-col>
           </v-row>
         </section>
 
-        <section>
-          <div class="d-flex justify-space-between align-center mb-4">
-            <h2 class="text-h6 font-weight-bold">ประกาศ</h2>
-            <v-btn variant="text" size="small" color="secondary" append-icon="mdi-arrow-right" @click="goToDatabase('prakat')">
-              ดูเพิ่มเติม
-            </v-btn>
+        <!-- Section: ประกาศ -->
+        <section class="elaw-home-section">
+          <div class="elaw-section-header">
+            <div class="elaw-section-header__left">
+              <div class="elaw-section-heading">
+                <span class="elaw-section-heading__bar elaw-section-heading__bar--prakat" />
+                <h2 class="elaw-section-heading__text">ประกาศ</h2>
+              </div>
+            </div>
+            <a class="elaw-section-link" @click.prevent="goToDatabase('prakat')">ดูทั้งหมด →</a>
           </div>
-          <v-row>
+          <v-row class="mt-2">
             <v-col
               v-for="doc in prakatDocs.slice(0, 3)"
               :key="doc._id"
               cols="12"
               md="4"
             >
-              <DocumentVersionCard :version="doc" variant="rectangle" />
+              <ELawLawCard
+                :title="doc.metadata.title"
+                :doc-type="toDocType(doc.metadata.documentType)"
+                :description="doc.metadata.summary"
+                :department="doc.metadata.ownerAgencyId"
+              />
             </v-col>
           </v-row>
         </section>
-      </v-container>
+      </div>
 
-      <v-footer color="elaw-navy" class="justify-center">
+      <footer class="elaw-footer">
         <p>© 2567 ระบบฐานข้อมูลกฎหมาย — มหาวิทยาลัยบูรพา</p>
-      </v-footer>
+      </footer>
     </v-main>
   </div>
 </template>
@@ -74,11 +114,23 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchDocumentList, fetchReview } from '../../api/client';
-import DocumentVersionCard from '../../components/shared/DocumentVersionCard.vue';
 import ELawHeroSearch from '../../components/shared/ELawHeroSearch.vue';
+import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
+import type { DocType } from '../../components/shared/lawBadge';
 import type { DocumentListItem, ReviewDocument } from '../../types/document';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
+
+function toDocType(t: DocumentType): DocType {
+  return t === 'phrb' ? 'kotmai-krung' : t;
+}
+
+const activeUpdateTab = ref('ทั้งหมด');
+const updateTabs = [
+  { label: 'ล่าสุด' },
+  { label: 'ยอดนิยม' },
+  { label: 'ทั้งหมด' },
+];
 
 const router = useRouter();
 
@@ -346,7 +398,118 @@ function toDate(value?: string | null): Date | undefined {
 
 <style scoped>
 .elaw-home-sections {
-  padding-top: 28px;
-  padding-bottom: 44px;
+  max-width: 1215px;
+  margin: 0 auto;
+  padding: 50px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
 }
+
+.elaw-home-section {
+  width: 100%;
+}
+
+/* Section header: heading + tabs row */
+.elaw-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.elaw-section-header__left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.elaw-section-header__right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+/* Heading with 4px accent bar (from Figma Heading 2) */
+.elaw-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.elaw-section-heading__bar {
+  display: inline-block;
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  background: rgb(var(--v-theme-primary));
+  flex-shrink: 0;
+}
+
+.elaw-section-heading__bar--rabiap { background: #3b82f6; }
+.elaw-section-heading__bar--prakat { background: #fb923c; }
+
+.elaw-section-heading__text {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.elaw-section-heading__sub {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  color: #64748b;
+  margin: 0;
+  padding-left: 14px;
+}
+
+/* Filter tabs (ล่าสุด / ยอดนิยม / ทั้งหมด) */
+.elaw-filter-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.elaw-filter-tab {
+  padding: 4px 16px;
+  border: 1px solid #d2c5b3;
+  border-radius: 9999px;
+  background: #ffffff;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3c2900;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.elaw-filter-tab--active {
+  background: #b68d40;
+  border-color: #b68d40;
+  color: #ffffff;
+}
+
+.elaw-section-link {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.elaw-footer {
+  background: #1a2e52;
+  color: #ffffff;
+  text-align: center;
+  padding: 24px 16px;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+}
+
+.elaw-footer p { margin: 0; }
 </style>
