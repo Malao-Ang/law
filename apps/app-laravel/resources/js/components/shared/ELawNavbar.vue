@@ -41,10 +41,12 @@ const router = useRouter();
 
 <style scoped>
 .elaw-header {
+  --elaw-navbar-height: 96px;
   position: sticky;
   top: 0;
   z-index: 100;
   width: 100%;
+  height: var(--elaw-navbar-height);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid rgba(210, 197, 179, 0.5);
@@ -55,9 +57,12 @@ const router = useRouter();
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 28px;
-  min-height: 96px;
+  height: var(--elaw-navbar-height);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 28px;
   gap: 24px;
+  box-sizing: border-box;
 }
 
 /* Logo */
@@ -146,9 +151,14 @@ const router = useRouter();
 }
 
 @media (max-width: 768px) {
+  .elaw-header {
+    height: auto;
+  }
+
   .elaw-header__inner {
     flex-wrap: wrap;
-    min-height: auto;
+    height: auto;
+    min-height: var(--elaw-navbar-height);
     padding: 12px 16px;
     gap: 12px;
   }
