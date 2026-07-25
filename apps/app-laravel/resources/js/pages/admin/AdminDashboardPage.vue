@@ -26,7 +26,6 @@
       </v-col>
       <v-col cols="12" sm="6" md="3">
         <ReportStatCard
-          filled
           title="ความสัมพันธ์ที่บันทึกแล้ว"
           :value="summary.totals.relations"
           footnote="เส้นเชื่อมโยง (Linkage)"
