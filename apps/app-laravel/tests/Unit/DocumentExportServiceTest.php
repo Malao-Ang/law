@@ -454,6 +454,48 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('w:type="page"', $documentXml);
     }
 
+    public function test_docx_preserves_reviewer_inserted_blank_lines_from_draft_html(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    [
+                        'block_id' => 'b1',
+                        'type' => 'paragraph',
+                        'reading_order' => 1,
+                        'approved_text' => 'บรรทัดแรก',
+                        'normalized_text' => 'บรรทัดแรก',
+                        'raw_text' => 'บรรทัดแรก',
+                        'meta' => ['reviewed_html' => '<p data-block-id="b1">บรรทัดแรก</p>', 'layout' => []],
+                    ],
+                    [
+                        'block_id' => 'b2',
+                        'type' => 'paragraph',
+                        'reading_order' => 2,
+                        'approved_text' => 'บรรทัดสาม',
+                        'normalized_text' => 'บรรทัดสาม',
+                        'raw_text' => 'บรรทัดสาม',
+                        'meta' => ['reviewed_html' => '<p data-block-id="b2">บรรทัดสาม</p>', 'layout' => []],
+                    ],
+                ],
+            ]],
+            'document_review' => [
+                // The reviewer pressed Enter between the two blocks: a bodiless <p>.
+                'draft_html' => '<p data-block-id="b1">บรรทัดแรก</p><p></p><p data-block-id="b2">บรรทัดสาม</p>',
+            ],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        // Three paragraphs must survive: the two blocks plus the empty spacer,
+        // in that order — otherwise the blank line vanishes from the PDF.
+        $this->assertSame(
+            1,
+            preg_match('/บรรทัดแรก.*<w:p\b[^>]*>(?:(?!บรรทัด).)*<\/w:p>.*บรรทัดสาม/su', $documentXml),
+        );
+    }
+
     public function test_blockHtmlOrFallback_emits_font_size_from_formatting(): void
     {
         $block = [

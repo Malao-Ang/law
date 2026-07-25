@@ -417,7 +417,13 @@ function setFontFamily(event: Event): void {
 
   let chain = editor.value?.chain().focus();
   if (!chain) return;
-  if (sel) chain = chain.setTextSelection(sel);
+
+  if (sel) {
+    const isWholeDoc = sel.from === 0
+      && editor.value != null
+      && sel.to >= editor.value.state.doc.content.size;
+    chain = isWholeDoc ? chain.selectAll() : chain.setTextSelection(sel);
+  }
 
   if (value === '') {
     chain.unsetFontFamily().run();
