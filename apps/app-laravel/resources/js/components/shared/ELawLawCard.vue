@@ -3,11 +3,9 @@
     <v-card-text class="pt-3 pb-3">
       <!-- Tags row -->
       <div class="d-flex align-center ga-2 mb-3">
-        <v-chip size="x-small" :color="typeColor" rounded="pill">{{ typeLabel }}</v-chip>
-        <v-chip v-if="changeStatus" size="x-small" :color="changeStatusColor" variant="tonal" rounded="pill">
-          <v-icon start :icon="changeStatusIcon" size="11" />
-          {{ changeStatusLabel }}
-        </v-chip>
+        <DocBadge v-if="typeBadge" :type="typeBadge" />
+        <v-chip v-else size="x-small" :color="typeColor" rounded="pill">{{ typeLabel }}</v-chip>
+        <DocBadge v-if="statusBadge" :type="statusBadge" />
         <v-spacer />
         <v-chip v-if="visibility" size="x-small" :color="visibilityColor" variant="outlined" rounded="pill">
           <v-icon start :icon="visibilityIcon" size="11" />
@@ -68,9 +66,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import DocBadge from './DocBadge.vue';
+import { changeStatusToBadge, docTypeToBadge, type ChangeStatus, type DocType } from './lawBadge';
 
-type DocType = 'rabiap' | 'kho-bangkhab' | 'prakat' | 'kotmai-krung' | 'other';
-type ChangeStatus = 'new' | 'amended' | 'repealed';
 type Visibility = 'public' | 'private' | 'organization';
 
 const props = defineProps<{
@@ -107,20 +105,8 @@ const typeColors: Record<DocType, string> = {
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
 const typeColor = computed(() => typeColors[props.docType] ?? 'grey');
-
-const changeStatusLabel = computed(() =>
-  ({ new: 'ใหม่ล่าสุด', amended: 'ปรับปรุง', repealed: 'ยกเลิก' } as Record<ChangeStatus, string>)[props.changeStatus!] ?? '',
-);
-const changeStatusColor = computed(() =>
-  ({ new: 'success', amended: 'info', repealed: 'error' } as Record<ChangeStatus, string>)[props.changeStatus!] ?? 'grey',
-);
-const changeStatusIcon = computed(() =>
-  ({
-    new: 'mdi-star-outline',
-    amended: 'mdi-pencil-outline',
-    repealed: 'mdi-close-circle-outline',
-  } as Record<ChangeStatus, string>)[props.changeStatus!] ?? 'mdi-information-outline',
-);
+const typeBadge = computed(() => docTypeToBadge(props.docType));
+const statusBadge = computed(() => (props.changeStatus ? changeStatusToBadge(props.changeStatus) : null));
 
 const visibilityLabel = computed(() =>
   ({ public: 'สาธารณะ', private: 'ส่วนบุคคล', organization: 'องค์กร' } as Record<Visibility, string>)[props.visibility!] ?? '',
@@ -141,11 +127,11 @@ const visibilityIcon = computed(() =>
 .elaw-card {
   border-left-width: 4px !important;
 }
-.elaw-card--rabiap      { border-left-color: var(--badge-rabiap) !important; }
-.elaw-card--kho-bangkhab { border-left-color: var(--badge-kho-bangkhab) !important; }
-.elaw-card--prakat      { border-left-color: var(--badge-prakat) !important; }
-.elaw-card--kotmai-krung { border-left-color: var(--badge-kotmai-krung) !important; }
-.elaw-card--other       { border-left-color: #9e9e9e !important; }
+.elaw-card--rabiap       { border-left-color: #3b82f6 !important; }
+.elaw-card--kho-bangkhab { border-left-color: #10b981 !important; }
+.elaw-card--prakat       { border-left-color: #fb923c !important; }
+.elaw-card--kotmai-krung { border-left-color: #854d0e !important; }
+.elaw-card--other        { border-left-color: #9e9e9e !important; }
 
 .elaw-clamp-2 {
   -webkit-line-clamp: 2;
