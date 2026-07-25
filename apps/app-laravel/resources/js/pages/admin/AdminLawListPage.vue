@@ -10,35 +10,6 @@
       </v-btn>
     </template>
 
-    <!-- Type stat tabs -->
-    <v-row class="mb-5">
-      <v-col v-for="stat in typeStats" :key="stat.value" cols="6" sm="3">
-        <v-card
-          flat
-          rounded="lg"
-          class="type-tab pa-4"
-          :class="{ 'type-tab--active': filterType === stat.value }"
-          :style="{ '--accent': `var(--v-theme-${stat.color})` }"
-          role="button"
-          @click="toggleType(stat.value)"
-        >
-          <div class="d-flex align-center justify-space-between mb-3">
-            <div class="d-flex align-center ga-2">
-              <v-avatar size="32" rounded="lg" class="type-tab__icon">
-                <v-icon :icon="stat.icon" size="18" />
-              </v-avatar>
-              <span class="text-body-2 font-weight-bold type-tab__label">{{ stat.label }}</span>
-            </div>
-            <span class="text-caption text-success font-weight-medium">+{{ stat.delta }} เดือนนี้</span>
-          </div>
-          <div class="d-flex align-end ga-1">
-            <span class="text-h5 font-weight-black">{{ stat.count.toLocaleString('th-TH') }}</span>
-            <span class="text-caption text-medium-emphasis mb-1">ฉบับ</span>
-          </div>
-        </v-card>
-      </v-col>
-    </v-row>
-
     <div class="d-flex flex-wrap ga-3 mb-4 align-center">
       <v-text-field
         v-model="search"
@@ -131,10 +102,15 @@
               <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ law.lawType }}</v-chip>
             </td>
             <td>
-              <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
-                <v-icon start icon="mdi-circle" size="8" />
-                {{ law.workflowStage }}
-              </v-chip>
+              <div class="d-flex flex-wrap ga-1 align-center">
+                <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
+                  <v-icon start icon="mdi-circle" size="8" />
+                  {{ law.workflowStage }}
+                </v-chip>
+                <v-chip v-if="law.metaStatus" size="x-small" :color="metaStatusColor(law.metaStatus)" variant="tonal" rounded="pill">
+                  {{ law.metaStatus }}
+                </v-chip>
+              </div>
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
             <td>
@@ -200,11 +176,6 @@ const TYPE_META: Record<string, { color: string; icon: string }> = {
   ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
   ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
-
-const thisMonthPrefix = (() => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-})();
 
 // Only laws that have passed the info step (ข้อมูล = step 4) belong in this catalog.
 // Raw uploads still being processed / not yet filled in are hidden.
@@ -279,7 +250,7 @@ const laws = computed<LawRow[]>(() =>
   })),
 );
 
-// Count law types over the filtered (info-completed) list so cards match the table.
+// Count law types over the filtered (info-completed) list so the dropdown matches the table.
 const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
   const counts = new Map<string, number>();
   for (const law of laws.value) {
@@ -289,20 +260,6 @@ const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
     .map(([key, count]) => ({ key, count }))
     .sort((a, b) => b.count - a.count);
 });
-
-const typeStats = computed(() =>
-  typeCounts.value.slice(0, 4).map((b) => ({
-    label: b.key,
-    value: b.key,
-    count: b.count,
-    delta: laws.value.filter((l) => l.lawType === b.key && l.rawDate.startsWith(thisMonthPrefix)).length,
-    ...(TYPE_META[b.key] ?? { color: 'grey', icon: 'mdi-file-document-outline' }),
-  })),
-);
-
-function toggleType(value: string): void {
-  filterType.value = filterType.value === value ? null : value;
-}
 
 const typeOptions = computed(() => [
   { label: 'ทุกประเภท', value: null },
@@ -349,28 +306,11 @@ function typeColor(type: string): string {
   return TYPE_META[type]?.color ?? 'grey';
 }
 
-</script>
+function metaStatusColor(status: string): string {
+  if (status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
+  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
+  if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
+  return 'grey';
+}
 
-<style scoped>
-.type-tab {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-left: 4px solid rgb(var(--accent));
-  cursor: pointer;
-  transition: box-shadow 0.15s ease, background 0.15s ease;
-}
-.type-tab:hover {
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
-}
-.type-tab--active {
-  background: rgba(var(--accent), 0.06);
-  border: 1px solid rgb(var(--accent));
-  border-left: 4px solid rgb(var(--accent));
-}
-.type-tab__icon {
-  background: rgba(var(--accent), 0.14);
-  color: rgb(var(--accent));
-}
-.type-tab__label {
-  color: rgb(var(--accent));
-}
-</style>
+</script>
