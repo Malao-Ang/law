@@ -10,6 +10,32 @@
       </v-btn>
     </template>
 
+    <!-- Type stat cards -->
+    <div class="d-flex ga-4 mb-5 flex-wrap">
+      <v-card
+        v-for="stat in statCards"
+        :key="stat.type"
+        flat
+        border
+        rounded="lg"
+        class="flex-1-1 pa-5"
+        style="min-width: 180px"
+      >
+        <div class="d-flex align-center ga-2 mb-3">
+          <v-icon :icon="stat.icon" :color="stat.color" size="20" />
+          <span class="text-body-2 font-weight-bold">{{ stat.type }}</span>
+          <v-spacer />
+          <v-chip v-if="stat.recent > 0" size="x-small" :color="stat.color" variant="tonal" rounded="pill">
+            +{{ stat.recent }} เดือนนี้
+          </v-chip>
+        </div>
+        <div class="d-flex align-end ga-1">
+          <span class="text-h4 font-weight-bold">{{ stat.count.toLocaleString('th-TH') }}</span>
+          <span class="text-body-2 text-medium-emphasis mb-1">ฉบับ</span>
+        </div>
+      </v-card>
+    </div>
+
     <div class="d-flex flex-wrap ga-3 mb-4 align-center">
       <v-text-field
         v-model="search"
@@ -102,14 +128,16 @@
               <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ law.lawType }}</v-chip>
             </td>
             <td>
-              <div class="d-flex flex-wrap ga-1 align-center">
-                <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
+              <div class="d-flex flex-column ga-1">
+                <div v-if="law.metaStatus" class="d-flex align-center ga-1">
+                  <v-icon :color="metaStatusColor(law.metaStatus)" icon="mdi-circle" size="9" />
+                  <span class="text-body-2 font-weight-medium">{{ law.metaStatus }}</span>
+                </div>
+                <v-chip v-else size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
                   <v-icon start icon="mdi-circle" size="8" />
                   {{ law.workflowStage }}
                 </v-chip>
-                <v-chip v-if="law.metaStatus" size="x-small" :color="metaStatusColor(law.metaStatus)" variant="tonal" rounded="pill">
-                  {{ law.metaStatus }}
-                </v-chip>
+                <span v-if="law.metaStatus" class="text-caption text-medium-emphasis">{{ law.workflowStage }}</span>
               </div>
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
@@ -176,6 +204,20 @@ const TYPE_META: Record<string, { color: string; icon: string }> = {
   ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
   ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
+
+const FEATURED_TYPES = ['พระราชบัญญัติ', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
+
+const statCards = computed(() => {
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  return FEATURED_TYPES.map((typeName) => {
+    const bucket = summary.value.by_type.find((b) => b.key === typeName);
+    const recent = summary.value.documents.filter(
+      (d) => d.type === typeName && d.date && new Date(d.date).getTime() > thirtyDaysAgo,
+    ).length;
+    const meta = TYPE_META[typeName] ?? { color: 'grey', icon: 'mdi-file-outline' };
+    return { type: typeName, count: bucket?.count ?? 0, recent, ...meta };
+  });
+});
 
 // Only laws that have passed the info step (ข้อมูล = step 4) belong in this catalog.
 // Raw uploads still being processed / not yet filled in are hidden.
