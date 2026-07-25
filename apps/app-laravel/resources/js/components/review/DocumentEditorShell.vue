@@ -37,7 +37,7 @@
 
       <v-divider vertical class="mx-1" style="height:18px; align-self:center" />
       <span class="text-caption text-medium-emphasis mr-1">แบบอักษร</span>
-      <select class="toolbar-select toolbar-select--font" :value="activeFontFamilyOption" @change="setFontFamily($event)">
+      <select class="toolbar-select toolbar-select--font" :value="activeFontFamilyOption" @mousedown="saveSelectionBeforeDropdown" @change="setFontFamily($event)">
         <option value="">ค่าเริ่มต้น (TH Sarabun New)</option>
         <option value="'TH Sarabun New', 'Sarabun', sans-serif">TH Sarabun New</option>
         <option value="'TH Sarabun PSK', 'Sarabun', sans-serif">TH Sarabun PSK</option>
@@ -255,6 +255,7 @@ const router = useRouter();
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let tableSyncTimer: ReturnType<typeof setTimeout> | null = null;
 let pageResizeObserver: ResizeObserver | null = null;
+let savedSelection: { from: number; to: number } | null = null;
 let hasPendingDraftSave = false;
 let pendingReviewPayload: ReviewSavePayload = {};
 
@@ -403,14 +404,26 @@ function setHeading(event: Event): void {
   }
 }
 
+function saveSelectionBeforeDropdown(): void {
+  if (!editor.value) return;
+  const { from, to } = editor.value.state.selection;
+  savedSelection = from !== to ? { from, to } : null;
+}
+
 function setFontFamily(event: Event): void {
   const value = (event.target as HTMLSelectElement).value;
-  if (value === '') {
-    editor.value?.chain().focus().unsetFontFamily().run();
-    return;
-  }
+  const sel = savedSelection;
+  savedSelection = null;
 
-  editor.value?.chain().focus().setFontFamily(value).run();
+  let chain = editor.value?.chain().focus();
+  if (!chain) return;
+  if (sel) chain = chain.setTextSelection(sel);
+
+  if (value === '') {
+    chain.unsetFontFamily().run();
+  } else {
+    chain.setFontFamily(value).run();
+  }
 }
 
 function commitFontSizeInput(): void {
