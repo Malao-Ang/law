@@ -10,16 +10,26 @@
     <v-btn variant="outlined" @click="reload">ลองใหม่</v-btn>
   </div>
 
-  <DocumentEditorShell
-    v-else-if="documentStore.review"
-    :document-id="documentId"
-    :locked="locked"
-  />
+  <template v-else-if="documentStore.review">
+    <div class="review-workflow-bg">
+      <WorkflowStepper :step="2" description="อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ" />
+    </div>
+
+    <v-dialog :model-value="true" fullscreen persistent scrim transition="dialog-bottom-transition">
+      <DocumentEditorShell
+        :document-id="documentId"
+        :locked="locked"
+        @close="goBack"
+      />
+    </v-dialog>
+  </template>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue';
+import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import { fetchStatus } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
@@ -32,6 +42,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
+const router = useRouter();
 const docStatus = ref<DocumentStatus | null>(null);
 
 const locked = computed(() => docStatus.value?.esign_exported_at != null);
@@ -58,9 +69,19 @@ async function reload(): Promise<void> {
   ]);
   docStatus.value = status;
 }
+
+function goBack(): void {
+  router.push('/admin/upload');
+}
 </script>
 
 <style scoped>
+.review-workflow-bg {
+  min-height: 100vh;
+  padding: 16px 24px;
+  background: #f8fafc;
+}
+
 .review-page-loading,
 .review-page-error {
   display: flex;

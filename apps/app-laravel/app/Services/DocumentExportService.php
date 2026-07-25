@@ -455,7 +455,10 @@ class DocumentExportService
             }
 
             // No block id and no visible text/media → a blank line the reviewer added.
-            if (trim($element->textContent) === '' && $element->getElementsByTagName('img')->length === 0) {
+            // TipTap serializes empty paragraphs as <p><br></p>; textContent is "\n" not "".
+            $childNodes = iterator_to_array($element->childNodes);
+            $onlyBr = count($childNodes) === 1 && strtolower($childNodes[0]->nodeName) === 'br';
+            if ((trim($element->textContent) === '' || $onlyBr) && $element->getElementsByTagName('img')->length === 0) {
                 $nodes[] = ['type' => 'blank'];
             }
         }

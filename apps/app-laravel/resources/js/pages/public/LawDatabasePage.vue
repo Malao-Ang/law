@@ -124,22 +124,6 @@
         </v-container>
       </section>
 
-      <div class="elaw-stats-bar">
-        <v-container style="max-width: 1280px" class="py-0">
-          <div class="elaw-stats-row">
-            <div v-for="stat in statsCards" :key="stat.label" class="elaw-stat-card">
-              <div class="elaw-stat-card__icon-wrap" :style="{ background: `${stat.color}18`, color: stat.color }">
-                <v-icon :icon="stat.icon" size="18" />
-              </div>
-              <div>
-                <div class="elaw-stat-card__num">{{ stat.value.toLocaleString() }}</div>
-                <div class="elaw-stat-card__label">{{ stat.label }}</div>
-              </div>
-            </div>
-          </div>
-        </v-container>
-      </div>
-
       <v-container style="max-width: 1280px" class="mt-6 mb-10">
         <v-row>
           <v-col cols="12" md="3">
@@ -916,17 +900,6 @@ function toggleGroupFilter(value: string): void {
   else selectedGroups.value.push(value);
 }
 
-const statsCards = computed(() => {
-  const f = baseFacets.value;
-  const csMap = new Map((f?.change_status ?? []).map((b) => [b.value, b.count]));
-  return [
-    { label: 'กฎหมายทั้งหมด', icon: 'mdi-file-document-multiple-outline', color: '#3b82f6', value: searchStore.total },
-    { label: 'กฎหมายใหม่', icon: 'mdi-plus-circle-outline', color: '#10b981', value: csMap.get('new') ?? 0 },
-    { label: 'ปรับปรุง', icon: 'mdi-pencil-outline', color: '#6366f1', value: csMap.get('amended') ?? 0 },
-    { label: 'ยกเลิก', icon: 'mdi-close-circle-outline', color: '#ef4444', value: csMap.get('repealed') ?? 0 },
-  ];
-});
-
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
@@ -1177,56 +1150,6 @@ onBeforeUnmount(() => {
   border: 1px dashed rgba(171, 127, 41, 0.28);
   border-radius: 12px;
   background: rgba(255, 250, 236, 0.55);
-}
-
-/* ── Stats bar ── */
-.elaw-stats-bar {
-  background: #ffffff;
-  border-bottom: 1px solid #e7e2d9;
-  padding: 14px 0;
-}
-
-.elaw-stats-row {
-  display: flex;
-  gap: 0;
-  flex-wrap: wrap;
-}
-
-.elaw-stat-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  border-right: 1px solid #f0ede8;
-  flex: 1 1 160px;
-}
-
-.elaw-stat-card:last-child {
-  border-right: none;
-}
-
-.elaw-stat-card__icon-wrap {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.elaw-stat-card__num {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  line-height: 1.1;
-}
-
-.elaw-stat-card__label {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 13px;
-  color: #64748b;
 }
 
 /* ── List result cards ── */

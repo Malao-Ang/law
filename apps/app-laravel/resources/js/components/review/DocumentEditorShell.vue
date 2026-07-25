@@ -1,27 +1,32 @@
 <template>
-  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:16px 24px 60px; background:#f8fafc; box-sizing:border-box">
-    <WorkflowFooterBar
-      :step="2"
-      next-label="บันทึก"
-      :next-loading="documentStore.saving"
-      @back="router.push('/admin/upload')"
-      @next="saveAndContinue"
-    />
-    <WorkflowStepper :step="2" description="อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ" />
+  <div class="d-flex flex-column" style="height:100dvh; min-height:100dvh; overflow:hidden; padding:0; background:#f8fafc; box-sizing:border-box">
+    <div class="review-dialog__header">
+      <div class="min-width-0">
+        <h2 class="text-h6 font-weight-bold mb-0">ตรวจทานเนื้อหาเอกสาร</h2>
+        <p class="text-body-2 text-medium-emphasis mb-0">อ่านทวน แก้ไข และจัดรูปแบบก่อนยืนยันนำเข้าระบบ</p>
+      </div>
+      <v-btn icon="mdi-close" variant="text" @click="emit('close')" />
+    </div>
 
     <v-alert
-      v-if="props.locked"
+      v-if="showCautionBanner"
       type="warning"
       variant="tonal"
       density="compact"
       class="mx-0 my-2"
       style="flex-shrink:0"
-      prepend-icon="mdi-lock-outline"
+      prepend-icon="mdi-alert-outline"
     >
-      เอกสารนี้ผ่านขั้นตอน e-Sign แล้ว — ไม่สามารถแก้ไขเนื้อหาได้
+      กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
     </v-alert>
 
-    <div v-if="editor && !props.locked" class="d-flex flex-wrap align-center ga-2 pa-3 mt-2 bg-white rounded-lg" style="border:1px solid #e2e8f0; flex-shrink:0">
+    <div
+      v-if="editor"
+      class="d-flex flex-wrap align-center ga-2 pa-3 mt-2 bg-white rounded-lg review-toolbar"
+      :class="{ 'review-toolbar--disabled': props.locked }"
+      :inert="props.locked"
+      style="border:1px solid #e2e8f0; flex-shrink:0"
+    >
       <span class="text-caption text-medium-emphasis mr-1">ย้อนกลับ</span>
       <v-btn icon="mdi-undo" variant="text" size="small" :disabled="!editor.can().undo()" title="Undo" @click="editor.chain().focus().undo().run()" />
       <v-btn icon="mdi-redo" variant="text" size="small" :disabled="!editor.can().redo()" title="Redo" @click="editor.chain().focus().redo().run()" />
@@ -173,6 +178,14 @@
       </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
+          <div class="page-backdrop" aria-hidden="true">
+            <div
+              v-for="(sheet, i) in pageSheets.sheets.value"
+              :key="i"
+              class="page-sheet"
+              :style="{ top: `${sheet.top}px`, height: `${sheet.height}px` }"
+            />
+          </div>
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -184,6 +197,17 @@
         <v-btn size="x-small" variant="text" @click="documentStore.setSaveError()">ปิด</v-btn>
       </template>
     </v-alert>
+
+    <div class="review-dialog__footer">
+      <span class="text-caption text-medium-emphasis">
+        {{ charCount.toLocaleString('th-TH') }} ตัวอักษร · บันทึกอัตโนมัติเมื่อปิด
+      </span>
+      <v-spacer />
+      <v-btn variant="outlined" class="text-none" @click="emit('close')">ยกเลิก</v-btn>
+      <v-btn color="admin-primary" class="text-none ml-2" :loading="documentStore.saving" @click="saveAndContinue">
+        บันทึกข้อมูล
+      </v-btn>
+    </div>
   </div>
 </template>
 
@@ -209,11 +233,10 @@ import { FontSizeExtension } from '../../extensions/FontSizeExtension';
 import { PageBreakExtension } from '../../extensions/PageBreakExtension';
 import { ResizableImageExtension } from '../../extensions/ResizableImageExtension';
 import { TableWithBlockIdExtension } from '../../extensions/TableWithBlockIdExtension';
+import { usePageSheets } from '../../pagination/usePageSheets';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
 import type { PageMargins } from '../../types/document';
-import WorkflowStepper from '../shared/WorkflowStepper.vue';
-import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import ReviewRuler from './ReviewRuler.vue';
 
 type MarginPreset = 'normal' | 'narrow' | 'wide' | 'custom';
@@ -226,6 +249,7 @@ type ReviewSavePayload = {
 const PAGE_WIDTH_MM = 210;
 const PAGE_MIN_HEIGHT_MM = 297;
 const MM_TO_CSS_PX = 96 / 25.4;
+const INTER_PAGE_GAP_PX = 24;
 const fontSizePresets = [12, 14, 16, 18, 20, 22, 24, 28, 36] as const;
 const zoomPresets = [75, 100, 125, 150] as const;
 const DEFAULT_PAGE_MARGINS: PageMargins = {
@@ -247,6 +271,7 @@ const marginInputOrder: Array<{ key: MarginKey; label: string }> = [
 ];
 
 const props = defineProps<{ documentId: string; locked?: boolean }>();
+const emit = defineEmits<{ (e: 'close'): void }>();
 
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
@@ -268,6 +293,16 @@ const activeFontFamilyOption = ref<string>('');
 const fontSizeInput = ref<string>('16');
 const pageMargins = ref<PageMargins>(normalizePageMargins(documentStore.review?.compose_state?.page_margins));
 const marginInputsMm = ref<Record<MarginKey, string>>(pageMarginsToInputs(pageMargins.value));
+const showCautionBanner = computed(() => props.locked);
+const pageSheets = usePageSheets(pageFrameRef, () => {
+  const mm = (twips: number) => twipsToMm(twips) * MM_TO_CSS_PX;
+  return {
+    usableHeight: (PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX) - mm(pageMargins.value.top) - mm(pageMargins.value.bottom),
+    topMargin: mm(pageMargins.value.top),
+    bottomMargin: mm(pageMargins.value.bottom),
+    gap: INTER_PAGE_GAP_PX,
+  };
+});
 
 const initialHtml = documentStore.review?.document_review.draft_html
   || documentStore.review?.document_review.generated_html
@@ -293,7 +328,7 @@ const editor = useEditor({
     TableCell,
   ],
   content: initialHtml,
-  editable: true,
+  editable: !props.locked,
   onCreate: () => {
     primeTableWidths();
     syncToolbarState();
@@ -311,6 +346,8 @@ const editor = useEditor({
     queueMicrotask(refreshPageHeight);
   },
 });
+
+const charCount = computed(() => editor.value?.getText().length ?? 0);
 
 const fontSizePresetValue = computed<string>(() => (
   fontSizePresets.includes(Number(fontSizeInput.value) as (typeof fontSizePresets)[number])
@@ -469,6 +506,7 @@ function setZoom(event: Event): void {
   const value = Number((event.target as HTMLSelectElement).value);
   if (!Number.isFinite(value)) return;
   zoomPercent.value = value;
+  queueMicrotask(refreshPageHeight);
 }
 
 function updateMarginPreset(event: Event): void {
@@ -648,7 +686,10 @@ function attachPageObserver(): void {
 
 function refreshPageHeight(): void {
   if (!pageFrameRef.value) return;
+  pageSheets.recompute();
   pageHeightPx.value = Math.max(pageFrameRef.value.offsetHeight, PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX);
+  // Re-scroll cursor into view after spacers shift content positions.
+  queueMicrotask(() => { editor.value?.commands.scrollIntoView(); });
 }
 
 function hasPendingSave(): boolean {
@@ -751,6 +792,31 @@ function formatMillimeters(value: number): string {
 </script>
 
 <style scoped>
+.review-dialog__header {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-shrink: 0;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 12px 24px;
+}
+
+.review-dialog__footer {
+  align-items: center;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-shrink: 0;
+  padding: 10px 24px;
+}
+
+.review-toolbar--disabled {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
 .toolbar-select,
 .toolbar-number-input,
 .toolbar-mm-input {
@@ -813,15 +879,31 @@ function formatMillimeters(value: number): string {
   width: 210mm;
   min-height: 297mm;
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
-  background: #fff;
-  box-shadow: 0 0 0 1px #e2e8f0, 0 18px 48px rgba(15, 23, 42, 0.08);
+  background: transparent;
   box-sizing: border-box;
   transform-origin: top center;
   position: relative;
 }
 
+.page-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.page-sheet {
+  position: absolute;
+  left: 0;
+  width: 210mm;
+  background: #fff;
+  box-shadow: 0 0 0 1px #e2e8f0, 0 10px 30px rgba(15, 23, 42, 0.08);
+  border-radius: 2px;
+}
 
 .editor-shell-content {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
 }
@@ -857,22 +939,9 @@ function formatMillimeters(value: number): string {
   margin: 0 0 8pt;
 }
 
+.editor-shell-content :deep(.ProseMirror .doc-page-gap),
 .editor-shell-content :deep(.ProseMirror [data-page-break]) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12pt 0;
-  color: #94a3b8;
-  font-size: 10pt;
-  font-family: sans-serif;
-}
-
-.editor-shell-content :deep(.ProseMirror [data-page-break])::before,
-.editor-shell-content :deep(.ProseMirror [data-page-break])::after {
-  content: '';
-  flex: 1;
-  height: 0;
-  border-top: 1.5px dashed #cbd5e1;
+  display: block;
 }
 
 .editor-shell-content :deep(.ProseMirror ul),

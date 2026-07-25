@@ -21,13 +21,17 @@
       />
     </template>
 
-    <v-date-picker
-      :model-value="pickerValue"
-      color="admin-primary"
-      hide-header
-      show-adjacent-months
-      @update:model-value="onPick"
-    />
+    <v-locale-provider locale="th">
+      <v-date-picker
+        :model-value="pickerValue"
+        color="admin-primary"
+        title="เลือกวันที่"
+        header="วันที่เลือก"
+        hide-header
+        show-adjacent-months
+        @update:model-value="onPick"
+      />
+    </v-locale-provider>
   </v-menu>
 </template>
 
@@ -78,9 +82,13 @@ const pickerValue = computed<Date | null>(() => {
 });
 
 function onPick(value: unknown): void {
-  // Vuetify 4 date-picker emits a Date object
-  const d = value as Date | null;
-  if (!d) {
+  const d = value instanceof Date
+    ? value
+    : typeof value === 'string'
+      ? new Date(value + 'T00:00:00')
+      : null;
+
+  if (!d || isNaN(d.getTime())) {
     emit('update:modelValue', null);
   } else {
     const y = d.getFullYear();

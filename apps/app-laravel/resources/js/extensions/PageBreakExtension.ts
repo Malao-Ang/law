@@ -18,7 +18,7 @@ export const PageBreakExtension = Node.create({
   },
 
   renderHTML() {
-    return ['div', { 'data-page-break': '', style: 'page-break-after: always' }, 'แบ่งหน้า'];
+    return ['div', { 'data-page-break': '', class: 'doc-page-gap', style: 'page-break-after: always' }];
   },
 
   addCommands() {
