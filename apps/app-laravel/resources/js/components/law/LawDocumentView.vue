@@ -394,11 +394,11 @@ onBeforeUnmount(() => observer?.disconnect());
   overflow-y: auto;
 }
 
-.lawx-toc__title { font-weight: 700; font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #1e2a4a; }
+.lawx-toc__title { font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
 .lawx-toc__items { display: flex; flex-direction: column; padding: 5px 0 4px 8px; }
 .lawx-toc__item { text-align: left; background: transparent; border: none; border-left: 2px solid transparent; padding: 7px 10px; font-size: 13px; color: #475569; border-radius: 0; cursor: pointer; font-family: inherit; }
-.lawx-toc__item:hover { color: #1d4ed8; }
-.lawx-toc__item.is-active { background: transparent; border-left-color: #1d4ed8; color: #1d4ed8; font-weight: 700; }
+.lawx-toc__item:hover { color: #7b580d; }
+.lawx-toc__item.is-active { background: transparent; border-left-color: #b68d40; color: #7b580d; font-weight: 700; }
 
 .lawx-doc {
   min-width: 0;
@@ -406,19 +406,19 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-headcard {
   background: rgb(var(--v-theme-detail-surface));
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-top: 5px solid #1e2a4a;
+  border: 1px solid #e7e2d9;
+  border-top: 5px solid #b68d40;
   border-radius: 22px;
   padding: 32px 28px;
   text-align: center;
   margin-bottom: 18px;
-  box-shadow: 0 22px 46px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 10px 40px rgba(75, 70, 61, 0.08);
 }
 
-.lawx-headcard__badge { display: inline-block; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; }
-.lawx-headcard__title { font-size: clamp(24px, 3vw, 32px); font-weight: 800; color: #1e2a4a; margin: 0 0 14px; line-height: 1.25; }
-.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-size: 13px; color: #64748b; }
-.lawx-headcard__meta .mdi { color: #94a3b8; }
+.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+.lawx-headcard__title { font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
+.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', sans-serif; font-size: 14px; color: #4e4538; }
+.lawx-headcard__meta .mdi { color: #b68d40; }
 
 .lawx-card {
   background: rgb(var(--v-theme-detail-surface));

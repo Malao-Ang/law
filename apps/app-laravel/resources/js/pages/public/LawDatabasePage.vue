@@ -5,10 +5,10 @@
       <section class="elaw-db-header">
         <v-container style="max-width: 1280px">
           <div class="text-center mb-5">
-            <h1 class="text-h5 font-weight-black text-elaw-navy mb-2">
+            <h1 class="elaw-db-header__title mb-2">
               สืบค้นกฎหมายและลำดับศักดิ์เอกสารภาครัฐ
             </h1>
-            <p class="text-body-2 text-medium-emphasis mb-0">
+            <p class="elaw-db-header__sub mb-0">
               ค้นหาชื่อกฎหมาย, เลขที่ประกาศ, คำสำคัญ, มาตรา หรือหน่วยงานที่เกี่ยวข้อง
             </p>
           </div>
@@ -74,42 +74,29 @@
                 </button>
               </v-card>
             </div>
-            <v-btn color="secondary" size="large" rounded="lg" @click="doSearch">
-              <v-icon start icon="mdi-magnify" />
+            <button type="button" class="elaw-db-search-btn" @click="doSearch">
+              <v-icon icon="mdi-magnify" size="18" />
               ค้นหาข้อมูล
-            </v-btn>
+            </button>
           </div>
 
-          <v-row class="ga-4 mt-4 justify-start align-start">
-            <v-col cols="12" md="7">
-              <div class="d-flex align-start flex-wrap ga-3 elaw-filter-row">
-                <p class="text-caption font-weight-bold text-medium-emphasis mb-0 mt-0">ประเภทเอกสาร</p>
-                <v-chip
-                  :variant="isTypeSelected('all') ? 'flat' : 'outlined'"
-                  color="primary"
-                  rounded="pill"
-                  size="small"
-                  class="elaw-search-chip"
-                  @click="toggleType('all')"
-                >
-                  ทั้งหมด
-                </v-chip>
-                <v-chip
-                  v-for="type in typeFilters"
-                  :key="type.value"
-                  :variant="isTypeSelected(type.value) ? 'flat' : 'outlined'"
-                  color="primary"
-                  rounded="pill"
-                  size="small"
-                  class="elaw-search-chip"
-                  @click="toggleType(type.value)"
-                >
-                  {{ type.label }}
-                  <span class="ml-1 text-caption">({{ type.count }})</span>
-                </v-chip>
-              </div>
-            </v-col>
-          </v-row>
+          <div class="d-flex align-center flex-wrap ga-2 mt-4 elaw-filter-row">
+            <span class="elaw-filter-row__label">ประเภทเอกสาร:</span>
+            <button
+              type="button"
+              class="elaw-type-pill"
+              :class="{ 'elaw-type-pill--active': isTypeSelected('all') }"
+              @click="toggleType('all')"
+            >ทั้งหมด</button>
+            <button
+              v-for="type in typeFilters"
+              :key="type.value"
+              type="button"
+              class="elaw-type-pill"
+              :class="{ 'elaw-type-pill--active': isTypeSelected(type.value) }"
+              @click="toggleType(type.value)"
+            >{{ type.label }}<span class="elaw-type-pill__count"> ({{ type.count }})</span></button>
+          </div>
         </v-container>
       </section>
 
@@ -290,50 +277,22 @@
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
-              <v-card
+              <div
                 v-for="law in sortedResults"
                 :key="law.law_id"
-                flat
-                border
-                rounded="lg"
-                class="pa-4 law-result-card"
-                style="cursor: pointer"
+                class="law-result-wrapper"
                 @click="router.push({ name: 'law', params: { documentId: law.law_id } })"
               >
-                <div class="d-flex flex-wrap align-center ga-2 mb-3">
-                  <v-chip size="x-small" color="primary" rounded="pill">{{ lawTypeLabel(law.law_type) }}</v-chip>
-                  <v-chip v-if="law.status" size="x-small" color="success" variant="tonal" rounded="pill">
-                    {{ statusLabel(law.status) }}
-                  </v-chip>
-                  <v-chip v-if="law.change_status" size="x-small" color="warning" variant="tonal" rounded="pill">
-                    {{ changeStatusLabel(law.change_status) }}
-                  </v-chip>
-                </div>
-
-                <h2 class="text-subtitle-1 font-weight-bold mb-2 law-result-card__title">
-                  {{ law.title || 'ไม่ระบุชื่อกฎหมาย' }}
-                </h2>
-
-                <p v-if="law.summary" class="text-body-2 text-medium-emphasis mb-3 law-result-card__summary">
-                  {{ law.summary }}
-                </p>
-
-                <div class="d-flex flex-wrap ga-4 text-caption text-medium-emphasis mb-3">
-                  <span class="law-result-card__meta-item">
-                    <v-icon size="13" icon="mdi-calendar-month-outline" />
-                    {{ law.published_date || 'ไม่ระบุวันที่ประกาศ' }}
-                  </span>
-                  <span class="law-result-card__meta-item">
-                    <v-icon size="13" icon="mdi-domain" />
-                    {{ law.agency || 'ไม่ระบุหน่วยงาน' }}
-                  </span>
-                  <span v-if="law.signer_group" class="law-result-card__meta-item">
-                    <v-icon size="13" icon="mdi-account-group-outline" />
-                    {{ law.signer_group }}
-                  </span>
-                </div>
-
-                <div class="d-flex flex-column ga-2">
+                <ELawLawCard
+                  :title="law.title || 'ไม่ระบุชื่อกฎหมาย'"
+                  :doc-type="toDocType(law.law_type)"
+                  :description="law.summary"
+                  :department="law.agency || undefined"
+                  :date="law.published_date || undefined"
+                  visibility="public"
+                  :change-status="toChangeStatus(law.change_status)"
+                />
+                <div v-if="law.snippets.length" class="law-snippets-row">
                   <div
                     v-for="(snippet, index) in law.snippets"
                     :key="`${law.law_id}-${index}`"
@@ -341,7 +300,7 @@
                     v-html="sanitizeHighlight(snippet)"
                   />
                 </div>
-              </v-card>
+              </div>
             </div>
 
             <div class="d-flex justify-center mt-6">
@@ -366,7 +325,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchLawFacets, getLookups } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
+import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
+import type { ChangeStatus, DocType } from '../../components/shared/lawBadge';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
@@ -845,6 +806,27 @@ function extractYear(item: LawSearchResult): number {
   return match ? Number(match[0]) : 0;
 }
 
+const LAW_TYPE_TO_DOC_TYPE: Record<string, DocType> = {
+  phrb: 'kotmai-krung',
+  'พ.ร.บ.': 'kotmai-krung',
+  พระราชบัญญัติ: 'kotmai-krung',
+  prakat: 'prakat',
+  ประกาศ: 'prakat',
+  'kho-bangkhab': 'kho-bangkhab',
+  ข้อบังคับ: 'kho-bangkhab',
+  rabiap: 'rabiap',
+  ระเบียบ: 'rabiap',
+};
+
+function toDocType(lawType: string | null | undefined): DocType {
+  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? 'other';
+}
+
+function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined {
+  if (cs === 'new' || cs === 'amended' || cs === 'repealed') return cs;
+  return undefined;
+}
+
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
@@ -867,8 +849,94 @@ onBeforeUnmount(() => {
 <style scoped>
 .elaw-db-header {
   background: linear-gradient(180deg, #f8f7f1 8%, #fff4b5 100%);
-  border-bottom: 1px solid var(--elaw-border);
+  border-bottom: 1px solid #eadfcb;
   padding: 28px 24px 34px;
+}
+
+.elaw-db-header__title {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #1f1b14;
+  margin: 0;
+}
+
+.elaw-db-header__sub {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 18px;
+  color: #4e4538;
+}
+
+.elaw-db-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #343028;
+  border: none;
+  cursor: pointer;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  padding: 14px 28px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.elaw-type-pill {
+  background: #ffffff;
+  border: 1px solid #d2c5b3;
+  border-radius: 9999px;
+  padding: 7px 18px;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #3c2900;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.elaw-type-pill:focus-visible {
+  outline: 2px solid #b68d40;
+  outline-offset: 2px;
+}
+
+.elaw-type-pill--active {
+  background: #b68d40;
+  border-color: #b68d40;
+  color: #3c2900;
+}
+
+.elaw-type-pill__count {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.elaw-filter-row {
+  min-height: 44px;
+}
+
+.elaw-filter-row__label {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #7b580d;
+  white-space: nowrap;
+}
+
+.law-result-wrapper {
+  cursor: pointer;
+}
+
+.law-snippets-row {
+  margin-top: -12px;
+  padding: 0 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .elaw-search-input :deep(.v-field__input) {
@@ -906,10 +974,6 @@ onBeforeUnmount(() => {
 
 .elaw-suggest-item:hover {
   background: rgba(255, 250, 236, 0.85);
-}
-
-.elaw-search-chip {
-  font-weight: 700;
 }
 
 .elaw-filter-panels {
@@ -989,20 +1053,6 @@ onBeforeUnmount(() => {
 
 .elaw-filter-row > p {
   line-height: 1;
-}
-
-.law-result-card__title {
-  line-height: 1.5;
-}
-
-.law-result-card__summary {
-  line-height: 1.6;
-}
-
-.law-result-card__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .law-snippet {
