@@ -6,7 +6,6 @@ use App\Services\Fast\LibreOfficeConverter;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use DOMXPath;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\SimpleType\Jc;
@@ -15,7 +14,13 @@ use RuntimeException;
 
 class DocumentExportService
 {
-    private const EXPORT_FONT_STACK = "'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif";
+    // Must match the editor's primary face (DocumentEditorShell .ProseMirror).
+    // Only "TH Sarabun New" is actually installed in the LibreOffice container;
+    // "TH Sarabun PSK" is not, so declaring it first makes fontconfig substitute
+    // Google "Sarabun" — a different font with different metrics than the review.
+    private const EXPORT_FONT = 'TH Sarabun New';
+
+    private const EXPORT_FONT_STACK = "'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', 'Noto Sans Thai', sans-serif";
     private const DEFAULT_PAGE_MARGINS = [
         'top' => 1440,
         'bottom' => 1440,
@@ -116,7 +121,7 @@ class DocumentExportService
     private function buildDocxFile(array $document): string
     {
         $phpWord = new PhpWord;
-        $phpWord->setDefaultFontName('TH Sarabun PSK');
+        $phpWord->setDefaultFontName(self::EXPORT_FONT);
         $phpWord->setDefaultFontSize(16);
         $pageMargins = $this->pageMarginsFromDocument($document);
         $section = $phpWord->addSection([
@@ -135,6 +140,11 @@ class DocumentExportService
                 continue;
             }
 
+            if (($node['type'] ?? null) === 'blank') {
+                $section->addTextRun($this->blankParagraphStyle());
+                continue;
+            }
+
             $block = is_array($node['block'] ?? null) ? $node['block'] : [];
             $type = (string) ($block['type'] ?? '');
             $table = $this->normalizeTable($block);
@@ -149,9 +159,15 @@ class DocumentExportService
                 continue;
             }
 
-            $html = $this->blockHtmlOrFallback($block);
+            // Prefer the element HTML captured from draft_html (reflects live editor edits
+            // like font changes) over the stale per-block reviewed_html.
+            $draftElementHtml = (string) ($node['draft_html'] ?? '');
+            $html = $draftElementHtml !== '' ? $draftElementHtml : $this->blockHtmlOrFallback($block);
             $runs = $this->parseHtmlRuns($html);
             if ($runs === []) {
+                // An emptied block is still a visible blank line in the editor —
+                // emit an empty paragraph so the PDF keeps the same vertical rhythm.
+                $section->addTextRun($this->paragraphStyleForBlock($block));
                 continue;
             }
 
@@ -360,17 +376,19 @@ class DocumentExportService
         }
 
         $dom = $this->loadHtmlFragment($draftHtml);
-        $xpath = new DOMXPath($dom);
-        $elements = $xpath->query('//*[@data-block-id or @data-page-break]');
-        if ($elements === false) {
+        $root = $dom->getElementsByTagName('div')->item(0);
+        if (! $root instanceof DOMElement) {
             return array_map(static fn (array $block): array => ['type' => 'block', 'block' => $block], $orderedBlocks);
         }
 
         $nodes = [];
         $seenBlockIds = [];
 
-        foreach ($elements as $element) {
-            if (! $element instanceof DOMElement || $this->hasTrackedAncestor($element)) {
+        // Walk top-level nodes in document order so page breaks AND user-inserted
+        // blank paragraphs (empty <p> with no data-block-id) are preserved in the
+        // PDF exactly where the editor shows them.
+        foreach ($root->childNodes as $element) {
+            if (! $element instanceof DOMElement) {
                 continue;
             }
 
@@ -380,12 +398,25 @@ class DocumentExportService
             }
 
             $blockId = trim((string) $element->getAttribute('data-block-id'));
-            if ($blockId === '' || isset($seenBlockIds[$blockId]) || ! isset($blocksById[$blockId])) {
+            if ($blockId !== '') {
+                if (isset($seenBlockIds[$blockId]) || ! isset($blocksById[$blockId])) {
+                    continue;
+                }
+                $seenBlockIds[$blockId] = true;
+                // Capture the element HTML from draft_html so font/formatting edits
+                // made in the whole-doc editor (not yet flushed to reviewed_html) appear in the PDF.
+                $nodes[] = [
+                    'type' => 'block',
+                    'block' => $blocksById[$blockId],
+                    'draft_html' => (string) $dom->saveHTML($element),
+                ];
                 continue;
             }
 
-            $seenBlockIds[$blockId] = true;
-            $nodes[] = ['type' => 'block', 'block' => $blocksById[$blockId]];
+            // No block id and no visible text → a blank line the reviewer added.
+            if (trim($element->textContent) === '') {
+                $nodes[] = ['type' => 'blank'];
+            }
         }
 
         foreach ($orderedBlocks as $block) {
@@ -500,7 +531,7 @@ class DocumentExportService
                 $cell = $row->addCell(null, $style);
                 $cell->addText(
                     (string) ($cellData['text'] ?? ''),
-                    ['name' => 'TH Sarabun PSK', 'size' => 16],
+                    ['name' => self::EXPORT_FONT, 'size' => 16],
                     [
                         'alignment' => $this->mapAlignment((string) ($cellData['alignment'] ?? '')) ?? Jc::LEFT,
                         'spaceAfter' => 0,
@@ -616,6 +647,21 @@ class DocumentExportService
     }
 
     /**
+     * A blank reviewer-inserted line: same 1.85 line spacing as real paragraphs
+     * so its height matches the editor.
+     *
+     * @return array<string, mixed>
+     */
+    private function blankParagraphStyle(): array
+    {
+        return [
+            'spaceAfter' => 0,
+            'line' => 444,
+            'lineRule' => 'auto',
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function paragraphStyleForBlock(array $block): array
@@ -683,7 +729,7 @@ class DocumentExportService
         ];
 
         $fontFamily = trim((string) ($run['fontFamily'] ?? ''));
-        $style['name'] = $fontFamily !== '' ? $fontFamily : 'TH Sarabun PSK';
+        $style['name'] = $fontFamily !== '' ? $fontFamily : self::EXPORT_FONT;
 
         $fontSize = $this->toPointSize($run['fontSize'] ?? null);
         if ($fontSize !== null) {
@@ -691,17 +737,6 @@ class DocumentExportService
         }
 
         return array_filter($style, static fn (mixed $value): bool => $value !== null && $value !== false);
-    }
-
-    private function hasTrackedAncestor(DOMElement $element): bool
-    {
-        for ($parent = $element->parentNode; $parent instanceof DOMElement; $parent = $parent->parentNode) {
-            if ($parent->hasAttribute('data-block-id') || $parent->hasAttribute('data-page-break')) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function collectRuns(DOMNode $node, array $context, array &$runs): void

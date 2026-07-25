@@ -134,12 +134,14 @@ class DocumentExportServiceTest extends TestCase
         $this->assertTrue($style['keepWithNext'] ?? false, 'keepWithNext must be true for section_header');
     }
 
-    public function test_docx_declares_th_sarabun_psk_default_font(): void
+    public function test_docx_declares_th_sarabun_new_default_font(): void
     {
         $bytes = $this->makeService()->toDocx($this->sampleDocument());
         $stylesXml = $this->readDocxXml($bytes, 'word/styles.xml');
 
-        $this->assertStringContainsString('TH Sarabun PSK', $stylesXml);
+        // Must match the editor's installed primary face, not the unavailable PSK
+        // name that fontconfig would substitute with a different-metric font.
+        $this->assertStringContainsString('TH Sarabun New', $stylesXml);
     }
 
     public function test_heading_runs_use_true_scale_point_sizes(): void
@@ -188,7 +190,7 @@ class DocumentExportServiceTest extends TestCase
 
         $this->assertCount(1, $runs);
         $this->assertArrayNotHasKey('size', $this->fontStyleForRun($runs[0]));
-        $this->assertSame('TH Sarabun PSK', $this->fontStyleForRun($runs[0])['name'] ?? null);
+        $this->assertSame('TH Sarabun New', $this->fontStyleForRun($runs[0])['name'] ?? null);
 
         $stylesXml = $this->readDocxXml($this->makeService()->toDocx($this->sampleDocument()), 'word/styles.xml');
 
@@ -346,7 +348,7 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('w:val="single"', $documentXml);
         $this->assertStringContainsString('w:sz="8"', $documentXml);
         $this->assertStringContainsString('<w:cantSplit w:val="1"/>', $documentXml);
-        $this->assertStringContainsString('TH Sarabun PSK', $documentXml);
+        $this->assertStringContainsString('TH Sarabun New', $documentXml);
     }
 
     public function test_docx_expands_rowspan_tables_for_page_safe_pdf_export(): void
