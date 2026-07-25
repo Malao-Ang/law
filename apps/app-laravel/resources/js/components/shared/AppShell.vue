@@ -92,8 +92,13 @@
     </div>
 
     <div v-if="title" class="app-shell__page-title">
-      <h1 class="text-h5 font-weight-black mb-0">{{ title }}</h1>
-      <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
+      <div class="min-width-0">
+        <h1 class="text-h5 font-weight-black mb-0">{{ title }}</h1>
+        <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
+      </div>
+      <div v-if="$slots['title-actions']" class="flex-shrink-0">
+        <slot name="title-actions" />
+      </div>
     </div>
 
     <div v-if="$slots.banner" class="px-6 pt-2">
@@ -148,8 +153,8 @@ const defaultNavGroups: NavGroup[] = [
     label: 'การจัดการข้อมูล',
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
-      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline' },
-      { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline' },
+      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
+      { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
     ],
   },
   {
@@ -243,8 +248,12 @@ function isActive(item: NavItem): boolean {
 }
 
 .app-shell__page-title {
+  align-items: center;
   background: #fff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
   padding: 14px 24px 16px;
 }
 
