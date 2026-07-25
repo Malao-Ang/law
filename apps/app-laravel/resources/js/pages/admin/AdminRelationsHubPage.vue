@@ -86,11 +86,23 @@
             </td>
             <td>
               <div class="d-flex flex-column ga-1">
-                <div v-if="doc.metaStatus" class="d-flex align-center ga-1">
-                  <v-icon :color="metaStatusColor(doc.metaStatus)" icon="mdi-circle" size="9" />
-                  <span class="text-body-2 font-weight-medium">{{ doc.metaStatus }}</span>
-                </div>
-                <v-chip v-else size="x-small" :color="workflowStageColor(doc.workflowStage)" rounded="pill">
+                <v-chip
+                  v-if="doc.metaStatus"
+                  size="x-small"
+                  :color="metaStatusColor(doc.metaStatus)"
+                  variant="tonal"
+                  rounded="pill"
+                >
+                  <v-icon start icon="mdi-circle" size="8" />
+                  {{ doc.metaStatus }}
+                </v-chip>
+                <v-chip
+                  v-else
+                  size="x-small"
+                  :color="workflowStageColor(doc.workflowStage)"
+                  variant="tonal"
+                  rounded="pill"
+                >
                   <v-icon start icon="mdi-circle" size="8" />
                   {{ doc.workflowStage }}
                 </v-chip>
