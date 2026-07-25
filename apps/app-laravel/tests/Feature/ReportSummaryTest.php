@@ -85,6 +85,46 @@ class ReportSummaryTest extends TestCase
         $this->assertSame($failed, $res->json('documents.0.id'));
     }
 
+    public function test_summary_totals_include_relations_and_legacy_links(): void
+    {
+        $store = app(ReviewStore::class);
+        $agency = 'AGENCY_'.uniqid();
+
+        // Doc A: 2 relations, 1 repealed reference.
+        $a = 'd_rel_'.uniqid();
+        $store->setStatus($a, ['status' => 'done', 'source_file' => 'a.docx']);
+        $store->writeReviewDocument($a, [
+            'document_id' => $a, 'source_file' => 'a.docx', 'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => ['law_type' => 'ประกาศ', 'agencies' => [$agency], 'repealed_laws' => ['พ.ร.บ. เก่า ๒๕๔๐']],
+            'relations' => [
+                ['id' => 'r1', 'scope' => 'document', 'type' => 'related', 'target_title' => 'X'],
+                ['id' => 'r2', 'scope' => 'document', 'type' => 'amends', 'target_title' => 'Y'],
+            ],
+            'pages' => [],
+        ]);
+
+        // Doc B: 1 relation, no repealed references.
+        $b = 'd_rel_'.uniqid();
+        $store->setStatus($b, ['status' => 'done', 'source_file' => 'b.docx']);
+        $store->writeReviewDocument($b, [
+            'document_id' => $b, 'source_file' => 'b.docx', 'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => ['law_type' => 'ประกาศ', 'agencies' => [$agency]],
+            'relations' => [
+                ['id' => 'r3', 'scope' => 'document', 'type' => 'related', 'target_title' => 'Z'],
+            ],
+            'pages' => [],
+        ]);
+
+        $res = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency));
+        $res->assertOk();
+        $res->assertJsonPath('totals.relations', 3);
+        $res->assertJsonPath('totals.legacy_links', 1);
+    }
+
     public function test_list_law_meta_returns_rows_with_meta_fields(): void
     {
         $store = app(ReviewStore::class);

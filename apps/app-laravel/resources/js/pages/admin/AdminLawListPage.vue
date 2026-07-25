@@ -4,6 +4,12 @@
     title="จัดการตัวบทกฎหมาย"
     subtitle="จัดการกฎหมายทั้งหมด ค้นหา แก้ไข ความสัมพันธ์ และเวอร์ชัน"
   >
+    <template #title-actions>
+      <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" rounded="lg" to="/admin/upload">
+        เพิ่มกฎหมายใหม่
+      </v-btn>
+    </template>
+
     <!-- Type stat tabs -->
     <v-row class="mb-5">
       <v-col v-for="stat in typeStats" :key="stat.value" cols="6" sm="3">
@@ -122,7 +128,7 @@
               </div>
             </td>
             <td>
-              <v-chip v-if="law.lawType" size="x-small" :color="typeColor(law.lawType)" rounded="pill">{{ law.lawType }}</v-chip>
+              <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ law.lawType }}</v-chip>
             </td>
             <td>
               <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" rounded="pill">
@@ -144,7 +150,7 @@
       <v-divider />
       <div class="d-flex justify-space-between align-center pa-3">
         <span class="text-caption text-medium-emphasis">
-          กำลังแสดงผล {{ filteredLaws.length.toLocaleString('th-TH') }} จากทั้งหมด {{ laws.length.toLocaleString('th-TH') }} รายการ
+          กำลังแสดงผล {{ rangeStart.toLocaleString('th-TH') }} - {{ rangeEnd.toLocaleString('th-TH') }} จากทั้งหมด {{ filteredLaws.length.toLocaleString('th-TH') }} รายการ
         </span>
         <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" rounded="circle" density="compact" />
       </div>
@@ -161,7 +167,7 @@ import AppShell from '../../components/shared/AppShell.vue';
 const PAGE_SIZE = 20;
 
 const summary = ref<ReportSummary>({
-  totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0 },
+  totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
   by_type: [],
   by_group: [],
   by_agency: [],
@@ -336,6 +342,8 @@ const filteredLaws = computed(() => {
 
 const pageCount = computed(() => Math.ceil(filteredLaws.value.length / PAGE_SIZE));
 const pagedLaws = computed(() => filteredLaws.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE));
+const rangeStart = computed(() => (filteredLaws.value.length === 0 ? 0 : (page.value - 1) * PAGE_SIZE + 1));
+const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, filteredLaws.value.length));
 
 function typeColor(type: string): string {
   return TYPE_META[type]?.color ?? 'grey';
@@ -346,7 +354,7 @@ function typeColor(type: string): string {
 <style scoped>
 .type-tab {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-top: 3px solid rgb(var(--accent));
+  border-left: 4px solid rgb(var(--accent));
   cursor: pointer;
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -356,7 +364,7 @@ function typeColor(type: string): string {
 .type-tab--active {
   background: rgba(var(--accent), 0.06);
   border: 1px solid rgb(var(--accent));
-  border-top: 3px solid rgb(var(--accent));
+  border-left: 4px solid rgb(var(--accent));
 }
 .type-tab__icon {
   background: rgba(var(--accent), 0.14);

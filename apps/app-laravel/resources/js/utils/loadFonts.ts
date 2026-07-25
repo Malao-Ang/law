@@ -16,8 +16,10 @@ const FONTS: Array<{ family: string; url: string; weight: string; style: string 
 export function loadThaiEditorFonts(): void {
   if (typeof FontFace === 'undefined') return;
 
+  const fontSet = document.fonts as FontFaceSet & { add(font: FontFace): void };
+
   for (const { family, url, weight, style } of FONTS) {
     const face = new FontFace(family, `url(${url})`, { weight, style });
-    face.load().then(loaded => document.fonts.add(loaded)).catch(() => {});
+    face.load().then(loaded => fontSet.add(loaded)).catch(() => {});
   }
 }

@@ -391,7 +391,15 @@ export interface ReportDocument {
 }
 
 export interface ReportSummary {
-  totals: { all: number; published: number; processing: number; failed: number; esign: number };
+  totals: {
+    all: number;
+    published: number;
+    processing: number;
+    failed: number;
+    esign: number;
+    relations: number;
+    legacy_links: number;
+  };
   by_type: ReportBucket[];
   by_group: ReportBucket[];
   by_agency: ReportBucket[];

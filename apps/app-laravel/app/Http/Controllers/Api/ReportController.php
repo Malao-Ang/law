@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    private const PUBLISHED = ['done', 'exported', 'ingested'];
+    private const PUBLISHED = ['exported', 'ingested'];
 
     private const PROCESSING = ['queued', 'processing', 'ingesting'];
 
@@ -72,6 +72,14 @@ class ReportController extends Controller
             'processing' => $count(self::PROCESSING),
             'failed' => $count(['failed']),
             'esign' => 0, // ponytail: no eSign workflow yet, add when signing lands
+            'relations' => array_sum(array_map(
+                static fn (array $r): int => (int) ($r['relations_count'] ?? 0),
+                $rows,
+            )),
+            'legacy_links' => array_sum(array_map(
+                static fn (array $r): int => (int) ($r['legacy_link_count'] ?? 0),
+                $rows,
+            )),
         ];
     }
 

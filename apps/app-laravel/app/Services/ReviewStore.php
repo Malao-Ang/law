@@ -179,6 +179,15 @@ class ReviewStore
                     'agencies' => $agencies,
                     'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
+                    'relations_count' => is_array($review['relations'] ?? null)
+                        ? count($review['relations'])
+                        : 0,
+                    'legacy_link_count' => is_array($meta['repealed_laws'] ?? null)
+                        ? count(array_filter(
+                            $meta['repealed_laws'],
+                            static fn ($x): bool => trim((string) $x) !== '',
+                        ))
+                        : 0,
                     'page_count' => is_array($review['summary'] ?? null) ? (int) ($review['summary']['page_count'] ?? 0) : 0,
                     'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
                     'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,

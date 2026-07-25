@@ -113,7 +113,7 @@ import AppShell from '../../components/shared/AppShell.vue';
 const router = useRouter();
 
 const summary = ref<ReportSummary>({
-  totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0 },
+  totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
   by_type: [], by_group: [], by_agency: [], by_year: [], documents: [],
 });
 const filters = reactive<ReportFilters>({ date_from: '', date_to: '', type: '', status: '', group: [], agency: [] });
