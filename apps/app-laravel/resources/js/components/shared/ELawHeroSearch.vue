@@ -108,13 +108,14 @@ async function applyPopularTag(tag: string): Promise<void> {
               </template>
               <template #append-inner>
                 <v-btn
-                  color="#ab7f29"
+                  color="#343028"
                   variant="flat"
                   rounded="lg"
-                  size="small"
+                  size="default"
                   class="elaw-search-card__search-btn"
                   @click="emitSearch"
                 >
+                  <v-icon icon="mdi-magnify" size="15" start />
                   ค้นหาทันที
                 </v-btn>
               </template>
@@ -146,135 +147,164 @@ async function applyPopularTag(tag: string): Promise<void> {
 </template>
 
 <style scoped>
+/* ── Hero section ──────────────────────────────────── */
 .elaw-hero {
-  background: linear-gradient(180deg, #f8f7f1 8%, #fff4b5 100%);
+  background: linear-gradient(180deg, #f8f7f1 8.17%, #fff4b5 100%);
   border-bottom: 1px solid #eadfcb;
-  min-height: 100vh;
-  padding: 24px 24px 40px;
+  padding: 50px 24px 60px;
 }
 
 .elaw-hero__container {
-  min-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
-  justify-content: start;
+  align-items: center;
 }
 
+/* Eyebrow pill — exact Figma: white bg, border rgba(123,88,13,0.3), text #7b580d 12px */
 .elaw-hero__eyebrow {
   display: inline-flex;
   align-items: center;
   padding: 5px 13px;
-  border: 1px solid #d9c9ab;
+  border: 1px solid rgba(123, 88, 13, 0.3);
   border-radius: 9999px;
-  color: rgb(var(--v-theme-primary));
-  background: rgba(255, 255, 255, 0.82);
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
+  background: #ffffff;
+  color: #7b580d;
+  font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
   margin-bottom: 16px;
 }
 
+/* H1: 64px two-color — first line #7b580d, second line #1f1b14 */
 .elaw-hero__title {
-  font-size: clamp(1.85rem, 3.2vw, 3rem);
-  line-height: 1.6;
-  color: #33302a;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-weight: 700;
+  line-height: 65px;
+  color: #1f1b14;
+  text-align: center;
+  margin-bottom: 12px;
 }
 
 .elaw-hero__title-accent {
-  color: rgb(var(--v-theme-primary));
+  color: #7b580d;
 }
 
+/* Subtitle: 24px #4e4538 */
 .elaw-hero__subtitle {
-  color: #6e685e;
-  font-size: 1.3rem;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #4e4538;
+  text-align: center;
+  margin-bottom: 28px;
 }
 
+/* ── Search card — exact Figma: rounded-32px, blur, border #e7e2d9, shadow ── */
 .elaw-search-card {
-  background: rgb(var(--v-theme-detail-surface));
-  border: 1px solid #e8dcc7 !important;
-  box-shadow: 0 18px 46px rgba(186, 151, 63, 0.15) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(6px) !important;
+  border: 1px solid #e7e2d9 !important;
+  border-radius: 32px !important;
+  box-shadow: 0 10px 40px 0 rgba(75, 70, 61, 0.08) !important;
+  max-width: 992px;
+  width: 100%;
 }
 
+/* Label: 18px TH Sarabun New Bold #4e4538 */
 .elaw-search-card__label {
-  color: #7d705a;
   font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
+  color: #4e4538;
+  letter-spacing: 0.36px;
+  margin: 0 0 5px;
 }
 
-.elaw-search-card__search-btn {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff !important;
-  margin-right: -4px;
+/* Category dropdown — white bg, border #d2c5b3, rounded 16px */
+.elaw-search-card :deep(.v-field) {
+  border-radius: 16px !important;
+  border-color: #d2c5b3 !important;
+  background: #ffffff !important;
 }
 
+/* Search input row */
 .elaw-search-card__search-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
+  width: 100%;
 }
 
+/* Search input: border #d2c5b3, rounded 16px */
 .elaw-search-card__query :deep(.v-field) {
-  border-radius: 20px;
+  border-radius: 16px !important;
+  border-color: #d2c5b3 !important;
+  background: #ffffff !important;
 }
 
-.elaw-search-card__query :deep(.v-field__append-inner) {
-  padding-inline-end: 10px;
+.elaw-search-card__query :deep(.v-field__input) {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 22px;
+  color: #6b7280;
 }
 
-.elaw-search-card__query :deep(.v-icon) {
-  color: rgba(52, 48, 40, 1);
+/* Search button: #343028, rounded 12px */
+.elaw-search-card__search-btn {
+  background: #343028 !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 20px !important;
+  font-weight: 700;
+  letter-spacing: 0.36px;
+  padding: 0 24px !important;
+  height: 48px !important;
+  margin-right: 0;
 }
 
+/* Trending row */
 .elaw-search-card__tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  padding-top: 18px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(210, 197, 179, 0.3);
+  margin-top: 8px;
 }
 
+/* Trending label: #7b580d 18px */
 .elaw-search-card__tags-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #9b7625;
-  font-size: 1rem;
+  color: #7b580d;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.36px;
   white-space: nowrap;
 }
 
+/* Trending pill: white bg, border #d2c5b3, text #4e4538 16px */
 .elaw-search-card__tag {
-  border-color: #e2d7c4;
-  color: #7a6551;
-  background: #fffdfa;
+  background: #ffffff !important;
+  border-color: #d2c5b3 !important;
+  color: #4e4538 !important;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 16px !important;
+  font-weight: 700;
+  padding: 7px 17px !important;
 }
 
 @media (max-width: 640px) {
   .elaw-hero {
-    min-height: auto;
-    padding: 32px 16px 32px;
+    padding: 32px 16px 40px;
   }
-
-  .elaw-hero__container {
-    min-height: auto;
-    justify-content: flex-start;
-  }
-
   .elaw-hero__title {
-    font-size: clamp(1.55rem, 7vw, 2.25rem);
+    font-size: clamp(1.6rem, 7vw, 2.4rem);
+    line-height: 1.5;
   }
-
   .elaw-hero__subtitle {
-    font-size: 1.05rem;
-  }
-
-  .elaw-search-card__search-row {
-    grid-template-columns: 1fr;
-  }
-
-  .elaw-search-card__tags {
-    align-items: flex-start;
+    font-size: 18px;
   }
 }
 </style>
