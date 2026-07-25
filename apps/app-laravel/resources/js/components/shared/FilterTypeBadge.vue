@@ -48,14 +48,13 @@ withDefaults(defineProps<{ options?: string[] }>(), {
 }
 
 .filter-pill:focus-visible {
-  outline: 2px solid #ab7f29;
+  outline: 2px solid #b68d40;
   outline-offset: 2px;
 }
 
-/* ponytail: active fill falls back to the current gold primary until the missing Figma node is fetched. */
 .filter-pill--active {
-  background: #ab7f29;
-  border-color: #ab7f29;
-  color: #ffffff;
+  background: #b68d40;
+  border-color: #b68d40;
+  color: #3c2900;
 }
 </style>

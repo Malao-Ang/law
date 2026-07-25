@@ -73,8 +73,8 @@ function isActive(item: NavItem): boolean {
   white-space: nowrap;
 }
 
-/* ponytail: active color falls back to the current gold primary until the missing Figma node is fetched. */
 .main-nav__item--active {
-  color: #ab7f29;
+  color: #7b580d;
+  border-bottom: 1px solid #7b580d;
 }
 </style>
