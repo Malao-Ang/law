@@ -145,18 +145,10 @@
               type="button"
               class="adm-btn adm-btn--primary"
               :disabled="isUploading || allDone"
-              @click="uploadAll"
+              @click="confirmDialog = true"
             >
-              <v-progress-circular
-                v-if="isUploading"
-                indeterminate
-                size="16"
-                width="2"
-                color="white"
-                class="mr-2"
-              />
-              <v-icon v-else icon="mdi-cloud-upload-outline" size="16" class="mr-1" />
-              {{ isUploading ? 'กำลังอัปโหลด...' : `อัปโหลด ${pendingCount} ไฟล์` }}
+              <v-icon icon="mdi-cloud-upload-outline" size="16" class="mr-1" />
+              {{ `อัปโหลด ${pendingCount} ไฟล์` }}
             </button>
 
             <button
@@ -170,6 +162,48 @@
           </div>
         </div>
       </template>
+
+      <!-- ── Confirm upload dialog ──────────────────────── -->
+      <v-dialog v-model="confirmDialog" max-width="520" persistent>
+        <v-card rounded="xl">
+          <v-card-title class="pa-5 pb-2 d-flex align-center gap-2">
+            <v-icon icon="mdi-cloud-upload-outline" color="admin-primary" />
+            <span style="font-family:'TH Sarabun New','Sarabun',sans-serif;font-size:20px;font-weight:700">
+              ยืนยันการอัปโหลด
+            </span>
+          </v-card-title>
+
+          <v-card-text class="px-5 pb-3">
+            <p class="mb-3" style="font-family:'TH Sarabun New','Sarabun',sans-serif;font-size:16px;color:#374151">
+              ระบบจะอัปโหลดและเริ่มประมวลผลเอกสารต่อไปนี้:
+            </p>
+            <div class="confirm-file-list">
+              <div
+                v-for="(item, i) in pendingItems.filter(i => !i.done)"
+                :key="i"
+                class="confirm-file-row"
+              >
+                <v-icon :icon="iconFor(item.file)" size="18" color="admin-primary" />
+                <div class="confirm-file-row__body">
+                  <span class="confirm-file-row__name">{{ item.file.name }}</span>
+                  <span class="confirm-file-row__meta">{{ sizeOf(item.file) }} • {{ modeLabel(item.scanMode) }}</span>
+                </div>
+              </div>
+            </div>
+          </v-card-text>
+
+          <v-divider />
+          <v-card-actions class="pa-4 gap-2 justify-end">
+            <button type="button" class="adm-btn adm-btn--ghost" style="font-size:15px;padding:8px 20px" @click="confirmDialog = false">
+              ยกเลิก
+            </button>
+            <button type="button" class="adm-btn adm-btn--primary" style="font-size:15px;padding:8px 20px" @click="confirmAndUpload">
+              <v-icon icon="mdi-check" size="16" class="mr-1" />
+              ยืนยันอัปโหลด
+            </button>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <!-- ── Queue table (always visible) ──────────────── -->
       <DocumentPipelineTable ref="pipelineTable" class="mt-2" />
@@ -199,6 +233,7 @@ const snackbar = useSnackbarStore();
 const fileInputEl = ref<HTMLInputElement | null>(null);
 const pendingItems = ref<PendingItem[]>([]);
 const dragOver = ref(false);
+const confirmDialog = ref(false);
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const isUploading = computed(() => pendingItems.value.some(i => i.uploading));
@@ -231,6 +266,13 @@ function modeOptionsFor(file: File) {
         { title: 'Local — Fast PHP extraction (แนะนำ)', value: 'local' },
         { title: 'Standard — Python Docling', value: 'auto' },
       ];
+}
+
+function modeLabel(mode: ScanExtractionMode): string {
+  const map: Record<ScanExtractionMode, string> = {
+    gemini: 'Gemini Vision', auto: 'Auto OCR', landingai: 'LandingAI', local: 'Local',
+  };
+  return map[mode] ?? mode;
 }
 
 function hintFor(item: PendingItem): string {
@@ -280,6 +322,11 @@ function onInputChange(event: Event): void {
 function onDrop(event: DragEvent): void {
   dragOver.value = false;
   if (event.dataTransfer?.files.length) addFiles(event.dataTransfer.files);
+}
+
+async function confirmAndUpload(): Promise<void> {
+  confirmDialog.value = false;
+  await uploadAll();
 }
 
 async function uploadAll(): Promise<void> {
@@ -594,4 +641,46 @@ async function uploadAll(): Promise<void> {
 
 /* gap utility for flex */
 .gap-3 { gap: 12px; }
+
+/* ── Confirm dialog file list ───────────────────────────── */
+.confirm-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.confirm-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.confirm-file-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.confirm-file-row__name {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confirm-file-row__meta {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 12px;
+  color: #6b7280;
+}
 </style>

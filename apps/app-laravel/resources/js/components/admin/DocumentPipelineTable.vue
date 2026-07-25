@@ -8,13 +8,30 @@
     </div>
     <v-divider />
 
+    <div v-if="selected.length" class="d-flex align-center gap-2 px-5 py-2 pipeline-sel-bar">
+      <span class="text-body-2 font-weight-medium">เลือก {{ selected.length }} รายการ</span>
+      <v-spacer />
+      <v-btn
+        size="small"
+        variant="tonal"
+        color="error"
+        prepend-icon="mdi-delete-outline"
+        class="text-none"
+        @click="selected = []"
+      >
+        ยกเลิกการเลือก
+      </v-btn>
+    </div>
+
     <v-data-table
+      v-model="selected"
       :headers="headers"
       :items="rows"
       :items-per-page="10"
       :loading="loading"
       item-value="documentId"
       density="comfortable"
+      show-select
       class="pipeline-table"
     >
       <template #item.title="{ item }">
@@ -94,6 +111,7 @@ interface Row {
 
 const router = useRouter();
 const docs = ref<DocumentListItem[]>([]);
+const selected = ref<string[]>([]);
 const localStages = ref<Record<string, StageKey>>(readStages());
 const loading = ref(false);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -202,5 +220,10 @@ defineExpose({ load });
   color: rgba(var(--v-theme-secondary), 0.6) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
+}
+
+.pipeline-sel-bar {
+  background: rgba(var(--v-theme-admin-primary), 0.05);
+  border-bottom: 1px solid rgba(var(--v-theme-admin-primary), 0.12);
 }
 </style>
