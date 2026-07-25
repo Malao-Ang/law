@@ -18,16 +18,21 @@
         flat
         border
         rounded="lg"
-        class="flex-1-1 pa-5"
+        class="flex-1-1 pa-5 adm-stat-card"
         style="min-width: 180px"
       >
-        <div class="d-flex align-center ga-2 mb-3">
-          <v-icon :icon="stat.icon" :color="stat.color" size="20" />
-          <span class="text-body-2 font-weight-bold">{{ stat.type }}</span>
-          <v-spacer />
-          <v-chip v-if="stat.recent > 0" size="x-small" :color="stat.color" variant="tonal" rounded="pill">
-            +{{ stat.recent }} เดือนนี้
-          </v-chip>
+        <div class="d-flex align-center ga-3 mb-3">
+          <div class="adm-stat-icon" :style="`--stat-color: rgb(var(--v-theme-${stat.color}))`">
+            <v-icon :icon="stat.icon" :color="stat.color" size="18" />
+          </div>
+          <div class="flex-1 min-width-0">
+            <div class="d-flex align-center ga-2">
+              <span class="text-body-2 font-weight-bold text-truncate">{{ stat.type }}</span>
+              <v-chip v-if="stat.recent > 0" size="x-small" :color="stat.color" variant="tonal" rounded="pill" class="flex-shrink-0">
+                +{{ stat.recent }} เดือนนี้
+              </v-chip>
+            </div>
+          </div>
         </div>
         <div class="d-flex align-end ga-1">
           <span class="text-h4 font-weight-bold">{{ stat.count.toLocaleString('th-TH') }}</span>
@@ -111,11 +116,20 @@
                   กฎหมายแม่บท
                 </v-chip>
               </div>
-              <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
-                <span v-if="law.childCount">
-                  <v-icon size="11" icon="mdi-sitemap" />
+              <div v-if="law.childCount" class="d-flex ga-2 mb-1">
+                <v-chip
+                  size="x-small"
+                  color="teal"
+                  variant="tonal"
+                  rounded="pill"
+                  :to="`/documents/${law.id}/relations`"
+                  @click.stop
+                >
+                  <v-icon start icon="mdi-sitemap" size="10" />
                   มีกฎหมายลูก {{ law.childCount }} ฉบับ
-                </span>
+                </v-chip>
+              </div>
+              <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
                 <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
                 <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
                 <span v-if="law.pages > 0 || law.sections != null">
@@ -142,9 +156,20 @@
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
             <td>
-              <div class="d-flex ga-1">
-                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" :to="`/documents/${law.id}/review`" />
+              <div class="d-flex align-center ga-1">
+                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="admin-primary" :to="`/documents/${law.id}/review`" />
                 <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}`" />
+                <v-menu>
+                  <template #activator="{ props: menuProps }">
+                    <v-btn icon="mdi-dots-vertical" size="x-small" variant="text" color="grey" v-bind="menuProps" />
+                  </template>
+                  <v-list density="compact" rounded="lg" min-width="160">
+                    <v-list-item :to="`/documents/${law.id}/law-info`" prepend-icon="mdi-information-outline" title="ข้อมูลกฎหมาย" />
+                    <v-list-item :to="`/documents/${law.id}/relations`" prepend-icon="mdi-graph-outline" title="ความสัมพันธ์" />
+                    <v-divider class="my-1" />
+                    <v-list-item :to="`/documents/${law.id}/rag`" prepend-icon="mdi-database-export-outline" title="RAG Export" />
+                  </v-list>
+                </v-menu>
               </div>
             </td>
           </tr>
@@ -354,5 +379,17 @@ function metaStatusColor(status: string): string {
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
 }
-
 </script>
+
+<style scoped>
+.adm-stat-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--stat-color) 12%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+</style>
