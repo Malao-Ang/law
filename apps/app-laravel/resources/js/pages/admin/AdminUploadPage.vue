@@ -7,206 +7,192 @@
   >
     <div class="adm-up">
 
-      <!-- ── Step 0: Drop zone ──────────────────────────── -->
-      <template v-if="!pendingItems.length">
-        <div
-          class="adm-drop"
-          :class="{ 'adm-drop--over': dragOver }"
-          @dragover.prevent="dragOver = true"
-          @dragleave.prevent="dragOver = false"
-          @drop.prevent="onDrop"
-        >
-          <input
-            ref="fileInputEl"
-            type="file"
-            accept=".pdf,.doc,.docx"
-            multiple
-            class="adm-drop__input"
-            @change="onInputChange"
-          />
-          <div class="adm-drop__icon">
-            <v-icon icon="mdi-cloud-upload-outline" size="30" color="white" />
-          </div>
-          <p class="adm-drop__title">ลากและวางไฟล์ข้อมูลกฎหมาย</p>
-          <p class="adm-drop__sub">
-            รองรับไฟล์ .PDF หรือ .DOCX (เลือกได้หลายไฟล์พร้อมกัน)
-          </p>
-          <div class="adm-drop__btns">
-            <button type="button" class="adm-btn adm-btn--primary" @click="fileInputEl?.click()">
-              เลือกไฟล์จากเครื่อง
-            </button>
-          </div>
-        </div>
-      </template>
+      <!-- ── Drop zone ─────────────────────────────────────── -->
+      <div
+        class="adm-drop"
+        :class="{ 'adm-drop--over': dragOver }"
+        @dragover.prevent="dragOver = true"
+        @dragleave.prevent="dragOver = false"
+        @drop.prevent="onDrop"
+      >
+        <input
+          ref="fileInputEl"
+          type="file"
+          accept=".pdf,.doc,.docx"
+          multiple
+          class="adm-drop__input"
+          @change="onInputChange"
+        />
 
-      <!-- ── Step 1: Files pending ──────────────────────── -->
-      <template v-else>
-        <!-- Card: file list -->
-        <div class="adm-card mb-4">
-          <div class="adm-card__head-row">
-            <h3 class="adm-card__head">ไฟล์เอกสาร ({{ pendingItems.length }} ไฟล์)</h3>
+        <div class="adm-drop__icon-ring" :class="{ 'adm-drop__icon-ring--active': dragOver }">
+          <v-icon
+            :icon="dragOver ? 'mdi-tray-arrow-down' : 'mdi-cloud-upload-outline'"
+            size="40"
+          />
+        </div>
+
+        <p class="adm-drop__title">
+          {{ dragOver ? 'ปล่อยไฟล์เพื่ออัปโหลด' : 'ลากไฟล์มาวางที่นี่' }}
+        </p>
+        <p class="adm-drop__sub">รองรับ PDF, DOCX และ DOC — เลือกได้หลายไฟล์พร้อมกัน</p>
+
+        <div class="adm-drop__or"><span>หรือ</span></div>
+
+        <button
+          type="button"
+          class="adm-btn adm-btn--primary adm-drop__cta"
+          @click.stop="fileInputEl?.click()"
+        >
+          <v-icon icon="mdi-folder-open-outline" size="18" />
+          เลือกไฟล์จากเครื่อง
+        </button>
+
+        <div class="adm-ftypes">
+          <span class="adm-ftype adm-ftype--pdf">PDF</span>
+          <span class="adm-ftype adm-ftype--docx">DOCX</span>
+          <span class="adm-ftype adm-ftype--doc">DOC</span>
+        </div>
+      </div>
+
+      <!-- ── Pending bar ─────────────────────────────────── -->
+      <div v-if="pendingItems.length && !uploadDialog" class="adm-review-bar">
+        <v-icon icon="mdi-file-multiple-outline" size="18" color="admin-primary" />
+        <span class="adm-review-bar__text">เลือกไว้ {{ pendingItems.length }} ไฟล์</span>
+        <v-spacer />
+        <button type="button" class="adm-btn adm-btn--primary" @click="uploadDialog = true">
+          <v-icon icon="mdi-upload-outline" size="17" />
+          ตรวจสอบและอัปโหลด
+        </button>
+      </div>
+
+      <!-- ── Upload dialog ──────────────────────────────── -->
+      <v-dialog v-model="uploadDialog" max-width="640" persistent scrollable>
+        <v-card rounded="xl">
+
+          <!-- Dialog header -->
+          <div class="adm-dlg-head">
+            <v-icon icon="mdi-file-document-multiple-outline" color="admin-primary" size="22" />
+            <div class="flex-1">
+              <div class="adm-dlg-head__title">รายการไฟล์</div>
+              <div class="adm-dlg-head__sub">{{ pendingItems.length }} ไฟล์ที่เลือก</div>
+            </div>
             <button type="button" class="adm-btn-sm adm-btn-sm--outline" @click="fileInputEl?.click()">
-              <v-icon icon="mdi-plus" size="14" />
+              <v-icon icon="mdi-plus" size="15" />
               เพิ่มไฟล์
             </button>
           </div>
 
-          <input
-            ref="fileInputEl"
-            type="file"
-            accept=".pdf,.doc,.docx"
-            multiple
-            class="adm-drop__input"
-            style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px"
-            @change="onInputChange"
-          />
+          <v-divider />
 
-          <div class="adm-file-list">
-            <div v-for="(item, i) in pendingItems" :key="i" class="adm-file-item">
-              <!-- navy row -->
-              <div class="adm-file-row">
-                <div class="adm-file-row__icon">
-                  <v-icon :icon="iconFor(item.file)" size="20" color="white" />
+          <v-card-text class="px-5 py-3">
+            <div class="adm-file-list">
+              <div v-for="(item, i) in pendingItems" :key="i" class="adm-file-item">
+
+                <!-- File row -->
+                <div class="adm-file-row">
+                  <div
+                    class="adm-file-icon"
+                    :class="isPdf(item.file) ? 'adm-file-icon--pdf' : 'adm-file-icon--doc'"
+                  >
+                    <v-icon :icon="iconFor(item.file)" size="22" />
+                  </div>
+                  <div class="adm-file-row__body">
+                    <span class="adm-file-row__name">{{ item.file.name }}</span>
+                    <span class="adm-file-row__meta">
+                      {{ isPdf(item.file) ? 'PDF' : 'Word' }} · {{ sizeOf(item.file) }}
+                    </span>
+                  </div>
+                  <div class="adm-file-row__end">
+                    <v-chip v-if="item.done" color="success" size="x-small" variant="tonal" rounded="pill">
+                      <v-icon start icon="mdi-check" size="11" />อัปโหลดแล้ว
+                    </v-chip>
+                    <v-progress-circular
+                      v-else-if="item.uploading"
+                      indeterminate
+                      size="20"
+                      width="2"
+                      color="admin-primary"
+                    />
+                    <button
+                      v-if="!item.uploading && !item.done"
+                      type="button"
+                      class="adm-remove-btn"
+                      title="ลบออก"
+                      @click="removeItem(i)"
+                    >
+                      <v-icon icon="mdi-close" size="15" />
+                    </button>
+                  </div>
                 </div>
-                <div class="adm-file-row__body">
-                  <span class="adm-file-row__name">{{ item.file.name }}</span>
-                  <span class="adm-file-row__meta">{{ sizeOf(item.file) }}</span>
+
+                <!-- OCR mode row -->
+                <div v-if="!item.done" class="adm-file-ocr">
+                  <v-icon icon="mdi-cog-outline" size="14" color="grey-darken-1" />
+                  <span class="adm-label-sm">โหมดสกัด:</span>
+                  <v-select
+                    v-model="item.scanMode"
+                    :items="modeOptionsFor(item.file)"
+                    item-title="title"
+                    item-value="value"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    rounded="lg"
+                    style="flex:1;max-width:380px"
+                  />
+                  <v-chip v-if="hintFor(item)" size="x-small" color="warning" variant="tonal" rounded="pill">
+                    <v-icon start icon="mdi-key-outline" size="10" />
+                    {{ hintFor(item) }}
+                  </v-chip>
                 </div>
-                <v-chip
-                  v-if="item.done"
-                  color="success"
-                  size="small"
-                  variant="flat"
-                  class="mr-2"
-                >
-                  <v-icon start icon="mdi-check" size="13" />อัปโหลดแล้ว
-                </v-chip>
-                <v-progress-circular
-                  v-else-if="item.uploading"
-                  indeterminate
-                  size="18"
-                  width="2"
-                  color="white"
-                  class="mr-2"
-                />
-                <button
-                  v-if="!item.uploading && !item.done"
-                  type="button"
-                  class="adm-file-row__remove"
-                  @click="removeItem(i)"
-                >
-                  <v-icon icon="mdi-close" size="16" />
-                </button>
+
+                <v-alert v-if="item.error" type="error" density="compact" rounded="lg" class="mt-2 mx-4 mb-3">
+                  {{ item.error }}
+                </v-alert>
               </div>
 
-              <!-- OCR selector row -->
-              <div v-if="!item.done" class="adm-file-ocr">
-                <span class="adm-label-sm">โหมด:</span>
-                <v-select
-                  v-model="item.scanMode"
-                  :items="modeOptionsFor(item.file)"
-                  item-title="title"
-                  item-value="value"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  rounded="lg"
-                  style="flex:1;max-width:420px"
-                />
-                <span v-if="hintFor(item)" class="adm-hint">{{ hintFor(item) }}</span>
-              </div>
-
-              <v-alert
-                v-if="item.error"
-                type="error"
-                density="compact"
-                rounded="lg"
-                class="mt-2"
-              >
-                {{ item.error }}
-              </v-alert>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card: Upload action -->
-        <div class="adm-card mb-4">
-          <div class="adm-warn mb-4">
-            <v-icon icon="mdi-information-outline" size="18" color="#1d4ed8" class="flex-shrink-0" style="margin-top:2px" />
-            <div>
-              <p class="adm-warn__title mb-0" style="color:#1e3a8a">
-                หลังอัปโหลดสำเร็จ สามารถคลิกเปิดเอกสารในตารางด้านล่างเพื่อตรวจสอบและแก้ไขได้ทันที
-              </p>
-            </div>
-          </div>
-
-          <div class="d-flex gap-3 align-center">
-            <button
-              type="button"
-              class="adm-btn adm-btn--primary"
-              :disabled="isUploading || allDone"
-              @click="confirmDialog = true"
-            >
-              <v-icon icon="mdi-cloud-upload-outline" size="16" class="mr-1" />
-              {{ `อัปโหลด ${pendingCount} ไฟล์` }}
-            </button>
-
-            <button
-              type="button"
-              class="adm-btn adm-btn--ghost"
-              :disabled="isUploading"
-              @click="clearAll"
-            >
-              ยกเลิก
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <!-- ── Confirm upload dialog ──────────────────────── -->
-      <v-dialog v-model="confirmDialog" max-width="520" persistent>
-        <v-card rounded="xl">
-          <v-card-title class="pa-5 pb-2 d-flex align-center gap-2">
-            <v-icon icon="mdi-cloud-upload-outline" color="admin-primary" />
-            <span style="font-family:'TH Sarabun New','Sarabun',sans-serif;font-size:20px;font-weight:700">
-              ยืนยันการอัปโหลด
-            </span>
-          </v-card-title>
-
-          <v-card-text class="px-5 pb-3">
-            <p class="mb-3" style="font-family:'TH Sarabun New','Sarabun',sans-serif;font-size:16px;color:#374151">
-              ระบบจะอัปโหลดและเริ่มประมวลผลเอกสารต่อไปนี้:
-            </p>
-            <div class="confirm-file-list">
-              <div
-                v-for="(item, i) in pendingItems.filter(i => !i.done)"
-                :key="i"
-                class="confirm-file-row"
-              >
-                <v-icon :icon="iconFor(item.file)" size="18" color="admin-primary" />
-                <div class="confirm-file-row__body">
-                  <span class="confirm-file-row__name">{{ item.file.name }}</span>
-                  <span class="confirm-file-row__meta">{{ sizeOf(item.file) }} • {{ modeLabel(item.scanMode) }}</span>
-                </div>
+              <div v-if="!pendingItems.length" class="adm-empty">
+                <v-icon icon="mdi-inbox-outline" size="36" color="grey-lighten-1" />
+                <p>ยังไม่มีไฟล์ที่เลือก</p>
               </div>
             </div>
           </v-card-text>
 
           <v-divider />
-          <v-card-actions class="pa-4 gap-2 justify-end">
-            <button type="button" class="adm-btn adm-btn--ghost" style="font-size:15px;padding:8px 20px" @click="confirmDialog = false">
-              ยกเลิก
+
+          <!-- Actions -->
+          <v-card-actions class="pa-4 ga-2 justify-end">
+            <button
+              type="button"
+              class="adm-btn adm-btn--ghost"
+              :disabled="isUploading"
+              @click="uploadDialog = false"
+            >
+              ปิด
             </button>
-            <button type="button" class="adm-btn adm-btn--primary" style="font-size:15px;padding:8px 20px" @click="confirmAndUpload">
-              <v-icon icon="mdi-check" size="16" class="mr-1" />
-              ยืนยันอัปโหลด
+            <button
+              type="button"
+              class="adm-btn adm-btn--ghost"
+              :disabled="isUploading || !pendingItems.length"
+              @click="clearAll"
+            >
+              ล้างทั้งหมด
+            </button>
+            <button
+              type="button"
+              class="adm-btn adm-btn--primary"
+              :disabled="isUploading || allDone || !pendingCount"
+              @click="uploadAll"
+            >
+              <v-icon icon="mdi-cloud-upload-outline" size="17" />
+              อัปโหลด {{ pendingCount }} ไฟล์
             </button>
           </v-card-actions>
         </v-card>
       </v-dialog>
 
-      <!-- ── Queue table (always visible) ──────────────── -->
-      <DocumentPipelineTable ref="pipelineTable" class="mt-2" />
+      <!-- ── Queue table ────────────────────────────────── -->
+      <DocumentPipelineTable ref="pipelineTable" class="mt-4" />
     </div>
   </AppShell>
 </template>
@@ -233,19 +219,23 @@ const snackbar = useSnackbarStore();
 const fileInputEl = ref<HTMLInputElement | null>(null);
 const pendingItems = ref<PendingItem[]>([]);
 const dragOver = ref(false);
-const confirmDialog = ref(false);
+const uploadDialog = ref(false);
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const isUploading = computed(() => pendingItems.value.some(i => i.uploading));
 const allDone = computed(() => pendingItems.value.length > 0 && pendingItems.value.every(i => i.done));
 const pendingCount = computed(() => pendingItems.value.filter(i => !i.done).length);
 
+function isPdf(file: File): boolean {
+  return file.name.split('.').pop()?.toLowerCase() === 'pdf';
+}
+
 function defaultMode(file: File): ScanExtractionMode {
-  return file.name.split('.').pop()?.toLowerCase() === 'pdf' ? 'gemini' : 'local';
+  return isPdf(file) ? 'gemini' : 'local';
 }
 
 function iconFor(file: File): string {
-  return file.name.split('.').pop()?.toLowerCase() === 'pdf' ? 'mdi-file-pdf-box' : 'mdi-file-word-box';
+  return isPdf(file) ? 'mdi-file-pdf-box' : 'mdi-file-word-box';
 }
 
 function sizeOf(file: File): string {
@@ -254,8 +244,7 @@ function sizeOf(file: File): string {
 }
 
 function modeOptionsFor(file: File) {
-  const isPdf = file.name.split('.').pop()?.toLowerCase() === 'pdf';
-  return isPdf
+  return isPdf(file)
     ? [
         { title: 'Gemini Vision (แนะนำสำหรับ PDF scan)', value: 'gemini' },
         { title: 'Auto — EasyOCR → cloud fallback', value: 'auto' },
@@ -268,39 +257,22 @@ function modeOptionsFor(file: File) {
       ];
 }
 
-function modeLabel(mode: ScanExtractionMode): string {
-  const map: Record<ScanExtractionMode, string> = {
-    gemini: 'Gemini Vision', auto: 'Auto OCR', landingai: 'LandingAI', local: 'Local',
-  };
-  return map[mode] ?? mode;
-}
-
 function hintFor(item: PendingItem): string {
-  const isPdf = item.file.name.split('.').pop()?.toLowerCase() === 'pdf';
-  if (isPdf && item.scanMode === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY';
-  if (isPdf && item.scanMode === 'landingai') return 'ต้องตั้งค่า VISION_AGENT_API_KEY';
+  if (isPdf(item.file) && item.scanMode === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY';
+  if (isPdf(item.file) && item.scanMode === 'landingai') return 'ต้องตั้งค่า VISION_AGENT_API_KEY';
   return '';
 }
 
 function engineFor(item: PendingItem): 'fast' | 'standard' {
-  const isPdf = item.file.name.split('.').pop()?.toLowerCase() === 'pdf';
-  if (isPdf && item.scanMode !== 'auto') return 'standard';
+  if (isPdf(item.file) && item.scanMode !== 'auto') return 'standard';
   return item.scanMode === 'local' ? 'fast' : 'standard';
 }
 
 function addFiles(files: FileList | File[]): void {
   for (const file of Array.from(files)) {
-    const dup = pendingItems.value.some(
-      i => i.file.name === file.name && i.file.size === file.size,
-    );
+    const dup = pendingItems.value.some(i => i.file.name === file.name && i.file.size === file.size);
     if (!dup) {
-      pendingItems.value.push({
-        file,
-        scanMode: defaultMode(file),
-        uploading: false,
-        done: false,
-        error: '',
-      });
+      pendingItems.value.push({ file, scanMode: defaultMode(file), uploading: false, done: false, error: '' });
     }
   }
 }
@@ -317,16 +289,13 @@ function onInputChange(event: Event): void {
   const input = event.target as HTMLInputElement;
   if (input.files?.length) addFiles(input.files);
   input.value = '';
+  if (pendingItems.value.length) uploadDialog.value = true;
 }
 
 function onDrop(event: DragEvent): void {
   dragOver.value = false;
   if (event.dataTransfer?.files.length) addFiles(event.dataTransfer.files);
-}
-
-async function confirmAndUpload(): Promise<void> {
-  confirmDialog.value = false;
-  await uploadAll();
+  if (pendingItems.value.length) uploadDialog.value = true;
 }
 
 async function uploadAll(): Promise<void> {
@@ -355,6 +324,7 @@ async function uploadAll(): Promise<void> {
   if (!failed) {
     snackbar.success?.(`อัปโหลดสำเร็จ ${toUpload.length} ไฟล์`);
     pendingItems.value = [];
+    uploadDialog.value = false;
   }
 }
 </script>
@@ -368,22 +338,21 @@ async function uploadAll(): Promise<void> {
 /* ── Drop zone ──────────────────────────────────────────── */
 .adm-drop {
   position: relative;
-  background: #ffffff;
-  border: 1.5px dashed #d1d5db;
-  border-radius: 16px;
-  padding: 52px 40px 44px;
+  background: #f5f7ff;
+  border: 2px dashed #c7d2fe;
+  border-radius: 20px;
+  padding: 56px 40px 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.18s, background 0.18s, transform 0.18s;
 }
 
 .adm-drop--over {
   border-color: rgb(var(--v-theme-admin-primary));
-  background: rgba(var(--v-theme-admin-primary), 0.03);
+  background: rgba(var(--v-theme-admin-primary), 0.05);
+  transform: scale(1.005);
 }
 
 .adm-drop__input {
@@ -395,67 +364,131 @@ async function uploadAll(): Promise<void> {
   cursor: pointer;
 }
 
-.adm-drop__icon {
-  width: 72px;
-  height: 72px;
+/* Icon ring */
+.adm-drop__icon-ring {
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
-  background: #dbeafe;
+  background: #e0e7ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  transition: background 0.18s;
 }
 
-.adm-drop__icon :deep(.v-icon) {
+.adm-drop__icon-ring :deep(.v-icon) {
   color: rgb(var(--v-theme-admin-primary)) !important;
+  transition: color 0.18s;
 }
 
+.adm-drop__icon-ring--active {
+  background: rgba(var(--v-theme-admin-primary), 0.18);
+}
+
+/* Text */
 .adm-drop__title {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
   font-size: 22px;
   font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
+  transition: color 0.18s;
+}
+
+.adm-drop--over .adm-drop__title {
   color: rgb(var(--v-theme-admin-primary));
-  margin: 0 0 10px;
 }
 
 .adm-drop__sub {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
-  color: #6b7280;
-  margin: 0 0 28px;
-  line-height: 1.6;
+  font-size: 15px;
+  color: #64748b;
+  margin: 0 0 24px;
 }
 
-.adm-drop__btns {
+/* หรือ divider */
+.adm-drop__or {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 20px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.adm-drop__or::before,
+.adm-drop__or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+/* CTA button - on top of hidden input */
+.adm-drop__cta {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 28px;
+}
+
+/* File type badges */
+.adm-ftypes {
+  display: flex;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
 
-/* ── Cards ──────────────────────────────────────────────── */
-.adm-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+.adm-ftype {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid;
 }
 
-.adm-card__head-row {
+.adm-ftype--pdf  { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
+.adm-ftype--docx { color: #2563eb; border-color: #93c5fd; background: #eff6ff; }
+.adm-ftype--doc  { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
+
+/* ── Pending bar ────────────────────────────────────────── */
+.adm-review-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 18px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
 }
 
-.adm-card__head {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 18px;
+.adm-review-bar__text {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+/* ── Dialog header ──────────────────────────────────────── */
+.adm-dlg-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 16px;
+}
+
+.adm-dlg-head__title {
+  font-size: 16px;
   font-weight: 700;
   color: #1e293b;
-  margin: 0;
+  line-height: 1.2;
+}
+
+.adm-dlg-head__sub {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 1px;
 }
 
 /* ── File list ──────────────────────────────────────────── */
@@ -467,28 +500,44 @@ async function uploadAll(): Promise<void> {
 
 .adm-file-item {
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
+  background: #ffffff;
 }
 
-/* ── File row (navy) ────────────────────────────────────── */
+/* File row - light */
 .adm-file-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgb(var(--v-theme-admin-primary));
-  padding: 12px 16px;
+  padding: 14px 16px;
+  background: #ffffff;
 }
 
-.adm-file-row__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.15);
+.adm-file-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.adm-file-icon--pdf {
+  background: #fff1f2;
+}
+
+.adm-file-icon--pdf :deep(.v-icon) {
+  color: #dc2626 !important;
+}
+
+.adm-file-icon--doc {
+  background: #eff6ff;
+}
+
+.adm-file-icon--doc :deep(.v-icon) {
+  color: #2563eb !important;
 }
 
 .adm-file-row__body {
@@ -496,83 +545,77 @@ async function uploadAll(): Promise<void> {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 .adm-file-row__name {
-  font-family: 'Sarabun', sans-serif;
   font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: 600;
+  color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .adm-file-row__meta {
-  font-family: 'Sarabun', sans-serif;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+  color: #94a3b8;
 }
 
-.adm-file-row__remove {
+.adm-file-row__end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Remove button */
+.adm-remove-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.8);
+  background: #f1f5f9;
+  border: none;
+  color: #94a3b8;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.12s;
+  transition: background 0.12s, color 0.12s;
 }
 
-.adm-file-row__remove:hover {
-  background: rgba(255, 80, 80, 0.35);
+.adm-remove-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 /* ── OCR selector row ───────────────────────────────────── */
 .adm-file-ocr {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: #f9fafb;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #f0f0f0;
   flex-wrap: wrap;
 }
 
 .adm-label-sm {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
   white-space: nowrap;
 }
 
-.adm-hint {
-  font-family: 'Sarabun', sans-serif;
-  font-size: 12px;
-  color: #9a7840;
-}
-
-/* ── Warning / info box ─────────────────────────────────── */
-.adm-warn {
+/* ── Empty state ────────────────────────────────────────── */
+.adm-empty {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-
-.adm-warn__title {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: #94a3b8;
+  font-size: 14px;
 }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -587,13 +630,13 @@ async function uploadAll(): Promise<void> {
   font-size: 17px;
   font-weight: 700;
   border-radius: 10px;
-  padding: 11px 24px;
+  padding: 10px 22px;
   transition: opacity 0.15s, background 0.15s;
   white-space: nowrap;
 }
 
 .adm-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -603,7 +646,7 @@ async function uploadAll(): Promise<void> {
 }
 
 .adm-btn--primary:hover:not(:disabled) {
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
 .adm-btn--ghost {
@@ -637,50 +680,5 @@ async function uploadAll(): Promise<void> {
 
 .adm-btn-sm--outline:hover {
   background: #f3f4f6;
-}
-
-/* gap utility for flex */
-.gap-3 { gap: 12px; }
-
-/* ── Confirm dialog file list ───────────────────────────── */
-.confirm-file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.confirm-file-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-}
-
-.confirm-file-row__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.confirm-file-row__name {
-  font-family: 'Sarabun', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1e293b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.confirm-file-row__meta {
-  font-family: 'Sarabun', sans-serif;
-  font-size: 12px;
-  color: #6b7280;
 }
 </style>
