@@ -148,34 +148,25 @@
           </div>
           <v-row dense>
             <v-col cols="12" sm="6">
-              <v-text-field
+              <ThaiDatePicker
                 v-model="form.promulgation_date"
                 label="วันที่ประกาศ"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
               />
             </v-col>
             <v-col cols="12" sm="6">
-              <v-text-field
+              <ThaiDatePicker
                 v-model="form.effective_date"
                 label="วันที่มีผลบังคับใช้ *"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
-                :rules="[v => !!v || 'จำเป็นต้องระบุ']"
                 required
+                :rules="[v => !!v || 'จำเป็นต้องระบุ']"
               />
             </v-col>
             <v-col cols="12" sm="6">
-              <v-text-field
+              <ThaiDatePicker
                 v-model="form.expiry_date"
                 label="วันที่สิ้นสุดการใช้"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
                 :disabled="noExpiry"
-                :placeholder="noExpiry ? 'ไม่มีวันสิ้นสุด' : ''"
+                disabled-placeholder="ไม่มีวันสิ้นสุด"
               />
               <v-checkbox
                 v-model="noExpiry"
@@ -251,6 +242,7 @@ import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/documen
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
+import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
