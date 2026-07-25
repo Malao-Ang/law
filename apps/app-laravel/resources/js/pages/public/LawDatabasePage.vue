@@ -96,9 +96,49 @@
               :class="{ 'elaw-type-pill--active': isTypeSelected(type.value) }"
               @click="toggleType(type.value)"
             >{{ type.label }}<span class="elaw-type-pill__count"> ({{ type.count }})</span></button>
+
+            <v-menu :close-on-content-click="false" max-height="320">
+              <template #activator="{ props: menuProps }">
+                <button type="button" class="elaw-type-pill elaw-group-pill" v-bind="menuProps">
+                  {{ selectedGroups.length > 0 ? `กลุ่มกฎหมาย (${selectedGroups.length})` : `กลุ่มกฎหมาย (${groupFilters.length} กลุ่ม)` }}
+                  <v-icon icon="mdi-chevron-down" size="14" />
+                </button>
+              </template>
+              <v-list density="compact" class="elaw-group-menu">
+                <v-list-item
+                  v-for="group in groupFilters"
+                  :key="group.value"
+                  @click="toggleGroupFilter(group.value)"
+                >
+                  <template #prepend>
+                    <v-checkbox-btn :model-value="selectedGroups.includes(group.value)" density="compact" hide-details readonly />
+                  </template>
+                  <v-list-item-title class="text-body-2">{{ group.label }}</v-list-item-title>
+                  <template #append>
+                    <span class="text-caption text-medium-emphasis">{{ group.count }}</span>
+                  </template>
+                </v-list-item>
+              </v-list>
+            </v-menu>
           </div>
         </v-container>
       </section>
+
+      <div class="elaw-stats-bar">
+        <v-container style="max-width: 1280px" class="py-0">
+          <div class="elaw-stats-row">
+            <div v-for="stat in statsCards" :key="stat.label" class="elaw-stat-card">
+              <div class="elaw-stat-card__icon-wrap" :style="{ background: `${stat.color}18`, color: stat.color }">
+                <v-icon :icon="stat.icon" size="18" />
+              </div>
+              <div>
+                <div class="elaw-stat-card__num">{{ stat.value.toLocaleString() }}</div>
+                <div class="elaw-stat-card__label">{{ stat.label }}</div>
+              </div>
+            </div>
+          </div>
+        </v-container>
+      </div>
 
       <v-container style="max-width: 1280px" class="mt-6 mb-10">
         <v-row>
@@ -280,25 +320,48 @@
               <div
                 v-for="law in sortedResults"
                 :key="law.law_id"
-                class="law-result-wrapper"
+                class="law-list-card"
+                :class="`law-list-card--${toDocType(law.law_type)}`"
+                role="article"
+                tabindex="0"
                 @click="router.push({ name: 'law', params: { documentId: law.law_id } })"
+                @keydown.enter="router.push({ name: 'law', params: { documentId: law.law_id } })"
               >
-                <ELawLawCard
-                  :title="law.title || 'ไม่ระบุชื่อกฎหมาย'"
-                  :doc-type="toDocType(law.law_type)"
-                  :description="law.summary"
-                  :department="law.agency || undefined"
-                  :date="law.published_date || undefined"
-                  visibility="public"
-                  :change-status="toChangeStatus(law.change_status)"
-                />
-                <div v-if="law.snippets.length" class="law-snippets-row">
-                  <div
-                    v-for="(snippet, index) in law.snippets"
-                    :key="`${law.law_id}-${index}`"
-                    class="law-snippet text-body-2"
-                    v-html="sanitizeHighlight(snippet)"
-                  />
+                <div class="law-list-card__body">
+                  <div class="law-list-card__tags">
+                    <DocBadge v-if="lawTypeBadgeKey(law.law_type)" :type="lawTypeBadgeKey(law.law_type)!" />
+                    <span v-if="law.status" class="law-use-status" :class="useStatusClass(law.status)">
+                      <v-icon size="9" icon="mdi-circle" />
+                      {{ statusLabel(law.status) }}
+                    </span>
+                  </div>
+                  <h3 class="law-list-card__title">{{ law.title || 'ไม่ระบุชื่อกฎหมาย' }}</h3>
+                  <p v-if="law.summary" class="law-list-card__desc">{{ law.summary }}</p>
+                  <div class="law-list-card__meta">
+                    <span v-if="law.published_date">
+                      <v-icon size="13" icon="mdi-calendar-blank-outline" />
+                      นับบังคับตั้งแต่ {{ law.published_date }}
+                    </span>
+                    <span v-if="law.agency">
+                      <v-icon size="13" icon="mdi-domain" />
+                      {{ law.agency }}
+                    </span>
+                    <span v-if="law.signer_group">
+                      <v-icon size="13" icon="mdi-folder-outline" />
+                      {{ law.signer_group }}
+                    </span>
+                  </div>
+                  <div v-if="law.snippets.length" class="law-list-card__snippets">
+                    <div
+                      v-for="(snippet, index) in law.snippets.slice(0, 2)"
+                      :key="`${law.law_id}-${index}`"
+                      class="law-snippet"
+                      v-html="sanitizeHighlight(snippet)"
+                    />
+                  </div>
+                </div>
+                <div class="law-list-card__arrow">
+                  <v-icon icon="mdi-chevron-right" color="#b68d40" size="22" />
                 </div>
               </div>
             </div>
@@ -324,8 +387,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchLawFacets, getLookups } from '../../api/client';
+import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
-import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import type { ChangeStatus, DocType } from '../../components/shared/lawBadge';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
@@ -827,6 +890,43 @@ function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined
   return undefined;
 }
 
+type DocBadgeKey = 'พ.ร.บ.' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ';
+
+const LAW_TYPE_TO_BADGE: Partial<Record<string, DocBadgeKey>> = {
+  phrb: 'พ.ร.บ.',
+  'kho-bangkhab': 'ข้อบังคับ',
+  rabiap: 'ระเบียบ',
+  prakat: 'ประกาศ',
+};
+
+function lawTypeBadgeKey(lawType: string | null | undefined): DocBadgeKey | null {
+  if (!lawType) return null;
+  return LAW_TYPE_TO_BADGE[canonicalLawTypeValue(lawType)] ?? null;
+}
+
+function useStatusClass(status: string | null | undefined): string {
+  if (status === 'active' || status === 'มีผลบังคับใช้') return 'law-use-status--active';
+  if (status === 'cancelled' || status === 'ยกเลิก') return 'law-use-status--cancelled';
+  return 'law-use-status--draft';
+}
+
+function toggleGroupFilter(value: string): void {
+  const idx = selectedGroups.value.indexOf(value);
+  if (idx >= 0) selectedGroups.value.splice(idx, 1);
+  else selectedGroups.value.push(value);
+}
+
+const statsCards = computed(() => {
+  const f = baseFacets.value;
+  const csMap = new Map((f?.change_status ?? []).map((b) => [b.value, b.count]));
+  return [
+    { label: 'กฎหมายทั้งหมด', icon: 'mdi-file-document-multiple-outline', color: '#3b82f6', value: searchStore.total },
+    { label: 'กฎหมายใหม่', icon: 'mdi-plus-circle-outline', color: '#10b981', value: csMap.get('new') ?? 0 },
+    { label: 'ปรับปรุง', icon: 'mdi-pencil-outline', color: '#6366f1', value: csMap.get('amended') ?? 0 },
+    { label: 'ยกเลิก', icon: 'mdi-close-circle-outline', color: '#ef4444', value: csMap.get('repealed') ?? 0 },
+  ];
+});
+
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
@@ -1077,5 +1177,184 @@ onBeforeUnmount(() => {
   border: 1px dashed rgba(171, 127, 41, 0.28);
   border-radius: 12px;
   background: rgba(255, 250, 236, 0.55);
+}
+
+/* ── Stats bar ── */
+.elaw-stats-bar {
+  background: #ffffff;
+  border-bottom: 1px solid #e7e2d9;
+  padding: 14px 0;
+}
+
+.elaw-stats-row {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.elaw-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-right: 1px solid #f0ede8;
+  flex: 1 1 160px;
+}
+
+.elaw-stat-card:last-child {
+  border-right: none;
+}
+
+.elaw-stat-card__icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.elaw-stat-card__num {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.1;
+}
+
+.elaw-stat-card__label {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── List result cards ── */
+.law-list-card {
+  display: flex;
+  align-items: stretch;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #9e9e9e;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+  overflow: hidden;
+}
+
+.law-list-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+.law-list-card--kotmai-krung { border-left-color: #854d0e; }
+.law-list-card--rabiap       { border-left-color: #3b82f6; }
+.law-list-card--kho-bangkhab { border-left-color: #10b981; }
+.law-list-card--prakat       { border-left-color: #fb923c; }
+
+.law-list-card__body {
+  flex: 1;
+  padding: 18px 22px;
+  min-width: 0;
+}
+
+.law-list-card__tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.law-use-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.law-use-status--cancelled {
+  background: #fff1f2;
+  color: #be123c;
+  border-color: #fecdd3;
+}
+
+.law-use-status--draft {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.law-list-card__title {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.law-list-card__desc {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0 0 10px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.law-list-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 13px;
+  color: #6b7280;
+  align-items: center;
+}
+
+.law-list-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.law-list-card__snippets {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.law-list-card__arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  flex-shrink: 0;
+}
+
+/* ── Group dropdown pill ── */
+.elaw-group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.elaw-group-menu {
+  min-width: 320px;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
 }
 </style>

@@ -2,6 +2,27 @@
   <div class="lawx">
     <ELawNavbar @go-admin="router.push('/admin')" />
 
+    <div class="lawx-breadcrumb">
+      <v-container style="max-width: 1360px" class="py-0">
+        <div class="lawx-bc">
+          <button type="button" class="lawx-bc__item" @click="router.push('/')">
+            <v-icon icon="mdi-home-outline" size="13" />
+            หน้าหลัก
+          </button>
+          <span class="lawx-bc__sep">›</span>
+          <button type="button" class="lawx-bc__item" @click="router.push('/database')">
+            ฐานข้อมูลกฎหมาย
+          </button>
+          <template v-if="meta.law_type">
+            <span class="lawx-bc__sep">›</span>
+            <span class="lawx-bc__item">{{ meta.law_type }}</span>
+          </template>
+          <span class="lawx-bc__sep">›</span>
+          <span class="lawx-bc__item lawx-bc__item--current">{{ meta.title || 'กฎหมาย' }}</span>
+        </div>
+      </v-container>
+    </div>
+
     <v-main class="lawx-main">
       <div class="lawx-subbar">
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
@@ -336,6 +357,56 @@ onBeforeUnmount(() => observer?.disconnect());
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   color: #1e293b;
   background: #f6f4ef;
+}
+
+.lawx-breadcrumb {
+  background: #ffffff;
+  border-bottom: 1px solid #e7e2d9;
+  padding: 9px 0;
+}
+
+.lawx-bc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 24px;
+}
+
+.lawx-bc__sep {
+  color: #9ca3af;
+  font-size: 14px;
+  user-select: none;
+}
+
+.lawx-bc__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-size: 14px;
+  color: #4e4538;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lawx-bc__item:hover {
+  color: #7b580d;
+  text-decoration: underline;
+}
+
+.lawx-bc__item--current {
+  color: #7b580d;
+  font-weight: 700;
+  cursor: default;
+  text-decoration: none !important;
+  max-width: 400px;
 }
 
 .lawx-main {
