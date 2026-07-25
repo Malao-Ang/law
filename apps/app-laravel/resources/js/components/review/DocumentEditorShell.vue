@@ -178,14 +178,6 @@
       </div>
       <div class="editor-stage" :style="editorStageStyle">
         <div ref="pageFrameRef" class="a4-page" :style="pageFrameStyle">
-          <div class="page-backdrop" aria-hidden="true">
-            <div
-              v-for="(sheet, i) in pageSheets.sheets.value"
-              :key="i"
-              class="page-sheet"
-              :style="{ top: `${sheet.top}px`, height: `${sheet.height}px` }"
-            />
-          </div>
           <EditorContent v-if="editor" :editor="editor" class="editor-shell-content" />
         </div>
       </div>
@@ -233,7 +225,6 @@ import { FontSizeExtension } from '../../extensions/FontSizeExtension';
 import { PageBreakExtension } from '../../extensions/PageBreakExtension';
 import { ResizableImageExtension } from '../../extensions/ResizableImageExtension';
 import { TableWithBlockIdExtension } from '../../extensions/TableWithBlockIdExtension';
-import { usePageSheets } from '../../pagination/usePageSheets';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
 import type { PageMargins } from '../../types/document';
@@ -249,7 +240,6 @@ type ReviewSavePayload = {
 const PAGE_WIDTH_MM = 210;
 const PAGE_MIN_HEIGHT_MM = 297;
 const MM_TO_CSS_PX = 96 / 25.4;
-const INTER_PAGE_GAP_PX = 24;
 const fontSizePresets = [12, 14, 16, 18, 20, 22, 24, 28, 36] as const;
 const zoomPresets = [75, 100, 125, 150] as const;
 const DEFAULT_PAGE_MARGINS: PageMargins = {
@@ -294,16 +284,6 @@ const fontSizeInput = ref<string>('16');
 const pageMargins = ref<PageMargins>(normalizePageMargins(documentStore.review?.compose_state?.page_margins));
 const marginInputsMm = ref<Record<MarginKey, string>>(pageMarginsToInputs(pageMargins.value));
 const showCautionBanner = computed(() => props.locked);
-const pageSheets = usePageSheets(pageFrameRef, () => {
-  const mm = (twips: number) => twipsToMm(twips) * MM_TO_CSS_PX;
-  return {
-    usableHeight: (PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX) - mm(pageMargins.value.top) - mm(pageMargins.value.bottom),
-    topMargin: mm(pageMargins.value.top),
-    bottomMargin: mm(pageMargins.value.bottom),
-    gap: INTER_PAGE_GAP_PX,
-  };
-});
-
 const initialHtml = documentStore.review?.document_review.draft_html
   || documentStore.review?.document_review.generated_html
   || '';
@@ -686,10 +666,7 @@ function attachPageObserver(): void {
 
 function refreshPageHeight(): void {
   if (!pageFrameRef.value) return;
-  pageSheets.recompute();
   pageHeightPx.value = Math.max(pageFrameRef.value.offsetHeight, PAGE_MIN_HEIGHT_MM * MM_TO_CSS_PX);
-  // Re-scroll cursor into view after spacers shift content positions.
-  queueMicrotask(() => { editor.value?.commands.scrollIntoView(); });
 }
 
 function hasPendingSave(): boolean {
@@ -879,26 +856,12 @@ function formatMillimeters(value: number): string {
   width: 210mm;
   min-height: 297mm;
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
-  background: transparent;
-  box-sizing: border-box;
-  transform-origin: top center;
-  position: relative;
-}
-
-.page-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.page-sheet {
-  position: absolute;
-  left: 0;
-  width: 210mm;
   background: #fff;
   box-shadow: 0 0 0 1px #e2e8f0, 0 10px 30px rgba(15, 23, 42, 0.08);
   border-radius: 2px;
+  box-sizing: border-box;
+  transform-origin: top center;
+  position: relative;
 }
 
 .editor-shell-content {
