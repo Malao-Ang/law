@@ -13,18 +13,15 @@
       type="warning"
       variant="tonal"
       density="compact"
-      class="mx-0 my-2"
-      style="flex-shrink:0"
+      class="review-locked-alert"
       prepend-icon="mdi-alert-outline"
     >
       กรุณาตรวจทานเนื้อหาให้ครบถ้วนก่อนยืนยัน เนื่องจากการแปลงไฟล์อัตโนมัติอาจมีความคลาดเคลื่อนในบางจุด
     </v-alert>
 
     <div
-      v-if="editor"
+      v-if="editor && !props.locked"
       class="d-flex flex-wrap align-center ga-2 pa-3 mt-2 bg-white rounded-lg review-toolbar"
-      :class="{ 'review-toolbar--disabled': props.locked }"
-      :inert="props.locked"
       style="border:1px solid #e2e8f0; flex-shrink:0"
     >
       <span class="text-caption text-medium-emphasis mr-1">ย้อนกลับ</span>
@@ -780,6 +777,13 @@ function formatMillimeters(value: number): string {
   padding: 12px 24px;
 }
 
+.review-locked-alert {
+  flex-shrink: 0;
+  margin: 12px 24px 0;
+  position: relative;
+  z-index: 20;
+}
+
 .review-dialog__footer {
   align-items: center;
   background: #fff;
@@ -787,11 +791,6 @@ function formatMillimeters(value: number): string {
   display: flex;
   flex-shrink: 0;
   padding: 10px 24px;
-}
-
-.review-toolbar--disabled {
-  opacity: 0.62;
-  pointer-events: none;
 }
 
 .toolbar-select,
@@ -1007,6 +1006,10 @@ function formatMillimeters(value: number): string {
 }
 
 @media (max-width: 960px) {
+  .review-locked-alert {
+    margin: 10px 12px 0;
+  }
+
   .editor-shell-scroll {
     padding: 16px 8px 24px;
   }
