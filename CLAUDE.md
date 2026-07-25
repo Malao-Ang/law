@@ -229,7 +229,7 @@ npm run build        # production bundle
 - **Two extraction engines**: `fast` (PHP-only, default) and `standard` (Python). `ExtractDocumentJob` branches on `$this->extractionEngine`. `FastPathUnsupportedException` triggers automatic fallback to standard.
 - **Every block carries 4 text layers** (`raw_text`, `normalized_text`, `ai_suggested_text`, `approved_text`). Preserve this for all new block types including Fast path.
 - **`NormalizeDocumentJob` is non-fatal** — if Python is down, it catches `ConnectionException` and silently skips. The document is already marked `done` before normalize runs.
-- **`normalize_autocorrect_min_confidence`** defaults to `1.0` (effectively disabled auto-correct). Lower it via `.env` to enable automatic spelling fixes. Tunable per-deploy without code changes.
+- **`normalize_autocorrect_min_confidence`** defaults to `0.85` — spell suggestions with ≥85% confidence auto-apply during normalize. Raise to `1.0` via `.env` to effectively disable auto-correct. Tunable per-deploy without code changes.
 - **Path translation is one-way**: Laravel relative paths → Python absolute paths via `DocumentPipelineClient::toSharedPath()`. Never construct these inline.
 - **Docling OCR is off** — we use docling-parse for text, EasyOCR/LandingAI for scans, and Docling TableFormer only for table structure.
 - **Scan extraction modes**: `local` forces EasyOCR. `gemini` forces Google Gemini vision OCR (requires `GEMINI_API_KEY`). `landingai` forces LandingAI ADE Parse (requires `VISION_AGENT_API_KEY`). `auto` tries EasyOCR first; if quality is poor, falls back to Gemini then LandingAI when keys are configured.
