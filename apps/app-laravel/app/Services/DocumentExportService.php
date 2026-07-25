@@ -146,10 +146,11 @@ class DocumentExportService
             }
 
             if (($node['type'] ?? null) === 'blank') {
-                // A zero-width space guarantees the empty paragraph keeps a full
-                // line box in LibreOffice (an emptied <w:p> otherwise collapses).
+                // A regular space with xml:space="preserve" guarantees the paragraph
+                // keeps a full line box in LibreOffice. U+200B (zero-width space) has
+                // zero advance width so LibreOffice collapses the line height to zero.
                 $blankRun = $section->addTextRun($this->blankParagraphStyle());
-                $blankRun->addText("\u{200B}", ['name' => self::EXPORT_FONT, 'size' => 16]);
+                $blankRun->addText(' ', ['name' => self::EXPORT_FONT, 'size' => 16]);
 
                 continue;
             }
@@ -179,7 +180,7 @@ class DocumentExportService
                 // An emptied block is still a visible blank line in the editor —
                 // emit an empty paragraph so the PDF keeps the same vertical rhythm.
                 $emptyRun = $section->addTextRun($this->paragraphStyleForBlock($block, $lineHeight));
-                $emptyRun->addText("\u{200B}", ['name' => self::EXPORT_FONT, 'size' => 16]);
+                $emptyRun->addText(' ', ['name' => self::EXPORT_FONT, 'size' => 16]);
 
                 continue;
             }
