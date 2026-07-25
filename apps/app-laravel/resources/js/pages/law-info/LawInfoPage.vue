@@ -18,10 +18,21 @@
         <span>กำลังโหลด...</span>
       </div>
 
-      <template v-else>
+      <v-form v-else ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
+        </v-alert>
+
+        <v-alert
+          v-if="validationFailed"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="mdi-alert-circle-outline"
+        >
+          กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อนดำเนินการต่อ: ชื่อเอกสาร, ประเภทเอกสาร, กลุ่มกฎหมาย, หน่วยงานรับผิดชอบ, วันที่มีผลบังคับใช้
         </v-alert>
 
         <!-- ข้อมูลพื้นฐาน -->
@@ -224,13 +235,14 @@
           </v-row>
         </v-card>
 
-      </template>
+      </v-form>
     </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import type { VForm } from 'vuetify/components';
 import { useRouter } from 'vue-router';
 import type { SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
@@ -266,6 +278,8 @@ const EMPTY: LawMeta = {
 
 const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_laws: [], keywords: [] });
 const noExpiry = ref(false);
+const formRef = ref<VForm | null>(null);
+const validationFailed = ref(false);
 const articleBlocks = computed<DocumentBlock[]>(() =>
   (documentStore.review?.pages ?? [])
     .flatMap((page) => page.blocks)
@@ -391,6 +405,14 @@ function buildLawMetaPayload(): LawMeta {
 }
 
 async function saveAndNext(): Promise<void> {
+  const result = await formRef.value?.validate();
+  if (!result?.valid) {
+    validationFailed.value = true;
+    await nextTick();
+    document.querySelector('.v-alert[type="warning"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  validationFailed.value = false;
   const payload = buildLawMetaPayload();
   const saved = await documentStore.saveLawMeta(payload);
   if (!saved) return;
