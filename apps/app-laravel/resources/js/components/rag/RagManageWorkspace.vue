@@ -53,8 +53,13 @@
           {{ documentStore.saveError }}
         </v-alert>
 
-        <!-- Section list (e-Law style) -->
-        <div ref="blockListEl" class="rag-block-list">
+        <!-- Document content card -->
+        <section class="rag-doc-card">
+          <header class="rag-doc-card__head">
+            <span class="rag-doc-card__icon"><v-icon icon="mdi-file-document-edit-outline" size="18" /></span>
+            <span class="rag-doc-card__title">เนื้อหาเอกสารกฎหมาย</span>
+          </header>
+          <div ref="blockListEl" class="rag-block-list">
           <div v-for="section in sections" :key="section.id" :data-section-id="section.id" class="rag-sec">
             <div class="rag-sec__head">
               <v-menu location="bottom start" :close-on-content-click="true">
@@ -128,7 +133,8 @@
           <div v-if="sections.length === 0" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
             <span>ไม่พบบล็อกเนื้อหา</span>
           </div>
-        </div>
+          </div>
+        </section>
 
       </div>
 
@@ -687,25 +693,63 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.rag-doc-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid #e6e8ef;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.rag-doc-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid #eef1f6;
+  flex: 0 0 auto;
+}
+
+.rag-doc-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(26, 54, 115, 0.08);
+  color: #1a3673;
+}
+
+.rag-doc-card__title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1a3673;
+}
+
 .rag-block-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
-  padding-right: 4px;
-  padding-bottom: 60px;
+  padding: 20px 24px 60px;
   overscroll-behavior: contain;
 }
 
 .rag-sec {
   background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 14px 16px;
+  border: 1px solid #eef1f6;
+  border-radius: 14px;
+  padding: 18px 20px;
   min-width: 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
 .rag-sec__head {
