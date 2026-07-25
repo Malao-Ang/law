@@ -234,6 +234,10 @@ export interface DocumentListItem {
   title: string;
   status: string;
   updated_at?: string | null;
+  extraction_engine?: string | null;
+  scan_mode?: string | null;
+  timings?: Record<string, number> | null;
+  error?: string | null;
   parent_document_id?: string | null;
   access_scope?: 'public' | 'private';
   workflow_completed_step?: number | null;

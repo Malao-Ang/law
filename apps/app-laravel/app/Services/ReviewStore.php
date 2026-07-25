@@ -117,6 +117,13 @@ class ReviewStore
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
+                'extraction_engine' => isset($status['extraction_engine']) ? (string) $status['extraction_engine'] : null,
+                'scan_mode' => $status['scan_mode']
+                    ?? $status['scan_extraction_mode_effective']
+                    ?? $status['scan_extraction_mode_requested']
+                    ?? null,
+                'timings' => is_array($status['timings'] ?? null) ? $status['timings'] : null,
+                'error' => isset($status['error']) ? (string) $status['error'] : null,
                 'parent_document_id' => $parentDocumentId,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,

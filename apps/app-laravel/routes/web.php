@@ -13,6 +13,8 @@ Route::view('/database', 'app');
 Route::view('/admin', 'app');
 Route::view('/admin/laws', 'app');
 Route::view('/admin/upload', 'app');
+Route::view('/admin/ocr-queue', 'app');
+Route::view('/admin/relations', 'app');
 Route::view('/upload', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/compose', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
