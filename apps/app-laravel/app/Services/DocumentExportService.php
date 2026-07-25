@@ -20,7 +20,11 @@ class DocumentExportService
     // Google "Sarabun" — a different font with different metrics than the review.
     private const EXPORT_FONT = 'TH Sarabun New';
 
+    // Matches the review editor's on-screen line-height (DocumentEditorShell 1.85).
+    private const DEFAULT_LINE_HEIGHT = 1.85;
+
     private const EXPORT_FONT_STACK = "'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', 'Noto Sans Thai', sans-serif";
+
     private const DEFAULT_PAGE_MARGINS = [
         'top' => 1440,
         'bottom' => 1440,
@@ -137,11 +141,16 @@ class DocumentExportService
         foreach ($this->orderedExportNodes($document) as $node) {
             if (($node['type'] ?? null) === 'page_break') {
                 $section->addPageBreak();
+
                 continue;
             }
 
             if (($node['type'] ?? null) === 'blank') {
-                $section->addTextRun($this->blankParagraphStyle());
+                // A zero-width space guarantees the empty paragraph keeps a full
+                // line box in LibreOffice (an emptied <w:p> otherwise collapses).
+                $blankRun = $section->addTextRun($this->blankParagraphStyle());
+                $blankRun->addText("\u{200B}", ['name' => self::EXPORT_FONT, 'size' => 16]);
+
                 continue;
             }
 
@@ -152,6 +161,7 @@ class DocumentExportService
 
             if ($isTable) {
                 $this->appendTable($section, $table);
+
                 continue;
             }
 
@@ -162,16 +172,19 @@ class DocumentExportService
             // Prefer the element HTML captured from draft_html (reflects live editor edits
             // like font changes) over the stale per-block reviewed_html.
             $draftElementHtml = (string) ($node['draft_html'] ?? '');
+            $lineHeight = $this->lineHeightFromHtml($draftElementHtml);
             $html = $draftElementHtml !== '' ? $draftElementHtml : $this->blockHtmlOrFallback($block);
             $runs = $this->parseHtmlRuns($html);
             if ($runs === []) {
                 // An emptied block is still a visible blank line in the editor —
                 // emit an empty paragraph so the PDF keeps the same vertical rhythm.
-                $section->addTextRun($this->paragraphStyleForBlock($block));
+                $emptyRun = $section->addTextRun($this->paragraphStyleForBlock($block, $lineHeight));
+                $emptyRun->addText("\u{200B}", ['name' => self::EXPORT_FONT, 'size' => 16]);
+
                 continue;
             }
 
-            $textRun = $section->addTextRun($this->paragraphStyleForBlock($block));
+            $textRun = $section->addTextRun($this->paragraphStyleForBlock($block, $lineHeight));
 
             foreach ($runs as $run) {
                 $parts = explode("\n", (string) ($run['text'] ?? ''));
@@ -246,7 +259,7 @@ class DocumentExportService
     /**
      * @param  array<string, mixed>  $imgMeta
      * @param  array<string, mixed>  $meta
-     * @return array{0: string|null, 1: bool}  [absolute path | null, isTempFile]
+     * @return array{0: string|null, 1: bool} [absolute path | null, isTempFile]
      */
     private function resolveImagePath(array $imgMeta, array $meta): array
     {
@@ -394,6 +407,7 @@ class DocumentExportService
 
             if ($element->hasAttribute('data-page-break')) {
                 $nodes[] = ['type' => 'page_break'];
+
                 continue;
             }
 
@@ -410,6 +424,7 @@ class DocumentExportService
                     'block' => $blocksById[$selfId],
                     'draft_html' => (string) $dom->saveHTML($element),
                 ];
+
                 continue;
             }
 
@@ -435,6 +450,7 @@ class DocumentExportService
                     $seenBlockIds[$blockId] = true;
                     $nodes[] = ['type' => 'block', 'block' => $blocksById[$blockId]];
                 }
+
                 continue;
             }
 
@@ -611,6 +627,7 @@ class DocumentExportService
                     }
 
                     $columnIndex += $colspan;
+
                     continue;
                 }
 
@@ -679,25 +696,63 @@ class DocumentExportService
      */
     private function blankParagraphStyle(): array
     {
+        // PhpWord's Paragraph style key for line spacing is `lineHeight` (a
+        // multiplier), NOT `line`/`lineRule` — those are silently ignored, which
+        // left blank paragraphs with no line box so LibreOffice collapsed them.
         return [
             'spaceAfter' => 0,
-            'line' => 444,
-            'lineRule' => 'auto',
+            'lineHeight' => self::DEFAULT_LINE_HEIGHT,
         ];
+    }
+
+    /**
+     * Parse a unitless CSS line-height (the editor's LineHeightExtension sets
+     * `line-height: 1.5` etc. on the paragraph) from a draft element's HTML.
+     */
+    private function lineHeightFromHtml(string $html): ?float
+    {
+        if ($html === '' || preg_match('/line-height\s*:\s*([0-9]*\.?[0-9]+)/i', $html, $m) !== 1) {
+            return null;
+        }
+
+        $value = (float) $m[1];
+
+        return $value > 0 ? $value : null;
+    }
+
+    /**
+     * Stored line spacing lives in Word units (240 = single). Convert to the
+     * PhpWord `lineHeight` multiplier, or null when absent.
+     *
+     * @param  array<string, mixed>  $layout
+     */
+    private function layoutLineHeight(array $layout): ?float
+    {
+        $spacing = $layout['line_spacing'] ?? null;
+        if (! is_numeric($spacing) || (float) $spacing <= 0) {
+            return null;
+        }
+
+        return (float) $spacing / 240.0;
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function paragraphStyleForBlock(array $block): array
+    private function paragraphStyleForBlock(array $block, ?float $lineHeight = null): array
     {
         $layout = is_array($block['meta']['layout'] ?? null) ? $block['meta']['layout'] : [];
         $isHeading = ($block['type'] ?? '') === 'section_header';
+        // `lineHeight` is the correct PhpWord key (multiplier → w:line auto).
+        // Prefer the value parsed from the live draft <p> (user's editor choice),
+        // then the stored layout.line_spacing (Word 240 units = 1×), else 1.85.
+        $resolvedLineHeight = $lineHeight
+            ?? $this->layoutLineHeight($layout)
+            ?? self::DEFAULT_LINE_HEIGHT;
         $style = [
             'spaceAfter' => 0,
             'widowControl' => true,
-            'line' => 444,      // 1.85× (auto = 240 units per 1×)
-            'lineRule' => 'auto',
+            'lineHeight' => $resolvedLineHeight,
         ];
 
         if ($isHeading) {
@@ -857,6 +912,7 @@ class DocumentExportService
                 && ($last['fontFamily'] ?? null) === ($run['fontFamily'] ?? null)
                 && ($last['fontSize'] ?? null) === ($run['fontSize'] ?? null)) {
                 $merged[count($merged) - 1]['text'] .= $run['text'];
+
                 continue;
             }
 

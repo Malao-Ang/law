@@ -534,6 +534,72 @@ class DocumentExportServiceTest extends TestCase
         );
     }
 
+    public function test_paragraphs_emit_default_line_spacing(): void
+    {
+        // Regression: the export used the invalid PhpWord keys line/lineRule, so
+        // NO line spacing reached the DOCX and 1.85 never rendered in the PDF.
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'b1', 'type' => 'paragraph', 'reading_order' => 1,
+                    'approved_text' => 'ก', 'normalized_text' => 'ก',
+                    'meta' => ['reviewed_html' => '<p>ก</p>', 'layout' => []],
+                ]],
+            ]],
+        ];
+
+        $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('w:line="444"', $xml);   // 1.85 × 240
+        $this->assertStringContainsString('w:lineRule="auto"', $xml);
+    }
+
+    public function test_user_line_height_from_draft_html_is_honored(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'b1', 'type' => 'paragraph', 'reading_order' => 1,
+                    'approved_text' => 'ก', 'normalized_text' => 'ก',
+                    'meta' => ['reviewed_html' => '<p data-block-id="b1">ก</p>', 'layout' => []],
+                ]],
+            ]],
+            'document_review' => [
+                'draft_html' => '<p data-block-id="b1" style="line-height: 2">ก</p>',
+            ],
+        ];
+
+        $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('w:line="480"', $xml);   // 2 × 240
+    }
+
+    public function test_blank_lines_do_not_collapse(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    ['block_id' => 'b1', 'type' => 'paragraph', 'reading_order' => 1, 'approved_text' => 'ข้อ ๑', 'normalized_text' => 'ข้อ ๑', 'meta' => ['reviewed_html' => '<p data-block-id="b1">ข้อ ๑</p>', 'layout' => []]],
+                    ['block_id' => 'b2', 'type' => 'paragraph', 'reading_order' => 2, 'approved_text' => 'ข้อ ๒', 'normalized_text' => 'ข้อ ๒', 'meta' => ['reviewed_html' => '<p data-block-id="b2">ข้อ ๒</p>', 'layout' => []]],
+                ],
+            ]],
+            'document_review' => [
+                'draft_html' => '<p data-block-id="b1">ข้อ ๑</p><p></p><p></p><p data-block-id="b2">ข้อ ๒</p>',
+            ],
+        ];
+
+        $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        // Four paragraphs (2 text + 2 blank), each carrying the 1.85 line box so
+        // LibreOffice cannot collapse the blanks.
+        $this->assertSame(4, substr_count($xml, 'w:line="444"'));
+        // Blank paragraphs carry a zero-width space run to hold their height.
+        $this->assertStringContainsString("\u{200B}", $xml);
+    }
+
     public function test_blockHtmlOrFallback_emits_font_size_from_formatting(): void
     {
         $block = [
