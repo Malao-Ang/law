@@ -28,7 +28,17 @@ const bodyHtml = computed<string>(() => {
   if (block.type === 'image' && block.meta.image) {
     const src = block.meta.image.src_url ?? block.meta.image.data_uri ?? '';
     const width = block.meta.image.display_width_px ?? block.meta.image.width ?? null;
-    const styleAttr = width ? ` style="width:${width}px;height:auto;"` : '';
+    // A block image with margin:auto centers regardless of the parent's
+    // text-align, so drive its horizontal margins from the block alignment
+    // (center is the default). Fixes right/left-aligned images reverting to center.
+    const align = block.meta.layout?.alignment;
+    const margin = align === 'right'
+      ? '8px 0 8px auto'
+      : align === 'left'
+        ? '8px auto 8px 0'
+        : '8px auto';
+    const dims = width ? `width:${width}px;height:auto;` : '';
+    const styleAttr = ` style="${dims}margin:${margin};"`;
 
     return DOMPurify.sanitize(`<img src="${src}" alt="" class="bf-img"${styleAttr}>`, {
       ALLOWED_TAGS: ['img'],
