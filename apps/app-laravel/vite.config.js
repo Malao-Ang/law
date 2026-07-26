@@ -5,7 +5,17 @@ import vue from '@vitejs/plugin-vue';
 const port = Number(process.env.PORT || 5173);
 const publicHost = process.env.VITE_DEV_SERVER_HOST || process.env.HMR_HOST || 'localhost';
 const publicPort = Number(process.env.VITE_HOST_PORT || process.env.HMR_PORT || port);
+const appPort = process.env.APP_HOST_PORT || 8000;
 const cacheDir = process.env.VITE_CACHE_DIR || '/tmp/app-laravel-vite-cache';
+
+// Browser treats localhost and 127.0.0.1 as different origins — allow both.
+const corsOrigins = [
+    `http://localhost:${appPort}`,
+    `http://127.0.0.1:${appPort}`,
+];
+if (!corsOrigins.includes(`http://${publicHost}:${appPort}`)) {
+    corsOrigins.push(`http://${publicHost}:${appPort}`);
+}
 
 export default defineConfig({
     cacheDir,
@@ -31,9 +41,9 @@ export default defineConfig({
         port,
         strictPort: true,
         origin: `http://${publicHost}:${publicPort}`,
-        allowedHosts: [publicHost],
+        allowedHosts: [publicHost, 'localhost', '127.0.0.1'],
         cors: {
-            origin: `http://${publicHost}:${process.env.APP_HOST_PORT || 8000}`,
+            origin: corsOrigins,
         },
         hmr: {
             host: publicHost,
