@@ -2,13 +2,10 @@ FROM node:20-bookworm-slim AS frontend
 
 WORKDIR /var/www/html
 
-# COPY .npmrc package.json package-lock.json ./
+# Reproducible install from the committed lock file.
+COPY package.json package-lock.json ./
 
-# RUN npm ci && rm -f .npmrc
-
-COPY package.json ./
-
-RUN npm install --registry=https://registry.npmjs.org/
+RUN npm ci
 
 COPY resources ./resources
 COPY public ./public
@@ -56,9 +53,9 @@ COPY docker/fonts/ /usr/share/fonts/truetype/th-sarabun-psk/
 COPY docker/fontconfig/local.conf /etc/fonts/local.conf
 RUN fc-cache -f
 
-# Install dependencies with cache mount
+# Install production dependencies only (no phpunit/dev tooling in the image).
 RUN --mount=type=cache,target=/tmp/composer-cache \
-    composer install --no-interaction --prefer-dist --optimize-autoloader
+    composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
 EXPOSE 8000
 
