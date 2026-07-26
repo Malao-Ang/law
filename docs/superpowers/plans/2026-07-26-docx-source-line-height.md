@@ -40,7 +40,7 @@ After `numberingXml()` (line 39), add:
 
 - [ ] **Step 2: Write the failing test**
 
-Create `apps/app-laravel/tests/Unit/DefaultLineSpacingReaderTest.php`:
+Create `apps/app-laravel/tests/Unit/DefaultLineSpacingReaderTest.php` (plain PHPUnit — this Unit test needs no Laravel bootstrap, matching `FastDocxExtractorTest`/`DocumentExportServiceTest`):
 
 ```php
 <?php
@@ -49,7 +49,7 @@ namespace Tests\Unit;
 
 use App\Services\Fast\Docx\DefaultLineSpacingReader;
 use DOMDocument;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 class DefaultLineSpacingReaderTest extends TestCase
 {
@@ -174,9 +174,41 @@ git commit -m "feat(fast): read default line spacing from DOCX styles.xml"
 
 **Files:**
 - Modify: `apps/app-laravel/app/Services/Fast/FastDocxExtractor.php`
-- Test: `apps/app-laravel/tests/Unit/FastExtractionPipelineTest.php` (or a new focused test if that file has no DOCX fixture; see Step 1)
+- Test: `apps/app-laravel/tests/Unit/FastDocxExtractorTest.php` (plain PHPUnit; PhpWord-built temp DOCX, matching the existing `buildTestDocx` convention)
 
-- [ ] **Step 1: Set compose_state.line_height in the returned document**
+- [ ] **Step 1: Write the failing test**
+
+`FastDocxExtractorTest` extends plain `PHPUnit\Framework\TestCase` and builds a DOCX in a temp path via PhpWord (no Laravel helpers). Add a test that builds a DOCX with a known **document default** line spacing via `setDefaultParagraphStyle(['lineHeight' => 1.5])` (PhpWord writes this into `styles.xml` `w:docDefaults`), then asserts the extractor threads the reader's value through. Add these imports at the top of the file if missing (`use App\Services\Fast\Docx\DefaultLineSpacingReader; use App\Services\Fast\Docx\DocxArchive; use PhpOffice\PhpWord\IOFactory; use PhpOffice\PhpWord\PhpWord;`), then add:
+
+```php
+    public function test_extract_threads_document_default_line_height(): void
+    {
+        $path = sys_get_temp_dir().'/fast-docx-lh-'.uniqid('', true).'.docx';
+        $phpWord = new PhpWord;
+        $phpWord->setDefaultParagraphStyle(['lineHeight' => 1.5]);
+        $section = $phpWord->addSection();
+        $section->addText('ทดสอบระยะบรรทัด');
+        IOFactory::createWriter($phpWord, 'Word2007')->save($path);
+
+        try {
+            // Ground truth: what the reader sees for this exact file.
+            $expected = (new DefaultLineSpacingReader)->multiplier((new DocxArchive($path))->stylesXml());
+            $this->assertNotNull($expected, 'PhpWord should emit a docDefaults line spacing for lineHeight 1.5');
+
+            $output = (new FastDocxExtractor)->extract($path, 'doc-lh');
+            $this->assertSame($expected, $output['compose_state']['line_height'] ?? null);
+        } finally {
+            @unlink($path);
+        }
+    }
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `docker compose exec -T laravel-app php artisan test --filter=test_extract_threads_document_default_line_height`
+Expected: FAIL — extractor output has no `compose_state.line_height` key (returns `null`).
+
+- [ ] **Step 3: Set compose_state.line_height in the returned document**
 
 In `FastDocxExtractor::extract`, after `$numberingResolver = ...` (line 35) add:
 
@@ -190,40 +222,15 @@ Then in the returned array (after `'language' => 'th',`, line 101) add:
             'compose_state' => $defaultLineHeight !== null ? ['line_height' => $defaultLineHeight] : [],
 ```
 
-- [ ] **Step 2: Add a focused test**
+- [ ] **Step 4: Run test to verify it passes**
 
-Add to `apps/app-laravel/tests/Unit/FastExtractionPipelineTest.php` (uses the repo-root sample `ประกาศ (3).docx`; skip if absent):
+Run: `docker compose exec -T laravel-app php artisan test --filter=test_extract_threads_document_default_line_height`
+Expected: PASS. (If PhpWord emits the default spacing in a form the reader doesn't match, the `assertNotNull` on `$expected` fails first — surfacing the dependency rather than a false pass.)
 
-```php
-    public function test_docx_extraction_sets_document_line_height_when_present(): void
-    {
-        $sample = base_path('../../ประกาศ (3).docx');
-        if (! is_file($sample)) {
-            $this->markTestSkipped('sample DOCX not present');
-        }
-
-        $result = (new \App\Services\Fast\FastDocxExtractor)->extract($sample, 'doc-lh-test');
-
-        // compose_state.line_height is either a positive multiplier or absent.
-        $lh = $result['compose_state']['line_height'] ?? null;
-        if ($lh !== null) {
-            $this->assertIsFloat($lh);
-            $this->assertGreaterThan(0, $lh);
-        } else {
-            $this->assertArrayHasKey('compose_state', $result);
-        }
-    }
-```
-
-- [ ] **Step 3: Run the test**
-
-Run: `docker compose exec -T laravel-app php artisan test --filter=test_docx_extraction_sets_document_line_height_when_present`
-Expected: PASS (or SKIP if the sample DOCX is absent).
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/app-laravel/app/Services/Fast/FastDocxExtractor.php apps/app-laravel/tests/Unit/FastExtractionPipelineTest.php
+git add apps/app-laravel/app/Services/Fast/FastDocxExtractor.php apps/app-laravel/tests/Unit/FastDocxExtractorTest.php
 git commit -m "feat(fast): expose DOCX default line height as compose_state.line_height"
 ```
 
@@ -432,15 +439,21 @@ git commit -m "feat(export): use document line height as paragraph fallback"
 - Modify: `apps/app-laravel/resources/js/types/document.ts` (compose_state type)
 - Modify: `apps/app-laravel/resources/js/components/review/DocumentEditorShell.vue`
 
-- [ ] **Step 1: Add line_height to the compose_state type**
+- [ ] **Step 1: Add line_height to the ComposeState interface**
 
-In `types/document.ts`, find the `compose_state` shape (it holds `page_margins`, `font_size_pt`). Add an optional field:
+In `types/document.ts`, the `ComposeState` interface (around line 182) currently declares `font_family`, `font_size_pt`, `page_margins`, `metadata`. Add an optional field so existing documents without it still type-check:
 
 ```ts
-    line_height?: number | null;
+export interface ComposeState {
+  font_family: ThaiFont;
+  font_size_pt: number;
+  line_height?: number | null;
+  page_margins: PageMargins;
+  metadata: DocumentMetadata;
+}
 ```
 
-(Place it beside the existing `font_size_pt` / `page_margins` fields in the same interface.)
+(`ReviewDocument.compose_state?: ComposeState` already exists, so `documentStore.review?.compose_state?.line_height` type-checks.)
 
 - [ ] **Step 2: Drive the editor page's line-height from compose_state**
 
@@ -511,3 +524,4 @@ git add -A && git commit -m "fix(review): line-height polish after manual check"
 - **Placeholders:** none — concrete code, tests, and commands throughout. ✓
 - **Type consistency:** `DefaultLineSpacingReader::multiplier()` returns `?float`, consumed in Task 2; `compose_state.line_height` written in Task 2, preserved in Task 3, read in Task 4 (`documentLineHeight`) and Task 5 (`docLineHeight`); `paragraphStyleForBlock(block, lineHeight, docLineHeight)` and `blankParagraphStyle(lineHeight)` signatures updated consistently at all call sites. ✓
 - **Deferred, flagged:** per-paragraph `exact`/`atLeast` line rules; standard/Python path; custom numeric line-height input. ✓
+- **Test conventions verified against the repo:** Unit tests (Tasks 1, 2, 4) extend plain `PHPUnit\Framework\TestCase`, build services with `new`, and use PhpWord-built temp DOCX fixtures — no `app()`/`base_path()`; the Feature test (Task 3) extends Laravel `Tests\TestCase` and uses `app()`. `WordXml::createXPath` registers the `w` namespace and `wordAttr`/`parseIntAttr` read `w:`-namespaced attributes, so the reader's XPath/attribute access is correct. `readDocxXml`/`makeService` helpers exist in `DocumentExportServiceTest`; `ComposeState` is a named interface with `ReviewDocument.compose_state?: ComposeState`. ✓
