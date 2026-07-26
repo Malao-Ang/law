@@ -354,7 +354,7 @@ onBeforeUnmount(() => observer?.disconnect());
 <style scoped>
 .lawx {
   min-height: 100vh;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
   color: #1e293b;
   background: #f6f4ef;
 }
@@ -488,7 +488,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
 .lawx-headcard__title { font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
-.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', sans-serif; font-size: 14px; color: #4e4538; }
+.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
 
 .lawx-card {
