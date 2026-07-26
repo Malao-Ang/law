@@ -153,9 +153,18 @@
 
 body {
   margin: 0;
-  font-family: "Sarabun", "Noto Sans Thai", sans-serif;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
   background: linear-gradient(180deg, #f6f4ef 0%, #eef2f5 100%);
   color: var(--text);
+}
+
+/* Override Vuetify's default Roboto on all UI — excludes TipTap content areas */
+.v-application {
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif !important;
+}
+.editor-shell-content,
+.document-rich-editor {
+  font-family: unset !important;
 }
 
 textarea {
