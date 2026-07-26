@@ -1,4 +1,5 @@
 import type { ESignActivity, ESignSession, ESignSigner } from '../types/esign';
+import { createClientId } from '../utils/createClientId';
 
 const SIGNERS_KEY = 'lawspace.esign.signers';
 const SESSION_KEY = 'lawspace.esign.session';
@@ -58,7 +59,7 @@ export function pushActivity(
   activity: Omit<ESignActivity, 'id' | 'at'> & { at?: string },
 ): ESignSession {
   const entry: ESignActivity = {
-    id: crypto.randomUUID(),
+    id: createClientId('activity'),
     at: activity.at ?? new Date().toISOString(),
     title: activity.title,
     detail: activity.detail,

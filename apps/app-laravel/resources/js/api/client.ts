@@ -269,6 +269,10 @@ export async function downloadPdfExport(documentId: string): Promise<void> {
   );
 }
 
+export function reviewPdfPreviewUrl(documentId: string): string {
+  return `/api/documents/${encodeURIComponent(documentId)}/export-pdf/preview`;
+}
+
 export async function downloadOriginalPdfExport(documentId: string): Promise<void> {
   return downloadBinaryExport(
     documentId,

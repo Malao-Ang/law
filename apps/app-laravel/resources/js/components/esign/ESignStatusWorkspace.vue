@@ -114,40 +114,43 @@
         </section>
 
         <section class="status-card">
-          <div class="text-subtitle-2 font-weight-bold mb-3">
-            {{ session.status === 'signed' ? 'เอกสารที่ลงนามแล้ว' : 'เอกสารที่ส่งเข้าสู่ระบบ' }}
-          </div>
-          <div class="status-file">
-            <div class="status-file__thumb" :class="{ 'is-signed': session.status === 'signed' }">
-              <v-icon icon="mdi-file-pdf-box" size="28" :color="session.status === 'signed' ? 'success' : 'error'" />
-              <span v-if="session.status === 'signed'" class="status-file__ribbon">E-Sign</span>
-            </div>
-            <div class="min-width-0 flex-grow-1">
-              <div class="text-body-2 font-weight-bold text-truncate">{{ packageName }}</div>
-              <div class="text-caption text-medium-emphasis">
-                เวอร์ชันร่าง • ประมาณ {{ packageSizeKb }} KB
+          <div class="d-flex align-center justify-space-between ga-3 mb-3">
+            <div>
+              <div class="text-subtitle-2 font-weight-bold">
+                {{ session.status === 'signed' ? 'เอกสาร PDF ที่ลงนามแล้ว' : 'ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว' }}
               </div>
-              <div v-if="session.status === 'signed'" class="d-flex align-center ga-1 mt-1 text-caption text-success">
-                <v-icon icon="mdi-shield-check" size="14" />
-                Digital Signature Verified
+              <div class="text-caption text-medium-emphasis">
+                Generate จากข้อมูล review ล่าสุด ไม่ใช้ไฟล์ต้นฉบับ
               </div>
             </div>
             <div class="d-flex ga-1">
+              <v-btn icon="mdi-refresh" size="small" variant="text" title="สร้าง PDF ใหม่" @click="refreshPdfPreview" />
               <v-btn
+                icon="mdi-download"
                 size="small"
-                variant="tonal"
-                prepend-icon="mdi-magnify"
-                class="text-none"
-                @click="openDocPreview"
-              >ดูตัวอย่าง</v-btn>
-              <v-btn
-                v-if="session.status === 'signed'"
-                size="small"
-                variant="outlined"
-                prepend-icon="mdi-download"
-                class="text-none"
-                @click="downloadStub"
-              >ดาวน์โหลด</v-btn>
+                variant="text"
+                title="ดาวน์โหลด PDF"
+                :loading="downloadingPdf"
+                @click="downloadPdf"
+              />
+            </div>
+          </div>
+          <div class="status-pdf">
+            <object :key="pdfPreviewKey" class="status-pdf__frame" :data="pdfPreviewUrl" type="application/pdf">
+              <div class="status-pdf__fallback">
+                <v-icon icon="mdi-file-pdf-box" size="40" color="error" />
+                <div class="text-body-2 font-weight-bold mt-2">{{ packageName }}</div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                  เบราว์เซอร์ไม่สามารถแสดง PDF ในหน้านี้ได้
+                </div>
+                <v-btn class="mt-3" color="admin-primary" :href="pdfPreviewUrl" target="_blank" rel="noopener">
+                  เปิด PDF
+                </v-btn>
+              </div>
+            </object>
+            <div v-if="session.status === 'signed'" class="status-pdf__signed">
+              <v-icon icon="mdi-shield-check" size="14" />
+              Digital Signature Verified
             </div>
           </div>
         </section>
@@ -319,10 +322,6 @@
       v-model="docPreviewOpen"
       :document-id="documentId"
       :signed="session.status === 'signed'"
-      :signer-name="primarySigner?.name"
-      :signer-position="primarySigner?.position || (primarySigner ? ROLE_LABELS[primarySigner.roleType] : '')"
-      :agency="agencyLabel"
-      :date-label="meta.promulgation_date || updatedAtLabel"
     />
 
     <PublishLawDialog
@@ -339,6 +338,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { downloadPdfExport, reviewPdfPreviewUrl } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -374,6 +374,8 @@ const docPreviewOpen = ref(false);
 const publishOpen = ref(false);
 const sending = ref(false);
 const publishing = ref(false);
+const downloadingPdf = ref(false);
+const pdfPreviewKey = ref(0);
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -421,10 +423,7 @@ const packageName = computed(() => {
   return `${base}_v1.0.pdf`;
 });
 
-const packageSizeKb = computed(() => {
-  const blocks = documentStore.review?.summary.block_count ?? 0;
-  return Math.max(120, blocks * 18);
-});
+const pdfPreviewUrl = computed(() => `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`);
 
 const metaOk = computed(() => Boolean(meta.value.title && meta.value.law_type && (meta.value.promulgation_date || meta.value.effective_date)));
 const structureOk = computed(() => (documentStore.review?.summary.block_count ?? 0) > 0);
@@ -556,6 +555,19 @@ function openDocPreview(): void {
   docPreviewOpen.value = true;
 }
 
+function refreshPdfPreview(): void {
+  pdfPreviewKey.value += 1;
+}
+
+async function downloadPdf(): Promise<void> {
+  downloadingPdf.value = true;
+  try {
+    await downloadPdfExport(props.documentId);
+  } finally {
+    downloadingPdf.value = false;
+  }
+}
+
 function saveDraft(): void {
   writeStage(props.documentId, 'wait_esign');
   persist();
@@ -621,16 +633,13 @@ function publish(): void {
   }
 }
 
-function downloadStub(): void {
-  window.print();
-}
-
 onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
     void documentStore.fetch(props.documentId);
   }
   session.value = loadSession(props.documentId);
   signers.value = loadSigners(props.documentId);
+  refreshPdfPreview();
   writeStage(props.documentId, 'wait_esign');
 });
 
@@ -770,43 +779,48 @@ onBeforeUnmount(() => documentStore.reset());
 
 .status-step.is-done .status-step__line { background: #86efac; }
 
-.status-file {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
+.status-pdf {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #d7dee7;
   border-radius: 14px;
-  background: #f8fafc;
+  background: #eef2f7;
 }
 
-.status-file__thumb {
-  position: relative;
-  width: 52px;
-  height: 64px;
-  border-radius: 8px;
+.status-pdf__frame {
+  display: block;
+  width: 100%;
+  height: min(68vh, 720px);
+  min-height: 460px;
+  border: 0;
   background: #fff;
-  border: 1px solid #e2e8f0;
+}
+
+.status-pdf__fallback {
+  width: 100%;
+  min-height: 460px;
+  border-radius: 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  padding: 24px;
+  text-align: center;
 }
 
-.status-file__thumb.is-signed { border-color: #86efac; background: #f0fdf4; }
-
-.status-file__ribbon {
+.status-pdf__signed {
   position: absolute;
-  bottom: 4px;
-  left: 4px;
-  right: 4px;
-  font-size: 9px;
-  font-weight: 800;
-  text-align: center;
-  background: #16a34a;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.94);
   color: #fff;
-  border-radius: 4px;
-  padding: 1px 0;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .status-side {

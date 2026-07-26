@@ -18,6 +18,24 @@ class PdfExportController extends Controller
 
     public function store(string $documentId): Response
     {
+        $response = $this->buildPdfResponse($documentId, HeaderUtils::DISPOSITION_ATTACHMENT);
+
+        $this->reviewStore->setStatus($documentId, [
+            'esign_exported_at' => now()->toIso8601String(),
+        ]);
+
+        $this->reviewStore->patchLawMeta($documentId, ['access_scope' => 'public']);
+
+        return $response;
+    }
+
+    public function preview(string $documentId): Response
+    {
+        return $this->buildPdfResponse($documentId, HeaderUtils::DISPOSITION_INLINE);
+    }
+
+    private function buildPdfResponse(string $documentId, string $dispositionType): Response
+    {
         try {
             $document = $this->reviewStore->getReviewDocument($documentId);
         } catch (RuntimeException) {
@@ -32,16 +50,10 @@ class PdfExportController extends Controller
             return response($exception->getMessage(), $status);
         }
 
-        $this->reviewStore->setStatus($documentId, [
-            'esign_exported_at' => now()->toIso8601String(),
-        ]);
-
-        $this->reviewStore->patchLawMeta($documentId, ['access_scope' => 'public']);
-
         $filenameWithExt = $this->exportService->safeFilenameBase($document).'.pdf';
         $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $filenameWithExt)) ?: 'document.pdf';
         $disposition = HeaderUtils::makeDisposition(
-            HeaderUtils::DISPOSITION_ATTACHMENT,
+            $dispositionType,
             $filenameWithExt,
             $asciiFallback,
         );

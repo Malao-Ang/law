@@ -52,26 +52,30 @@
       <!-- Document viewer -->
       <section class="preview-viewer">
         <div class="preview-viewer__toolbar">
-          <div class="d-flex align-center ga-1">
-            <v-btn icon="mdi-minus" size="x-small" variant="text" @click="zoomOut" />
-            <span class="text-caption font-weight-medium" style="min-width:48px;text-align:center">{{ zoom }}%</span>
-            <v-btn icon="mdi-plus" size="x-small" variant="text" @click="zoomIn" />
-          </div>
-          <div class="d-flex align-center ga-2">
-            <v-btn icon="mdi-chevron-left" size="x-small" variant="text" :disabled="page <= 1" @click="page--" />
-            <span class="text-caption">หน้า {{ page }} / {{ pageCount }}</span>
-            <v-btn icon="mdi-chevron-right" size="x-small" variant="text" :disabled="page >= pageCount" @click="page++" />
+          <div>
+            <div class="text-body-2 font-weight-bold">ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว</div>
+            <div class="text-caption text-medium-emphasis">Generate จาก review ล่าสุดก่อนส่งเข้า E-Sign</div>
           </div>
           <div class="d-flex align-center ga-1">
-            <v-btn icon="mdi-arrow-expand-horizontal" size="x-small" variant="text" title="พอดีความกว้าง" @click="fitWidth" />
-            <v-btn icon="mdi-fullscreen" size="x-small" variant="text" title="เต็มจอ" @click="toggleFullscreen" />
+            <v-btn icon="mdi-refresh" size="x-small" variant="text" title="สร้าง PDF ใหม่" @click="refreshPdfPreview" />
+            <v-btn icon="mdi-open-in-new" size="x-small" variant="text" title="เปิด PDF" :href="pdfPreviewUrl" target="_blank" rel="noopener" />
+            <v-btn icon="mdi-download" size="x-small" variant="text" title="ดาวน์โหลด PDF" :loading="downloadingPdf" @click="downloadPdf" />
           </div>
         </div>
 
-        <div ref="viewportEl" class="preview-viewer__viewport" @scroll="onScroll">
-          <div class="preview-viewer__stage" :style="{ transform: `scale(${zoom / 100})` }">
-            <article ref="paperEl" class="preview-paper" v-html="safeHtml" />
-          </div>
+        <div class="preview-viewer__viewport">
+          <object :key="pdfPreviewKey" class="preview-pdf" :data="pdfPreviewUrl" type="application/pdf">
+            <div class="preview-pdf__fallback">
+              <v-icon icon="mdi-file-pdf-box" size="44" color="error" />
+              <div class="text-body-2 font-weight-bold mt-2">{{ packageName }}</div>
+              <div class="text-caption text-medium-emphasis mt-1">
+                เบราว์เซอร์ไม่สามารถแสดง PDF ในหน้านี้ได้
+              </div>
+              <v-btn class="mt-3" color="admin-primary" :href="pdfPreviewUrl" target="_blank" rel="noopener">
+                เปิด PDF
+              </v-btn>
+            </div>
+          </object>
         </div>
       </section>
 
@@ -226,9 +230,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import DOMPurify from 'dompurify';
+import { downloadPdfExport, reviewPdfPreviewUrl } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -249,25 +253,20 @@ import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
 } from '../../types/lawRelation';
-
-const A4_HEIGHT_PX = 1123; // ~297mm at 96dpi
+import { createClientId } from '../../utils/createClientId';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const previewStore = usePreviewStore();
 
-const zoom = ref(100);
-const page = ref(1);
-const pageCount = ref(1);
-const viewportEl = ref<HTMLElement | null>(null);
-const paperEl = ref<HTMLElement | null>(null);
-
 const signers = ref<ESignSigner[]>([]);
 const addDialog = ref(false);
 const confirmSendOpen = ref(false);
 const savingDraft = ref(false);
 const sending = ref(false);
+const downloadingPdf = ref(false);
+const pdfPreviewKey = ref(0);
 const flash = ref('');
 const errorFlash = ref('');
 
@@ -280,18 +279,6 @@ const docTitle = computed(() =>
   || documentStore.review?.source_file
   || props.documentId,
 );
-
-const safeHtml = computed(() => {
-  const raw = previewStore.data?.draft_html ?? previewStore.data?.html ?? '';
-  return DOMPurify.sanitize(raw, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-      'span', 'div', 'section', 'header', 'article', 'sub', 'sup',
-      'img', 'figure', 'figcaption'],
-    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan', 'src', 'alt', 'width', 'height',
-      'data-block-id', 'data-block-type', 'data-page-no', 'data-reading-order'],
-  });
-});
 
 const meta = computed(() => documentStore.review?.law_meta);
 const docRelations = computed(() => documentRelations(documentStore.review?.relations));
@@ -328,6 +315,7 @@ const packageName = computed(() => {
     .replace(/\.[^.]+$/, '');
   return `${base}_v1.0.pdf`;
 });
+const pdfPreviewUrl = computed(() => `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`);
 
 function hydrateSigners(): void {
   signers.value = readStoredSigners(props.documentId);
@@ -337,7 +325,7 @@ function hydrateSigners(): void {
     const md = documentStore.review?.compose_state?.metadata;
     if (md?.signatory_name) {
       signers.value = [{
-        id: crypto.randomUUID(),
+        id: createClientId('signer'),
         roleType: 'delegate',
         name: md.signatory_name,
         position: md.signatory_position || '',
@@ -376,64 +364,18 @@ function removeSigner(index: number): void {
   persistSigners();
 }
 
-function zoomIn(): void {
-  zoom.value = Math.min(150, zoom.value + 10);
+function refreshPdfPreview(): void {
+  pdfPreviewKey.value += 1;
 }
 
-function zoomOut(): void {
-  zoom.value = Math.max(50, zoom.value - 10);
-}
-
-function fitWidth(): void {
-  const viewport = viewportEl.value;
-  if (!viewport) return;
-  const target = Math.floor(((viewport.clientWidth - 48) / 794) * 100);
-  zoom.value = Math.min(150, Math.max(50, target));
-}
-
-function toggleFullscreen(): void {
-  const el = viewportEl.value;
-  if (!el) return;
-  if (document.fullscreenElement) {
-    void document.exitFullscreen();
-  } else {
-    void el.requestFullscreen();
+async function downloadPdf(): Promise<void> {
+  downloadingPdf.value = true;
+  try {
+    await downloadPdfExport(props.documentId);
+  } finally {
+    downloadingPdf.value = false;
   }
 }
-
-function recomputePages(): void {
-  const paper = paperEl.value;
-  if (!paper) {
-    pageCount.value = 1;
-    return;
-  }
-  const height = paper.scrollHeight;
-  pageCount.value = Math.max(1, Math.ceil(height / A4_HEIGHT_PX));
-  page.value = Math.min(page.value, pageCount.value);
-}
-
-function onScroll(): void {
-  const viewport = viewportEl.value;
-  if (!viewport) return;
-  const scaledPage = A4_HEIGHT_PX * (zoom.value / 100);
-  const next = Math.floor(viewport.scrollTop / scaledPage) + 1;
-  page.value = Math.min(pageCount.value, Math.max(1, next));
-}
-
-watch(page, (next) => {
-  const viewport = viewportEl.value;
-  if (!viewport) return;
-  const scaledPage = A4_HEIGHT_PX * (zoom.value / 100);
-  const target = (next - 1) * scaledPage;
-  if (Math.abs(viewport.scrollTop - target) > scaledPage * 0.4) {
-    viewport.scrollTo({ top: target, behavior: 'smooth' });
-  }
-});
-
-watch([safeHtml, zoom], async () => {
-  await nextTick();
-  recomputePages();
-});
 
 async function saveDraft(): Promise<void> {
   savingDraft.value = true;
@@ -485,8 +427,7 @@ onMounted(async () => {
       : documentStore.fetch(props.documentId),
   ]);
   hydrateSigners();
-  await nextTick();
-  recomputePages();
+  refreshPdfPreview();
   writeStage(props.documentId, 'wait_esign');
 });
 
@@ -544,27 +485,33 @@ onBeforeUnmount(() => {
 
 .preview-viewer__viewport {
   flex: 1;
-  overflow: auto;
-  padding: 24px;
+  min-height: 0;
+  padding: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  background: #111827;
 }
 
-.preview-viewer__stage {
-  transform-origin: top center;
-  transition: transform 0.15s ease;
-}
-
-.preview-paper {
+.preview-pdf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  border: 0;
   background: #fff;
-  width: 210mm;
-  min-height: 297mm;
-  padding: 25mm 30mm;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
-  font-size: 16pt;
-  line-height: 1.8;
-  color: #1e293b;
+}
+
+.preview-pdf__fallback {
+  width: 100%;
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: #fff;
 }
 
 .preview-side {

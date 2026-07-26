@@ -49,6 +49,7 @@ Route::patch('/documents/{documentId}/blocks/{blockId}/size', [ReviewController:
 Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewController::class, 'reprocess']);
 Route::post('/documents/{documentId}/pages/{pageNo}/reprocess', [ReviewController::class, 'reprocessPage']);
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store']);
+Route::get('/documents/{documentId}/export-pdf/preview', [PdfExportController::class, 'preview']);
 Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);

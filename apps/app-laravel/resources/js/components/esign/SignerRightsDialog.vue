@@ -126,6 +126,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { ESignPerson, ESignSigner, ESignSignerRole } from '../../types/esign';
+import { createClientId } from '../../utils/createClientId';
 import {
   COUNCIL_CHAIR_PERSON,
   DELEGATE_CANDIDATES,
@@ -242,7 +243,7 @@ function confirm(): void {
   if (roleType.value === 'president' || roleType.value === 'council') {
     const person = presetPerson.value!;
     emit('confirm', {
-      id: crypto.randomUUID(),
+      id: createClientId('signer'),
       roleType: roleType.value,
       name: person.name,
       position: person.position,
@@ -251,7 +252,7 @@ function confirm(): void {
     });
   } else if (selectedDelegate.value) {
     emit('confirm', {
-      id: crypto.randomUUID(),
+      id: createClientId('signer'),
       roleType: 'delegate',
       name: selectedDelegate.value.name,
       position: selectedDelegate.value.position,
