@@ -2,7 +2,6 @@ import './bootstrap';
 import { loadThaiEditorFonts } from './utils/loadFonts';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
-import VueApexCharts from 'vue3-apexcharts';
 import App from './App.vue';
 import { router } from './router';
 import { vuetify } from './plugins/vuetify';
@@ -13,7 +12,6 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 app.use(vuetify);
-app.use(VueApexCharts);
 
 // Swap Vuetify theme by route: /admin/* → navy admin theme, everything else → gold user theme.
 // ponytail: defensive on the v4 theme API (change() vs global.name ref); drop the fallback once verified.

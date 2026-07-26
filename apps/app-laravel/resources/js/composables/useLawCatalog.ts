@@ -1,9 +1,10 @@
 import type { DocumentListItem } from '../types/document';
 
 const PICKABLE_STATUSES = new Set(['done', 'exported', 'ingested']);
+const RELATION_READY_STEP = 4;
 
 export function isPickableDocument(doc: DocumentListItem): boolean {
-  return PICKABLE_STATUSES.has(doc.status);
+  return PICKABLE_STATUSES.has(doc.status) || (doc.workflow_completed_step ?? 0) >= RELATION_READY_STEP;
 }
 
 export function rootDocuments(

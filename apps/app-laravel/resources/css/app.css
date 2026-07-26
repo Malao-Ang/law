@@ -42,7 +42,7 @@
 @font-face {
   font-family: 'TH Sarabun New';
   src: local('TH Sarabun New'), local('THSarabunNew'),
-       url('/fonts/THSarabunNew.ttf') format('truetype');
+       url('../../public/fonts/THSarabunNew.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -51,7 +51,7 @@
 @font-face {
   font-family: 'TH Sarabun New';
   src: local('TH Sarabun New Bold'), local('THSarabunNew Bold'),
-       url('/fonts/THSarabunNew-Bold.ttf') format('truetype');
+       url('../../public/fonts/THSarabunNew-Bold.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -60,7 +60,7 @@
 @font-face {
   font-family: 'TH Sarabun New';
   src: local('TH Sarabun New Italic'), local('THSarabunNew Italic'),
-       url('/fonts/THSarabunNew-Italic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunNew-Italic.ttf') format('truetype');
   font-weight: normal;
   font-style: italic;
   font-display: swap;
@@ -69,7 +69,7 @@
 @font-face {
   font-family: 'TH Sarabun New';
   src: local('TH Sarabun New Bold Italic'), local('THSarabunNew BoldItalic'),
-       url('/fonts/THSarabunNew-BoldItalic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunNew-BoldItalic.ttf') format('truetype');
   font-weight: bold;
   font-style: italic;
   font-display: swap;
@@ -78,7 +78,7 @@
 @font-face {
   font-family: 'TH Sarabun PSK';
   src: local('TH Sarabun PSK'), local('THSarabunPSK'),
-       url('/fonts/THSarabunPSK.ttf') format('truetype');
+       url('../../public/fonts/THSarabunPSK.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -87,7 +87,7 @@
 @font-face {
   font-family: 'TH Sarabun PSK';
   src: local('TH Sarabun PSK Bold'), local('THSarabunPSK Bold'),
-       url('/fonts/THSarabunPSK-Bold.ttf') format('truetype');
+       url('../../public/fonts/THSarabunPSK-Bold.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -96,7 +96,7 @@
 @font-face {
   font-family: 'TH Sarabun PSK';
   src: local('TH Sarabun PSK Italic'), local('THSarabunPSK Italic'),
-       url('/fonts/THSarabunPSK-Italic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunPSK-Italic.ttf') format('truetype');
   font-weight: normal;
   font-style: italic;
   font-display: swap;
@@ -105,7 +105,7 @@
 @font-face {
   font-family: 'TH Sarabun PSK';
   src: local('TH Sarabun PSK Bold Italic'), local('THSarabunPSK BoldItalic'),
-       url('/fonts/THSarabunPSK-BoldItalic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunPSK-BoldItalic.ttf') format('truetype');
   font-weight: bold;
   font-style: italic;
   font-display: swap;
@@ -114,7 +114,7 @@
 @font-face {
   font-family: 'TH SarabunIT9';
   src: local('TH SarabunIT9'), local('THSarabunIT9'),
-       url('/fonts/THSarabunIT9.ttf') format('truetype');
+       url('../../public/fonts/THSarabunIT9.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -123,7 +123,7 @@
 @font-face {
   font-family: 'TH SarabunIT9';
   src: local('TH SarabunIT9 Bold'), local('THSarabunIT9 Bold'),
-       url('/fonts/THSarabunIT9-Bold.ttf') format('truetype');
+       url('../../public/fonts/THSarabunIT9-Bold.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -132,7 +132,7 @@
 @font-face {
   font-family: 'TH SarabunIT9';
   src: local('TH SarabunIT9 Italic'), local('THSarabunIT9 Italic'),
-       url('/fonts/THSarabunIT9-Italic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunIT9-Italic.ttf') format('truetype');
   font-weight: normal;
   font-style: italic;
   font-display: swap;
@@ -141,7 +141,7 @@
 @font-face {
   font-family: 'TH SarabunIT9';
   src: local('TH SarabunIT9 Bold Italic'), local('THSarabunIT9 BoldItalic'),
-       url('/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
+       url('../../public/fonts/THSarabunIT9-BoldItalic.ttf') format('truetype');
   font-weight: bold;
   font-style: italic;
   font-display: swap;

@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
@@ -327,6 +327,10 @@ function scheduleCatalogSearch(): void {
 
 watch([globalSearch, searchCol1], () => {
   scheduleCatalogSearch();
+});
+
+onMounted(() => {
+  void loadDocuments();
 });
 
 async function loadSections(documentId: string): Promise<void> {

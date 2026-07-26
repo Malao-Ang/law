@@ -38,7 +38,7 @@
           <div class="text-subtitle-1 font-weight-bold mb-2">{{ dim.title }}</div>
           <div v-if="dim.buckets.length === 0" class="text-medium-emphasis text-body-2 pa-4 text-center">ไม่มีข้อมูล</div>
           <template v-else>
-            <apexchart
+            <ApexChart
               :type="dim.chartType"
               height="240"
               :options="chartOptions(dim)"
@@ -105,6 +105,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import ApexChart from 'vue3-apexcharts/core';
+import 'apexcharts/bar';
+import 'apexcharts/donut';
+import 'apexcharts/features/legend';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportBucket, ReportFilters, ReportSummary } from '../../types/document';
 import AdminStatCard from '../../components/admin/AdminStatCard.vue';

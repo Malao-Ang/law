@@ -1,22 +1,23 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import PublicHomePage from '../pages/public/PublicHomePage.vue';
-import LawDatabasePage from '../pages/public/LawDatabasePage.vue';
-import AdminDashboardPage from '../pages/admin/AdminDashboardPage.vue';
-import AdminLawListPage from '../pages/admin/AdminLawListPage.vue';
-import AdminUploadPage from '../pages/admin/AdminUploadPage.vue';
-import AdminReportPage from '../pages/admin/AdminReportPage.vue';
-import AdminOcrQueuePage from '../pages/admin/AdminOcrQueuePage.vue';
-import AdminRelationsHubPage from '../pages/admin/AdminRelationsHubPage.vue';
-import UploadPage from '../pages/UploadPage.vue';
-import ReviewPage from '../pages/review/ReviewPage.vue';
-import ComposePage from '../pages/compose/ComposePage.vue';
-import PreviewPage from '../pages/preview/PreviewPage.vue';
-import RagPage from '../pages/rag/RagPage.vue';
-import ResultPage from '../pages/result/ResultPage.vue';
-import LawInfoPage from '../pages/law-info/LawInfoPage.vue';
-import LawRelationsPage from '../pages/law-relations/LawRelationsPage.vue';
-import PermissionAccessPage from '../pages/permissions/PermissionAccessPage.vue';
-import LawPage from '../pages/law/LawPage.vue';
+
+const PublicHomePage = () => import('../pages/public/PublicHomePage.vue');
+const LawDatabasePage = () => import('../pages/public/LawDatabasePage.vue');
+const AdminDashboardPage = () => import('../pages/admin/AdminDashboardPage.vue');
+const AdminLawListPage = () => import('../pages/admin/AdminLawListPage.vue');
+const AdminUploadPage = () => import('../pages/admin/AdminUploadPage.vue');
+const AdminReportPage = () => import('../pages/admin/AdminReportPage.vue');
+const AdminOcrQueuePage = () => import('../pages/admin/AdminOcrQueuePage.vue');
+const AdminRelationsHubPage = () => import('../pages/admin/AdminRelationsHubPage.vue');
+const UploadPage = () => import('../pages/UploadPage.vue');
+const ReviewPage = () => import('../pages/review/ReviewPage.vue');
+const ComposePage = () => import('../pages/compose/ComposePage.vue');
+const PreviewPage = () => import('../pages/preview/PreviewPage.vue');
+const RagPage = () => import('../pages/rag/RagPage.vue');
+const ResultPage = () => import('../pages/result/ResultPage.vue');
+const LawInfoPage = () => import('../pages/law-info/LawInfoPage.vue');
+const LawRelationsPage = () => import('../pages/law-relations/LawRelationsPage.vue');
+const PermissionAccessPage = () => import('../pages/permissions/PermissionAccessPage.vue');
+const LawPage = () => import('../pages/law/LawPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },

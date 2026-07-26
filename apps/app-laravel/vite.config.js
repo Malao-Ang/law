@@ -60,4 +60,31 @@ export default defineConfig({
             ],
         },
     },
+    build: {
+        chunkSizeWarningLimit: 700,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) {
+                        return;
+                    }
+
+                    if (id.includes('apexcharts') || id.includes('vue3-apexcharts')) {
+                        return 'charts';
+                    }
+                    if (id.includes('@tiptap') || id.includes('prosemirror')) {
+                        return 'editor';
+                    }
+                    if (id.includes('vuetify') || id.includes('@mdi')) {
+                        return 'vuetify';
+                    }
+                    if (id.includes('/vue') || id.includes('@vue') || id.includes('pinia')) {
+                        return 'vue';
+                    }
+
+                    return 'vendor';
+                },
+            },
+        },
+    },
 });
