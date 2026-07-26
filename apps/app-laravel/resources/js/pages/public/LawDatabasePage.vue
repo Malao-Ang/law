@@ -13,7 +13,7 @@
             </p>
           </div>
 
-          <div class="d-flex flex-column flex-md-row ga-3 align-stretch align-md-start">
+          <div class="d-flex flex-column flex-md-row ga-3 align-stretch align-md-center">
             <div class="flex-grow-1 elaw-search-shell">
               <v-text-field
                 v-model="query"
@@ -27,7 +27,22 @@
                 @focus="searchFocused = true"
                 @blur="queueHideSuggestions"
                 @keydown.enter.prevent="doSearch"
-              />
+              >
+                <template #prepend-inner>
+                  <v-icon icon="mdi-magnify" size="18" color="#3c2900" />
+                </template>
+                <template #append-inner>
+                  <button
+                    type="button"
+                    class="elaw-search-input__button"
+                    @mousedown.prevent
+                    @click.stop="doSearch"
+                  >
+                    <v-icon icon="mdi-magnify" size="18" />
+                    ค้นหาข้อมูล
+                  </button>
+                </template>
+              </v-text-field>
               <v-card
                 v-if="showSuggestions"
                 class="elaw-suggest-card"
@@ -74,10 +89,6 @@
                 </button>
               </v-card>
             </div>
-            <button type="button" class="elaw-db-search-btn" @click="doSearch">
-              <v-icon icon="mdi-magnify" size="18" />
-              ค้นหาข้อมูล
-            </button>
           </div>
 
           <div class="d-flex align-center flex-wrap ga-2 mt-4 elaw-filter-row">
@@ -97,10 +108,11 @@
               @click="toggleType(type.value)"
             >{{ type.label }}<span class="elaw-type-pill__count"> ({{ type.count }})</span></button>
 
+            <span class="elaw-filter-row__label elaw-filter-row__label--group">กลุ่มกฎหมาย:</span>
             <v-menu :close-on-content-click="false" max-height="320">
               <template #activator="{ props: menuProps }">
                 <button type="button" class="elaw-type-pill elaw-group-pill" v-bind="menuProps">
-                  {{ selectedGroups.length > 0 ? `กลุ่มกฎหมาย (${selectedGroups.length})` : `กลุ่มกฎหมาย (${groupFilters.length} กลุ่ม)` }}
+                  {{ selectedGroups.length > 0 ? `${selectedGroups.length} กลุ่มที่เลือก` : `${groupFilters.length} กลุ่ม` }}
                   <v-icon icon="mdi-chevron-down" size="14" />
                 </button>
               </template>
@@ -287,6 +299,8 @@
                 variant="outlined"
                 density="compact"
                 hide-details
+                bg-color="white"
+                class="elaw-sort-select"
                 style="max-width: 220px"
               />
             </div>
@@ -298,9 +312,31 @@
             <div v-else-if="sortedResults.length === 0" class="law-empty-state">
               <v-icon icon="mdi-file-search-outline" size="28" color="medium-emphasis" />
               <p class="text-body-2 text-medium-emphasis mb-0">ไม่พบเอกสาร</p>
+              <div v-if="nearbySearchTerms.length > 0" class="law-empty-suggestions">
+                <span class="law-empty-suggestions__label">ลองค้นหาคำใกล้เคียง:</span>
+                <button
+                  v-for="term in nearbySearchTerms.slice(0, 5)"
+                  :key="term"
+                  type="button"
+                  class="law-empty-suggestions__item"
+                  @click="applySearchTerm(term)"
+                >
+                  {{ term }}
+                </button>
+              </div>
             </div>
 
-            <div v-else class="d-flex flex-column ga-3">
+            <div v-else class="law-results-list">
+              <v-alert
+                v-if="isFuzzyResults"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-1"
+                icon="mdi-magnify-scan"
+              >
+                ไม่พบผลลัพธ์ที่ตรงกับ "{{ query }}" — แสดงผลใกล้เคียงที่พบแทน
+              </v-alert>
               <div
                 v-for="law in sortedResults"
                 :key="law.law_id"
@@ -308,8 +344,8 @@
                 :class="`law-list-card--${toDocType(law.law_type)}`"
                 role="article"
                 tabindex="0"
-                @click="router.push({ name: 'law', params: { documentId: law.law_id } })"
-                @keydown.enter="router.push({ name: 'law', params: { documentId: law.law_id } })"
+                @click="law.restricted ? goLogin() : router.push({ name: 'law', params: { documentId: law.law_id } })"
+                @keydown.enter="law.restricted ? goLogin() : router.push({ name: 'law', params: { documentId: law.law_id } })"
               >
                 <div class="law-list-card__body">
                   <div class="law-list-card__tags">
@@ -319,8 +355,13 @@
                       {{ statusLabel(law.status) }}
                     </span>
                   </div>
-                  <h3 class="law-list-card__title">{{ law.title || 'ไม่ระบุชื่อกฎหมาย' }}</h3>
-                  <p v-if="law.summary" class="law-list-card__desc">{{ law.summary }}</p>
+                  <h3
+                    class="law-list-card__title"
+                    v-html="law.title_highlighted ? sanitizeHighlight(law.title_highlighted) : (law.title || 'ไม่ระบุชื่อกฎหมาย')"
+                  />
+                  <p class="law-list-card__desc" :class="{ 'law-list-card__desc--empty': !law.summary }">
+                    {{ law.summary || 'ไม่มีสรุปข้อมูล' }}
+                  </p>
                   <div class="law-list-card__meta">
                     <span v-if="law.published_date">
                       <v-icon size="13" icon="mdi-calendar-blank-outline" />
@@ -330,12 +371,30 @@
                       <v-icon size="13" icon="mdi-domain" />
                       {{ law.agency }}
                     </span>
+                    <span v-if="law.law_group">
+                      <v-icon size="13" icon="mdi-sitemap-outline" />
+                      {{ law.law_group }}
+                    </span>
                     <span v-if="law.signer_group">
                       <v-icon size="13" icon="mdi-folder-outline" />
                       {{ law.signer_group }}
                     </span>
                   </div>
-                  <div v-if="law.snippets.length" class="law-list-card__snippets">
+                  <div class="law-list-card__children" :class="{ 'law-list-card__children--empty': childChips(law).length === 0 }">
+                    <span v-if="childChips(law).length" class="law-list-card__children-label">
+                      <v-icon size="12" icon="mdi-link-variant" />
+                      กฎหมายลูก
+                    </span>
+                    <span
+                      v-for="chip in childChips(law)"
+                      :key="chip.type"
+                      class="law-child-chip"
+                      :class="`law-child-chip--${chip.type}`"
+                    >
+                      {{ chip.label }} {{ chip.count }}
+                    </span>
+                  </div>
+                  <div class="law-list-card__snippets" :class="{ 'law-list-card__snippets--empty': law.snippets.length === 0 }">
                     <div
                       v-for="(snippet, index) in law.snippets.slice(0, 2)"
                       :key="`${law.law_id}-${index}`"
@@ -344,7 +403,15 @@
                     />
                   </div>
                 </div>
-                <div class="law-list-card__arrow">
+                <div v-if="law.restricted" class="law-list-card__restricted">
+                  <v-icon icon="mdi-lock-outline" size="16" />
+                  <span class="law-list-card__restricted-label">Private · เฉพาะผู้ได้รับสิทธิ์</span>
+                  <button type="button" class="law-restricted-btn" @click.stop="goLogin">
+                    เข้าสู่ระบบเพื่อดูเอกสาร
+                    <v-icon size="14" icon="mdi-arrow-right" />
+                  </button>
+                </div>
+                <div v-else class="law-list-card__arrow">
                   <v-icon icon="mdi-chevron-right" color="#b68d40" size="22" />
                 </div>
               </div>
@@ -370,7 +437,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchLawFacets, getLookups } from '../../api/client';
+import { fetchLawFacets, getLookups, type LookupData } from '../../api/client';
 import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
@@ -438,8 +505,14 @@ const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
   resolution: ['resolution', 'มติ'],
 };
 
-// The only law types shown in the filter, in display order (พ.ร.บ. / ประกาศ /
-// ข้อบังคับ / ระเบียบ). Any other stored type (คำสั่ง, มติ, …) is hidden.
+const CHILD_CHIP_LABELS: Record<string, string> = {
+  phrb: 'พ.ร.บ.',
+  'kho-bangkhab': 'ข้อบังคับ',
+  rabiap: 'ระเบียบ',
+  prakat: 'ประกาศ',
+  other: 'อื่น ๆ',
+};
+
 const LAW_TYPE_ORDER = ['phrb', 'prakat', 'kho-bangkhab', 'rabiap'];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
@@ -459,6 +532,7 @@ const router = useRouter();
 const route = useRoute();
 const searchStore = useLawSearchStore();
 const baseFacets = ref<LawSearchFacets | null>(null);
+const lookupFacets = ref<LawSearchFacets | null>(null);
 
 const query = ref('');
 const selectedTypes = ref<string[]>(['all']);
@@ -484,12 +558,31 @@ const sortOptions = [
 
 const currentTypes = computed(() => selectedTypes.value.includes('all') ? [] : selectedTypes.value);
 const pageCount = computed(() => Math.max(1, Math.ceil(searchStore.total / PER_PAGE)));
+// Near-word results: the search fell back to fuzzy matching (no exact hit).
+const isFuzzyResults = computed(() =>
+  query.value.trim() !== ''
+  && searchStore.meta.mode.includes('fuzzy')
+  && searchStore.results.length > 0,
+);
 const showSuggestions = computed(() => searchFocused.value && query.value.trim().length >= 2 && (searchStore.suggesting || searchStore.suggestions.length > 0));
+const nearbySearchTerms = computed(() => {
+  const fromMeta = searchStore.meta.suggestions
+    .map((term) => term.trim())
+    .filter(Boolean);
+  if (fromMeta.length > 0) {
+    return uniqueStrings(fromMeta);
+  }
+
+  return uniqueStrings(searchStore.suggestions
+    .flatMap((suggestion) => [suggestion.title ?? '', ...suggestion.keywords])
+    .map((term) => term.trim())
+    .filter(Boolean));
+});
 
 function effectiveFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[] {
   const fromSearch = searchStore.facets[key];
-  if (fromSearch.length > 0) return fromSearch;
-  return baseFacets.value?.[key] ?? [];
+  const counted = fromSearch.length > 0 ? fromSearch : (baseFacets.value?.[key] ?? []);
+  return mergeFacetBuckets(lookupFacets.value?.[key] ?? [], counted);
 }
 
 // Build filter options from the REAL facet buckets (values actually present in
@@ -707,6 +800,19 @@ function applySuggestion(suggestion: LawSuggestion): void {
   void syncRouteAndSearch();
 }
 
+function applySearchTerm(term: string): void {
+  if (hideSuggestionsTimer) {
+    clearTimeout(hideSuggestionsTimer);
+  }
+  mutatingSearchState = true;
+  query.value = term;
+  page.value = 1;
+  mutatingSearchState = false;
+  searchFocused.value = false;
+  searchStore.clearSuggestions();
+  void syncRouteAndSearch();
+}
+
 async function syncRouteAndSearch(): Promise<void> {
   suppressNextRouteSearch = true;
   await replaceRoute();
@@ -733,6 +839,9 @@ async function replaceRoute(): Promise<void> {
 
 async function runSearch(): Promise<void> {
   await searchStore.search(query.value.trim(), currentFilters(), page.value, PER_PAGE);
+  if (searchStore.total === 0 && query.value.trim().length >= 2) {
+    await searchStore.suggest(query.value, 5);
+  }
   if (page.value > pageCount.value) {
     page.value = pageCount.value;
   }
@@ -814,6 +923,43 @@ function mapFacetOptions(
   }));
 }
 
+function mergeFacetBuckets(baseline: FacetBucket[], counted: FacetBucket[]): FacetBucket[] {
+  const byValue = new Map<string, number>();
+  const order: string[] = [];
+
+  for (const bucket of baseline) {
+    if (!byValue.has(bucket.value)) {
+      order.push(bucket.value);
+    }
+    byValue.set(bucket.value, 0);
+  }
+
+  for (const bucket of counted) {
+    if (!byValue.has(bucket.value)) {
+      order.push(bucket.value);
+    }
+    byValue.set(bucket.value, bucket.count);
+  }
+
+  return order.map((value) => ({ value, count: byValue.get(value) ?? 0 }));
+}
+
+function lookupBuckets(options: LookupData[keyof LookupData]): FacetBucket[] {
+  return options.map((option) => ({ value: option.value, count: 0 }));
+}
+
+function lookupDataToFacets(data: LookupData): LawSearchFacets {
+  return {
+    law_type: lookupBuckets(data.document_types),
+    status: lookupBuckets(data.statuses),
+    change_status: lookupBuckets(data.change_statuses),
+    agency: lookupBuckets(data.agencies),
+    law_group: lookupBuckets(data.law_groups),
+    signer_group: [],
+    years: [],
+  };
+}
+
 function canonicalLawTypeValue(value: string): string {
   return LAW_TYPE_CANONICAL_VALUES[value] ?? value;
 }
@@ -869,6 +1015,17 @@ function toDocType(lawType: string | null | undefined): DocType {
   return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? 'other';
 }
 
+function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
+  const types = law.child_types ?? {};
+  return Object.entries(types)
+    .filter(([, count]) => count > 0)
+    .map(([type, count]) => ({ type, label: CHILD_CHIP_LABELS[type] ?? type, count }));
+}
+
+function goLogin(): void {
+  router.push('/login');
+}
+
 function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined {
   if (cs === 'new' || cs === 'amended' || cs === 'repealed') return cs;
   return undefined;
@@ -904,6 +1061,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
   fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
+  getLookups().then((lookups) => { lookupFacets.value = lookupDataToFacets(lookups); }).catch(() => { /* non-fatal */ });
   refreshTimer = setInterval(() => {
     void runSearch();
     fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
@@ -927,32 +1085,34 @@ onBeforeUnmount(() => {
 }
 
 .elaw-db-header__title {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 32px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 28px;
   font-weight: 700;
   color: #1f1b14;
   margin: 0;
 }
 
 .elaw-db-header__sub {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 18px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 16px;
   color: #4e4538;
 }
 
-.elaw-db-search-btn {
+.elaw-search-input__button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   background: #343028;
   border: none;
   cursor: pointer;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 20px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 16px;
   font-weight: 700;
+  line-height: 1;
   color: #ffffff;
-  padding: 14px 28px;
-  border-radius: 12px;
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 9999px;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -961,10 +1121,10 @@ onBeforeUnmount(() => {
   background: #ffffff;
   border: 1px solid #d2c5b3;
   border-radius: 9999px;
-  padding: 7px 18px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  padding: 6px 16px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   color: #3c2900;
   cursor: pointer;
   white-space: nowrap;
@@ -979,13 +1139,18 @@ onBeforeUnmount(() => {
 .elaw-type-pill--active {
   background: #b68d40;
   border-color: #b68d40;
-  color: #3c2900;
+  color: #ffffff;
 }
 
 .elaw-type-pill__count {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   opacity: 0.8;
+}
+
+.elaw-type-pill--active .elaw-type-pill__count {
+  color: #ffffff;
+  opacity: 0.9;
 }
 
 .elaw-filter-row {
@@ -993,11 +1158,19 @@ onBeforeUnmount(() => {
 }
 
 .elaw-filter-row__label {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 16px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 14px;
   font-weight: 700;
   color: #7b580d;
   white-space: nowrap;
+}
+
+.elaw-filter-row__label--group {
+  margin-left: 8px;
+}
+
+.elaw-sort-select :deep(.v-field) {
+  background: #ffffff;
 }
 
 .law-result-wrapper {
@@ -1013,7 +1186,15 @@ onBeforeUnmount(() => {
 }
 
 .elaw-search-input :deep(.v-field__input) {
-  min-height: 58px;
+  font-size: 16px;
+  min-height: 54px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.elaw-search-input :deep(.v-field__append-inner) {
+  align-items: center;
+  padding-inline-start: 10px;
 }
 
 .elaw-search-shell {
@@ -1147,15 +1328,58 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 12px;
   min-height: 240px;
+  padding: 28px;
   border: 1px dashed rgba(171, 127, 41, 0.28);
   border-radius: 12px;
   background: rgba(255, 250, 236, 0.55);
 }
 
+.law-empty-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.law-empty-suggestions__label {
+  color: #7b580d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.law-empty-suggestions__item {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #d2c5b3;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #3c2900;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 14px;
+}
+
+.law-empty-suggestions__item:hover {
+  border-color: #b68d40;
+  color: #7b580d;
+}
+
 /* ── List result cards ── */
+.law-results-list {
+  display: grid;
+  gap: 12px;
+}
+
 .law-list-card {
   display: flex;
   align-items: stretch;
+  min-height: 0;
+  height: auto;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
@@ -1163,7 +1387,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   cursor: pointer;
   transition: box-shadow 0.15s ease;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .law-list-card:hover {
@@ -1176,17 +1400,22 @@ onBeforeUnmount(() => {
 .law-list-card--prakat       { border-left-color: #fb923c; }
 
 .law-list-card__body {
+  display: grid;
+  grid-template-rows: auto;
+  row-gap: 8px;
   flex: 1;
   padding: 18px 22px;
   min-width: 0;
+  overflow: visible;
 }
 
 .law-list-card__tags {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
   flex-wrap: wrap;
+  min-width: 0;
+  overflow: visible;
 }
 
 .law-use-status {
@@ -1215,51 +1444,109 @@ onBeforeUnmount(() => {
 }
 
 .law-list-card__title {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #1e293b;
-  margin: 0 0 6px;
+  margin: 0;
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .law-list-card__desc {
   font-family: 'Sarabun', sans-serif;
   font-size: 14px;
   color: #4b5563;
-  margin: 0 0 10px;
+  margin: 0;
   line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.law-list-card__desc--empty {
+  visibility: hidden;
 }
 
 .law-list-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 6px 16px;
   font-family: 'Sarabun', sans-serif;
   font-size: 13px;
   color: #6b7280;
   align-items: center;
+  overflow: visible;
 }
 
 .law-list-card__meta span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .law-list-card__snippets {
-  margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: auto;
+  overflow: visible;
+}
+
+.law-list-card__snippets--empty {
+  visibility: hidden;
+}
+
+.law-list-card__children {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.law-list-card__children--empty {
+  visibility: hidden;
+}
+
+.law-list-card__children-label {
+  font-size: 12px;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.law-child-chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.law-child-chip--phrb {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.law-child-chip--rabiap {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.law-child-chip--kho-bangkhab {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.law-child-chip--prakat {
+  background: #ffedd5;
+  color: #9a3412;
 }
 
 .law-list-card__arrow {
@@ -1267,6 +1554,64 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0 18px;
   flex-shrink: 0;
+}
+
+.law-list-card__restricted {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.law-list-card__restricted-label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.law-restricted-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #b68d40;
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .elaw-search-input__button {
+    gap: 5px;
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 16px;
+  }
+
+  .law-list-card {
+    flex-direction: column;
+    height: auto;
+    min-height: 214px;
+  }
+
+  .law-list-card__body {
+    grid-template-rows: auto;
+  }
+
+  .law-list-card__restricted,
+  .law-list-card__arrow {
+    justify-content: flex-end;
+    padding: 0 18px 16px;
+  }
+
+  .law-list-card__restricted {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* ── Group dropdown pill ── */
@@ -1278,6 +1623,6 @@ onBeforeUnmount(() => {
 
 .elaw-group-menu {
   min-width: 320px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
 </style>
