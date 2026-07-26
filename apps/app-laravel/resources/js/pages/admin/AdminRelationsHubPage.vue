@@ -373,6 +373,7 @@ import {
   formatRelationTarget,
   relationTypeLabel,
 } from '../../types/lawRelation';
+import { createClientId } from '../../utils/createClientId';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -555,7 +556,7 @@ const changeLogCountById = computed<Record<string, number>>(() => {
 
 function logChange(action: 'add' | 'remove', relation: LawRelation): void {
   changeLog.value.unshift({
-    id: crypto.randomUUID(),
+    id: createClientId('change'),
     timestamp: new Date(),
     action,
     docId: quickEditId.value ?? '',

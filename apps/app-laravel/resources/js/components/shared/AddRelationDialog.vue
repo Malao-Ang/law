@@ -145,6 +145,7 @@ import {
   formatRelationTarget,
   relationTypeLabel,
 } from '../../types/lawRelation';
+import { createClientId } from '../../utils/createClientId';
 import LawRelationColumnPicker from './LawRelationColumnPicker.vue';
 
 const props = defineProps<{
@@ -163,7 +164,7 @@ const pickerTarget = ref<LawRelationTarget | null>(null);
 const existingRelations = computed(() => props.existingRelations ?? []);
 
 const form = ref<LawRelation>({
-  id: crypto.randomUUID(),
+  id: createClientId('relation'),
   scope: props.scope,
   block_id: props.blockId ?? null,
   type: props.defaultType ?? 'related',
