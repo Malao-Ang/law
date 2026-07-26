@@ -154,7 +154,6 @@ const visibilityIcon = computed(() =>
   border: 1px solid #bbf7d0;
   background: #f0fdf4;
   color: #15803d;
-  font-family: 'Sarabun', sans-serif;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -174,7 +173,6 @@ const visibilityIcon = computed(() =>
 
 /* Title */
 .elaw-card__title {
-  font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #1e293b;
@@ -188,7 +186,6 @@ const visibilityIcon = computed(() =>
 
 /* Description */
 .elaw-card__desc {
-  font-family: 'Sarabun', sans-serif;
   font-size: 14px;
   font-weight: 400;
   color: #4b5563;
@@ -211,7 +208,6 @@ const visibilityIcon = computed(() =>
 }
 
 .elaw-agency-strip__label {
-  font-family: 'Sarabun', sans-serif;
   font-size: 11px;
   font-weight: 700;
   color: #059669;
@@ -221,7 +217,6 @@ const visibilityIcon = computed(() =>
 }
 
 .elaw-agency-strip__value {
-  font-family: 'Sarabun', sans-serif;
   font-size: 12px;
   font-weight: 700;
   color: #1e293b;
@@ -242,7 +237,6 @@ const visibilityIcon = computed(() =>
   background: #f9fafb;
   border-radius: 8px;
   padding: 6px 8px;
-  font-family: 'Sarabun', sans-serif;
   font-size: 12px;
   font-weight: 400;
   color: #6b7280;
@@ -265,7 +259,6 @@ const visibilityIcon = computed(() =>
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Sarabun', sans-serif;
   font-size: 12px;
   font-weight: 400;
   color: #6b7280;
@@ -278,7 +271,6 @@ const visibilityIcon = computed(() =>
   background: none;
   border: none;
   cursor: pointer;
-  font-family: 'Sarabun', sans-serif;
   font-size: 14px;
   font-weight: 500;
   color: #3b82f6;

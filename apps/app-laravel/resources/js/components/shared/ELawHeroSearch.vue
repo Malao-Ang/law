@@ -169,7 +169,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   border-radius: 9999px;
   background: #ffffff;
   color: #7b580d;
-  font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
   font-size: 12px;
   font-weight: 700;
   margin-bottom: 16px;
@@ -256,7 +256,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   font-weight: 700;
   letter-spacing: 0.36px;
   padding: 0 24px !important;
-  height: 48px !important;
+  height: 44px !important;
   margin-right: 0;
 }
 
