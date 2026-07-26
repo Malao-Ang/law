@@ -17,7 +17,8 @@ WORKDIR /app
 
 # Install Python dependencies from the project requirements so the image and
 # local test/runtime environments do not drift apart.
-COPY requirements.txt /app/
+# requirements.txt does `-r requirements-heavy.txt`, so both must be present.
+COPY requirements.txt requirements-heavy.txt /app/
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy application
