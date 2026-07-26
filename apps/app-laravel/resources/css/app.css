@@ -158,13 +158,9 @@ body {
   color: var(--text);
 }
 
-/* Override Vuetify's default Roboto on all UI — excludes TipTap content areas */
+/* Override Vuetify's default Roboto on all UI */
 .v-application {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif !important;
-}
-.editor-shell-content,
-.document-rich-editor {
-  font-family: unset !important;
+  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
 }
 
 textarea {
