@@ -28,7 +28,7 @@
         v-model="globalSearch"
         density="compact"
         hide-details
-        placeholder="ค้นหา..."
+        placeholder="ค้นหา"
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
         class="law-rel-picker__global-search"
@@ -466,6 +466,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 8px;
   overflow: hidden;
@@ -483,11 +484,23 @@ onMounted(() => {
 }
 
 .law-rel-col__search {
-  margin: 8px;
+  flex: 0 0 auto;
+  margin: 6px 8px 4px;
+}
+
+.law-rel-col__search :deep(.v-field) {
+  font-size: 0.8125rem;
+}
+
+.law-rel-col__search :deep(.v-field__input) {
+  min-height: 32px;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 .law-rel-col__list {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 0 8px 8px;
   display: flex;

@@ -247,16 +247,24 @@ function isActive(item: NavItem): boolean {
 }
 
 .app-shell__main--full-height {
+  display: flex;
+  flex-direction: column;
   height: 100dvh;
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
 
+.app-shell__main--full-height .app-shell__topbar,
+.app-shell__main--full-height .app-shell__page-title {
+  flex-shrink: 0;
+}
+
 .app-shell__content--full-height {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   overflow: hidden;
 }

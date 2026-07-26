@@ -6,7 +6,7 @@
   >
     <WorkflowFooterBar
       :step="6"
-      next-label="เผยแพร่"
+      next-label="ไปหน้าลงนาม"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"
       @back="router.push(`/documents/${props.documentId}/relations`)"
@@ -166,6 +166,7 @@ import {
   listPermissionGroups,
 } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
+import { writeStage } from '../../data/documentPipeline';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../../types/permission';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
@@ -276,7 +277,8 @@ async function saveAndPublish(): Promise<void> {
 
   const progressed = await documentStore.completeWorkflowStep(6);
   if (!progressed) return;
-  router.push(`/law/${props.documentId}`);
+  writeStage(props.documentId, 'wait_esign');
+  router.push(`/documents/${props.documentId}/esign`);
 }
 
 onMounted(async () => {
