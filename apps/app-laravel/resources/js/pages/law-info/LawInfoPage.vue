@@ -1,8 +1,7 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ข้อมูลเอกสาร']"
-    title="นำเข้าเอกสารกฎหมาย"
-    subtitle="ขั้นตอนที่ 4 จาก 6: ข้อมูลเอกสาร"
+    title=""
   >
     <WorkflowFooterBar
       :step="4"
@@ -12,17 +11,28 @@
       @next="saveAndNext"
     />
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="4" />
+      <WorkflowStepper :step="4" description="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
       </div>
 
-      <template v-else>
+      <v-form v-else ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
+        </v-alert>
+
+        <v-alert
+          v-if="validationFailed"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="mdi-alert-circle-outline"
+        >
+          กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน ยกเว้นคำสำคัญ และเลือกวันที่สิ้นสุดการใช้หรือเลือกไม่มีวันสิ้นสุด
         </v-alert>
 
         <!-- ข้อมูลพื้นฐาน -->
@@ -35,30 +45,60 @@
             <v-col cols="12">
               <v-text-field
                 v-model="form.title"
-                label="ชื่อเอกสาร"
+                :label="requiredLabel('ชื่อเอกสาร')"
                 variant="outlined"
-                :rules="[v => !!v || 'จำเป็นต้องกรอก']"
+                :rules="requiredTextRules('ชื่อเอกสาร')"
                 required
               />
             </v-col>
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
-                :items="DOC_TYPES"
-                label="ประเภทเอกสาร"
+                :items="documentTypes"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('ประเภทเอกสาร')"
                 placeholder="- เลือกประเภทเอกสาร -"
                 variant="outlined"
-                :rules="[v => !!v || 'จำเป็นต้องเลือก']"
+                :rules="requiredTextRules('ประเภทเอกสาร')"
+                required
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.status"
+                :items="statuses"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('สถานะการบังคับใช้')"
+                placeholder="- เลือกสถานะ -"
+                variant="outlined"
+                clearable
+                :rules="requiredTextRules('สถานะการบังคับใช้')"
+                required
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.change_status"
+                :items="changeStatuses"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('สถานะการเปลี่ยนแปลง')"
+                placeholder="- เลือกสถานะการเปลี่ยนแปลง -"
+                variant="outlined"
+                clearable
+                :rules="requiredTextRules('สถานะการเปลี่ยนแปลง')"
                 required
               />
             </v-col>
             <v-col cols="12">
               <v-autocomplete
                 v-model="form.law_groups"
-                :items="LAW_GROUP_OPTIONS"
+                :items="lawGroups"
                 item-title="title"
                 item-value="value"
-                label="กลุ่มกฎหมาย"
+                :label="requiredLabel('กลุ่มกฎหมาย')"
                 placeholder="- เลือกกลุ่มกฎหมาย -"
                 multiple
                 chips
@@ -66,7 +106,8 @@
                 variant="outlined"
                 clearable
                 :custom-filter="searchSelectableOption"
-                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 กลุ่ม']"
+                :rules="requiredArrayRules('กลุ่มกฎหมาย')"
+                required
               >
                 <template #item="{ props: itemProps, item }">
                   <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
@@ -81,9 +122,11 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 :model-value="sectionCountDisplay"
-                label="จำนวนข้อ/มาตรา"
+                :label="requiredLabel('จำนวนข้อ/มาตรา')"
                 variant="outlined"
                 readonly
+                :rules="[() => articleCount >= 0 || 'ไม่พบจำนวนข้อ/มาตรา']"
+                required
               />
             </v-col>
             <v-col cols="12">
@@ -112,41 +155,37 @@
           </div>
           <v-row dense>
             <v-col cols="12" sm="6">
-              <v-text-field
+              <ThaiDatePicker
                 v-model="form.promulgation_date"
-                label="วันที่ประกาศ"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
-              />
-            </v-col>
-            <v-col cols="12" sm="6">
-              <v-text-field
-                v-model="form.effective_date"
-                label="วันที่มีผลบังคับใช้ *"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
-                :rules="[v => !!v || 'จำเป็นต้องระบุ']"
+                :label="requiredLabel('วันที่ประกาศ')"
                 required
+                :rules="promulgationDateRules"
               />
             </v-col>
             <v-col cols="12" sm="6">
-              <v-text-field
+              <ThaiDatePicker
+                v-model="form.effective_date"
+                :label="requiredLabel('วันที่มีผลบังคับใช้')"
+                required
+                :rules="effectiveDateRules"
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <ThaiDatePicker
                 v-model="form.expiry_date"
-                label="วันที่สิ้นสุดการใช้"
-                type="date"
-                variant="outlined"
-                prepend-inner-icon="mdi-calendar"
+                :label="requiredLabel('วันที่สิ้นสุดการใช้')"
+                required
                 :disabled="noExpiry"
-                :placeholder="noExpiry ? 'ไม่มีวันสิ้นสุด' : ''"
+                disabled-placeholder="ไม่มีวันสิ้นสุด"
+                :rules="expiryDateRules"
               />
               <v-checkbox
                 v-model="noExpiry"
                 label="ไม่มีวันสิ้นสุด"
                 density="compact"
-                hide-details
+                hide-details="auto"
                 class="mt-1"
+                :rules="noExpiryRules"
                 @update:model-value="v => { if (v) form.expiry_date = null }"
               />
             </v-col>
@@ -162,16 +201,15 @@
           <v-row dense>
             <v-col cols="12">
               <div class="d-flex align-center ga-2 mb-2">
-                <span class="text-body-2 font-weight-medium">หน่วยงานรับผิดชอบ</span>
-                <span class="text-caption text-error">*</span>
+                <span class="text-body-2 font-weight-medium">{{ requiredLabel('หน่วยงานรับผิดชอบ') }}</span>
                 <v-chip v-if="form.agencies.length === 0" size="x-small" color="error" class="ml-1">จำเป็น</v-chip>
               </div>
               <v-autocomplete
                 v-model="form.agencies"
-                :items="AGENCY_OPTIONS"
+                :items="agencies"
                 item-title="title"
                 item-value="value"
-                label="หน่วยงานรับผิดชอบ"
+                :label="requiredLabel('หน่วยงานรับผิดชอบ')"
                 placeholder="- เลือกหน่วยงานรับผิดชอบ -"
                 prepend-inner-icon="mdi-office-building-outline"
                 multiple
@@ -180,7 +218,8 @@
                 variant="outlined"
                 clearable
                 :custom-filter="searchSelectableOption"
-                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 หน่วยงาน']"
+                :rules="requiredArrayRules('หน่วยงานรับผิดชอบ')"
+                required
               >
                 <template #item="{ props: itemProps, item }">
                   <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
@@ -190,41 +229,40 @@
             <v-col cols="12" sm="6" class="mt-2">
               <v-text-field
                 v-model="form.imported_by"
-                label="ผู้นำเข้าข้อมูล"
+                :label="requiredLabel('ผู้นำเข้าข้อมูล')"
                 variant="outlined"
                 prepend-inner-icon="mdi-account-outline"
                 readonly
+                :rules="requiredTextRules('ผู้นำเข้าข้อมูล')"
+                required
               />
             </v-col>
           </v-row>
         </v-card>
 
-      </template>
+      </v-form>
     </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import type { VForm } from 'vuetify/components';
 import { useRouter } from 'vue-router';
+import type { SelectableOption } from '../../api/client';
+import { useLookups } from '../../composables/useLookups';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
+import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
-
-type SelectableOption = {
-  title: string;
-  value: string;
-  subtitle: string;
-};
-
-const DOC_TYPES = ['พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'คำสั่ง', 'มติ'];
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พ.ร.บ.'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
@@ -232,33 +270,6 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/ประกาศ/u, 'ประกาศ'],
   [/คำสั่ง/u, 'คำสั่ง'],
   [/มติ/u, 'มติ'],
-];
-const LAW_GROUP_OPTIONS: SelectableOption[] = [
-  { title: 'ด้านวิชาการ', value: 'ด้านวิชาการ', subtitle: 'นโยบายวิชาการ หลักสูตร และมาตรฐานการศึกษา' },
-  { title: 'การผลิตบัณฑิต', value: 'การผลิตบัณฑิต', subtitle: 'การจัดการเรียนการสอนและการพัฒนาผู้เรียน' },
-  { title: 'การเรียนรู้ตลอดชีวิต', value: 'การเรียนรู้ตลอดชีวิต', subtitle: 'หลักสูตรระยะสั้นและการบริการวิชาการต่อเนื่อง' },
-  { title: 'การบริหารหลักสูตร', value: 'การบริหารหลักสูตร', subtitle: 'การเปิด ปรับปรุง และกำกับดูแลหลักสูตร' },
-  { title: 'ด้านกิจการนิสิต', value: 'ด้านกิจการนิสิต', subtitle: 'สวัสดิการ วินัย และกิจกรรมพัฒนานิสิต' },
-  { title: 'ด้านบริหารบุคคล', value: 'ด้านบริหารบุคคล', subtitle: 'การสรรหา แต่งตั้ง สิทธิประโยชน์ และวินัยบุคลากร' },
-  { title: 'ด้านการเงินและงบประมาณ', value: 'ด้านการเงินและงบประมาณ', subtitle: 'งบประมาณ รายรับ รายจ่าย และการควบคุมทางการเงิน' },
-  { title: 'ด้านทรัพย์สินและจัดซื้อจัดจ้าง', value: 'ด้านทรัพย์สินและจัดซื้อจัดจ้าง', subtitle: 'พัสดุ ทรัพย์สิน และกระบวนการจัดซื้อจัดจ้าง' },
-  { title: 'ด้านเทคโนโลยีสารสนเทศ', value: 'ด้านเทคโนโลยีสารสนเทศ', subtitle: 'ระบบสารสนเทศ ความมั่นคงปลอดภัย และข้อมูลดิจิทัล' },
-  { title: 'ด้านกฎหมายและนิติการ', value: 'ด้านกฎหมายและนิติการ', subtitle: 'งานนิติการ การตีความ และการกำกับตามกฎหมาย' },
-  { title: 'ด้านความร่วมมือระหว่างประเทศ', value: 'ด้านความร่วมมือระหว่างประเทศ', subtitle: 'ความร่วมมือ หน่วยงานคู่สัญญา และกิจการต่างประเทศ' },
-  { title: 'อื่นๆ', value: 'อื่นๆ', subtitle: 'รายการที่ไม่อยู่ในหมวดหลักของระบบ' },
-];
-const AGENCY_OPTIONS: SelectableOption[] = [
-  { title: 'มหาวิทยาลัยบูรพา', value: 'มหาวิทยาลัยบูรพา', subtitle: 'หน่วยงานหลักระดับสถาบัน' },
-  { title: 'สำนักงานอธิการบดี', value: 'สำนักงานอธิการบดี', subtitle: 'งานบริหารกลางและสนับสนุนผู้บริหาร' },
-  { title: 'กองกลาง', value: 'กองกลาง', subtitle: 'สารบรรณ งานธุรการ และงานอำนวยการกลาง' },
-  { title: 'กองคลัง', value: 'กองคลัง', subtitle: 'การเงิน บัญชี งบประมาณ และเบิกจ่าย' },
-  { title: 'กองพัสดุ', value: 'กองพัสดุ', subtitle: 'จัดซื้อจัดจ้างและบริหารพัสดุ' },
-  { title: 'กองกิจการนิสิต', value: 'กองกิจการนิสิต', subtitle: 'สวัสดิการและกิจกรรมนิสิต' },
-  { title: 'สำนักวิชาการ', value: 'สำนักวิชาการ', subtitle: 'งานวิชาการ หลักสูตร และมาตรฐานการศึกษา' },
-  { title: 'บัณฑิตวิทยาลัย', value: 'บัณฑิตวิทยาลัย', subtitle: 'กำกับดูแลการศึกษาระดับบัณฑิตศึกษา' },
-  { title: 'กระทรวงการคลัง', value: 'กระทรวงการคลัง', subtitle: 'หน่วยงานภายนอกด้านการคลังและงบประมาณ' },
-  { title: 'สำนักนายกรัฐมนตรี', value: 'สำนักนายกรัฐมนตรี', subtitle: 'หน่วยงานภายนอกด้านนโยบายและงานบริหารราชการ' },
-  { title: 'กระทรวงสาธารณสุข', value: 'กระทรวงสาธารณสุข', subtitle: 'หน่วยงานภายนอกด้านสาธารณสุขและสุขภาพ' },
 ];
 
 const EMPTY: LawMeta = {
@@ -273,6 +284,70 @@ const EMPTY: LawMeta = {
 
 const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_laws: [], keywords: [] });
 const noExpiry = ref(false);
+const formRef = ref<VForm | null>(null);
+const validationFailed = ref(false);
+
+function requiredLabel(label: string): string {
+  return `${label} *`;
+}
+
+function hasText(value: unknown): boolean {
+  return typeof value === 'string' ? value.trim().length > 0 : !!value;
+}
+
+function hasArrayValue(value: unknown): boolean {
+  return Array.isArray(value) && value.some((entry) => typeof entry === 'string' ? entry.trim().length > 0 : !!entry);
+}
+
+function requiredTextRules(label: string): Array<(v: unknown) => boolean | string> {
+  return [(v: unknown) => hasText(v) || `กรุณากรอก${label}`];
+}
+
+function requiredArrayRules(label: string): Array<(v: unknown) => boolean | string> {
+  return [(v: unknown) => hasArrayValue(v) || `กรุณาเลือก${label}`];
+}
+
+function dateMs(value: unknown): number | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const t = new Date(`${value}T00:00:00`).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+const promulgationDateRules = [
+  ...requiredTextRules('วันที่ประกาศ'),
+  (v: unknown) => {
+    const prom = dateMs(v);
+    const eff = dateMs(form.value.effective_date);
+    if (prom == null || eff == null) return true;
+    return prom <= eff || 'ต้องไม่หลังวันที่มีผลบังคับใช้';
+  },
+];
+
+const effectiveDateRules = [
+  (v: unknown) => !!v || 'จำเป็นต้องระบุ',
+  (v: unknown) => {
+    const eff = dateMs(v);
+    const prom = dateMs(form.value.promulgation_date);
+    if (eff == null || prom == null) return true;
+    return eff >= prom || 'ต้องไม่ก่อนวันที่ประกาศ';
+  },
+];
+
+const expiryDateRules = [
+  (v: unknown) => {
+    if (noExpiry.value) return true;
+    if (!hasText(v)) return 'กรุณาเลือกวันที่สิ้นสุดการใช้ หรือเลือกไม่มีวันสิ้นสุด';
+    const exp = dateMs(v);
+    const eff = dateMs(form.value.effective_date);
+    if (exp == null || eff == null) return true;
+    return exp > eff || 'ต้องอยู่หลังวันที่มีผลบังคับใช้';
+  },
+];
+
+const noExpiryRules = [
+  (v: unknown) => !!v || hasText(form.value.expiry_date) || 'ถ้าไม่มีวันที่สิ้นสุด กรุณาเลือกไม่มีวันสิ้นสุด',
+];
+
 const articleBlocks = computed<DocumentBlock[]>(() =>
   (documentStore.review?.pages ?? [])
     .flatMap((page) => page.blocks)
@@ -397,7 +472,26 @@ function buildLawMetaPayload(): LawMeta {
   };
 }
 
+function focusFirstError(errors: { id: string | number; errorMessages: string[] }[]): void {
+  const firstId = errors[0]?.id;
+  if (firstId == null) return;
+
+  const el = document.getElementById(String(firstId));
+  if (!el) return;
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  requestAnimationFrame(() => el.focus());
+}
+
 async function saveAndNext(): Promise<void> {
+  const result = await formRef.value?.validate();
+  if (!result?.valid) {
+    validationFailed.value = true;
+    await nextTick();
+    focusFirstError(result?.errors ?? []);
+    return;
+  }
+  validationFailed.value = false;
   const payload = buildLawMetaPayload();
   const saved = await documentStore.saveLawMeta(payload);
   if (!saved) return;
@@ -407,6 +501,23 @@ async function saveAndNext(): Promise<void> {
   router.push(`/documents/${props.documentId}/relations`);
 }
 
-onMounted(() => documentStore.fetch(props.documentId));
+async function clearValidationBannerIfValid(): Promise<void> {
+  if (!validationFailed.value) return;
+  const result = await formRef.value?.validate();
+  if (result?.valid) validationFailed.value = false;
+}
+
+watch(form, () => {
+  void clearValidationBannerIfValid();
+}, { deep: true });
+
+watch(noExpiry, () => {
+  void clearValidationBannerIfValid();
+});
+
+onMounted(() => {
+  void loadLookups();
+  void documentStore.fetch(props.documentId);
+});
 onBeforeUnmount(() => documentStore.reset());
 </script>

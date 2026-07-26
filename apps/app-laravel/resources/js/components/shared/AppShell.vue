@@ -7,17 +7,13 @@
     permanent
     class="app-drawer"
   >
-    <!-- Drawer header: logo + collapse toggle -->
     <div class="app-drawer__header" :class="{ 'app-drawer__header--rail': rail }">
-      <div class="d-flex align-center ga-2 min-width-0">
-        <v-avatar color="admin-primary" rounded="lg" size="36" class="flex-shrink-0">
-          <v-icon icon="mdi-bank-outline" size="18" />
+      <div class="app-drawer__brand">
+        <v-avatar color="admin-primary" rounded="lg" size="36" class="app-drawer__brand-icon">
+          <v-icon icon="mdi-scale-balance" size="18" />
         </v-avatar>
         <Transition name="fade-slide">
-          <div v-if="!rail" class="min-width-0">
-            <p class="text-subtitle-2 font-weight-bold mb-0 text-no-wrap">LAWSPACE</p>
-            <p class="text-caption text-medium-emphasis mb-0 text-no-wrap">ระบบจัดการกฎหมาย</p>
-          </div>
+          <p v-if="!rail" class="app-drawer__brand-title">e-Law</p>
         </Transition>
       </div>
       <v-btn
@@ -28,8 +24,6 @@
         @click="rail = !rail"
       />
     </div>
-
-    <v-divider />
 
     <v-list nav density="comfortable" class="pt-2">
       <template v-for="group in resolvedNavGroups" :key="group.label">
@@ -92,8 +86,13 @@
     </div>
 
     <div v-if="title" class="app-shell__page-title">
-      <h1 class="text-h5 font-weight-black mb-0">{{ title }}</h1>
-      <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
+      <div class="min-width-0">
+        <h1 class="text-h5 font-weight-black mb-0">{{ title }}</h1>
+        <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
+      </div>
+      <div v-if="$slots['title-actions']" class="flex-shrink-0">
+        <slot name="title-actions" />
+      </div>
     </div>
 
     <div v-if="$slots.banner" class="px-6 pt-2">
@@ -148,8 +147,8 @@ const defaultNavGroups: NavGroup[] = [
     label: 'การจัดการข้อมูล',
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
-      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline' },
-      { label: 'แผนผังความเชื่อมโยง', icon: 'mdi-graph-outline' },
+      { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
+      { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
     ],
   },
   {
@@ -157,6 +156,12 @@ const defaultNavGroups: NavGroup[] = [
     items: [
       { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
+    ],
+  },
+  {
+    label: 'ลิงก์ด่วน',
+    items: [
+      { label: 'กลับหน้าหลัก', icon: 'mdi-home-circle-outline', to: '/' },
     ],
   },
 ];
@@ -188,11 +193,37 @@ function isActive(item: NavItem): boolean {
   padding: 12px 12px 12px 16px;
 }
 
+.app-drawer__brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-drawer__brand-icon {
+  flex-shrink: 0;
+}
+
+.app-drawer__brand-title {
+  color: rgb(var(--v-theme-admin-primary));
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-drawer__header--rail {
   flex-direction: column;
   gap: 4px;
   justify-content: center;
   padding: 12px 0;
+}
+
+.app-drawer__header--rail .app-drawer__brand {
+  justify-content: center;
 }
 
 .app-drawer__user {
@@ -222,7 +253,7 @@ function isActive(item: NavItem): boolean {
   gap: 12px;
   justify-content: space-between;
   min-height: 52px;
-  padding: 8px 24px;
+  padding: 12px 24px;
 }
 
 .app-shell__breadcrumbs {
@@ -237,13 +268,33 @@ function isActive(item: NavItem): boolean {
 }
 
 .app-shell__page-title {
+  align-items: center;
   background: #fff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 14px 24px 16px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px 24px;
 }
 
 .app-shell__content {
   background: #f8f7f5;
+}
+
+.app-shell__main :deep(.v-field) {
+  background: #ffffff;
+}
+
+.app-shell__main :deep(.v-field--variant-outlined),
+.app-shell__main :deep(.v-field--variant-solo),
+.app-shell__main :deep(.v-field--variant-filled),
+.app-shell__main :deep(.v-field--variant-underlined) {
+  background: #ffffff;
+}
+
+.app-shell__main :deep(.v-field__overlay) {
+  background: #ffffff;
+  opacity: 1;
 }
 
 .app-shell__main--full-height {

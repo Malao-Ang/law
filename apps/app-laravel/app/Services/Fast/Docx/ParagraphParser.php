@@ -159,13 +159,14 @@ final class ParagraphParser
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function extractFormatting(DOMElement $paragraph): array
     {
         $bold = false;
         $italic = false;
         $underline = false;
+        $fontSize = null;
 
         foreach ($paragraph->getElementsByTagNameNS(WordXml::WORD_NS, 'r') as $run) {
             if (! $run instanceof DOMElement) {
@@ -192,9 +193,30 @@ final class ParagraphParser
             if ($this->hasOnFormatting($rPr, 'u')) {
                 $underline = true;
             }
+
+            if ($fontSize === null) {
+                $szEl = null;
+                foreach ($rPr->childNodes as $child) {
+                    if ($child instanceof DOMElement && $child->localName === 'sz') {
+                        $szEl = $child;
+                        break;
+                    }
+                }
+                if ($szEl !== null) {
+                    $val = WordXml::wordAttr($szEl, 'val');
+                    if ($val !== null && is_numeric($val)) {
+                        $fontSize = (float) $val / 2.0;
+                    }
+                }
+            }
         }
 
-        return ['bold' => $bold, 'italic' => $italic, 'underline' => $underline];
+        $result = ['bold' => $bold, 'italic' => $italic, 'underline' => $underline];
+        if ($fontSize !== null) {
+            $result['font_size_pt'] = $fontSize;
+        }
+
+        return $result;
     }
 
     private function hasOnFormatting(DOMElement $rPr, string $name): bool

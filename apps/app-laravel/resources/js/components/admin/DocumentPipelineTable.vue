@@ -203,4 +203,9 @@ defineExpose({ load });
   font-size: 0.75rem !important;
   font-weight: 600 !important;
 }
+
+.pipeline-sel-bar {
+  background: rgba(var(--v-theme-admin-primary), 0.05);
+  border-bottom: 1px solid rgba(var(--v-theme-admin-primary), 0.12);
+}
 </style>

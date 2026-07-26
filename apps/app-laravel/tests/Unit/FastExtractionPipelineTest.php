@@ -9,6 +9,8 @@ use App\Services\Fast\FastPathUnsupportedException;
 use App\Services\Fast\FastPdfTextExtractor;
 use App\Services\Fast\LibreOfficeConverter;
 use App\Services\ReviewStore;
+use App\Services\Storage\MongoBlobStore;
+use MongoDB\Collection;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../Fixtures/Fast/build_test_docx.php';
@@ -24,13 +26,40 @@ class FastExtractionPipelineTest extends TestCase
     {
         $this->tmpRoot = sys_get_temp_dir().'/fast-pipeline-'.uniqid('', true);
         mkdir($this->tmpRoot.'/uploads', 0700, true);
-        mkdir($this->tmpRoot.'/intermediate', 0700, true);
-        mkdir($this->tmpRoot.'/status', 0700, true);
         mkdir($this->tmpRoot.'/exports', 0700, true);
         mkdir($this->tmpRoot.'/ingested', 0700, true);
         mkdir($this->tmpRoot.'/pages', 0700, true);
 
-        $this->reviewStore = new ReviewStore(new DocumentHtmlService, $this->tmpRoot);
+        // ponytail: MongoBlobStore is final — fake the Collection it wraps instead
+        $store = [];
+        $col = $this->createMock(Collection::class);
+        $col->method('findOne')->willReturnCallback(function (array $filter) use (&$store): ?array {
+            $id = $filter['_id'] ?? null;
+
+            return $id !== null && isset($store[(string) $id]) ? $store[(string) $id] : null;
+        });
+        $updateResult = $this->createMock(\MongoDB\UpdateResult::class);
+        $updateResult->method('getMatchedCount')->willReturn(1);
+        $col->method('updateOne')->willReturnCallback(function (array $filter, array $update) use (&$store, $updateResult): \MongoDB\UpdateResult {
+            $id = (string) ($filter['_id'] ?? '');
+            $existing = $store[$id] ?? ['_version' => 0];
+            foreach ($update['$set'] ?? [] as $k => $v) {
+                $existing[$k] = $v;
+            }
+            $existing['_version'] = ($existing['_version'] ?? 0) + 1;
+            $store[$id] = $existing;
+
+            return $updateResult;
+        });
+        $col->method('insertOne')->willReturnCallback(function (array $doc) use (&$store): void {
+            $store[(string) $doc['_id']] = $doc;
+        });
+        $col->method('countDocuments')->willReturn(0);
+        // ponytail: find() is not called by any test in this class — throw to surface accidental calls
+        $col->method('find')->willThrowException(new \RuntimeException('find() not expected in FastExtractionPipelineTest'));
+
+        $blob = new MongoBlobStore($col);
+        $this->reviewStore = new ReviewStore(new DocumentHtmlService, $blob, $this->tmpRoot);
     }
 
     protected function tearDown(): void
@@ -53,12 +82,7 @@ class FastExtractionPipelineTest extends TestCase
         $result = $pipeline->run('doc-pipe-001', 'uploads/sample.docx');
 
         $this->assertSame('docx', $result['source_type']);
-
-        $reviewPath = $this->tmpRoot.'/intermediate/doc-pipe-001.review.json';
-        $this->assertFileExists($reviewPath);
-
-        $stored = json_decode((string) file_get_contents($reviewPath), true);
-        $this->assertSame('doc-pipe-001', $stored['document_id']);
+        $this->assertSame('doc-pipe-001', $result['document_id']);
     }
 
     public function test_extract_pdf_text_routes_to_pdf_extractor(): void

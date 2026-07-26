@@ -94,4 +94,43 @@ class DocumentHtmlServiceTest extends TestCase
         $this->assertStringContainsString('data-block-id="img-1"', $html);
         $this->assertStringContainsString('max-width:100%', $html);
     }
+
+    public function test_build_layout_style_attribute_uses_first_tab_as_padding_left(): void
+    {
+        $style = $this->makeService()->buildLayoutStyleAttribute([
+            'tabs' => [['position' => 1440, 'type' => 'left']],
+        ]);
+
+        $this->assertStringContainsString('padding-left:72pt', $style);
+    }
+
+    public function test_applyFormatting_wraps_font_size_pt_in_span(): void
+    {
+        $html = $this->makeService()->buildBlockHtml(
+            $this->block(['bold' => false, 'italic' => false, 'underline' => false, 'font_size_pt' => 14.0]),
+        );
+
+        $this->assertStringContainsString('<span style="font-size: 14pt">', $html);
+    }
+
+    public function test_build_block_html_does_not_double_render_promoted_leading_tab(): void
+    {
+        $html = $this->makeService()->buildBlockHtml([
+            'block_id' => 'p1-b0001',
+            'type' => 'paragraph',
+            'reading_order' => 1,
+            'approved_text' => "\tข้อความ",
+            'normalized_text' => "\tข้อความ",
+            'ai_suggested_text' => "\tข้อความ",
+            'meta' => [
+                'layout' => [
+                    'tabs' => [['position' => 1440, 'type' => 'left']],
+                ],
+                'formatting' => [],
+            ],
+        ]);
+
+        $this->assertStringContainsString('padding-left:72pt', $html);
+        $this->assertStringNotContainsString('class="doc-tab"', $html);
+    }
 }

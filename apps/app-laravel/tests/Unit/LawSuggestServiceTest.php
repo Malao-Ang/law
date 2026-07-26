@@ -15,7 +15,13 @@ class LawSuggestServiceTest extends TestCase
         $mock->shouldReceive('search')->once()->andReturnUsing(function (array $body) use (&$captured): array {
             $captured = $body;
 
-            return ['hits' => ['hits' => []]];
+            return ['hits' => ['hits' => [[
+                '_source' => [
+                    'law_id' => 'L1',
+                    'title' => 'พระราชบัญญัติภาษี',
+                    'keywords' => [],
+                ],
+            ]]]];
         });
 
         (new LawSuggestService($mock))->suggest(['q' => 'ภาษ', 'size' => 5]);
@@ -27,6 +33,32 @@ class LawSuggestServiceTest extends TestCase
         $this->assertContains('keywords_suggest._index_prefix', $captured['query']['bool']['should'][0]['multi_match']['fields']);
         $this->assertSame(['title^4', 'keywords_text^4', 'section_path^2'], $captured['query']['bool']['should'][1]['multi_match']['fields']);
         $this->assertSame('law_id', $captured['collapse']['field']);
+    }
+
+    public function test_falls_back_to_fuzzy_query_when_prefix_has_no_hits(): void
+    {
+        $captured = [];
+        $mock = \Mockery::mock(ElasticClient::class);
+        $mock->shouldReceive('search')->once()->andReturn(['hits' => ['hits' => []]]);
+        $mock->shouldReceive('search')->once()->andReturnUsing(function (array $body) use (&$captured): array {
+            $captured = $body;
+
+            return ['hits' => ['hits' => [[
+                '_source' => [
+                    'law_id' => 'L2',
+                    'title' => 'พระราชบัญญัติมหาวิทยาลัย',
+                    'keywords' => ['มหาวิทยาลัย'],
+                ],
+            ]]]];
+        });
+
+        $out = (new LawSuggestService($mock))->suggest(['q' => 'มหาวทิยาลัย', 'size' => 5]);
+
+        $this->assertSame('AUTO', $captured['query']['bool']['should'][0]['multi_match']['fuzziness']);
+        $this->assertSame(['title^5', 'keywords_text^4', 'section_path^2'], $captured['query']['bool']['should'][0]['multi_match']['fields']);
+        $this->assertSame(0, $captured['query']['bool']['should'][1]['multi_match']['prefix_length']);
+        $this->assertSame('AUTO:3,6', $captured['query']['bool']['should'][1]['multi_match']['fuzziness']);
+        $this->assertSame('L2', $out['suggestions'][0]['law_id']);
     }
 
     public function test_parses_compact_suggestion_payload(): void

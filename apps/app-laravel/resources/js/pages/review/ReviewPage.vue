@@ -13,14 +13,20 @@
   <DocumentEditorShell
     v-else-if="documentStore.review"
     :document-id="documentId"
+    :locked="locked"
+    @close="goBack"
   />
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue';
+import { fetchStatus } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
+import { getPreviewCached } from '../../stores/reviewCache';
+import type { DocumentStatus } from '../../types/document';
 
 const props = defineProps<{
   documentId: string;
@@ -28,9 +34,19 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
+const router = useRouter();
+const docStatus = ref<DocumentStatus | null>(null);
+
+const locked = computed(() => docStatus.value?.esign_exported_at != null);
 
 onMounted(async () => {
-  await documentStore.fetch(props.documentId);
+  const [, status] = await Promise.all([
+    documentStore.fetch(props.documentId),
+    fetchStatus(props.documentId).catch(() => null),
+  ]);
+  docStatus.value = status;
+  // Warm the preview HTML in the background so the next step feels instant.
+  void getPreviewCached(props.documentId).catch(() => undefined);
 });
 
 onUnmounted(() => {
@@ -39,7 +55,15 @@ onUnmounted(() => {
 });
 
 async function reload(): Promise<void> {
-  await documentStore.fetch(props.documentId);
+  const [, status] = await Promise.all([
+    documentStore.fetch(props.documentId),
+    fetchStatus(props.documentId).catch(() => null),
+  ]);
+  docStatus.value = status;
+}
+
+function goBack(): void {
+  router.push('/admin/upload');
 }
 </script>
 

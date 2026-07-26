@@ -2,6 +2,27 @@
   <div class="lawx">
     <ELawNavbar @go-admin="router.push('/admin')" />
 
+    <div class="lawx-breadcrumb">
+      <v-container style="max-width: 1360px" class="py-0">
+        <div class="lawx-bc">
+          <button type="button" class="lawx-bc__item" @click="router.push('/')">
+            <v-icon icon="mdi-home-outline" size="13" />
+            หน้าหลัก
+          </button>
+          <span class="lawx-bc__sep">›</span>
+          <button type="button" class="lawx-bc__item" @click="router.push('/database')">
+            ฐานข้อมูลกฎหมาย
+          </button>
+          <template v-if="meta.law_type">
+            <span class="lawx-bc__sep">›</span>
+            <span class="lawx-bc__item">{{ meta.law_type }}</span>
+          </template>
+          <span class="lawx-bc__sep">›</span>
+          <span class="lawx-bc__item lawx-bc__item--current">{{ meta.title || 'กฎหมาย' }}</span>
+        </div>
+      </v-container>
+    </div>
+
     <v-main class="lawx-main">
       <div class="lawx-subbar">
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
@@ -16,7 +37,9 @@
           <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
             @click="printPage()">พิมพ์</v-btn>
           <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
-            @click="printPage()">ดาวน์โหลด PDF</v-btn>
+            :loading="exportingPdf"
+            :disabled="exportingPdf"
+            @click="downloadPdf()">ดาวน์โหลด PDF</v-btn>
         </div>
       </div>
 
@@ -28,8 +51,13 @@
         {{ documentStore.error }}
       </v-alert>
 
+      <template v-else-if="documentStore.review">
+      <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
+        {{ pdfExportError }}
+      </v-alert>
+
       <v-alert
-        v-else-if="documentStore.review && meta.access_scope === 'private'"
+        v-if="meta.access_scope === 'private'"
         type="warning"
         variant="tonal"
         density="comfortable"
@@ -39,7 +67,6 @@
       </v-alert>
 
       <div
-        v-else-if="documentStore.review"
         class="lawx-grid"
         :class="{
           'is-toc-hidden': !tocOpen,
@@ -101,27 +128,34 @@
               />
             </div>
           </div>
-          <div v-if="sectionRelations(section.id).length" class="lawx-rel">
-            <v-btn variant="tonal" color="primary" size="small"
-              prepend-icon="mdi-link-variant"
-              :append-icon="expanded.has(section.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-              @click="toggleExpand(section.id)">
-              กฎหมายที่เกี่ยวข้อง · {{ sectionRelations(section.id).length }}
-            </v-btn>
-            <ul v-show="expanded.has(section.id)" class="lawx-rel__list">
-              <li
-                v-for="rel in sectionRelations(section.id)"
+          <div v-if="sectionRelations(section.id).length" class="lawx-relcard">
+            <div class="lawx-relcard__head">
+              <span class="mdi mdi-scale-balance" />
+              กฎหมายที่เกี่ยวข้อง
+            </div>
+            <div
+              v-for="group in groupedSectionRelations(section.id)"
+              :key="group.type"
+              class="lawx-relgroup"
+            >
+              <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+              <a
+                v-for="rel in group.items"
                 :key="rel.id"
-                :class="relationListClass(rel.type)"
+                class="lawx-relrow"
+                :class="`is-${group.type}`"
+                :href="relationHref(rel) ?? undefined"
+                :target="safeUrl(rel.url) ? '_blank' : undefined"
+                rel="noopener"
               >
-                <span class="mdi" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
-                <span class="lawx-rel__type">{{ relationTypeLabel(rel.type) }}</span>
-                <a v-if="safeUrl(rel.url)" :href="safeUrl(rel.url) ?? ''" target="_blank" rel="noopener">{{ rel.target_title }}</a>
-                <span v-else>{{ rel.target_title }}</span>
-                <span v-if="rel.target_section" class="lawx-rel__sec">{{ rel.target_section }}</span>
-                <span v-if="rel.note" class="lawx-rel__note">— {{ rel.note }}</span>
-              </li>
-            </ul>
+                <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+                <span class="lawx-relrow__main">
+                  <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                  <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+                </span>
+                <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+              </a>
+            </div>
           </div>
         </v-card>
       </main>
@@ -130,6 +164,7 @@
         <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" />
       </aside>
       </div>
+      </template>
 
       <ELawFooter />
     </v-main>
@@ -144,8 +179,8 @@ import { buildSections, buildTocGroups, relationsForSection, documentRelations }
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
-  relationTypeLabel,
 } from '../../types/lawRelation';
+import { downloadPdfExport } from '../../api/client';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -154,6 +189,8 @@ import ELawNavbar from '../shared/ELawNavbar.vue';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const exportingPdf = ref(false);
+const pdfExportError = ref('');
 
 onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
@@ -206,17 +243,30 @@ const articleUnitLabel = computed(() => {
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const tocOpen = ref(true);
 const infoOpen = ref(true);
-const expanded = ref<Set<string>>(new Set());
 
 function sectionRelations(sectionId: string): LawRelation[] {
   return relationsForSection(relations.value, sectionId);
 }
 
-function toggleExpand(sectionId: string): void {
-  const next = new Set(expanded.value);
-  if (next.has(sectionId)) next.delete(sectionId);
-  else next.add(sectionId);
-  expanded.value = next;
+const RELATION_GROUP_LABELS: Record<RelationType, string> = {
+  repeals: 'กฎหมายที่ถูกยกเลิก',
+  amends: 'กฎหมายที่แก้ไขเพิ่มเติม',
+  supersedes: 'กฎหมายที่ถูกแทนที่',
+  issued_under: 'ออกตามอำนาจของ',
+  related: 'กฎหมายที่เกี่ยวข้อง',
+};
+
+const RELATION_GROUP_ORDER: RelationType[] = ['repeals', 'supersedes', 'amends', 'issued_under', 'related'];
+
+function groupedSectionRelations(sectionId: string): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
+  const rels = sectionRelations(sectionId);
+  return RELATION_GROUP_ORDER
+    .map((type) => ({
+      type,
+      label: RELATION_GROUP_LABELS[type],
+      items: rels.filter((rel) => rel.type === type),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 function badgeOf(sectionId: string): string {
@@ -229,17 +279,29 @@ function safeUrl(url: string | null): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
-function relationListClass(type: RelationType): Record<string, boolean> {
-  return {
-    'is-repeal': type === 'repeals',
-    'is-supersedes': type === 'supersedes',
-    'is-amends': type === 'amends',
-    'is-issued-under': type === 'issued_under',
-  };
+function relationHref(rel: LawRelation): string | null {
+  const external = safeUrl(rel.url);
+  if (external) return external;
+  return rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : null;
 }
 
 function printPage(): void {
   window.print();
+}
+
+async function downloadPdf(): Promise<void> {
+  if (exportingPdf.value) return;
+
+  exportingPdf.value = true;
+  pdfExportError.value = '';
+  try {
+    await downloadPdfExport(props.documentId);
+    await documentStore.fetch(props.documentId, true);
+  } catch (error) {
+    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
+  } finally {
+    exportingPdf.value = false;
+  }
 }
 
 const sectionEls = ref<Record<string, HTMLElement>>({});
@@ -313,6 +375,56 @@ onBeforeUnmount(() => observer?.disconnect());
   background: #f6f4ef;
 }
 
+.lawx-breadcrumb {
+  background: #ffffff;
+  border-bottom: 1px solid #e7e2d9;
+  padding: 9px 0;
+}
+
+.lawx-bc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 24px;
+}
+
+.lawx-bc__sep {
+  color: #9ca3af;
+  font-size: 14px;
+  user-select: none;
+}
+
+.lawx-bc__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 14px;
+  color: #4e4538;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lawx-bc__item:hover {
+  color: #7b580d;
+  text-decoration: underline;
+}
+
+.lawx-bc__item--current {
+  color: #7b580d;
+  font-weight: 700;
+  cursor: default;
+  text-decoration: none !important;
+  max-width: 400px;
+}
+
 .lawx-main {
   background: #f6f4ef;
 }
@@ -369,11 +481,11 @@ onBeforeUnmount(() => observer?.disconnect());
   overflow-y: auto;
 }
 
-.lawx-toc__title { font-weight: 700; font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #1e2a4a; }
+.lawx-toc__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
 .lawx-toc__items { display: flex; flex-direction: column; padding: 5px 0 4px 8px; }
 .lawx-toc__item { text-align: left; background: transparent; border: none; border-left: 2px solid transparent; padding: 7px 10px; font-size: 13px; color: #475569; border-radius: 0; cursor: pointer; font-family: inherit; }
-.lawx-toc__item:hover { color: #1d4ed8; }
-.lawx-toc__item.is-active { background: transparent; border-left-color: #1d4ed8; color: #1d4ed8; font-weight: 700; }
+.lawx-toc__item:hover { color: #7b580d; }
+.lawx-toc__item.is-active { background: transparent; border-left-color: #b68d40; color: #7b580d; font-weight: 700; }
 
 .lawx-doc {
   min-width: 0;
@@ -381,19 +493,19 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-headcard {
   background: rgb(var(--v-theme-detail-surface));
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-top: 5px solid #1e2a4a;
+  border: 1px solid #e7e2d9;
+  border-top: 5px solid #b68d40;
   border-radius: 22px;
   padding: 32px 28px;
   text-align: center;
   margin-bottom: 18px;
-  box-shadow: 0 22px 46px rgba(148, 163, 184, 0.12);
+  box-shadow: 0 10px 40px rgba(75, 70, 61, 0.08);
 }
 
-.lawx-headcard__badge { display: inline-block; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-bottom: 12px; }
-.lawx-headcard__title { font-size: clamp(24px, 3vw, 32px); font-weight: 800; color: #1e2a4a; margin: 0 0 14px; line-height: 1.25; }
-.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-size: 13px; color: #64748b; }
-.lawx-headcard__meta .mdi { color: #94a3b8; }
+.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+.lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
+.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
+.lawx-headcard__meta .mdi { color: #b68d40; }
 
 .lawx-card {
   background: rgb(var(--v-theme-detail-surface));
@@ -404,21 +516,110 @@ onBeforeUnmount(() => observer?.disconnect());
   box-shadow: 0 18px 38px rgba(148, 163, 184, 0.1);
 }
 
-.lawx-card__body { display: flex; gap: 16px; align-items: flex-start; }
-.lawx-card__badge { flex-shrink: 0; max-width: 160px; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
+.lawx-card__body { display: flex; flex-direction: column; gap: 10px; }
+.lawx-card__badge { align-self: flex-start; flex-shrink: 0; max-width: 100%; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .lawx-card__badge--chapter { background: #eef2ff; color: #4338ca; }
 .lawx-card__content { flex: 1; min-width: 0; }
+.lawx-card__content :deep(.block-flow) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+  line-height: 1.78;
+}
+.lawx-card__content :deep(.block-flow *) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+  line-height: inherit !important;
+}
+.lawx-card__content :deep(table),
+.lawx-card__content :deep(th),
+.lawx-card__content :deep(td) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+}
 
-.lawx-rel { margin-top: 12px; border-top: 1px dashed #d7dee7; padding-top: 10px; }
-.lawx-rel__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.lawx-rel__list li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #334155; }
-.lawx-rel__list li.is-repeal { color: #dc2626; }
-.lawx-rel__list li.is-supersedes { color: #ea580c; }
-.lawx-rel__list li.is-amends { color: #0d9488; }
-.lawx-rel__list li.is-issued-under { color: #7c3aed; }
-.lawx-rel__type { font-size: 11px; font-weight: 600; color: #64748b; }
-.lawx-rel__sec { color: #64748b; font-size: 12px; }
-.lawx-rel__note { color: #94a3b8; font-size: 12px; }
+.lawx-relcard {
+  margin-top: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 14px 16px;
+}
+.lawx-relcard__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 10px;
+}
+.lawx-relgroup { margin-top: 8px; }
+.lawx-relgroup__label {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #64748b;
+}
+.lawx-relgroup__label.is-repeals { color: #dc2626; }
+.lawx-relgroup__label.is-supersedes { color: #ea580c; }
+.lawx-relgroup__label.is-amends { color: #0d9488; }
+.lawx-relgroup__label.is-issued_under { color: #7c3aed; }
+
+.lawx-relrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #334155;
+  text-decoration: none;
+}
+.lawx-relrow:hover { border-color: #cbd5e1; background: #fcfcfd; }
+.lawx-relrow__icon { flex-shrink: 0; }
+.lawx-relrow.is-repeals .lawx-relrow__icon { color: #dc2626; }
+.lawx-relrow.is-supersedes .lawx-relrow__icon { color: #ea580c; }
+.lawx-relrow.is-amends .lawx-relrow__icon { color: #0d9488; }
+.lawx-relrow.is-issued_under .lawx-relrow__icon { color: #7c3aed; }
+.lawx-relrow.is-related .lawx-relrow__icon { color: #2563eb; }
+.lawx-relrow__main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lawx-relrow__title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.lawx-relrow__sec {
+  color: #64748b;
+  font-size: 12px;
+  justify-self: end;
+  min-width: 34px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lawx-relrow__note {
+  color: #94a3b8;
+  flex: 0 1 auto;
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .lawx-info {
   position: sticky;
@@ -462,6 +663,16 @@ onBeforeUnmount(() => observer?.disconnect());
 
   .lawx-card__body {
     flex-direction: column;
+  }
+
+  .lawx-relrow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .lawx-relrow__sec {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 }
 

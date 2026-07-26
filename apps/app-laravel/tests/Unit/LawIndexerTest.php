@@ -44,6 +44,7 @@ class LawIndexerTest extends TestCase
 
         $captured = [];
         $mock = \Mockery::mock(ElasticClient::class);
+        $mock->shouldReceive('indexExists')->once()->andReturn(true);
         $mock->shouldReceive('deleteByLawId')->once()->with($id);
         $mock->shouldReceive('bulkIndex')->once()->andReturnUsing(function ($docs) use (&$captured) {
             $captured = $docs;

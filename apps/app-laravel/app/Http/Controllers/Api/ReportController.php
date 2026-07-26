@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    private const PUBLISHED = ['done', 'exported', 'ingested'];
+    private const PUBLISHED = ['exported', 'ingested'];
 
     private const PROCESSING = ['queued', 'processing', 'ingesting'];
 
@@ -72,6 +72,14 @@ class ReportController extends Controller
             'processing' => $count(self::PROCESSING),
             'failed' => $count(['failed']),
             'esign' => 0, // ponytail: no eSign workflow yet, add when signing lands
+            'relations' => array_sum(array_map(
+                static fn (array $r): int => (int) ($r['relations_count'] ?? 0),
+                $rows,
+            )),
+            'legacy_links' => array_sum(array_map(
+                static fn (array $r): int => (int) ($r['legacy_link_count'] ?? 0),
+                $rows,
+            )),
         ];
     }
 
@@ -158,7 +166,12 @@ class ReportController extends Controller
             'group' => ($r['law_groups'][0] ?? '') ?: 'ไม่ระบุ',
             'agency' => ($r['agencies'][0] ?? '') ?: 'ไม่ระบุ',
             'status' => $r['status'],
+            'meta_status' => trim((string) ($r['meta_status'] ?? '')),
             'date' => $r['updated_at'],
+            'section_count' => isset($r['section_count']) ? (int) $r['section_count'] : null,
+            'page_count' => (int) ($r['page_count'] ?? 0),
+            'parent_document_id' => $r['parent_document_id'] ?? null,
+            'workflow_completed_step' => isset($r['workflow_completed_step']) ? (int) $r['workflow_completed_step'] : null,
         ], array_values($rows));
     }
 }

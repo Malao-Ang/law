@@ -29,6 +29,24 @@ class SanitizeHtmlTest extends TestCase
         $this->assertStringContainsString('margin-left: 24px', $result);
     }
 
+    public function test_preserves_font_size_style(): void
+    {
+        $result = $this->callSanitize('<span style="font-size: 20pt">big</span>');
+        $this->assertStringContainsString('font-size: 20pt', $result);
+    }
+
+    public function test_preserves_font_family_style(): void
+    {
+        $result = $this->callSanitize('<span style="font-family: \'TH Sarabun PSK\'">x</span>');
+        $this->assertStringContainsString('font-family:', $result);
+    }
+
+    public function test_strips_font_family_with_unsafe_value(): void
+    {
+        $result = $this->callSanitize('<span style="font-family: url(evil)">x</span>');
+        $this->assertStringNotContainsString('url(', $result);
+    }
+
     public function test_strips_event_handlers(): void
     {
         $result = $this->callSanitize('<p onclick="alert(1)">x</p>');

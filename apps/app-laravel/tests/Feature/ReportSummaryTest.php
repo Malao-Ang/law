@@ -9,9 +9,9 @@ class ReportSummaryTest extends TestCase
 {
     /** Seed a done document with the given law_meta. */
     // ponytail: renamed public to avoid collision with parent seed()
-    private function seedDocument(ReviewStore $store, string $id, array $meta): void
+    private function seedDocument(ReviewStore $store, string $id, array $meta, string $status = 'done'): void
     {
-        $store->setStatus($id, ['status' => 'done', 'source_file' => $id.'.docx']);
+        $store->setStatus($id, ['status' => $status, 'source_file' => $id.'.docx']);
         $store->writeReviewDocument($id, [
             'document_id' => $id,
             'source_file' => $id.'.docx',
@@ -39,13 +39,13 @@ class ReportSummaryTest extends TestCase
         $this->seedDocument($store, 'd3_'.uniqid(), [
             'law_type' => 'ประกาศ', 'agencies' => [$agency],
             'law_groups' => ['ด้านวิชาการ'], 'promulgation_date' => 'ไม่มีปี',
-        ]);
+        ], 'ingested');
 
         $res = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency));
         $res->assertOk();
 
         $res->assertJsonPath('totals.all', 3);
-        $res->assertJsonPath('totals.published', 3);
+        $res->assertJsonPath('totals.published', 1);
 
         $byType = collect($res->json('by_type'))->keyBy('key');
         $this->assertSame(2, $byType['พระราชบัญญัติ']['count']);
@@ -83,6 +83,46 @@ class ReportSummaryTest extends TestCase
         $res->assertOk();
         $res->assertJsonPath('totals.all', 1);
         $this->assertSame($failed, $res->json('documents.0.id'));
+    }
+
+    public function test_summary_totals_include_relations_and_legacy_links(): void
+    {
+        $store = app(ReviewStore::class);
+        $agency = 'AGENCY_'.uniqid();
+
+        // Doc A: 2 relations, 1 repealed reference.
+        $a = 'd_rel_'.uniqid();
+        $store->setStatus($a, ['status' => 'done', 'source_file' => 'a.docx']);
+        $store->writeReviewDocument($a, [
+            'document_id' => $a, 'source_file' => 'a.docx', 'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => ['law_type' => 'ประกาศ', 'agencies' => [$agency], 'repealed_laws' => ['พ.ร.บ. เก่า ๒๕๔๐']],
+            'relations' => [
+                ['id' => 'r1', 'scope' => 'document', 'type' => 'related', 'target_title' => 'X'],
+                ['id' => 'r2', 'scope' => 'document', 'type' => 'amends', 'target_title' => 'Y'],
+            ],
+            'pages' => [],
+        ]);
+
+        // Doc B: 1 relation, no repealed references.
+        $b = 'd_rel_'.uniqid();
+        $store->setStatus($b, ['status' => 'done', 'source_file' => 'b.docx']);
+        $store->writeReviewDocument($b, [
+            'document_id' => $b, 'source_file' => 'b.docx', 'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => ['law_type' => 'ประกาศ', 'agencies' => [$agency]],
+            'relations' => [
+                ['id' => 'r3', 'scope' => 'document', 'type' => 'related', 'target_title' => 'Z'],
+            ],
+            'pages' => [],
+        ]);
+
+        $res = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency));
+        $res->assertOk();
+        $res->assertJsonPath('totals.relations', 3);
+        $res->assertJsonPath('totals.legacy_links', 1);
     }
 
     public function test_list_law_meta_returns_rows_with_meta_fields(): void

@@ -10,17 +10,26 @@ import {
   reorderBlocks,
   reprocessBlock,
   reprocessPageWithLandingAI,
+  restoreBlocks,
   splitBlock,
 } from '../api/client';
+import { invalidateReview } from './reviewCache';
 import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
 
 export const useBlockStore = defineStore('blocks', () => {
+  function invalidate(documentId: string): void {
+    invalidateReview(documentId);
+  }
+
   async function patch(
     documentId: string,
     blockId: string,
     payload: Parameters<typeof patchBlock>[2],
   ): Promise<{ status: string }> {
-    return patchBlock(documentId, blockId, payload);
+    const response = await patchBlock(documentId, blockId, payload);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function reprocess(
@@ -29,6 +38,7 @@ export const useBlockStore = defineStore('blocks', () => {
     pageNo: number,
   ): Promise<void> {
     await reprocessBlock(documentId, blockId, { page_no: pageNo, mode: 'ai_correction' });
+    invalidate(documentId);
   }
 
   async function patchLayout(
@@ -36,7 +46,10 @@ export const useBlockStore = defineStore('blocks', () => {
     blockId: string,
     payload: LayoutPatch,
   ): Promise<{ status: string }> {
-    return patchBlockLayout(documentId, blockId, payload);
+    const response = await patchBlockLayout(documentId, blockId, payload);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function remove(
@@ -44,14 +57,30 @@ export const useBlockStore = defineStore('blocks', () => {
     blockId: string,
     pageNo: number,
   ): Promise<{ status: string }> {
-    return deleteBlock(documentId, blockId, pageNo);
+    const response = await deleteBlock(documentId, blockId, pageNo);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function merge(
     documentId: string,
     blockIds: string[],
   ): Promise<{ status: string; block: DocumentBlock }> {
-    return mergeBlocks(documentId, blockIds);
+    const response = await mergeBlocks(documentId, blockIds);
+    invalidate(documentId);
+
+    return response;
+  }
+
+  async function restore(
+    documentId: string,
+    pages: Array<{ page_no: number; blocks: DocumentBlock[] }>,
+  ): Promise<{ document_id: string; status: string }> {
+    const response = await restoreBlocks(documentId, pages);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function split(
@@ -59,14 +88,20 @@ export const useBlockStore = defineStore('blocks', () => {
     blockId: string,
     payload: Parameters<typeof splitBlock>[2],
   ): Promise<{ status: string; first: DocumentBlock; second: DocumentBlock }> {
-    return splitBlock(documentId, blockId, payload);
+    const response = await splitBlock(documentId, blockId, payload);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function create(
     documentId: string,
     payload: Parameters<typeof createBlock>[1],
   ): Promise<{ status: string; block: DocumentBlock }> {
-    return createBlock(documentId, payload);
+    const response = await createBlock(documentId, payload);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function reprocessPage(
@@ -75,13 +110,17 @@ export const useBlockStore = defineStore('blocks', () => {
     mode: ScanExtractionMode = 'gemini',
   ): Promise<void> {
     await reprocessPageWithLandingAI(documentId, pageNo, mode);
+    invalidate(documentId);
   }
 
   async function reorder(
     documentId: string,
     blockIds: string[],
   ): Promise<{ document_id: string; status: string; reordered_block_ids: string[] }> {
-    return reorderBlocks(documentId, blockIds);
+    const response = await reorderBlocks(documentId, blockIds);
+    invalidate(documentId);
+
+    return response;
   }
 
   async function patchChunkType(
@@ -96,7 +135,8 @@ export const useBlockStore = defineStore('blocks', () => {
       mark_uncertain: block.needs_review,
       chunk_type: chunkType,
     });
+    invalidate(documentId);
   }
 
-  return { patch, reprocess, patchLayout, remove, merge, split, create, reprocessPage, reorder, patchChunkType };
+  return { patch, reprocess, patchLayout, remove, merge, restore, split, create, reprocessPage, reorder, patchChunkType };
 });

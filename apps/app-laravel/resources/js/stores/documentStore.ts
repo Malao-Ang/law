@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { fetchReview, saveDocumentReview, updateWorkflowProgress } from '../api/client';
-import type { DocumentReviewState, LawMeta, LawRelation, ReviewDocument } from '../types/document';
+import { saveDocumentReview, updateWorkflowProgress } from '../api/client';
+import { getReviewCached, invalidateReview, setReview } from './reviewCache';
+import type { DocumentReviewState, LawMeta, LawRelation, PageMargins, ReviewDocument } from '../types/document';
 
 export const useDocumentStore = defineStore('document', () => {
   const documentId = ref('');
@@ -11,12 +12,12 @@ export const useDocumentStore = defineStore('document', () => {
   const saving = ref(false);
   const saveError = ref('');
 
-  async function fetch(id: string): Promise<void> {
+  async function fetch(id: string, force = false): Promise<void> {
     documentId.value = id;
     loading.value = true;
     error.value = '';
     try {
-      review.value = await fetchReview(id);
+      review.value = await getReviewCached(id, force);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'ไม่สามารถโหลดเอกสาร';
     } finally {
@@ -29,13 +30,24 @@ export const useDocumentStore = defineStore('document', () => {
     approved_by?: string;
     notes?: string;
     reset_to_generated?: boolean;
+    page_margins?: Partial<PageMargins>;
   }): Promise<DocumentReviewState | null> {
     saving.value = true;
     saveError.value = '';
     try {
       const res = await saveDocumentReview(documentId.value, payload);
+      const shouldInvalidate = Object.prototype.hasOwnProperty.call(payload, 'draft_html') || payload.reset_to_generated;
       if (review.value) {
         review.value.document_review = res.document_review;
+        if (res.compose_state) {
+          review.value.compose_state = res.compose_state;
+        }
+        if (!shouldInvalidate) {
+          setReview(documentId.value, review.value);
+        }
+      }
+      if (shouldInvalidate) {
+        invalidateReview(documentId.value);
       }
       return res.document_review;
     } catch (e: unknown) {
@@ -53,6 +65,7 @@ export const useDocumentStore = defineStore('document', () => {
       const res = await saveDocumentReview(documentId.value, { law_meta: payload });
       if (review.value && res.law_meta) {
         review.value.law_meta = res.law_meta;
+        setReview(documentId.value, review.value);
       }
       return true;
     } catch (e: unknown) {
@@ -70,6 +83,7 @@ export const useDocumentStore = defineStore('document', () => {
       const res = await saveDocumentReview(documentId.value, { relations });
       if (review.value && res.relations) {
         review.value.relations = res.relations;
+        setReview(documentId.value, review.value);
       }
       return true;
     } catch (e: unknown) {

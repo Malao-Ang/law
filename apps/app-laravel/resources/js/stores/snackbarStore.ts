@@ -27,5 +27,9 @@ export const useSnackbarStore = defineStore('snackbar', () => {
     notify(msg, 'error');
   }
 
-  return { show, message, color, success, error };
+  function info(msg: string): void {
+    notify(msg, 'info');
+  }
+
+  return { show, message, color, success, error, info };
 });

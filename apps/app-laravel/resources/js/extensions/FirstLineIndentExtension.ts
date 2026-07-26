@@ -1,5 +1,13 @@
 import { Extension } from '@tiptap/core';
 
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    firstLineIndent: {
+      setFirstLineIndent: (value: string) => ReturnType;
+    };
+  }
+}
+
 // Preserves first-line indent (CSS text-indent) on text blocks so the extracted
 // Thai-legal paragraph indent (indent_first_line, emitted by generated_html as
 // `text-indent: NNpt`) survives editing and renders in the editor. Without this,
@@ -23,5 +31,22 @@ export const FirstLineIndentExtension = Extension.create({
         },
       },
     ];
+  },
+
+  addCommands() {
+    return {
+      setFirstLineIndent:
+        (value: string) =>
+        ({ tr, state, dispatch }) => {
+          const { from, to } = state.selection;
+          state.doc.nodesBetween(from, to, (node, pos) => {
+            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, firstLineIndent: value || null });
+            }
+          });
+          if (dispatch) dispatch(tr);
+          return true;
+        },
+    };
   },
 });

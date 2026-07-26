@@ -24,7 +24,7 @@ class LawSearchRequest extends FormRequest
             'filters.status' => ['nullable', 'array'],
             'filters.status.*' => ['nullable', 'string', 'max:120'],
             'filters.change_status' => ['nullable', 'array'],
-            'filters.change_status.*' => ['nullable', 'string', 'in:new,amended,repealed,consolidated'],
+            'filters.change_status.*' => ['nullable', 'string', 'max:120'],
             'filters.agency' => ['nullable', 'array'],
             'filters.agency.*' => ['nullable', 'string', 'max:255'],
             'filters.law_group' => ['nullable', 'array'],

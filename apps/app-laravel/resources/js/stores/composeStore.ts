@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { exportDocument, fetchReview, fetchStatus, updateComposeState } from '../api/client';
+import { exportDocument, fetchStatus, updateComposeState } from '../api/client';
+import { getReviewCached, setReview } from './reviewCache';
 import type { DocumentMetadata, DocumentStatus, ReviewDocument, ThaiFont } from '../types/document';
 
 export const useComposeStore = defineStore('compose', () => {
@@ -10,11 +11,11 @@ export const useComposeStore = defineStore('compose', () => {
   const docStatus = ref<DocumentStatus | null>(null);
   const exporting = ref(false);
 
-  async function fetch(documentId: string): Promise<void> {
+  async function fetch(documentId: string, force = false): Promise<void> {
     loading.value = true;
     error.value = '';
     try {
-      review.value = await fetchReview(documentId);
+      review.value = await getReviewCached(documentId, force);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to load compose editor';
     } finally {
@@ -53,6 +54,7 @@ export const useComposeStore = defineStore('compose', () => {
       const response = await updateComposeState(documentId, payload);
       if (review.value && response.compose_state) {
         review.value.compose_state = response.compose_state;
+        setReview(documentId, review.value);
       }
       return { saved: true, errorMessage: '' };
     } catch (e: unknown) {

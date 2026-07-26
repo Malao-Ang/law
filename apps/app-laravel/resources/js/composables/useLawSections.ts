@@ -9,6 +9,7 @@ export interface LawSection {
   headBodyText: string;
   children: DocumentBlock[];
   isChapter: boolean;
+  isHeader?: boolean;
 }
 
 export interface TocGroup {
@@ -22,6 +23,28 @@ const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะ�
 // Structural heading chunk-types: assigning one makes a block a section head,
 // so the following blocks group under it without merging text.
 const HEAD_CHUNK_TYPE_SET = new Set<string>(HEAD_CHUNK_TYPES);
+
+// A block that "displays as a divider": its text is only a run of dashes/underscores.
+const DIVIDER_RE = /^[-–—_─]{2,}\s*$/u;
+
+function isDivider(block: DocumentBlock): boolean {
+  return DIVIDER_RE.test(blockText(block));
+}
+
+// Index (inclusive) of the last block of the leading header region, or -1 when
+// there is nothing to auto-group. Region = blocks[0 … first divider], but only
+// when an image appears at/before that divider. Stops early before any block the
+// user has explicitly promoted to a structural head (reversibility escape hatch).
+function headerRegionEnd(blocks: DocumentBlock[]): number {
+  const dividerIdx = blocks.findIndex(isDivider);
+  if (dividerIdx < 0) return -1;
+  if (!blocks.slice(0, dividerIdx + 1).some((b) => b.type === 'image')) return -1;
+  for (let i = 1; i <= dividerIdx; i += 1) {
+    const ct = blocks[i].meta?.chunk_type;
+    if (ct && HEAD_CHUNK_TYPE_SET.has(ct)) return i - 1;
+  }
+  return dividerIdx;
+}
 
 function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();
@@ -74,9 +97,28 @@ export function buildSections(review: ReviewDocument | null): LawSection[] {
 
   const blocks = review.pages.flatMap((page) => page.blocks);
   const sections: LawSection[] = [];
-  let current: LawSection | null = null;
 
-  for (const block of blocks) {
+  let startIndex = 0;
+  const headerEnd = headerRegionEnd(blocks);
+  if (headerEnd >= 0) {
+    const headBlock = blocks[0];
+    const text = blockText(headBlock);
+    const badge = 'ชื่อกฎหมาย';
+    sections.push({
+      id: headBlock.block_id,
+      badge,
+      headBlock,
+      headBodyText: text.startsWith(badge) ? text.slice(badge.length).trim() : text,
+      children: blocks.slice(1, headerEnd + 1),
+      isChapter: false,
+      isHeader: true,
+    });
+    startIndex = headerEnd + 1;
+  }
+
+  let current: LawSection | null = null;
+  for (let i = startIndex; i < blocks.length; i += 1) {
+    const block = blocks[i];
     if (isHead(block) || current === null) {
       const badge = markerFor(block);
       const text = blockText(block);

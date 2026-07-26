@@ -78,6 +78,32 @@ class ParagraphParserTest extends TestCase
         $this->assertSame('list_item', $parsedListItem['type']);
     }
 
+    public function test_extractFormatting_reads_font_size_from_w_sz(): void
+    {
+        [, , $paragraph] = $this->loadWordFragment(
+            '<w:r><w:rPr><w:sz w:val="28"/></w:rPr><w:t>ข้อความ</w:t></w:r>',
+        );
+
+        $parser = new ParagraphParser;
+        $parsed = $parser->parse($paragraph, 1, new NumberingResolver(null));
+
+        $this->assertNotNull($parsed);
+        $this->assertSame(14.0, $parsed['formatting']['font_size_pt']);
+    }
+
+    public function test_extractFormatting_ignores_non_numeric_w_sz_val(): void
+    {
+        [, , $paragraph] = $this->loadWordFragment(
+            '<w:r><w:rPr><w:sz w:val="bad"/></w:rPr><w:t>ข้อความ</w:t></w:r>',
+        );
+
+        $parser = new ParagraphParser;
+        $parsed = $parser->parse($paragraph, 1, new NumberingResolver(null));
+
+        $this->assertNotNull($parsed);
+        $this->assertArrayNotHasKey('font_size_pt', $parsed['formatting']);
+    }
+
     public function test_numbering_prefix_suppresses_leading_tab_inference(): void
     {
         $numberingXml = new DOMDocument;

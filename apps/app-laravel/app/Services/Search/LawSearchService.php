@@ -20,14 +20,16 @@ class LawSearchService
         $page = max(1, (int) ($params['page'] ?? 1));
         $perPage = max(1, (int) ($params['per_page'] ?? 20));
 
+        $mode = 'exact';
         $body = $this->buildExactBody($q, $filters, $page, $perPage);
         $raw = $this->client->search($body);
 
         if ($q !== '' && mb_strlen($q) >= self::FUZZY_MIN_QUERY_LENGTH && ($raw['hits']['hits'] ?? []) === []) {
+            $mode = 'fuzzy';
             $raw = $this->client->search($this->buildFuzzyBody($q, $filters, $page, $perPage));
         }
 
-        return $this->parse($raw);
+        return $this->parse($raw, $mode);
     }
 
     /**
@@ -168,16 +170,27 @@ class LawSearchService
      * @param  array<string,mixed>  $raw
      * @return array<string,mixed>
      */
-    private function parse(array $raw): array
+    private function parse(array $raw, string $mode): array
     {
         $results = [];
+        $maxScore = $this->maxScore($raw);
         foreach ($raw['hits']['hits'] ?? [] as $hit) {
             $source = is_array($hit['_source'] ?? null) ? $hit['_source'] : [];
             $snippets = [];
+            $score = is_numeric($hit['_score'] ?? null) ? (float) $hit['_score'] : null;
+            $confidence = $this->confidenceFromScore($score, $maxScore, $mode);
 
             foreach ($hit['inner_hits']['snippets']['hits']['hits'] ?? [] as $innerHit) {
                 foreach (['text', 'title'] as $field) {
                     foreach ($innerHit['highlight'][$field] ?? [] as $fragment) {
+                        $snippets[] = $fragment;
+                    }
+                }
+            }
+
+            if ($snippets === []) {
+                foreach (['text', 'title'] as $field) {
+                    foreach ($hit['highlight'][$field] ?? [] as $fragment) {
                         $snippets[] = $fragment;
                     }
                 }
@@ -196,7 +209,12 @@ class LawSearchService
                 'summary' => $source['summary'] ?? null,
                 'published_date' => $source['published_date'] ?? null,
                 'agency' => $source['agency'] ?? null,
+                'law_group' => $source['law_group'] ?? null,
                 'signer_group' => $source['signer_group'] ?? null,
+                'restricted' => false,
+                'child_types' => (object) [],
+                'confidence' => $confidence,
+                'match_mode' => $mode,
                 'snippets' => array_values(array_unique($snippets)),
             ];
         }
@@ -217,7 +235,59 @@ class LawSearchService
             'total' => (int) ($raw['aggregations']['total_laws']['value'] ?? 0),
             'results' => $results,
             'facets' => $facets,
+            'meta' => [
+                'engine' => 'elastic',
+                'mode' => $mode,
+                'confidence' => $this->aggregateConfidence($results),
+                'suggestions' => [],
+            ],
         ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $raw
+     */
+    private function maxScore(array $raw): float
+    {
+        if (is_numeric($raw['hits']['max_score'] ?? null) && (float) $raw['hits']['max_score'] > 0) {
+            return (float) $raw['hits']['max_score'];
+        }
+
+        $scores = array_map(
+            static fn (array $hit): float => is_numeric($hit['_score'] ?? null) ? (float) $hit['_score'] : 0.0,
+            $raw['hits']['hits'] ?? [],
+        );
+
+        return max([1.0, ...$scores]);
+    }
+
+    private function confidenceFromScore(?float $score, float $maxScore, string $mode): float
+    {
+        if ($score === null || $score <= 0) {
+            return $mode === 'fuzzy' ? 0.55 : 0.72;
+        }
+
+        $normalized = min(1.0, max(0.0, $score / max(0.0001, $maxScore)));
+        $confidence = $mode === 'fuzzy'
+            ? 0.42 + ($normalized * 0.28)
+            : 0.70 + ($normalized * 0.30);
+
+        return round(min(1.0, $confidence), 2);
+    }
+
+    /**
+     * @param  array<int, array<string,mixed>>  $results
+     */
+    private function aggregateConfidence(array $results): float
+    {
+        if ($results === []) {
+            return 0.0;
+        }
+
+        return round(max(array_map(
+            static fn (array $result): float => is_numeric($result['confidence'] ?? null) ? (float) $result['confidence'] : 0.0,
+            $results,
+        )), 2);
     }
 
     /**

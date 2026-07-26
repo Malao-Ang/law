@@ -4,16 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\CorrectDocumentJob;
-use App\Jobs\IngestRagJob;
 use App\Services\ExportService;
+use App\Services\RagIngestService;
 use App\Services\ReviewStore;
+use App\Services\Search\LawIndexer;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class ExportController extends Controller
 {
     public function __construct(
         private readonly ExportService $exportService,
+        private readonly RagIngestService $ragIngestService,
+        private readonly LawIndexer $lawIndexer,
         private readonly ReviewStore $reviewStore,
     ) {}
 
@@ -36,16 +41,41 @@ class ExportController extends Controller
             return response()->json(['message' => $exception->getMessage()], 404);
         }
 
-        $this->reviewStore->setStatus($documentId, [
-            'status' => 'ingesting',
-            'current_step' => 'rag_ingest_queued',
+        $ingestPath = null;
+        $chunkCount = 0;
+        try {
+            $ingestResult = $this->ragIngestService->ingest($documentId);
+            $ingestPath = $ingestResult['ingest_path'];
+            $chunkCount = $ingestResult['chunk_count'];
+        } catch (Throwable $exception) {
+            Log::warning('RAG ingest failed (non-fatal)', [
+                'document_id' => $documentId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->lawIndexer->index($documentId);
+        } catch (Throwable $exception) {
+            Log::warning('Law indexing failed (non-fatal)', [
+                'document_id' => $documentId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        $statusPatch = [
+            'status' => 'ingested',
+            'current_step' => 'rag_ingested',
             'progress' => 100,
             'export_path' => $result['export_path'],
-        ]);
+            'ingested_chunk_count' => $chunkCount,
+        ];
+        if ($ingestPath !== null) {
+            $statusPatch['ingest_path'] = $ingestPath;
+        }
+        $this->reviewStore->setStatus($documentId, $statusPatch);
 
-        IngestRagJob::dispatch($documentId);
-
-        $response = array_merge($result, ['rag_status' => 'queued']);
+        $response = array_merge($result, ['rag_status' => 'ingested']);
 
         if ($correctionStatus === 'failed') {
             $response['correction_warning'] = true;

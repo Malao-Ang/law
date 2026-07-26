@@ -23,7 +23,7 @@
       <div v-else-if="previewStore.error" class="d-flex flex-column align-center ga-3 pa-12">
         <v-icon icon="mdi-alert-circle-outline" size="32" />
         <v-alert type="error" variant="tonal">{{ previewStore.error }}</v-alert>
-        <v-btn variant="outlined" @click="previewStore.fetch(documentId)">โหลดใหม่</v-btn>
+        <v-btn variant="outlined" @click="previewStore.fetch(documentId, true)">โหลดใหม่</v-btn>
       </div>
       <article
         v-else
@@ -46,7 +46,7 @@ const previewStore = usePreviewStore();
 const sourceFile = computed(() => previewStore.data?.source_file ?? '');
 
 const safeHtml = computed(() => {
-  const raw = previewStore.data?.draft_html ?? previewStore.data?.html ?? '';
+  const raw = previewStore.data?.html ?? previewStore.data?.draft_html ?? '';
   return DOMPurify.sanitize(raw, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                    'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
@@ -75,6 +75,7 @@ onUnmounted(() => previewStore.reset());
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
   font-size: 16pt;
   line-height: 1.8;
+  font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
 @media print {
   .preview-toolbar { display: none; }

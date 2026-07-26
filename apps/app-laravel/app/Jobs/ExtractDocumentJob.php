@@ -42,13 +42,7 @@ class ExtractDocumentJob implements ShouldQueue
             return;
         }
 
-        if ($this->extractionEngine === 'fast') {
-            $this->runFast($fastPipeline, $reviewStore, $callbackUrl, $pipelineClient);
-
-            return;
-        }
-
-        $this->runStandard($pipelineClient, $reviewStore, $callbackUrl);
+        $this->runFast($fastPipeline, $reviewStore, $callbackUrl, $pipelineClient);
     }
 
     /**
@@ -57,11 +51,18 @@ class ExtractDocumentJob implements ShouldQueue
      */
     private function shouldUseStandardPipeline(): bool
     {
+        $ext = strtolower(pathinfo($this->relativeFilePath, PATHINFO_EXTENSION));
+
+        // DOCX/DOC never need a scan pipeline; fast PHP extraction always applies.
+        if (in_array($ext, ['docx', 'doc'], true)) {
+            return false;
+        }
+
         if ($this->extractionEngine === 'standard') {
             return true;
         }
 
-        if (strtolower(pathinfo($this->relativeFilePath, PATHINFO_EXTENSION)) !== 'pdf') {
+        if ($ext !== 'pdf') {
             return false;
         }
 

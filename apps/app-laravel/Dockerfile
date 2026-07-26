@@ -2,13 +2,10 @@ FROM node:20-bookworm-slim AS frontend
 
 WORKDIR /var/www/html
 
-# COPY .npmrc package.json package-lock.json ./
+# Reproducible install from the committed lock file.
+COPY package.json package-lock.json ./
 
-# RUN npm ci && rm -f .npmrc
-
-COPY package.json ./
-
-RUN npm install --registry=https://registry.npmjs.org/
+RUN npm ci
 
 COPY resources ./resources
 COPY public ./public
@@ -27,6 +24,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl \
     libreoffice-core \
     libreoffice-writer \
+    fontconfig \
+    fonts-thai-tlwg \
     imagemagick \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -50,9 +49,13 @@ COPY . .
 
 COPY --from=frontend /var/www/html/public/build ./public/build
 
-# Install dependencies with cache mount
+COPY docker/fonts/ /usr/share/fonts/truetype/th-sarabun-psk/
+COPY docker/fontconfig/local.conf /etc/fonts/local.conf
+RUN fc-cache -f
+
+# Install production dependencies only (no phpunit/dev tooling in the image).
 RUN --mount=type=cache,target=/tmp/composer-cache \
-    composer install --no-interaction --prefer-dist --optimize-autoloader
+    composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
 EXPOSE 8000
 

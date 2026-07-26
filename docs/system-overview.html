@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ภาพรวมระบบ — Thai Legal OCR / e-Law</title>
+<style>
+  :root {
+    --navy: #1a3673; --gold: #b68d40; --brown: #4e4538;
+    --bg: #f6f4ef; --card: #ffffff; --line: #e6e2d6;
+    --green: #15803d; --blue: #1d4ed8; --red: #be123c; --purple: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: #1f2430;
+    font-family: 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
+    font-size: 18px; line-height: 1.75;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 22px 80px; }
+  header.hero {
+    background: linear-gradient(135deg, var(--navy), #24408a);
+    color: #fff; padding: 40px 22px; border-radius: 0 0 22px 22px;
+  }
+  header.hero .wrap { padding: 0; max-width: 1040px; margin: 0 auto; }
+  header.hero h1 { margin: 0 0 6px; font-size: 34px; font-weight: 800; }
+  header.hero p { margin: 0; opacity: .9; font-size: 18px; }
+  h2 {
+    margin: 44px 0 14px; font-size: 26px; color: var(--navy); font-weight: 800;
+    border-left: 5px solid var(--gold); padding-left: 12px;
+  }
+  h3 { margin: 24px 0 8px; font-size: 21px; color: var(--brown); font-weight: 700; }
+  p, li { font-size: 18px; }
+  code, .path {
+    font-family: 'Cascadia Code', Consolas, monospace; font-size: 14.5px;
+    background: #eef1f6; color: #24408a; padding: 1px 6px; border-radius: 5px;
+    word-break: break-all;
+  }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; margin: 14px 0; }
+  .toc { columns: 2; gap: 24px; }
+  .toc a { color: var(--navy); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  /* flow diagram */
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 18px 0; }
+  .step { flex: 1 1 130px; min-width: 130px; background: #fff; border: 1px solid var(--line);
+          border-top: 3px solid var(--gold); border-radius: 10px; padding: 10px 12px; }
+  .step b { display: block; color: var(--navy); }
+  .step small { color: #6b7280; font-size: 13.5px; }
+  .arrow { align-self: center; color: var(--gold); font-weight: 800; font-size: 20px; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 16px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0ece2; color: var(--navy); }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+  .tag.fast { background: #dcfce7; color: var(--green); }
+  .tag.std { background: #dbeafe; color: var(--blue); }
+  .note { background: #fff9ec; border: 1px solid #e7d8b5; border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  .note b { color: var(--gold); }
+  .pill { display:inline-block; background:#eef2ff; color:#3730a3; border-radius:999px; padding:1px 10px; font-size:14px; font-weight:700; }
+  ul.tight { margin: 6px 0; }
+  .kv { display: grid; grid-template-columns: 190px 1fr; gap: 4px 14px; }
+  .kv div:nth-child(odd) { color: var(--brown); font-weight: 700; }
+  @media (max-width: 720px) { .toc { columns: 1; } .kv { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>⚖️ ภาพรวมระบบ Thai Legal OCR / e-Law</h1>
+    <p>เอกสารกฎหมายไทย (DOCX / .doc / PDF ข้อความ / PDF สแกน) → สกัด → ตรวจทาน → แบ่ง chunk → ค้นหาแบบ RAG</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <b>สารบัญ</b>
+    <div class="toc">
+      <a href="#overview">1. ภาพรวมและ Flow ทั้งระบบ</a><br>
+      <a href="#read">2. การอ่าน / สกัดเอกสาร (Extraction)</a><br>
+      <a href="#normalize">3. Normalize + Spellcheck ภาษาไทย</a><br>
+      <a href="#chunk">4. การทำ Chunk (RAG)</a><br>
+      <a href="#index">5. การทำ Index เข้า Elasticsearch</a><br>
+      <a href="#search">6. ระบบค้นหา (Search / Suggest / Fuzzy / Highlight)</a><br>
+      <a href="#queue">7. Redis &amp; คิวงานเบื้องหลัง (Queue)</a><br>
+      <a href="#cache">8. การทำ Cache — ทำไม doc โหลดเร็ว</a><br>
+      <a href="#map">9. แผนที่โค้ด (ไฟล์ไหนทำอะไร)</a><br>
+    </div>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="overview">1. ภาพรวมและ Flow ทั้งระบบ</h2>
+  <p>ระบบไม่มีฐานข้อมูลหลักถาวร — state เก็บเป็นไฟล์ใน <code>storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python) ผ่าน Docker volume ร่วมกัน. Elasticsearch ใช้เป็น index สำหรับค้นหา, MongoDB เก็บ blob เอกสาร, Redis เป็นคิว.</p>
+  <div class="flow">
+    <div class="step"><b>1) Upload</b><small>ผู้ใช้อัปโหลดไฟล์</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>2) Extract</b><small>อ่าน/สกัดเป็น blocks</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>3) Normalize</b><small>จัดภาษาไทย + spellcheck</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>4) Review</b><small>แก้ไข (TipTap)</small></div>
+  </div>
+  <div class="flow">
+    <div class="step"><b>5) RAG / Chunk</b><small>รวม/แยกบล็อก, กำหนดประเภท</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>6) Export</b><small>สร้าง chunks JSON</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>7) Index</b><small>ยัดเข้า Elasticsearch</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>8) Search / View</b><small>ค้นหา + หน้าอ่านกฎหมาย</small></div>
+  </div>
+  <div class="note"><b>หัวใจ:</b> หน่วยข้อมูลพื้นฐานคือ “block” ทุก block มี <b>4 ชั้นข้อความ</b> เสมอ: <code>raw_text</code> (ดิบจากการสกัด) → <code>normalized_text</code> (จัดไทยแล้ว) → <code>ai_suggested_text</code> (AI แนะนำ) → <code>approved_text</code> (คนอนุมัติ). และ chunk คือหน่วยที่ใช้ค้นหา ซึ่งสร้างจาก block เหล่านี้ตอน export.</div>
+
+  <!-- 2 -->
+  <h2 id="read">2. การอ่าน / สกัดเอกสาร (Extraction)</h2>
+  <p>เริ่มที่ <code>UploadController</code> → dispatch <code>ExtractDocumentJob</code> ซึ่ง<b>แยกเป็น 2 engine</b> ตามฟิลด์ <code>extraction_engine</code>:</p>
+
+  <h3><span class="tag fast">Fast</span> (ค่าเริ่มต้น — PHP ล้วน ไม่ต้องพึ่ง Python)</h3>
+  <div class="card">
+    <div class="kv">
+      <div>Entry</div><div><code>app/Services/Fast/FastExtractionPipeline.php</code></div>
+      <div>DOCX</div><div><code>FastDocxExtractor.php</code> → unzip ด้วย <code>DocxArchive</code>, แปลงย่อหน้าด้วย <code>ParagraphParser</code>, เลขข้อ/มาตราด้วย <code>NumberingResolver</code>, ตารางด้วย <code>TableParser</code></div>
+      <div>PDF (ข้อความ)</div><div><code>FastPdfTextExtractor.php</code> — อ่านชั้นข้อความของ PDF (ไม่ใช้ OCR)</div>
+      <div>.doc</div><div><code>LibreOfficeConverter.php</code> แปลง .doc → .docx ก่อน</div>
+      <div>ถ้าเจอไฟล์ที่รองรับไม่ได้</div><div>โยน <code>FastPathUnsupportedException</code> → fallback ไป engine Standard อัตโนมัติ</div>
+    </div>
+  </div>
+
+  <h3><span class="tag std">Standard</span> (Python pipeline — สำหรับสแกน / bbox แม่นยำ)</h3>
+  <p>Laravel เรียก <code>DocumentPipelineClient::extract()</code> → <code>POST http://ocr-service:8010/pipeline/extract</code> (async 202) แล้ว Python ทำงานใน <code>apps/ocr-service/app/api/routes.py::_run_extraction</code>:</p>
+  <table>
+    <tr><th>ขั้น</th><th>ทำอะไร</th><th>โค้ด</th></tr>
+    <tr><td>detect ชนิดไฟล์</td><td>เลือกเส้นทางตามชนิดไฟล์</td><td><code>utils/file_type.py</code></td></tr>
+    <tr><td>DOCX / PDF ข้อความ</td><td>อ่านด้วย docling-parse (ได้ bbox แม่น)</td><td><code>services/docling_service.py</code></td></tr>
+    <tr><td>PDF สแกน (OCR)</td><td>EasyOCR (local) หรือ Gemini Vision หรือ LandingAI</td><td><code>ocr_pipeline.py</code>, <code>gemini_vision_parser.py</code>, <code>landingai_parser.py</code></td></tr>
+    <tr><td>จัดเลย์เอาต์</td><td>คลัสเตอร์ตำแหน่ง x → กำหนด indent ต่อ block</td><td><code>services/layout_inferrer.py</code></td></tr>
+    <tr><td>ความหมายย่อหน้า</td><td>มาตรา = ระดับ 0, ข้อ = ระดับ 1, วรรค/ต่อเนื่องสืบทอดแม่</td><td><code>services/semantic_indent_resolver.py</code></td></tr>
+    <tr><td>ตัวเลขนำหน้า</td><td>ติดป้าย มาตรา / ข้อ / (ก) / ๑.๑</td><td><code>services/numbering_tokenizer.py</code></td></tr>
+    <tr><td>ประกอบผลลัพธ์</td><td>สร้าง block 4 ชั้น + normalize/spellcheck → เขียน <code>{id}.review.json</code></td><td><code>services/block_builder.py</code></td></tr>
+  </table>
+  <div class="note"><b>โหมดสแกน (scan_extraction_mode):</b> <code>local</code>=EasyOCR, <code>gemini</code>=Google Gemini Vision, <code>landingai</code>=LandingAI ADE, <code>auto</code>=ลอง EasyOCR ก่อน ถ้าคุณภาพต่ำค่อย fallback ไป Gemini/LandingAI ตามคีย์ที่ตั้งไว้.</div>
+
+  <!-- 3 -->
+  <h2 id="normalize">3. Normalize + Spellcheck ภาษาไทย</h2>
+  <p>ฝั่ง Fast path หลังสกัดเสร็จจะ dispatch <code>NormalizeDocumentJob</code> (ไม่ล้ม ถ้า Python ดับก็ข้าม) ส่ง block ที่ไม่ใช่ตาราง/รูปไปที่ <code>POST /pipeline/normalize</code> แล้วเขียนกลับด้วย <code>ReviewStore::applyNormalizationResults()</code>.</p>
+  <ul class="tight">
+    <li><b>Normalize</b> (<code>thai_normalizer.py</code>): จัดเรียงสระ, แก้วรรณยุกต์, <code>ํา</code>→<code>ำ</code>, ล้าง whitespace</li>
+    <li><b>Spellcheck</b> (<code>thai_spellchecker.py</code>): Norvig + <code>resources/legal_terms.txt</code> — ทำเฉพาะ block ที่ <code>needs_review=true</code></li>
+    <li><b>Autocorrect</b>: <code>normalize_autocorrect_min_confidence</code> (ปัจจุบันตั้ง <span class="pill">0.85</span>) — คำแนะนำที่มั่นใจ ≥85% จะแก้อัตโนมัติ</li>
+  </ul>
+
+  <!-- 4 -->
+  <h2 id="chunk">4. การทำ Chunk (RAG)</h2>
+  <p>“chunk” คือหน่วยที่นำไปค้นหา. ขั้นตอนการสร้าง:</p>
+  <ol>
+    <li><b>ตรวจทานทั้งเอกสาร</b> — หน้า <code>/documents/:id/review</code> ใช้ TipTap (<code>DocumentEditorShell.vue</code>) แก้ไขแล้วเซฟเป็น <code>draft_html</code></li>
+    <li><b>จัดกลุ่มเป็น section</b> — หน้า <code>/documents/:id/rag</code> (<code>RagManageWorkspace.vue</code>) รวม block เป็น “section” ตาม <code>chunk_type</code> ผ่าน <code>composables/useLawSections.ts</code> (<code>buildSections</code>). ผู้ใช้เลือกประเภทหัวข้อ (TITLE / ARTICLE=มาตรา / CLAUSE=ข้อ / CHAPTER=หมวด …), รวม/แยก/ลบบล็อกได้</li>
+    <li><b>Export → chunks</b> — <code>ExportService::export()</code> เรียก <code>DocumentHtmlService::buildChunksFromHtml(draft_html)</code> ตัดเป็น chunk ต่อ block (จับด้วย <code>data-block-id</code>) แต่ละ chunk มี: <code>chunk_id, page_no, block_ids, section_path, text, meta.type, meta.html</code> → เขียนเป็น export JSON</li>
+  </ol>
+  <div class="note"><b>โครงสร้าง 1 chunk (โดยย่อ):</b> <code>{ chunk_id, page_no, block_ids[], section_path, text, meta:{ type, html, layout } }</code>. v1 จับคู่ block 1:1 (การ merge/split/new ทำในหน้า RAG ก่อน export).</div>
+  <p>สัญญา (schema) ของ chunk export อยู่ที่ <code>schemas/export-rag.schema.json</code>.</p>
+
+  <!-- 5 -->
+  <h2 id="index">5. การทำ Index เข้า Elasticsearch</h2>
+  <p>เมื่อกด “บันทึกและเผยแพร่” จะ dispatch <code>IngestRagJob</code>:</p>
+  <ol>
+    <li>ถ้ายังไม่มี export → เรียก <code>ExportService::export()</code> (สร้าง chunks ตามข้อ 4)</li>
+    <li>เรียก <code>LawIndexer::index(documentId)</code> — อ่าน export chunks + <code>law_meta</code> แล้วสร้าง ES doc ต่อ chunk ด้วย <code>buildDoc()</code> ยัดเข้า index ชื่อ <code>laws</code></li>
+  </ol>
+  <p>ฟิลด์ที่ index (จาก <code>LawIndexer.php</code> / <code>LawIndexDefinition.php</code>) เช่น:</p>
+  <table>
+    <tr><th>กลุ่ม</th><th>ฟิลด์</th><th>ใช้ทำอะไร</th></tr>
+    <tr><td>ค้นข้อความ</td><td><code>title</code>, <code>text</code>, <code>keywords_text</code>, <code>section_path</code></td><td>full-text search + highlight</td></tr>
+    <tr><td>autocomplete</td><td><code>title_suggest</code>, <code>keywords_suggest</code>, <code>section_path_suggest</code> (search_as_you_type)</td><td>คำแนะนำแบบพิมพ์ไปเจอไป</td></tr>
+    <tr><td>กรอง (facets)</td><td><code>law_type</code>, <code>status</code>, <code>change_status</code>, <code>agency</code>, <code>law_group</code>, <code>signer_group</code>, <code>published_year</code></td><td>ตัวกรองด้านซ้าย + สถิติ</td></tr>
+    <tr><td>สิทธิ์</td><td><code>access_scope</code> (public/private), <code>law_id</code></td><td>กรองเอกสารส่วนตัว + รวมผลต่อกฎหมาย</td></tr>
+  </table>
+
+  <!-- 6 -->
+  <h2 id="search">6. ระบบค้นหา (Search / Suggest / Fuzzy / Highlight)</h2>
+  <p>Endpoint: <code>POST /api/laws/search</code>, <code>POST /api/laws/suggest</code>, <code>GET /api/laws/facets</code> (ดู <code>routes/api.php</code>).</p>
+
+  <h3>สถาปัตยกรรม 2 ชั้น (สำคัญ)</h3>
+  <div class="card">
+    <p><code>LawSearchController::search()</code> ใช้ <b>ผลจากไฟล์เป็นหลัก (authoritative)</b> แล้วเสริมด้วย Elasticsearch:</p>
+    <div class="flow">
+      <div class="step"><b>fileBasedSearch()</b><small>อ่าน status/บล็อกจริงผ่าน <code>ReviewStore::listLawMeta()</code> — สะท้อนสถานะ publish ล่าสุดเสมอ ไม่พึ่ง ES</small></div>
+      <div class="arrow">+</div>
+      <div class="step"><b>LawSearchService (ES)</b><small>ให้คะแนน/จัดอันดับ + fuzzy + facets</small></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>รวมผล</b><small>ES ที่มีคะแนน + เติมเอกสารที่ ES ตกหล่นจากฝั่งไฟล์</small></div>
+    </div>
+    <p class="note" style="margin-top:8px"><b>ทำไมต้องมีฝั่งไฟล์:</b> ถ้า ES ยังไม่ได้ index (เช่น dev หรือ ES ดับ) การค้นหายังทำงาน — และ<b>ตรรกะ fuzzy จริงอยู่ที่ฝั่งไฟล์ด้วย</b> จึงค้นเจอแม้ ES ว่าง.</p>
+  </div>
+
+  <h3>ค้นหาแบบตรงตัว + คำใกล้เคียง (Fuzzy)</h3>
+  <ul class="tight">
+    <li><b>ตรงตัว:</b> ฝั่งไฟล์ใช้ <code>mb_stripos</code> บนชื่อ/เนื้อหา; ES ใช้ <code>multi_match best_fields</code></li>
+    <li><b>คำใกล้เคียง (พิมพ์ผิด):</b> ถ้าตรงตัวไม่เจอ จะ fallback — ฝั่งไฟล์ใช้ Dice-similarity แบบ multibyte (รองรับไทย, sliding window) ใน <code>fileSearchMatch</code>/<code>textSimilarity</code>; ES ใช้ <code>fuzziness: AUTO</code>. ตัวอย่าง <b>“มหาวิทยาลับ” → เจอ “มหาวิทยาลัย”</b></li>
+    <li>ผลลัพธ์แนบ <code>fuzzy</code> / <code>meta.mode=file_fuzzy</code> เพื่อให้ UI ขึ้นแบนเนอร์ “แสดงผลใกล้เคียง”</li>
+  </ul>
+
+  <h3>ไฮไลต์คำ (Highlight)</h3>
+  <p>ฝั่งไฟล์คืน <code>title_highlighted</code> (ครอบคำที่ตรงด้วย <code>&lt;mark&gt;</code>); ES คืน highlight ของ <code>text/title/keywords</code> เป็น snippets. ฝั่งหน้าเว็บ sanitize ด้วย DOMPurify แล้วเรนเดอร์.</p>
+
+  <h3>คำแนะนำ (Suggest / autocomplete)</h3>
+  <p><code>LawSuggestService</code>: <code>bool_prefix</code> บน *_suggest fields ก่อน ถ้าไม่เจอค่อย fuzzy fallback. ใช้ทั้งในกล่องค้นหา <code>/database</code> และกล่อง hero หน้าแรก.</p>
+
+  <h3>ฝั่งหน้าเว็บ (Vue)</h3>
+  <div class="kv">
+    <div>หน้าค้นหา</div><div><code>pages/public/LawDatabasePage.vue</code> — ค้นหา + ตัวกรอง + ไฮไลต์ชื่อ + แบนเนอร์ใกล้เคียง + การ์ด private</div>
+    <div>กล่องค้นหน้าแรก</div><div><code>components/shared/ELawHeroSearch.vue</code> — dropdown แนะนำคำ (มี fuzzy)</div>
+    <div>state ค้นหา</div><div><code>stores/lawSearchStore.ts</code> — <code>search()</code> / <code>suggest()</code></div>
+    <div>หน้าอ่านกฎหมาย</div><div><code>components/law/LawDocumentView.vue</code> — สารบัญมาตรา + ความสัมพันธ์กฎหมาย + ข้อมูลกฎหมาย</div>
+  </div>
+
+  <!-- 7 -->
+  <h2 id="queue">7. Redis &amp; คิวงานเบื้องหลัง (Queue)</h2>
+  <p>ในระบบนี้ <b>Redis ทำหน้าที่เดียว: เป็น “คิวงานเบื้องหลัง” (queue backend) ของ Laravel</b> — จากคอนฟิกจริง <code>QUEUE_CONNECTION=redis</code> (ส่วน <code>CACHE_STORE=file</code> และ <code>SESSION_DRIVER=file</code> ไม่ได้ใช้ Redis).</p>
+  <div class="flow">
+    <div class="step"><b>laravel-app</b><small>โยนงาน (dispatch) เข้าคิว แล้วตอบผู้ใช้ทันที</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>Redis</b><small>กล่องพักงาน (queue)</small></div>
+    <div class="arrow">→</div>
+    <div class="step"><b>queue-worker</b><small><code>php artisan queue:work</code> ดึงงานมาทำทีละงาน (tries=2, timeout=1800)</small></div>
+  </div>
+  <p>งานหนักที่วิ่งผ่านคิว (โฟลเดอร์ <code>app/Jobs/</code>):</p>
+  <table>
+    <tr><th>Job</th><th>ทำอะไร</th></tr>
+    <tr><td><code>ExtractDocumentJob</code></td><td>สกัดเอกสารหลังอัปโหลด (แยก Fast/Standard)</td></tr>
+    <tr><td><code>NormalizeDocumentJob</code></td><td>จัดภาษาไทย + spellcheck</td></tr>
+    <tr><td><code>CorrectDocumentJob</code></td><td>แก้คำ / AI correction (เส้นทาง standard)</td></tr>
+    <tr><td><code>ReprocessBlockJob</code></td><td>สกัดบล็อกใหม่รายบล็อก</td></tr>
+    <tr><td><code>IngestRagJob</code></td><td>export chunks + index เข้า Elasticsearch</td></tr>
+  </table>
+  <div class="note"><b>ทำไมต้องมีคิว:</b> (1) <b>ไม่บล็อกผู้ใช้</b> — อัปโหลดเสร็จได้ response ทันที ส่วน OCR/สกัดที่กินเวลาทำเบื้องหลัง; (2) <b>ขยายกำลังได้</b> — <code>docker compose up -d --scale queue-worker=3</code> ทำหลายเอกสารพร้อมกัน; (3) <b>กันงานหาย</b> — worker ล้ม งานยังอยู่ใน Redis ให้ retry. ถ้า Redis ดับ งานเบื้องหลังหยุด แต่หน้าเว็บ/ค้นหายังทำงาน (ไม่พึ่ง Redis).</div>
+
+  <!-- 8 -->
+  <h2 id="cache">8. การทำ Cache — ทำไม doc โหลดเร็ว</h2>
+  <p>ระบบเก็บข้อมูลเป็นไฟล์/Mongo (ไม่มี DB หลัก) การอ่านซ้ำ ๆ จึงแพง — เลยมี cache <b>3 ชั้น</b> ทำให้หน้ารายการ/ค้นหา/เปิด doc เร็ว:</p>
+  <table>
+    <tr><th>ชั้น</th><th>อยู่ที่ไหน / เก็บอะไร</th><th>ล้าง (invalidate) เมื่อไหร่</th></tr>
+    <tr>
+      <td><b>1. Laravel cache</b><br><span class="pill">file driver</span></td>
+      <td><code>ReviewStore::listLawMeta()</code> ใช้ <code>Cache::remember('law-meta-list', 180, …)</code> — cache <b>รายการ meta ของกฎหมายทั้งหมด</b> (ชื่อ/สถานะ/หน่วยงาน/ปี…) ไว้ 180 วินาที. หน้า <code>/database</code> (ค้นหา + facets) และ dashboard อ่านจากตรงนี้ จึง<b>ไม่ต้องเปิดอ่าน review blob ทุกอันทุก request</b></td>
+      <td><code>MongoBlobStore</code> เรียก <code>Cache::forget('law-meta-list')</code> ทุกครั้งที่มีการเขียนเอกสาร (insert/update) → ข้อมูลสดเสมอหลังแก้</td>
+    </tr>
+    <tr>
+      <td><b>2. Frontend cache</b><br><span class="pill">in-memory Map</span></td>
+      <td><code>resources/js/stores/reviewCache.ts</code> — เก็บใน browser: <code>reviewCache</code> (ReviewDocument ต่อ id) และ <code>previewCache</code> (HTML พรีวิว). เปิด doc/พรีวิวซ้ำ = ดึงจาก Map ไม่ยิง API ใหม่. ยิ่งกว่านั้น <code>ReviewPage</code> ยัง <b>อุ่นพรีวิวไว้ล่วงหน้า</b> (<code>getPreviewCached()</code> ทำงานเบื้องหลัง) ให้ก้าวถัดไปรู้สึกทันที</td>
+      <td>ล้างเมื่อเซฟ/แก้เอกสาร (<code>reviewCache.set</code> ใหม่ + <code>previewCache.delete</code>) — พรีวิวจะถูกสร้างใหม่จากข้อมูลล่าสุด</td>
+    </tr>
+    <tr>
+      <td><b>3. PHP OPcache</b><br><span class="pill">bytecode</span></td>
+      <td><code>apps/app-laravel/docker/opcache.ini</code> — cache <b>bytecode ที่คอมไพล์แล้ว</b> ของไฟล์ PHP (memory 256MB) ให้รันเร็วขึ้น ไม่ต้องคอมไพล์ใหม่ทุก request</td>
+      <td>Dev: <code>revalidate_freq=60</code> (เช็ค mtime ทุก 60 วิ). Deploy: <code>php artisan optimize</code> แคช config/route เพิ่ม</td>
+    </tr>
+  </table>
+  <div class="note"><b>ภาพรวมว่าทำไมเร็ว:</b> หน้ารายการ/ค้นหาเร็วเพราะ <code>law-meta-list</code> ถูกแคช 180 วิ (ชั้น 1); เปิด doc/พรีวิวเร็วเพราะ browser จำไว้ + อุ่นล่วงหน้า (ชั้น 2); ตัว PHP เองเร็วเพราะ OPcache (ชั้น 3). ทั้งหมดมีกลไกล้าง cache เมื่อข้อมูลเปลี่ยน จึงไม่แสดงข้อมูลเก่าค้าง.</div>
+
+  <!-- 9 -->
+  <h2 id="map">9. แผนที่โค้ด (ไฟล์ไหนทำอะไร)</h2>
+  <table>
+    <tr><th>หน้าที่</th><th>ไฟล์</th></tr>
+    <tr><td>เริ่มงานสกัด + แยก engine</td><td><code>app/Jobs/ExtractDocumentJob.php</code></td></tr>
+    <tr><td>Fast: DOCX/PDF</td><td><code>app/Services/Fast/*</code> (FastExtractionPipeline, FastDocxExtractor, FastPdfTextExtractor)</td></tr>
+    <tr><td>Standard: Python OCR pipeline</td><td><code>apps/ocr-service/app/api/routes.py</code> + <code>services/*</code></td></tr>
+    <tr><td>Normalize (fast path)</td><td><code>app/Jobs/NormalizeDocumentJob.php</code> → <code>/pipeline/normalize</code></td></tr>
+    <tr><td>เก็บ state เอกสาร</td><td><code>app/Services/ReviewStore.php</code></td></tr>
+    <tr><td>สร้าง HTML / chunks จาก block</td><td><code>app/Services/DocumentHtmlService.php</code> (<code>buildChunksFromHtml</code>)</td></tr>
+    <tr><td>จัด section / TOC ฝั่ง UI</td><td><code>resources/js/composables/useLawSections.ts</code></td></tr>
+    <tr><td>Export chunks JSON</td><td><code>app/Services/ExportService.php</code></td></tr>
+    <tr><td>Index เข้า ES</td><td><code>app/Jobs/IngestRagJob.php</code> → <code>app/Services/Search/LawIndexer.php</code> + <code>LawIndexDefinition.php</code></td></tr>
+    <tr><td>ค้นหา (controller 2 ชั้น)</td><td><code>app/Http/Controllers/Api/LawSearchController.php</code></td></tr>
+    <tr><td>ค้นหา ES (query DSL + fuzzy)</td><td><code>app/Services/Search/LawSearchService.php</code></td></tr>
+    <tr><td>แนะนำคำ (autocomplete)</td><td><code>app/Services/Search/LawSuggestService.php</code></td></tr>
+    <tr><td>สัญญาข้อมูล (schemas)</td><td><code>schemas/document-output.schema.json</code>, <code>review-patch.schema.json</code>, <code>export-rag.schema.json</code></td></tr>
+  </table>
+
+  <div class="note" style="margin-top:26px">
+    เอกสารนี้สรุปจากสถาปัตยกรรมจริงในโค้ด (ดูรายละเอียดเพิ่มใน <code>CLAUDE.md</code>, <code>README.md</code>, <code>docling-arch.md</code>). โครงสร้างอาจเปลี่ยนได้ — เมื่อแก้โค้ด ควรอัปเดตไฟล์นี้ตาม.
+  </div>
+
+</div>
+</body>
+</html>

@@ -172,9 +172,17 @@ export interface DocumentMetadata {
   signatory_position: string;
 }
 
+export interface PageMargins {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 export interface ComposeState {
   font_family: ThaiFont;
   font_size_pt: number;
+  page_margins: PageMargins;
   metadata: DocumentMetadata;
 }
 
@@ -182,7 +190,7 @@ export interface LawMeta {
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
-  change_status?: 'new' | 'amended' | 'repealed' | 'consolidated' | null;
+  change_status?: string | null;   // canonical Thai label from config/lookups.change_statuses
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
   signer_group?: string | null;
@@ -226,6 +234,10 @@ export interface DocumentListItem {
   title: string;
   status: string;
   updated_at?: string | null;
+  extraction_engine?: string | null;
+  scan_mode?: string | null;
+  timings?: Record<string, number> | null;
+  error?: string | null;
   parent_document_id?: string | null;
   access_scope?: 'public' | 'private';
   workflow_completed_step?: number | null;
@@ -297,6 +309,7 @@ export interface DocumentStatus {
   workflow_completed_step?: number | null;
   workflow_current_step?: number | null;
   workflow_updated_at?: string | null;
+  esign_exported_at?: string | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;
@@ -373,11 +386,24 @@ export interface ReportDocument {
   group: string;
   agency: string;
   status: string;
+  meta_status: string;
   date: string | null;
+  section_count: number | null;
+  page_count: number;
+  parent_document_id: string | null;
+  workflow_completed_step: number | null;
 }
 
 export interface ReportSummary {
-  totals: { all: number; published: number; processing: number; failed: number; esign: number };
+  totals: {
+    all: number;
+    published: number;
+    processing: number;
+    failed: number;
+    esign: number;
+    relations: number;
+    legacy_links: number;
+  };
   by_type: ReportBucket[];
   by_group: ReportBucket[];
   by_agency: ReportBucket[];

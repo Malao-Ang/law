@@ -1,8 +1,7 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'กำหนดสิทธิ์การเข้าถึง']"
-    title="นำเข้าเอกสารกฎหมาย"
-    subtitle="ขั้นตอนที่ 6 จาก 6: กำหนดสิทธิ์การเข้าถึง"
+    title=""
   >
     <WorkflowFooterBar
       :step="6"
@@ -13,8 +12,8 @@
       @next="saveAndPublish"
     />
 
-    <div class="mx-auto" style="max-width:960px; padding-bottom:60px">
-      <WorkflowStepper :step="6" />
+    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
+      <WorkflowStepper :step="6" description="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -73,7 +72,7 @@
 
               <v-text-field
                 v-model="search"
-                label="ค้นหากลุ่มสิทธิ์"
+                placeholder="พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อแสดงรายการกลุ่มที่มีในระบบ"
                 variant="outlined"
                 prepend-inner-icon="mdi-magnify"
                 hide-details
@@ -163,6 +162,7 @@ import {
   exportDocument,
   fetchPermissionDirectory,
   fetchPermissionGroup,
+  fetchStatus,
   listPermissionGroups,
 } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -283,6 +283,17 @@ async function saveAndPublish(): Promise<void> {
 
 onMounted(async () => {
   await documentStore.fetch(props.documentId);
+
+  try {
+    const status = await fetchStatus(props.documentId);
+    if ((status.workflow_completed_step ?? 0) >= 6) {
+      router.push(`/documents/${props.documentId}/esign`);
+      return;
+    }
+  } catch {
+    // non-fatal: proceed normally
+  }
+
   scope.value = documentStore.review?.law_meta?.access_scope === 'private' ? 'private' : 'public';
   selectedGroupIds.value = [...(documentStore.review?.law_meta?.permission_group_ids ?? [])];
   await loadPermissionResources();

@@ -34,7 +34,11 @@ return [
         'shared_storage_root' => env('OCR_SHARED_STORAGE_ROOT', '/data/poc'),
         'internal_callback_url' => env('INTERNAL_CALLBACK_URL', 'http://laravel-app:8000/api/internal/pipeline-callback'),
         'enable_ai_correction' => filter_var(env('AI_CORRECTION_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'normalize_autocorrect_min_confidence' => env('OCR_NORMALIZE_AUTOCORRECT_MIN_CONFIDENCE', 1.0),
+        'normalize_autocorrect_min_confidence' => env('OCR_NORMALIZE_AUTOCORRECT_MIN_CONFIDENCE', 0.85),
+    ],
+
+    'pdf' => [
+        'base_url' => env('PDF_SERVICE_URL', 'http://pdf-service:3001'),
     ],
 
 ];

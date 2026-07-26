@@ -1,0 +1,68 @@
+# Development override for docker-compose.yml.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+services:
+  laravel-app:
+    command: >
+      sh -c "git config --global --add safe.directory '*'
+      && mkdir -p storage/app/poc
+      && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot public/hot
+      && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
+      && php artisan optimize:clear
+      && touch storage/app/poc/.vendor_ready
+      && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
+      - poc_storage:/var/www/html/storage/app/poc
+      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
+
+  laravel-vite:
+    image: node:20-bookworm-slim
+    container_name: thai-ocr-laravel-vite
+    working_dir: /var/www/html
+    command: >
+      sh -c "test -x node_modules/.bin/vite
+      || { echo 'Missing apps/app-laravel/node_modules/.bin/vite. Run: cd apps/app-laravel && npm install'; exit 1; }
+      && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      - PORT=5173
+      - HMR_PORT=${VITE_HOST_PORT:-5173}
+      - HMR_HOST=${VITE_DEV_SERVER_HOST:-localhost}
+      - VITE_DEV_SERVER_HOST=${VITE_DEV_SERVER_HOST:-localhost}
+      - VITE_HOST_PORT=${VITE_HOST_PORT:-5173}
+      - APP_HOST_PORT=${APP_HOST_PORT:-8500}
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_CACHE_DIR=/tmp/app-laravel-vite-cache
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - /tmp/app-laravel-vite-cache:/tmp/app-laravel-vite-cache
+    ports:
+      - "${VITE_HOST_PORT:-5173}:5173"
+    depends_on:
+      - laravel-app
+
+  queue-worker:
+    command: >
+      sh -c "git config --global --add safe.directory '*'
+      && echo 'Waiting for vendor install to complete...'
+      && until [ -f storage/app/poc/.vendor_ready ]; do sleep 2; done
+      && php artisan queue:work --tries=2 --backoff=10 --timeout=1800"
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
+      - poc_storage:/var/www/html/storage/app/poc
+      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
+
+  ocr-service:
+    volumes:
+      - ./apps/ocr-service:/app
+      - poc_storage:/data/poc
+
+volumes:
+  laravel_vendor:
+  laravel_bootstrap_cache:

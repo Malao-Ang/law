@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thai Legal OCR — เอกสารอ้างอิงสถาปัตยกรรม</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Sarabun', 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; font-size: 14px; line-height: 1.6; }
+
+  /* ── Layout ── */
+  .page { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 26px; font-weight: 800; color: #f1f5f9; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #64748b; margin-bottom: 40px; }
+  h2 { font-size: 16px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 16px; margin-top: 48px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 20px 0 24px;
+    margin-bottom: 8px;
+  }
+  .flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .flow-box {
+    background: #1e293b;
+    border: 1.5px solid #334155;
+    border-radius: 10px;
+    padding: 12px 18px;
+    text-align: center;
+    min-width: 120px;
+    position: relative;
+    transition: border-color .2s;
+  }
+  .flow-box:hover { border-color: #6366f1; }
+  .flow-box .icon { font-size: 22px; margin-bottom: 4px; }
+  .flow-box .label { font-size: 12px; font-weight: 700; color: #f1f5f9; }
+  .flow-box .sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+  .flow-box .badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 99px;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+  .badge-php { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed44; }
+  .badge-py  { background: #0369a122; color: #38bdf8; border: 1px solid #0369a144; }
+  .badge-vue { background: #05966922; color: #34d399; border: 1px solid #05966944; }
+  .badge-redis { background: #dc262622; color: #f87171; border: 1px solid #dc262644; }
+
+  .flow-arrow {
+    color: #334155;
+    font-size: 20px;
+    padding: 0 4px;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: -24px;
+  }
+  .flow-label-under { font-size: 10px; color: #475569; text-align: center; max-width: 110px; }
+
+  /* ── Column grid ── */
+  .grid { display: grid; gap: 16px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 1100px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .grid-3, .grid-4, .grid-2 { grid-template-columns: 1fr; } }
+
+  /* ── Service cards ── */
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card-header { display: flex; align-items: center; gap: 10px; }
+  .card-icon { font-size: 26px; flex-shrink: 0; }
+  .card-title { font-size: 14px; font-weight: 700; color: #f1f5f9; }
+  .card-port { font-size: 10px; color: #64748b; }
+  .card-desc { font-size: 12px; color: #94a3b8; }
+
+  /* ── Function lists ── */
+  .fn-section { }
+  .fn-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: #475569;
+    margin-bottom: 6px;
+    margin-top: 8px;
+  }
+  .fn-list { display: flex; flex-direction: column; gap: 3px; }
+  .fn-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 11.5px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    transition: background .15s;
+  }
+  .fn-item:hover { background: #0f172a; }
+  .fn-name { font-family: 'Cascadia Code', 'Fira Code', monospace; color: #7dd3fc; white-space: nowrap; font-size: 11px; }
+  .fn-verb { font-size: 10px; background: #0f172a; color: #64748b; padding: 1px 5px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+  .fn-desc { color: #94a3b8; font-size: 11px; }
+
+  /* ── Type table ── */
+  .type-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; }
+  .type-card-header { padding: 12px 16px; background: #0f172a; border-bottom: 1px solid #1e293b; font-size: 12px; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
+  .type-tag { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+  .tag-ts { background: #1d4ed833; color: #93c5fd; border: 1px solid #1d4ed855; }
+  .tag-py { background: #0369a133; color: #38bdf8; border: 1px solid #0369a155; }
+  .tag-php { background: #7c3aed33; color: #c4b5fd; border: 1px solid #7c3aed55; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 7px 14px; text-align: left; font-size: 11.5px; }
+  th { background: #162032; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  tr { border-bottom: 1px solid #1e293b22; }
+  tr:last-child { border-bottom: none; }
+  tr:hover td { background: #162032; }
+  .field-name { font-family: monospace; color: #7dd3fc; font-size: 11px; }
+  .field-type { font-family: monospace; color: #f0abfc; font-size: 10px; }
+  .field-desc { color: #94a3b8; font-size: 11px; }
+
+  /* ── Route table ── */
+  .route-table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 12px; overflow: hidden; }
+  .route-table th { background: #0f172a; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 9px 14px; }
+  .route-table td { padding: 7px 14px; font-size: 11.5px; border-bottom: 1px solid #0f172a; }
+  .route-table tr:last-child td { border-bottom: none; }
+  .route-table tr:hover td { background: #162032; }
+  .method { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
+  .method-GET { background: #05966922; color: #34d399; }
+  .method-POST { background: #1d4ed822; color: #60a5fa; }
+  .method-PATCH { background: #d9770622; color: #fbbf24; }
+  .method-DELETE { background: #dc262622; color: #f87171; }
+  .route-path { font-family: monospace; color: #7dd3fc; font-size: 11px; }
+  .route-handler { font-family: monospace; color: #c084fc; font-size: 10px; }
+  .route-note { color: #64748b; font-size: 10px; }
+
+  /* ── OCR pipeline ── */
+  .pipe { display: flex; flex-direction: column; gap: 0; }
+  .pipe-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    border-left: 3px solid #334155;
+    margin-left: 16px;
+    position: relative;
+  }
+  .pipe-step::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 18px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #334155;
+    border: 2px solid #1e293b;
+  }
+  .pipe-step:first-child { border-top-left-radius: 0; }
+  .pipe-num { font-size: 10px; font-weight: 800; color: #64748b; flex-shrink: 0; width: 18px; text-align: right; }
+  .pipe-content { flex: 1; }
+  .pipe-title { font-size: 12px; font-weight: 700; color: #f1f5f9; margin-bottom: 2px; }
+  .pipe-fn { font-family: monospace; font-size: 10px; color: #7dd3fc; }
+  .pipe-detail { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .pipe-cond { font-size: 10px; color: #fbbf24; margin-top: 3px; }
+
+  .step-active::before { background: #6366f1; }
+  .step-ocr::before { background: #0369a1; }
+  .step-ai::before { background: #d97706; }
+  .step-out::before { background: #059669; }
+
+  /* ── Store map ── */
+  .store-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .store-grid { grid-template-columns: repeat(2, 1fr); } }
+  .store-card {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .store-name { font-family: monospace; font-size: 12px; color: #a78bfa; font-weight: 700; margin-bottom: 4px; }
+  .store-file { font-size: 9px; color: #334155; margin-bottom: 8px; }
+  .store-state { margin-bottom: 8px; }
+  .store-label { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: #475569; font-weight: 700; margin-bottom: 4px; }
+  .store-fn { font-family: monospace; font-size: 10.5px; color: #7dd3fc; display: block; padding: 1px 0; }
+  .store-state-var { font-family: monospace; font-size: 10.5px; color: #f0abfc; display: block; padding: 1px 0; }
+
+  /* ── Inline note ── */
+  .note { background: #162032; border-left: 3px solid #6366f1; padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 12px; color: #94a3b8; margin-top: 12px; }
+  .note strong { color: #c4b5fd; }
+
+  /* ── Layer box ── */
+  .layer-row { display: flex; gap: 8px; align-items: stretch; }
+  .layer-box {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .layer-name { font-family: monospace; font-size: 11px; font-weight: 700; color: #f1f5f9; }
+  .layer-key { font-family: monospace; font-size: 10px; color: #64748b; margin-bottom: 4px; }
+  .layer-desc { font-size: 11px; color: #94a3b8; }
+  .layer-arrow { display: flex; align-items: center; color: #334155; font-size: 16px; flex-shrink: 0; }
+
+  .sep { height: 1px; background: #1e293b; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Thai Legal OCR — เอกสารอ้างอิงสถาปัตยกรรมระบบ</h1>
+  <p class="subtitle">แผนที่ระบบทั้งหมด: บริการ, ประเภทข้อมูล, การประสานงาน PHP/Laravel, ไปป์ไลน์ OCR ของ Python, Vue stores และ request flows</p>
+
+  <!-- ══════════════ OVERALL FLOW ══════════════ -->
+  <h2>การไหลของคำขอตั้งแต่ต้นจนจบ</h2>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">🖥️</div>
+        <div class="label">เบราว์เซอร์</div>
+        <div class="sub">Vue 3 + Pinia</div>
+        <span class="badge badge-vue">Frontend</span>
+      </div>
+      <div class="flow-label-under">อัปโหลดไฟล์</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">🐘</div>
+        <div class="label">UploadController</div>
+        <div class="sub">POST /api/documents</div>
+        <span class="badge badge-php">PHP:8000</span>
+      </div>
+      <div class="flow-label-under">บันทึกไฟล์, ส่งงานเข้าคิว</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">📮</div>
+        <div class="label">Redis Queue</div>
+        <div class="sub">ExtractDocumentJob</div>
+        <span class="badge badge-redis">Redis:6379</span>
+      </div>
+      <div class="flow-label-under">งานแบบ async</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">⚙️</div>
+        <div class="label">queue-worker</div>
+        <div class="sub">PipelineClient.extract()</div>
+        <span class="badge badge-php">PHP worker</span>
+      </div>
+      <div class="flow-label-under">HTTP 202 ไปยัง Python</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">🐍</div>
+        <div class="label">ocr-service</div>
+        <div class="sub">FastAPI /pipeline/extract</div>
+        <span class="badge badge-py">Python:8010</span>
+      </div>
+      <div class="flow-label-under">ประมวลผลในพื้นหลัง</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">📞</div>
+        <div class="label">Callback</div>
+        <div class="sub">POST /api/pipeline/callback</div>
+        <span class="badge badge-php">PHP</span>
+      </div>
+      <div class="flow-label-under">บันทึกสถานะ + review JSON</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">✏️</div>
+        <div class="label">ตรวจสอบ</div>
+        <div class="sub">/documents/:id/review</div>
+        <span class="badge badge-vue">Vue TipTap</span>
+      </div>
+      <div class="flow-label-under">ผู้ดูแลแก้ไข</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">📦</div>
+        <div class="label">จัดการ RAG</div>
+        <div class="sub">/documents/:id/rag</div>
+        <span class="badge badge-vue">Vue</span>
+      </div>
+      <div class="flow-label-under">ผสาน / ลบบล็อก</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="icon">🚀</div>
+        <div class="label">ส่งออก</div>
+        <div class="sub">RAG-ready JSON</div>
+        <span class="badge badge-php">ExportController</span>
+      </div>
+      <div class="flow-label-under">/documents/:id/preview</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Shared volume:</strong> <code>poc_storage</code> เมาท์เป็น <code>/var/www/html/storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python). การแปลง path ผ่าน <code>DocumentPipelineClient::toSharedPath()</code> — ห้ามสร้าง path เองโดยตรง
+  </div>
+
+
+  <!-- ══════════════ SERVICES ══════════════ -->
+  <h2>บริการและพอร์ต</h2>
+  <div class="grid grid-3">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🐘</div>
+        <div>
+          <div class="card-title">laravel-app</div>
+          <div class="card-port">:8000 · PHP 8.3 · thai-ocr-laravel-app</div>
+        </div>
+      </div>
+      <div class="card-desc">เซิร์ฟเวอร์ API + queue worker. บันทึกสถานะเป็น JSON files ใน <code>storage/app/poc/</code> ไม่มีฐานข้อมูล</div>
+      <div class="fn-section">
+        <div class="fn-section-title">Controllers</div>
+        <div class="fn-list">
+          <div class="fn-item"><span class="fn-name">UploadController</span><span class="fn-desc">store() / show()</span></div>
+          <div class="fn-item"><span class="fn-name">ReviewController</span><span class="fn-desc">show, preview, update, updateLayout, reprocess, mergeBlocks, deleteBlock, splitBlock, createBlock, reorderBlocks, reprocessPage, updateDocumentReview</span></div>
+          <div class="fn-item"><span class="fn-name">ExportController</span><span class="fn-desc">store() — ส่งออก RAG JSON; retryCorrection()</span></div>
+          <div class="fn-item"><span class="fn-name">PipelineCallbackController</span><span class="fn-desc">receive() — Python ส่งผลลัพธ์มาที่นี่</span></div>
+          <div class="fn-item"><span class="fn-name">ImageController</span><span class="fn-desc">show() รูปภาพบล็อก; showPage() thumbnail หน้า</span></div>
+          <div class="fn-item"><span class="fn-name">HealthController</span><span class="fn-desc">__invoke() — ตรวจสอบสถานะระบบ</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🐍</div>
+        <div>
+          <div class="card-title">ocr-service</div>
+          <div class="card-port">:8010 · FastAPI · thai-ocr-service</div>
+        </div>
+      </div>
+      <div class="card-desc">Docling + EasyOCR + LandingAI. รันในฐานะ root เพื่อจัดการสิทธิ์ volume. ยังไม่พร้อมทันที — EasyOCR ดาวน์โหลดโมเดล ~2 GB ครั้งแรก</div>
+      <div class="fn-section">
+        <div class="fn-section-title">Endpoints (routes.py)</div>
+        <div class="fn-list">
+          <div class="fn-item"><span class="fn-name">GET /health</span><span class="fn-desc">สถานะ ocr_ready</span></div>
+          <div class="fn-item"><span class="fn-name">POST /pipeline/extract</span><span class="fn-desc">202 + BackgroundTasks → _run_extraction()</span></div>
+          <div class="fn-item"><span class="fn-name">POST /pipeline/reprocess-page</span><span class="fn-desc">202 + BackgroundTasks → _run_page_reprocess()</span></div>
+          <div class="fn-item"><span class="fn-name">POST /pipeline/reprocess-block</span><span class="fn-desc">sync → reprocess_block()</span></div>
+          <div class="fn-item"><span class="fn-name">POST /pipeline/normalize</span><span class="fn-desc">normalize_blocks()</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📮</div>
+        <div>
+          <div class="card-title">queue-worker + redis</div>
+          <div class="card-port">redis:6379 · thai-ocr-queue-worker</div>
+        </div>
+      </div>
+      <div class="card-desc">Laravel queue:listen --tries=1 --timeout=1800. Jobs ถูกส่งโดย UploadController</div>
+      <div class="fn-section">
+        <div class="fn-section-title">Jobs</div>
+        <div class="fn-list">
+          <div class="fn-item"><span class="fn-name">ExtractDocumentJob</span><span class="fn-desc">เรียก PipelineClient.extract() → POST :8010/pipeline/extract</span></div>
+          <div class="fn-item"><span class="fn-name">ReprocessBlockJob</span><span class="fn-desc">เรียก PipelineClient.reprocessBlock()</span></div>
+          <div class="fn-item"><span class="fn-name">NormalizeDocumentJob</span><span class="fn-desc">ทำ Thai normalize + auto-correct (fast path)</span></div>
+          <div class="fn-item"><span class="fn-name">IngestRagJob</span><span class="fn-desc">นำเข้า RAG หลังส่งออก</span></div>
+        </div>
+      </div>
+      <div class="fn-section">
+        <div class="fn-section-title">Vite Dev Server</div>
+        <div class="fn-list">
+          <div class="fn-item"><span class="fn-name">laravel-vite :5173</span><span class="fn-desc">Vue HMR. หยุดถ้าไม่มี node_modules — รัน npm install ก่อน</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════ PHP SERVICES ══════════════ -->
+  <h2>PHP Laravel — ชั้น Services</h2>
+  <div class="grid grid-2">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📁</div>
+        <div>
+          <div class="card-title">ReviewStore</div>
+          <div class="card-port">Services/ReviewStore.php · บันทึกสถานะลงไฟล์</div>
+        </div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">generateDocumentId()</span><span class="fn-verb">util</span><span class="fn-desc">สร้าง UUID สำหรับการอัปโหลดใหม่</span></div>
+        <div class="fn-item"><span class="fn-name">storeUpload(file, id)</span><span class="fn-verb">write</span><span class="fn-desc">บันทึกไฟล์ไปยัง poc/uploads/{id}/</span></div>
+        <div class="fn-item"><span class="fn-name">setStatus(id, array)</span><span class="fn-verb">write</span><span class="fn-desc">เขียน {id}.status.json</span></div>
+        <div class="fn-item"><span class="fn-name">getStatus(id)</span><span class="fn-verb">read</span><span class="fn-desc">อ่าน status JSON; null ถ้าไม่มีไฟล์</span></div>
+        <div class="fn-item"><span class="fn-name">writeReviewDocument(id, doc)</span><span class="fn-verb">write</span><span class="fn-desc">เขียน {id}.review.json</span></div>
+        <div class="fn-item"><span class="fn-name">getReviewDocument(id)</span><span class="fn-verb">read</span><span class="fn-desc">อ่าน review JSON จาก intermediate/</span></div>
+        <div class="fn-item"><span class="fn-name">patchApprovedBlock(id, pageNo, blockId, patch)</span><span class="fn-verb">patch</span><span class="fn-desc">อัปเดต approved_text / reviewed_html ใน review JSON</span></div>
+        <div class="fn-item"><span class="fn-name">applyNormalizationResults(id, results)</span><span class="fn-verb">patch</span><span class="fn-desc">นำผล normalize กลับเข้าบล็อก (fast path)</span></div>
+        <div class="fn-item"><span class="fn-name">applyReprocessResult(id, result)</span><span class="fn-verb">patch</span><span class="fn-desc">ผสานบล็อกที่ประมวลผลซ้ำกลับเข้า review</span></div>
+        <div class="fn-item"><span class="fn-name">updateDocumentReview(id, payload)</span><span class="fn-verb">patch</span><span class="fn-desc">อัปเดต draft_html ใน document_review</span></div>
+        <div class="fn-item"><span class="fn-name">patchBlockLayout(id, pageNo, blockId, patch)</span><span class="fn-verb">patch</span><span class="fn-desc">อัปเดต indent/alignment/tabs ใน block meta</span></div>
+        <div class="fn-item"><span class="fn-name">reorderBlocks(id, blockIds[])</span><span class="fn-verb">write</span><span class="fn-desc">เรียงลำดับบล็อกใหม่ภายในหน้า</span></div>
+        <div class="fn-item"><span class="fn-name">deleteBlock(id, pageNo, blockId)</span><span class="fn-verb">delete</span><span class="fn-desc">ลบบล็อกออกจาก review JSON</span></div>
+        <div class="fn-item"><span class="fn-name">writeExport / writeIngest</span><span class="fn-verb">write</span><span class="fn-desc">เขียนไฟล์ RAG export / ingest สุดท้าย</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔌</div>
+        <div>
+          <div class="card-title">DocumentPipelineClient</div>
+          <div class="card-port">Services/DocumentPipelineClient.php · HTTP → Python</div>
+        </div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">extract(id, path, mode, engine)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/extract — เริ่มการสกัดแบบ async</span></div>
+        <div class="fn-item"><span class="fn-name">reprocessPage(id, pageNo, mode)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/reprocess-page</span></div>
+        <div class="fn-item"><span class="fn-name">reprocessBlock(id, pageNo, blockId, mode)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/reprocess-block (sync)</span></div>
+        <div class="fn-item"><span class="fn-name">normalize(id, blocks, threshold)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/normalize — normalize + auto-correct CPU-only</span></div>
+        <div class="fn-item"><span class="fn-name">toSharedPath(relativePath)</span><span class="fn-verb">util</span><span class="fn-desc">แปลง path สัมพัทธ์ของ Laravel → Python /data/poc path สัมบูรณ์</span></div>
+      </div>
+      <div class="sep"></div>
+      <div class="fn-section-title">DocumentHtmlService</div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">buildGeneratedHtml(document)</span><span class="fn-verb">render</span><span class="fn-desc">คำนวณ HTML ใหม่จากบล็อกทั้งหมด (ไม่ใช้ reviewed_html เก่า)</span></div>
+        <div class="fn-item"><span class="fn-name">buildBlockHtml(block)</span><span class="fn-verb">render</span><span class="fn-desc">บล็อกเดียว → HTML span/p พร้อม style</span></div>
+        <div class="fn-item"><span class="fn-name">buildChunksFromHtml(id, html)</span><span class="fn-verb">parse</span><span class="fn-desc">แปลง HTML ของ editor กลับเป็นบล็อกสำหรับส่งออก</span></div>
+        <div class="fn-item"><span class="fn-name">normalizeTablePayload(table)</span><span class="fn-verb">util</span><span class="fn-desc">ปรับโครงสร้าง cell ของตาราง</span></div>
+      </div>
+      <div class="sep"></div>
+      <div class="fn-section-title">ExportService</div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">export(id)</span><span class="fn-verb">write</span><span class="fn-desc">สร้าง RAG-ready JSON จาก review doc + approved blocks; เขียนไฟล์ export</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fast DOCX parser note -->
+  <div class="note">
+    <strong>Fast mode (PHP-only DOCX):</strong> <code>FastDocxExtractor</code> → <code>DocxArchive</code> (unzip) → <code>ParagraphParser</code> (ข้อความ+layout) + <code>NumberingResolver</code> (list markers) + <code>TableParser</code> → blocks. ข้ามกระบวนการ Python ทั้งหมดสำหรับ DOCX ทั่วไป. ถ้าเป็น PDF ที่สแกนมาจะ fallback ไปยัง Python pipeline
+  </div>
+
+
+  <!-- ══════════════ LARAVEL API ROUTES ══════════════ -->
+  <h2>Laravel API Routes</h2>
+  <div class="type-card">
+    <div class="type-card-header">
+      <span>PHP API Routes</span>
+      <span class="type-tag tag-php">routes/web.php + routes/api.php</span>
+    </div>
+    <table class="route-table">
+      <thead><tr><th>Method</th><th>Path</th><th>Handler</th><th>วัตถุประสงค์</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/health</td><td class="route-handler">HealthController</td><td class="route-note">สถานะบริการ + queue</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents</td><td class="route-handler">UploadController@store</td><td class="route-note">อัปโหลดไฟล์; ส่งงานเข้าคิว</td></tr>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/documents/{id}</td><td class="route-handler">UploadController@show</td><td class="route-note">ตรวจสอบสถานะการสกัด</td></tr>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/documents/{id}/review</td><td class="route-handler">ReviewController@show</td><td class="route-note">ดึง review JSON ทั้งหมด</td></tr>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/documents/{id}/preview</td><td class="route-handler">ReviewController@preview</td><td class="route-note">HTML ที่สร้างสำหรับ preview</td></tr>
+        <tr><td><span class="method method-PATCH">PATCH</span></td><td class="route-path">/api/documents/{id}/review</td><td class="route-handler">ReviewController@updateDocumentReview</td><td class="route-note">บันทึก draft_html จาก TipTap editor</td></tr>
+        <tr><td><span class="method method-PATCH">PATCH</span></td><td class="route-path">/api/documents/{id}/blocks/{blockId}</td><td class="route-handler">ReviewController@update</td><td class="route-note">แก้ไขข้อความ / approved_text ของบล็อก</td></tr>
+        <tr><td><span class="method method-PATCH">PATCH</span></td><td class="route-path">/api/documents/{id}/blocks/{blockId}/layout</td><td class="route-handler">ReviewController@updateLayout</td><td class="route-note">แก้ไข indent / alignment / tabs</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/blocks/{blockId}/reprocess</td><td class="route-handler">ReviewController@reprocess</td><td class="route-note">สกัดบล็อกเดียวซ้ำผ่าน Python</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/pages/{pageNo}/reprocess</td><td class="route-handler">ReviewController@reprocessPage</td><td class="route-note">สกัดหน้าซ้ำผ่าน LandingAI</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/blocks/merge</td><td class="route-handler">ReviewController@mergeBlocks</td><td class="route-note">รวมบล็อกที่เลือก → 1 บล็อก</td></tr>
+        <tr><td><span class="method method-DELETE">DELETE</span></td><td class="route-path">/api/documents/{id}/blocks/{blockId}</td><td class="route-handler">ReviewController@deleteBlock</td><td class="route-note">ลบบล็อกออกจาก review JSON</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/blocks/{blockId}/split</td><td class="route-handler">ReviewController@splitBlock</td><td class="route-note">แบ่งบล็อกที่ตำแหน่ง cursor</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/blocks/reorder</td><td class="route-handler">ReviewController@reorderBlocks</td><td class="route-note">เรียงลำดับบล็อกตาม ID list ที่ส่งมา</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/documents/{id}/export</td><td class="route-handler">ExportController@store</td><td class="route-note">สร้าง + เขียน RAG export JSON</td></tr>
+        <tr><td><span class="method method-POST">POST</span></td><td class="route-path">/api/pipeline/callback</td><td class="route-handler">PipelineCallbackController@receive</td><td class="route-note">Python ส่งผลลัพธ์มาที่นี่หลังสกัดเสร็จ</td></tr>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/documents/{id}/images/{filename}</td><td class="route-handler">ImageController@show</td><td class="route-note">ให้บริการรูปภาพบล็อกจาก poc/images/</td></tr>
+        <tr><td><span class="method method-GET">GET</span></td><td class="route-path">/api/documents/{id}/pages/{pageNo}/image</td><td class="route-handler">ImageController@showPage</td><td class="route-note">ให้บริการ thumbnail หน้าจาก poc/pages/</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+
+  <!-- ══════════════ PYTHON OCR PIPELINE ══════════════ -->
+  <h2>ไปป์ไลน์การสกัด OCR ของ Python</h2>
+  <div class="grid grid-2">
+
+    <div class="pipe">
+      <div class="pipe-step step-active">
+        <div class="pipe-num">1</div>
+        <div class="pipe-content">
+          <div class="pipe-title">จำแนกประเภทไฟล์</div>
+          <div class="pipe-fn">detect_file_type(path)</div>
+          <div class="pipe-detail">ผลลัพธ์: <code>docx</code> · <code>pdf_text</code> · <code>pdf_scan</code> · <code>mixed</code></div>
+        </div>
+      </div>
+      <div class="pipe-step step-active">
+        <div class="pipe-num">2</div>
+        <div class="pipe-content">
+          <div class="pipe-title">สกัดข้อความ</div>
+          <div class="pipe-fn">DoclingService.extract() / extract_mixed_pdf()</div>
+          <div class="pipe-detail">DOCX: parse XML ผ่าน docx_parser. PDF text: docling-parse (bbox-accurate). ตาราง: Docling TableFormer (do_cell_matching=True). รูปภาพ: crop ไปยัง poc/images/</div>
+          <div class="pipe-cond">⚡ Fast mode: PHP FastDocxExtractor สำหรับ DOCX ทั่วไป</div>
+        </div>
+      </div>
+      <div class="pipe-step step-ocr">
+        <div class="pipe-num">3</div>
+        <div class="pipe-content">
+          <div class="pipe-title">OCR (หน้าที่สแกนมา)</div>
+          <div class="pipe-fn">OcrPipeline.extract() · LandingAiAdeParser.parse_pdf()</div>
+          <div class="pipe-detail">Mode <code>local</code>: EasyOCR (โหลดแบบ lazy, ใช้ GPU ถ้ามี). Mode <code>landingai</code>: ADE Parse API → Markdown → blocks. Mode <code>auto</code>: ลอง LandingAI ก่อน</div>
+          <div class="pipe-cond">⚠ Quality gate (auto mode): mean_confidence &lt; 0.78 หรือ uncertain_ratio &gt; 0.50 → fallback ไป EasyOCR</div>
+        </div>
+      </div>
+      <div class="pipe-step step-active">
+        <div class="pipe-num">4</div>
+        <div class="pipe-content">
+          <div class="pipe-title">วิเคราะห์ Layout</div>
+          <div class="pipe-fn">infer_indent_levels(pages)</div>
+          <div class="pipe-detail">จัดกลุ่ม x-position ทั้งเอกสาร กำหนด indent_level 0–7 ต่อบล็อก</div>
+        </div>
+      </div>
+      <div class="pipe-step step-active">
+        <div class="pipe-num">5</div>
+        <div class="pipe-content">
+          <div class="pipe-title">กำหนด Indent เชิงความหมาย</div>
+          <div class="pipe-fn">resolve_semantic_indents(pages)</div>
+          <div class="pipe-detail">ใช้กฎกฎหมายไทยหลัง geometry pass: มาตรา → level 0, ข้อ → level 1, วรรค/ข้อความต่อเนื่องรับ indent จากแม่, เส้นคั่น → โดย pattern</div>
+          <div class="pipe-cond">⚡ ห้ามข้ามสำหรับ PDF กฎหมาย</div>
+        </div>
+      </div>
+      <div class="pipe-step step-active">
+        <div class="pipe-num">6</div>
+        <div class="pipe-content">
+          <div class="pipe-title">จำแนกเลขลำดับ</div>
+          <div class="pipe-fn">NumberingTokenizer.annotate()</div>
+          <div class="pipe-detail">ตรวจหารูปแบบ มาตรา / ข้อ / วรรค / (ก) / ๑.๑ เขียน <code>list_marker.{type, level, text}</code> ลงใน block meta</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe">
+      <div class="pipe-step step-active">
+        <div class="pipe-num">7</div>
+        <div class="pipe-content">
+          <div class="pipe-title">ปรับมาตรฐานภาษาไทย</div>
+          <div class="pipe-fn">normalize_text(text) → NormalizeResult</div>
+          <div class="pipe-detail">จัดลำดับสระ, แก้ไขวรรณยุกต์, ํา → ำ, ทำความสะอาด whitespace (เก็บ \t และ \n ไว้). <code>NormalizeResult</code> TypedDict: {normalized, changes}</div>
+        </div>
+      </div>
+      <div class="pipe-step step-ai">
+        <div class="pipe-num">8</div>
+        <div class="pipe-content">
+          <div class="pipe-title">ตรวจสอบการสะกด (opt-in)</div>
+          <div class="pipe-fn">ThaiSpellChecker.check(text)</div>
+          <div class="pipe-detail">Lazy singleton. NorvigSpellChecker + resources/legal_terms.txt. ทำงานเฉพาะบล็อกที่ <code>needs_review=True</code> ควบคุมโดย <code>THAI_REVIEW_THRESHOLD</code> (ค่าเริ่มต้น 0.90)</div>
+        </div>
+      </div>
+      <div class="pipe-step step-ai">
+        <div class="pipe-num">9</div>
+        <div class="pipe-content">
+          <div class="pipe-title">แก้ไขด้วย AI (opt-in)</div>
+          <div class="pipe-fn">MockAICorrector.correct()</div>
+          <div class="pipe-detail">เชื่อมต่อ provider จริงได้ที่ <code>services/ai_corrector.py</code>. ส่งเฉพาะบล็อก needs_review=True เขียนชั้น ai_suggested_text</div>
+        </div>
+      </div>
+      <div class="pipe-step step-out">
+        <div class="pipe-num">10</div>
+        <div class="pipe-content">
+          <div class="pipe-title">ประกอบเอกสาร</div>
+          <div class="pipe-fn">build_document_output(pages, meta)</div>
+          <div class="pipe-detail">ประกอบบล็อก 4 ชั้น เขียน <code>{id}.review.json</code> ไปยัง <code>intermediate/</code></div>
+        </div>
+      </div>
+      <div class="pipe-step step-out">
+        <div class="pipe-num">11</div>
+        <div class="pipe-content">
+          <div class="pipe-title">Callback</div>
+          <div class="pipe-fn">_post_callback(callback_url, id, payload)</div>
+          <div class="pipe-detail">POST ไปยัง <code>INTERNAL_CALLBACK_URL</code> (Laravel). Dual-write: ข้อผิดพลาดบันทึกทั้งในไฟล์ JSON และ callback. LandingAI metadata: job_id, duration_ms, credit_usage, failed_pages</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════ PYTHON SERVICES ══════════════ -->
+  <h2>Python OCR — ไฟล์ Service</h2>
+  <div class="grid grid-4">
+
+    <div class="card" style="grid-column: span 2;">
+      <div class="card-header">
+        <div class="card-icon">📄</div>
+        <div><div class="card-title">DoclingService</div><div class="card-port">services/docling_service.py</div></div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">extract(path, id)</span><span class="fn-verb">dispatch</span><span class="fn-desc">กระจายไปยัง DOCX หรือ PDF extractor ตามประเภทไฟล์</span></div>
+        <div class="fn-item"><span class="fn-name">extract_mixed_pdf(path, id)</span><span class="fn-verb">dispatch</span><span class="fn-desc">หน้าที่มีข้อความใช้ docling-parse; หน้าสแกนใช้ OCR</span></div>
+        <div class="fn-item"><span class="fn-name">_extract_docx_blocks(path, id)</span><span class="fn-verb">parse</span><span class="fn-desc">DOCX XML → paragraphs/tables/images; numbering ผ่าน _parse_numbering_xml</span></div>
+        <div class="fn-item"><span class="fn-name">_extract_pdf_blocks(path, id)</span><span class="fn-verb">parse</span><span class="fn-desc">docling-parse → text blocks พร้อม bbox ที่แม่นยำต่อหน้า</span></div>
+        <div class="fn-item"><span class="fn-name">_extract_pdf_table(page, block)</span><span class="fn-verb">parse</span><span class="fn-desc">สกัดตารางด้วย TableFormer; fallback ไป PyMuPDF fitz</span></div>
+        <div class="fn-item"><span class="fn-name">_build_image_meta(data, id, name)</span><span class="fn-verb">util</span><span class="fn-desc">บันทึกรูปภาพ, สร้าง src_url; ฝัง data_uri ถ้า ≤ 200 KB</span></div>
+        <div class="fn-item"><span class="fn-name">_is_pdf_header_block(block)</span><span class="fn-verb">filter</span><span class="fn-desc">ตรวจ running header ผ่าน threshold GHOST_TONE_MAX_WIDTH_PT</span></div>
+        <div class="fn-item"><span class="fn-name">_merge_column_pair_tables(blocks)</span><span class="fn-verb">layout</span><span class="fn-desc">รวมคอลัมน์ที่อยู่ติดกันเข้าเป็น table block เดียว</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🤖</div>
+        <div><div class="card-title">LandingAiAdeParser</div><div class="card-port">services/landingai_parser.py</div></div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">parse_pdf(path, id, page_indices?)</span><span class="fn-verb">POST</span><span class="fn-desc">เรียก ADE Parse API; สร้าง block list</span></div>
+        <div class="fn-item"><span class="fn-name">_call_ade_parse(path)</span><span class="fn-verb">HTTP</span><span class="fn-desc">อัปโหลด multipart; คืน (payload, status_code)</span></div>
+        <div class="fn-item"><span class="fn-name">_build_pages_from_parse(payload)</span><span class="fn-verb">parse</span><span class="fn-desc">chunks โครงสร้าง → blocks จัดกลุ่มตามหน้า</span></div>
+        <div class="fn-item"><span class="fn-name">_build_plain_pages_from_markdown(md)</span><span class="fn-verb">parse</span><span class="fn-desc">Fallback: markdown ธรรมดา → blocks</span></div>
+        <div class="fn-item"><span class="fn-name">_chunk_to_block(chunk, grounding)</span><span class="fn-verb">map</span><span class="fn-desc">ADE chunk → dict บล็อก 4 ชั้น</span></div>
+        <div class="fn-item"><span class="fn-name">_scan_quality_good(pages)</span><span class="fn-verb">gate</span><span class="fn-desc">ตรวจคุณภาพ: confidence + uncertain_ratio</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🏗️</div>
+        <div><div class="card-title">block_builder</div><div class="card-port">services/block_builder.py</div></div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">build_document_output(pages, meta)</span><span class="fn-verb">assemble</span><span class="fn-desc">จุดเข้าหลักของไปป์ไลน์: normalize → spellcheck → ai_correct → เขียน review JSON</span></div>
+        <div class="fn-item"><span class="fn-name">_normalize_block_text(raw, fn)</span><span class="fn-verb">util</span><span class="fn-desc">เรียก normalizer; บันทึกผลในชั้น normalized_text</span></div>
+        <div class="fn-item"><span class="fn-name">normalize_layout(layout, bbox, ro)</span><span class="fn-verb">util</span><span class="fn-desc">ปรับ block layout dict ให้เป็นมาตรฐาน schema</span></div>
+        <div class="fn-item"><span class="fn-name">build_reviewed_html(type, text, layout, id)</span><span class="fn-verb">render</span><span class="fn-desc">บล็อก → string HTML พร้อม style และ data-* attributes</span></div>
+        <div class="fn-item"><span class="fn-name">build_table_payload(block, raw, type)</span><span class="fn-verb">parse</span><span class="fn-desc">สกัด rows/cols ของตารางเป็น dict โครงสร้าง</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🇹🇭</div>
+        <div><div class="card-title">thai_normalizer</div><div class="card-port">services/thai_normalizer.py</div></div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">normalize_text(text)</span><span class="fn-verb">main</span><span class="fn-desc">→ NormalizeResult(normalized, changes). จุดเข้าหลัก</span></div>
+        <div class="fn-item"><span class="fn-name">normalize_thai_vowels(text)</span><span class="fn-verb">fix</span><span class="fn-desc">จัดลำดับตัวอักษรสระให้ถูกต้อง</span></div>
+        <div class="fn-item"><span class="fn-name">_apply_ocr_fixes(text)</span><span class="fn-verb">fix</span><span class="fn-desc">ํา → ำ, การแทนที่ที่พบบ่อยจาก OCR</span></div>
+        <div class="fn-item"><span class="fn-name">_collapse_combining_whitespace(text)</span><span class="fn-verb">fix</span><span class="fn-desc">ลบ space ระหว่างตัวอักษรหลักกับ combining marks</span></div>
+        <div class="fn-item"><span class="fn-name">_preserve_zero_width_boundaries(text)</span><span class="fn-verb">fix</span><span class="fn-desc">เก็บ zero-width joiners ไว้ที่ขอบเขตคำ</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📐</div>
+        <div><div class="card-title">layout_inferrer + semantic_indent</div><div class="card-port">services/</div></div>
+      </div>
+      <div class="fn-list">
+        <div class="fn-item"><span class="fn-name">infer_indent_levels(pages)</span><span class="fn-verb">cluster</span><span class="fn-desc">จัดกลุ่ม x0 ทั้งเอกสาร → กำหนด indent_level 0–7 ต่อบล็อก</span></div>
+        <div class="fn-item"><span class="fn-name">_x_for_block(block, default_margin)</span><span class="fn-verb">util</span><span class="fn-desc">ดึง x-position มาตรฐานจาก block bbox</span></div>
+        <div class="fn-item"><span class="fn-name">resolve_semantic_indents(pages)</span><span class="fn-verb">rules</span><span class="fn-desc">ผ่านกฎกฎหมายไทย; กระจายไปยัง _resolve_page() ต่อหน้า</span></div>
+        <div class="fn-item"><span class="fn-name">_resolve_page(blocks)</span><span class="fn-verb">rules</span><span class="fn-desc">มาตรา=0, ข้อ=1, วรรค/ต่อเนื่องรับ indent จากแม่, เส้นคั่น=โดย</span></div>
+        <div class="fn-item"><span class="fn-name">_is_continuation_text(text)</span><span class="fn-verb">detect</span><span class="fn-desc">ตรวจว่าข้อความต่อเนื่องจากย่อหน้าก่อน</span></div>
+        <div class="fn-item"><span class="fn-name">_verify_parent_child(blocks)</span><span class="fn-verb">validate</span><span class="fn-desc">ตรวจสอบ parent_id อ้างอิงสอดคล้องกัน</span></div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════ 4-LAYER BLOCK MODEL ══════════════ -->
+  <h2>โมเดลข้อความบล็อก 4 ชั้น</h2>
+  <div class="layer-row">
+    <div class="layer-box">
+      <div class="layer-name">raw_text</div>
+      <div class="layer-key">ชั้น 0 — ผลลัพธ์ OCR/parse</div>
+      <div class="layer-desc">ข้อมูลดิบที่ได้จาก Docling / EasyOCR / LandingAI ไม่มีการแก้ไขหลังสกัด</div>
+    </div>
+    <div class="layer-arrow">→</div>
+    <div class="layer-box">
+      <div class="layer-name">normalized_text</div>
+      <div class="layer-key">ชั้น 1 — ผ่าน Thai normalizer</div>
+      <div class="layer-desc">จัดลำดับสระถูกต้อง, ํา→ำ, ทำความสะอาด whitespace. กำหนดโดย <code>_normalize_block_text()</code> ใน block_builder</div>
+    </div>
+    <div class="layer-arrow">→</div>
+    <div class="layer-box">
+      <div class="layer-name">ai_suggested_text</div>
+      <div class="layer-key">ชั้น 2 — แก้ไขด้วย AI</div>
+      <div class="layer-desc">กำหนดเฉพาะเมื่อ <code>needs_review=True</code> และ confidence &lt; THAI_REVIEW_THRESHOLD. แหล่งที่มา: MockAICorrector (เสียบ provider จริงได้)</div>
+    </div>
+    <div class="layer-arrow">→</div>
+    <div class="layer-box">
+      <div class="layer-name">approved_text</div>
+      <div class="layer-key">ชั้น 3 — ผู้ตรวจสอบอนุมัติ</div>
+      <div class="layer-desc">เขียนโดยผู้ตรวจสอบผ่าน PATCH /blocks/{id} ใช้สำหรับส่งออก รวมถึง <code>reviewed_html</code> (bold/italic/underline; ผ่าน DOMPurify)</div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════ VUE STORES ══════════════ -->
+  <h2>Vue 3 Pinia Stores</h2>
+  <div class="store-grid">
+
+    <div class="store-card">
+      <div class="store-name">useDocumentStore</div>
+      <div class="store-file">stores/documentStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">documentId, review, loading, error, saving, saveError</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">fetch(documentId) → โหลด review JSON</span>
+      <span class="store-fn">saveReview({draft_html}) → PATCH /review</span>
+      <span class="store-fn">setSaveError(msg?) → ล้าง/ตั้งค่า error</span>
+      <span class="store-fn">reset()</span>
+    </div>
+
+    <div class="store-card">
+      <div class="store-name">useBlockStore</div>
+      <div class="store-file">stores/blockStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">stateless (async ops เท่านั้น)</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">patch(id, blockId, payload)</span>
+      <span class="store-fn">patchLayout(id, blockId, payload)</span>
+      <span class="store-fn">reprocess(id, blockId, mode)</span>
+      <span class="store-fn">merge(id, blockIds[]) → merged block</span>
+      <span class="store-fn">remove(id, blockId, pageNo)</span>
+      <span class="store-fn">split(id, blockId, payload)</span>
+      <span class="store-fn">create(id, payload)</span>
+      <span class="store-fn">reorderBlocks(id, blockIds[])</span>
+      <span class="store-fn">reprocessPage(id, pageNo, mode)</span>
+    </div>
+
+    <div class="store-card">
+      <div class="store-name">useComposeStore</div>
+      <div class="store-file">stores/composeStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">review, loading, error, docStatus, exporting</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">fetch(documentId) → โหลด review สำหรับหน้า RAG</span>
+      <span class="store-fn">triggerExport(documentId) → POST /export</span>
+      <span class="store-fn">pollStatus(documentId) → bool</span>
+      <span class="store-fn">saveComposeState(id, payload)</span>
+      <span class="store-fn">setError(msg?) / reset()</span>
+    </div>
+
+    <div class="store-card">
+      <div class="store-name">useReviewUiStore</div>
+      <div class="store-file">stores/reviewUiStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">mode, isDirty, selectedBlockId, editing</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">setDirty(bool)</span>
+      <span class="store-fn">setMode(next)</span>
+      <span class="store-fn">selectBlock(blockId)</span>
+      <span class="store-fn">setEditing(bool)</span>
+      <span class="store-fn">clearSelection() / reset()</span>
+    </div>
+
+    <div class="store-card">
+      <div class="store-name">useUploadStore</div>
+      <div class="store-file">stores/uploadStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">status, pollError</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">upload(file, scanMode, engine) → documentId</span>
+      <span class="store-fn">pollOnce(documentId) → DocumentStatus | null</span>
+      <span class="store-fn">reset()</span>
+    </div>
+
+    <div class="store-card">
+      <div class="store-name">usePreviewStore</div>
+      <div class="store-file">stores/previewStore.ts</div>
+      <div class="store-state">
+        <div class="store-label">State</div>
+        <span class="store-state-var">html, loading, error</span>
+      </div>
+      <div class="store-label">Actions</div>
+      <span class="store-fn">fetch(documentId) → GET /preview HTML</span>
+      <span class="store-fn">reset()</span>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════ KEY TYPES ══════════════ -->
+  <h2>TypeScript Types หลัก (types/document.ts)</h2>
+  <div class="grid grid-2">
+
+    <div class="type-card">
+      <div class="type-card-header">DocumentBlock <span class="type-tag tag-ts">TypeScript</span></div>
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>คำอธิบาย</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">block_id</td><td class="field-type">string</td><td class="field-desc">UUID</td></tr>
+          <tr><td class="field-name">type</td><td class="field-type">BlockType</td><td class="field-desc">title / paragraph / section_header / list_item / table / image / figure_caption / footnote / unknown</td></tr>
+          <tr><td class="field-name">raw_text</td><td class="field-type">string</td><td class="field-desc">ผลลัพธ์ OCR/parse ดิบ</td></tr>
+          <tr><td class="field-name">normalized_text</td><td class="field-type">string</td><td class="field-desc">หลังผ่าน Thai normalizer</td></tr>
+          <tr><td class="field-name">ai_suggested_text</td><td class="field-type">string?</td><td class="field-desc">การแก้ไขด้วย AI (opt-in)</td></tr>
+          <tr><td class="field-name">approved_text</td><td class="field-type">string</td><td class="field-desc">ข้อความที่ผู้ตรวจสอบอนุมัติแล้ว</td></tr>
+          <tr><td class="field-name">reviewed_html</td><td class="field-type">string?</td><td class="field-desc">HTML พร้อม bold/italic/underline; ผ่าน DOMPurify sanitize</td></tr>
+          <tr><td class="field-name">needs_review</td><td class="field-type">boolean</td><td class="field-desc">True เมื่อ confidence &lt; THAI_REVIEW_THRESHOLD</td></tr>
+          <tr><td class="field-name">meta.layout</td><td class="field-type">BlockLayout</td><td class="field-desc">indent_left, indent_first_line, indent_hanging, alignment, tabs[]</td></tr>
+          <tr><td class="field-name">meta.list_marker</td><td class="field-type">ListMarker?</td><td class="field-desc">{type, level, text} — มาตรา/ข้อ/วรรค/(ก)/๑.๑</td></tr>
+          <tr><td class="field-name">meta.image</td><td class="field-type">ImageMeta?</td><td class="field-desc">src_url, data_uri (≤200 KB), width, height</td></tr>
+          <tr><td class="field-name">meta.spell_suggestions</td><td class="field-type">string[]?</td><td class="field-desc">คำแนะนำจาก Thai spellcheck</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="type-card">
+      <div class="type-card-header">DocumentStatus <span class="type-tag tag-ts">TypeScript</span></div>
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>คำอธิบาย</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">status</td><td class="field-type">'queued'|'processing'|'ingesting'|'done'|'exported'|'ingested'|'failed'</td><td class="field-desc">สถานะของงาน</td></tr>
+          <tr><td class="field-name">source_file</td><td class="field-type">string?</td><td class="field-desc">ชื่อไฟล์ต้นฉบับ</td></tr>
+          <tr><td class="field-name">current_step</td><td class="field-type">string?</td><td class="field-desc">ป้ายบอกความคืบหน้า</td></tr>
+          <tr><td class="field-name">scan_extraction_mode_requested</td><td class="field-type">'auto'|'local'|'landingai'</td><td class="field-desc">โหมดที่ผู้ใช้ขอ</td></tr>
+          <tr><td class="field-name">scan_extraction_mode_effective</td><td class="field-type">'auto'|'local'|'landingai'</td><td class="field-desc">โหมดที่ใช้จริง (อาจต่างถ้า fallback ทำงาน)</td></tr>
+          <tr><td class="field-name">extraction.landingai</td><td class="field-type">object?</td><td class="field-desc">job_id, duration_ms, credit_usage, failed_pages จาก LandingAI</td></tr>
+          <tr><td class="field-name">conversion</td><td class="field-type">object?</td><td class="field-desc">tool, duration_ms, exit_code (สำหรับการแปลง .doc → .docx)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="type-card">
+      <div class="type-card-header">BlockLayout / TabStop <span class="type-tag tag-ts">TypeScript</span></div>
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>คำอธิบาย</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">indent_level</td><td class="field-type">number</td><td class="field-desc">0–7; จาก LayoutInferrer + SemanticIndentResolver</td></tr>
+          <tr><td class="field-name">indent_left</td><td class="field-type">number</td><td class="field-desc">twips; การเยื้องซ้ายของย่อหน้า</td></tr>
+          <tr><td class="field-name">indent_first_line</td><td class="field-type">number</td><td class="field-desc">twips; การเยื้องเพิ่มเติมบรรทัดแรก</td></tr>
+          <tr><td class="field-name">indent_hanging</td><td class="field-type">number</td><td class="field-desc">twips; hanging indent</td></tr>
+          <tr><td class="field-name">alignment</td><td class="field-type">'left'|'center'|'right'|'justify'</td><td class="field-desc">การจัดวางข้อความ</td></tr>
+          <tr><td class="field-name">tabs</td><td class="field-type">TabStop[]</td><td class="field-desc">อาร์เรย์ของ {position(twips), type: 'left'|'center'|'right'|'decimal'}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="type-card">
+      <div class="type-card-header">ReviewDocument / DocumentPage <span class="type-tag tag-ts">TypeScript</span></div>
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>คำอธิบาย</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">document_id</td><td class="field-type">string</td><td class="field-desc">UUID</td></tr>
+          <tr><td class="field-name">source_file</td><td class="field-type">string</td><td class="field-desc">ชื่อไฟล์ต้นฉบับ</td></tr>
+          <tr><td class="field-name">source_type</td><td class="field-type">'docx'|'pdf_text'|'pdf_scan'|'pdf_mixed'</td><td class="field-desc">ผลการจำแนกประเภท</td></tr>
+          <tr><td class="field-name">pages</td><td class="field-type">DocumentPage[]</td><td class="field-desc">page_no + blocks[]</td></tr>
+          <tr><td class="field-name">document_review</td><td class="field-type">DocumentReviewState</td><td class="field-desc">draft_html (จาก TipTap editor)</td></tr>
+          <tr><td class="field-name">compose_state</td><td class="field-type">ComposeState?</td><td class="field-desc">สถานะ compose mode เดิม</td></tr>
+          <tr><td class="field-name">summary</td><td class="field-type">DocumentSummary</td><td class="field-desc">จำนวนบล็อก, หน้า, บล็อกที่ต้องตรวจสอบ</td></tr>
+          <tr><td class="field-name">extraction.landingai</td><td class="field-type">object?</td><td class="field-desc">LandingAI metadata (job_id, credits, duration, failed_pages)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════ FRONTEND ROUTES ══════════════ -->
+  <h2>Vue Router — หน้าของ Frontend</h2>
+  <div class="type-card">
+    <div class="type-card-header">
+      <span>Vue 3 Routes</span>
+      <span class="type-tag tag-ts">router/index.ts</span>
+    </div>
+    <table class="route-table">
+      <thead><tr><th>Path</th><th>Component</th><th>วัตถุประสงค์</th></tr></thead>
+      <tbody>
+        <tr><td class="route-path">/</td><td class="route-handler">PublicHomePage</td><td class="route-note">หน้าแรกสาธารณะ</td></tr>
+        <tr><td class="route-path">/admin</td><td class="route-handler">AdminDashboardPage</td><td class="route-note">แดชบอร์ดผู้ดูแล</td></tr>
+        <tr><td class="route-path">/admin/upload</td><td class="route-handler">AdminUploadPage</td><td class="route-note">อัปโหลด + poll + redirect อัตโนมัติไปยัง /review เมื่อเสร็จ</td></tr>
+        <tr><td class="route-path">/documents/:id/review</td><td class="route-handler">ReviewPage → DocumentEditorShell</td><td class="route-note">TipTap editor ทั้งเอกสาร, toolbar 3 แถว, บันทึก → /rag</td></tr>
+        <tr><td class="route-path">/documents/:id/rag</td><td class="route-handler">RagPage → RagManageWorkspace</td><td class="route-note">รายการบล็อก read-only; ผสาน / ลบ; export → /preview</td></tr>
+        <tr><td class="route-path">/documents/:id/preview</td><td class="route-handler">PreviewPage</td><td class="route-note">preview เอกสาร render สุดท้าย</td></tr>
+        <tr><td class="route-path">/documents/:id/compose</td><td class="route-handler">ComposePage</td><td class="route-note">มุมมอง compose ต่อบล็อกแบบเดิม (ไม่เชื่อมกับ flow ใหม่)</td></tr>
+        <tr><td class="route-path">/upload</td><td class="route-handler">UploadPage</td><td class="route-note">หน้าอัปโหลดแบบเดิม</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:16px;">
+    <strong>Admin flow (ปัจจุบัน):</strong> /admin/upload → <em>(redirect อัตโนมัติเมื่อเสร็จ)</em> → /review → "บันทึกข้อมูล" → /rag → "บันทึกและเผยแพร่" → /preview
+  </div>
+
+</div>
+</body>
+</html>

@@ -14,6 +14,10 @@ class DocumentListTest extends TestCase
         $store->setStatus($id, [
             'status' => 'done',
             'source_file' => 'ตัวอย่าง.docx',
+            'extraction_engine' => 'fast',
+            'scan_extraction_mode_effective' => 'gemini',
+            'timings' => ['fast_extract' => 1.25, 'normalize' => 0.75],
+            'error' => 'sample failure',
         ]);
 
         $response = $this->getJson('/api/documents');
@@ -23,5 +27,9 @@ class DocumentListTest extends TestCase
         $found = collect($response->json('documents'))->firstWhere('document_id', $id);
         $this->assertNotNull($found);
         $this->assertSame('ตัวอย่าง.docx', $found['title']);
+        $this->assertSame('fast', $found['extraction_engine']);
+        $this->assertSame('gemini', $found['scan_mode']);
+        $this->assertSame(['fast_extract' => 1.25, 'normalize' => 0.75], $found['timings']);
+        $this->assertSame('sample failure', $found['error']);
     }
 }

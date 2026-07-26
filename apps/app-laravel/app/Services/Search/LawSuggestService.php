@@ -4,6 +4,8 @@ namespace App\Services\Search;
 
 class LawSuggestService
 {
+    private const FUZZY_MIN_QUERY_LENGTH = 4;
+
     public function __construct(private readonly ElasticClient $client) {}
 
     /**
@@ -19,7 +21,21 @@ class LawSuggestService
             return ['suggestions' => []];
         }
 
-        $raw = $this->client->search([
+        $raw = $this->client->search($this->buildPrefixBody($query, $size));
+
+        if (($raw['hits']['hits'] ?? []) === [] && mb_strlen($query) >= self::FUZZY_MIN_QUERY_LENGTH) {
+            $raw = $this->client->search($this->buildFuzzyBody($query, $size));
+        }
+
+        return ['suggestions' => $this->parseSuggestions($raw)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPrefixBody(string $query, int $size): array
+    {
+        return [
             'track_total_hits' => false,
             'size' => $size,
             '_source' => ['law_id', 'title', 'law_type', 'agency', 'published_date', 'keywords'],
@@ -76,8 +92,66 @@ class LawSuggestService
                 ],
             ],
             'collapse' => ['field' => 'law_id'],
-        ]);
+        ];
+    }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildFuzzyBody(string $query, int $size): array
+    {
+        return [
+            'track_total_hits' => false,
+            'size' => $size,
+            '_source' => ['law_id', 'title', 'law_type', 'agency', 'published_date', 'keywords'],
+            'query' => [
+                'bool' => [
+                    'filter' => [[
+                        'bool' => [
+                            'should' => [
+                                ['term' => ['access_scope' => 'public']],
+                                ['bool' => ['must_not' => [['exists' => ['field' => 'access_scope']]]]],
+                            ],
+                            'minimum_should_match' => 1,
+                        ],
+                    ]],
+                    'should' => [
+                        [
+                            'multi_match' => [
+                                'query' => $query,
+                                'type' => 'best_fields',
+                                'fields' => ['title^5', 'keywords_text^4', 'section_path^2'],
+                                'fuzziness' => 'AUTO',
+                                'prefix_length' => 1,
+                                'max_expansions' => 25,
+                                'boost' => 2,
+                            ],
+                        ],
+                        [
+                            'multi_match' => [
+                                'query' => $query,
+                                'type' => 'best_fields',
+                                'fields' => ['title^4', 'keywords_text^4'],
+                                'fuzziness' => 'AUTO:3,6',
+                                'prefix_length' => 0,
+                                'max_expansions' => 50,
+                                'operator' => 'and',
+                            ],
+                        ],
+                    ],
+                    'minimum_should_match' => 1,
+                ],
+            ],
+            'collapse' => ['field' => 'law_id'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseSuggestions(array $raw): array
+    {
         $suggestions = [];
         foreach ($raw['hits']['hits'] ?? [] as $hit) {
             $source = is_array($hit['_source'] ?? null) ? $hit['_source'] : [];
@@ -91,6 +165,6 @@ class LawSuggestService
             ];
         }
 
-        return ['suggestions' => $suggestions];
+        return $suggestions;
     }
 }

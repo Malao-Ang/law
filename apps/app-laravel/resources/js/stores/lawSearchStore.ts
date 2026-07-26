@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { searchLaws, suggestLaws } from '../api/client';
-import type { LawSearchFacets, LawSearchFilters, LawSearchResponse, LawSearchResult, LawSuggestion, LawSuggestResponse } from '../types/lawSearch';
+import type { LawSearchFacets, LawSearchFilters, LawSearchMeta, LawSearchResponse, LawSearchResult, LawSuggestion, LawSuggestResponse } from '../types/lawSearch';
 
 const EMPTY_FACETS: LawSearchFacets = {
   law_type: [],
@@ -13,9 +13,17 @@ const EMPTY_FACETS: LawSearchFacets = {
   years: [],
 };
 
+const EMPTY_META: LawSearchMeta = {
+  engine: 'file',
+  mode: 'none',
+  confidence: 0,
+  suggestions: [],
+};
+
 export const useLawSearchStore = defineStore('lawSearch', () => {
   const results = ref<LawSearchResult[]>([]);
   const facets = ref<LawSearchFacets>({ ...EMPTY_FACETS });
+  const meta = ref<LawSearchMeta>({ ...EMPTY_META });
   const total = ref(0);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -33,10 +41,12 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
       results.value = response.results;
       facets.value = response.facets;
       total.value = response.total;
+      meta.value = response.meta ?? { ...EMPTY_META };
     } catch (errorValue) {
       error.value = errorValue instanceof Error ? errorValue.message : 'ค้นหาไม่พร้อมใช้งาน';
       results.value = [];
       facets.value = { ...EMPTY_FACETS };
+      meta.value = { ...EMPTY_META };
       total.value = 0;
     } finally {
       loading.value = false;
@@ -88,6 +98,7 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
   return {
     results,
     facets,
+    meta,
     total,
     loading,
     error,

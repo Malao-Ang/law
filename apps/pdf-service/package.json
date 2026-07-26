@@ -1,0 +1,10 @@
+{
+  "name": "pdf-service",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.21.2",
+    "puppeteer": "^24.15.0"
+  }
+}

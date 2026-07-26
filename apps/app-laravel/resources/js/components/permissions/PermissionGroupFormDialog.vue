@@ -51,29 +51,37 @@
                 กำลังโหลดข้อมูลสมาชิก...
               </div>
 
-              <v-list v-else density="comfortable" class="member-list">
-                <v-list-item
-                  v-for="item in filteredItems"
-                  :key="item.id"
-                  :title="item.name"
-                  :subtitle="'email' in item ? (item.email || undefined) : undefined"
-                >
-                  <template #append>
-                    <v-btn
-                      size="small"
-                      variant="text"
-                      color="admin-primary"
-                      prepend-icon="mdi-plus"
-                      @click="addItem(item.id)"
-                    >
-                      เพิ่ม
-                    </v-btn>
-                  </template>
-                </v-list-item>
-                <div v-if="directory && filteredItems.length === 0" class="text-body-2 text-medium-emphasis pa-4">
-                  ไม่พบรายการที่ตรงกับคำค้น
+              <template v-else>
+                <div v-if="tab !== 'users' && filteredItems.length > 0" class="d-flex justify-end mb-1">
+                  <v-btn variant="text" size="small" density="compact" color="admin-primary" @click="selectAll">
+                    เลือกทั้งหมด ({{ filteredItems.length }})
+                  </v-btn>
                 </div>
-              </v-list>
+
+                <v-list density="comfortable" class="member-list">
+                  <v-list-item
+                    v-for="item in filteredItems"
+                    :key="item.id"
+                    :title="item.name"
+                    :subtitle="'email' in item ? (item.email || undefined) : undefined"
+                  >
+                    <template #append>
+                      <v-btn
+                        size="small"
+                        variant="text"
+                        color="admin-primary"
+                        prepend-icon="mdi-plus"
+                        @click="addItem(item.id)"
+                      >
+                        เพิ่ม
+                      </v-btn>
+                    </template>
+                  </v-list-item>
+                  <div v-if="filteredItems.length === 0" class="text-body-2 text-medium-emphasis pa-4">
+                    ไม่พบรายการที่ตรงกับคำค้น
+                  </div>
+                </v-list>
+              </template>
             </v-card>
           </v-col>
 
@@ -86,64 +94,52 @@
                 </div>
               </div>
 
-              <div class="d-flex flex-column ga-3">
-                <v-card flat border rounded="lg" class="pa-3">
-                  <div class="d-flex align-center justify-space-between mb-2">
-                    <span class="font-weight-bold">หน่วยงาน</span>
-                    <v-chip size="x-small" color="primary" variant="tonal">{{ selectedUnits.length }}</v-chip>
-                  </div>
-                  <div v-if="selectedUnits.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
-                  <div v-else class="d-flex flex-wrap ga-2">
-                    <v-chip
-                      v-for="unit in selectedUnits"
-                      :key="unit.id"
-                      size="small"
-                      closable
-                      @click:close="removeItem('units', unit.id)"
-                    >
-                      {{ unit.name }}
-                    </v-chip>
-                  </div>
-                </v-card>
+              <v-expansion-panels v-model="expandedSections" multiple variant="accordion" rounded="xl">
+                <v-expansion-panel value="units">
+                  <v-expansion-panel-title>
+                    <div class="d-flex align-center ga-2">
+                      <span class="font-weight-bold">หน่วยงาน</span>
+                      <v-chip size="x-small" color="primary" variant="tonal">{{ selectedUnits.length }} รายการ</v-chip>
+                    </div>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div v-if="selectedUnits.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
+                    <div v-else class="d-flex flex-wrap ga-2">
+                      <v-chip v-for="unit in selectedUnits" :key="unit.id" size="small" closable @click:close="removeItem('units', unit.id)">{{ unit.name }}</v-chip>
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-                <v-card flat border rounded="lg" class="pa-3">
-                  <div class="d-flex align-center justify-space-between mb-2">
-                    <span class="font-weight-bold">ตำแหน่ง</span>
-                    <v-chip size="x-small" color="success" variant="tonal">{{ selectedPositions.length }}</v-chip>
-                  </div>
-                  <div v-if="selectedPositions.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
-                  <div v-else class="d-flex flex-wrap ga-2">
-                    <v-chip
-                      v-for="position in selectedPositions"
-                      :key="position.id"
-                      size="small"
-                      closable
-                      @click:close="removeItem('positions', position.id)"
-                    >
-                      {{ position.name }}
-                    </v-chip>
-                  </div>
-                </v-card>
+                <v-expansion-panel value="positions">
+                  <v-expansion-panel-title>
+                    <div class="d-flex align-center ga-2">
+                      <span class="font-weight-bold">ตำแหน่ง</span>
+                      <v-chip size="x-small" color="success" variant="tonal">{{ selectedPositions.length }} รายการ</v-chip>
+                    </div>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div v-if="selectedPositions.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
+                    <div v-else class="d-flex flex-wrap ga-2">
+                      <v-chip v-for="position in selectedPositions" :key="position.id" size="small" closable @click:close="removeItem('positions', position.id)">{{ position.name }}</v-chip>
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
 
-                <v-card flat border rounded="lg" class="pa-3">
-                  <div class="d-flex align-center justify-space-between mb-2">
-                    <span class="font-weight-bold">รายบุคคล</span>
-                    <v-chip size="x-small" color="secondary" variant="tonal">{{ selectedUsers.length }}</v-chip>
-                  </div>
-                  <div v-if="selectedUsers.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
-                  <div v-else class="d-flex flex-wrap ga-2">
-                    <v-chip
-                      v-for="user in selectedUsers"
-                      :key="user.id"
-                      size="small"
-                      closable
-                      @click:close="removeItem('users', user.id)"
-                    >
-                      {{ user.name }}
-                    </v-chip>
-                  </div>
-                </v-card>
-              </div>
+                <v-expansion-panel value="users">
+                  <v-expansion-panel-title>
+                    <div class="d-flex align-center ga-2">
+                      <span class="font-weight-bold">รายบุคคล</span>
+                      <v-chip size="x-small" color="secondary" variant="tonal">{{ selectedUsers.length }} รายการ</v-chip>
+                    </div>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <div v-if="selectedUsers.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่มีรายการ</div>
+                    <div v-else class="d-flex flex-wrap ga-2">
+                      <v-chip v-for="user in selectedUsers" :key="user.id" size="small" closable @click:close="removeItem('users', user.id)">{{ user.name }}</v-chip>
+                    </div>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
             </v-card>
           </v-col>
         </v-row>
@@ -185,6 +181,7 @@ const description = ref('');
 const unitIds = ref<string[]>([]);
 const positionIds = ref<string[]>([]);
 const userIds = ref<string[]>([]);
+const expandedSections = ref(['units']);
 
 watch(() => props.modelValue, (open) => {
   if (!open) return;
@@ -195,6 +192,7 @@ watch(() => props.modelValue, (open) => {
   unitIds.value = [];
   positionIds.value = [];
   userIds.value = [];
+  expandedSections.value = ['units'];
 });
 
 const searchLabel = computed(() => {
@@ -243,6 +241,12 @@ function addItem(id: string): void {
   if (tab.value === 'units' && !unitIds.value.includes(id)) unitIds.value = [...unitIds.value, id];
   if (tab.value === 'positions' && !positionIds.value.includes(id)) positionIds.value = [...positionIds.value, id];
   if (tab.value === 'users' && !userIds.value.includes(id)) userIds.value = [...userIds.value, id];
+}
+
+function selectAll(): void {
+  const ids = filteredItems.value.map((item) => item.id);
+  if (tab.value === 'units') unitIds.value = [...new Set([...unitIds.value, ...ids])];
+  else if (tab.value === 'positions') positionIds.value = [...new Set([...positionIds.value, ...ids])];
 }
 
 function removeItem(category: 'units' | 'positions' | 'users', id: string): void {

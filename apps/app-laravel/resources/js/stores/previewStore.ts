@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { fetchPreview } from '../api/client';
+import { getPreviewCached } from './reviewCache';
 import type { PreviewData } from '../types/document';
 
 export const usePreviewStore = defineStore('preview', () => {
@@ -8,11 +8,11 @@ export const usePreviewStore = defineStore('preview', () => {
   const loading = ref(false);
   const error = ref('');
 
-  async function fetch(documentId: string): Promise<void> {
+  async function fetch(documentId: string, force = false): Promise<void> {
     loading.value = true;
     error.value = '';
     try {
-      data.value = await fetchPreview(documentId);
+      data.value = await getPreviewCached(documentId, force);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'โหลดตัวอย่างไม่สำเร็จ';
     } finally {

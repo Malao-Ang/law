@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Jobs\CorrectDocumentJob;
-use App\Jobs\IngestRagJob;
 use App\Services\ReviewStore;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -30,7 +29,7 @@ class ExportGatingTest extends TestCase
 
     public function test_export_proceeds_with_warning_when_correction_failed(): void
     {
-        Queue::fake([IngestRagJob::class]);
+        Queue::fake();
 
         $store = app(ReviewStore::class);
         $documentId = 'doc-export-gate-004';
@@ -95,7 +94,7 @@ class ExportGatingTest extends TestCase
 
     public function test_export_proceeds_when_correction_done(): void
     {
-        Queue::fake([IngestRagJob::class]);
+        Queue::fake();
 
         $store = app(ReviewStore::class);
         $documentId = 'doc-export-gate-002';
@@ -121,7 +120,7 @@ class ExportGatingTest extends TestCase
 
     public function test_export_proceeds_when_correction_not_required(): void
     {
-        Queue::fake([IngestRagJob::class]);
+        Queue::fake();
 
         $store = app(ReviewStore::class);
         $documentId = 'doc-export-gate-003';
