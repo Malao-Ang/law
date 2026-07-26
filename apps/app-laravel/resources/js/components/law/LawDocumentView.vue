@@ -128,27 +128,32 @@
               />
             </div>
           </div>
-          <div v-if="sectionRelations(section.id).length" class="lawx-rel">
-            <v-btn variant="tonal" color="primary" size="small"
-              prepend-icon="mdi-link-variant"
-              :append-icon="expanded.has(section.id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-              @click="toggleExpand(section.id)">
-              กฎหมายที่เกี่ยวข้อง · {{ sectionRelations(section.id).length }}
-            </v-btn>
-            <ul v-show="expanded.has(section.id)" class="lawx-rel__list">
-              <li
-                v-for="rel in sectionRelations(section.id)"
+          <div v-if="sectionRelations(section.id).length" class="lawx-relcard">
+            <div class="lawx-relcard__head">
+              <span class="mdi mdi-scale-balance" />
+              กฎหมายที่เกี่ยวข้อง
+            </div>
+            <div
+              v-for="group in groupedSectionRelations(section.id)"
+              :key="group.type"
+              class="lawx-relgroup"
+            >
+              <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+              <a
+                v-for="rel in group.items"
                 :key="rel.id"
-                :class="relationListClass(rel.type)"
+                class="lawx-relrow"
+                :class="`is-${group.type}`"
+                :href="safeUrl(rel.url) ?? undefined"
+                :target="safeUrl(rel.url) ? '_blank' : undefined"
+                rel="noopener"
               >
-                <span class="mdi" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
-                <span class="lawx-rel__type">{{ relationTypeLabel(rel.type) }}</span>
-                <a v-if="safeUrl(rel.url)" :href="safeUrl(rel.url) ?? ''" target="_blank" rel="noopener">{{ rel.target_title }}</a>
-                <span v-else>{{ rel.target_title }}</span>
-                <span v-if="rel.target_section" class="lawx-rel__sec">{{ rel.target_section }}</span>
-                <span v-if="rel.note" class="lawx-rel__note">— {{ rel.note }}</span>
-              </li>
-            </ul>
+                <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+                <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+                <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+              </a>
+            </div>
           </div>
         </v-card>
       </main>
@@ -172,7 +177,6 @@ import { buildSections, buildTocGroups, relationsForSection, documentRelations }
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
-  relationTypeLabel,
 } from '../../types/lawRelation';
 import { downloadPdfExport } from '../../api/client';
 import LawInfoPanel from './LawInfoPanel.vue';
@@ -237,17 +241,30 @@ const articleUnitLabel = computed(() => {
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const tocOpen = ref(true);
 const infoOpen = ref(true);
-const expanded = ref<Set<string>>(new Set());
 
 function sectionRelations(sectionId: string): LawRelation[] {
   return relationsForSection(relations.value, sectionId);
 }
 
-function toggleExpand(sectionId: string): void {
-  const next = new Set(expanded.value);
-  if (next.has(sectionId)) next.delete(sectionId);
-  else next.add(sectionId);
-  expanded.value = next;
+const RELATION_GROUP_LABELS: Record<RelationType, string> = {
+  repeals: 'กฎหมายที่ถูกยกเลิก',
+  amends: 'กฎหมายที่แก้ไขเพิ่มเติม',
+  supersedes: 'กฎหมายที่ถูกแทนที่',
+  issued_under: 'ออกตามอำนาจของ',
+  related: 'กฎหมายที่เกี่ยวข้อง',
+};
+
+const RELATION_GROUP_ORDER: RelationType[] = ['repeals', 'supersedes', 'amends', 'issued_under', 'related'];
+
+function groupedSectionRelations(sectionId: string): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
+  const rels = sectionRelations(sectionId);
+  return RELATION_GROUP_ORDER
+    .map((type) => ({
+      type,
+      label: RELATION_GROUP_LABELS[type],
+      items: rels.filter((rel) => rel.type === type),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 function badgeOf(sectionId: string): string {
@@ -258,15 +275,6 @@ function safeUrl(url: string | null): string | null {
   if (!url) return null;
   const trimmed = url.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
-}
-
-function relationListClass(type: RelationType): Record<string, boolean> {
-  return {
-    'is-repeal': type === 'repeals',
-    'is-supersedes': type === 'supersedes',
-    'is-amends': type === 'amends',
-    'is-issued-under': type === 'issued_under',
-  };
 }
 
 function printPage(): void {
@@ -507,16 +515,57 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-card__content :deep(.block-flow) { font-size: 13px; line-height: 1.72; }
 .lawx-card__content :deep(table) { font-size: 12px; }
 
-.lawx-rel { margin-top: 12px; border-top: 1px dashed #d7dee7; padding-top: 10px; }
-.lawx-rel__list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.lawx-rel__list li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #334155; }
-.lawx-rel__list li.is-repeal { color: #dc2626; }
-.lawx-rel__list li.is-supersedes { color: #ea580c; }
-.lawx-rel__list li.is-amends { color: #0d9488; }
-.lawx-rel__list li.is-issued-under { color: #7c3aed; }
-.lawx-rel__type { font-size: 11px; font-weight: 600; color: #64748b; }
-.lawx-rel__sec { color: #64748b; font-size: 12px; }
-.lawx-rel__note { color: #94a3b8; font-size: 12px; }
+.lawx-relcard {
+  margin-top: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 14px 16px;
+}
+.lawx-relcard__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 10px;
+}
+.lawx-relgroup { margin-top: 8px; }
+.lawx-relgroup__label {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #64748b;
+}
+.lawx-relgroup__label.is-repeals { color: #dc2626; }
+.lawx-relgroup__label.is-supersedes { color: #ea580c; }
+.lawx-relgroup__label.is-amends { color: #0d9488; }
+.lawx-relgroup__label.is-issued_under { color: #7c3aed; }
+
+.lawx-relrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #334155;
+  text-decoration: none;
+}
+.lawx-relrow:hover { border-color: #cbd5e1; background: #fcfcfd; }
+.lawx-relrow__icon { flex-shrink: 0; }
+.lawx-relrow.is-repeals .lawx-relrow__icon { color: #dc2626; }
+.lawx-relrow.is-supersedes .lawx-relrow__icon { color: #ea580c; }
+.lawx-relrow.is-amends .lawx-relrow__icon { color: #0d9488; }
+.lawx-relrow.is-issued_under .lawx-relrow__icon { color: #7c3aed; }
+.lawx-relrow.is-related .lawx-relrow__icon { color: #2563eb; }
+.lawx-relrow__title { font-weight: 500; }
+.lawx-relrow__sec { color: #64748b; font-size: 12px; }
+.lawx-relrow__note { color: #94a3b8; font-size: 12px; }
 
 .lawx-info {
   position: sticky;
