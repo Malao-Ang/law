@@ -61,7 +61,7 @@ const iconName = computed(() => props.icon || toneStyles.value.icon);
 }
 
 .law-strip__label {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-weight: 700;
   font-size: 11px;
   line-height: 16.5px;
@@ -71,7 +71,7 @@ const iconName = computed(() => props.icon || toneStyles.value.icon);
 
 .law-strip__body {
   margin-top: 2px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 12px;
   line-height: 16px;
   color: #1e293b;

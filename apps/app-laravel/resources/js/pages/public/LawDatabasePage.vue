@@ -474,6 +474,9 @@ const CHANGE_STATUS_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   active: 'มีผลบังคับใช้',
   มีผลบังคับใช้: 'มีผลบังคับใช้',
+  มีผลใช้บังคับ: 'มีผลบังคับใช้',
+  ใช้บังคับ: 'มีผลบังคับใช้',
+  บังคับใช้: 'มีผลบังคับใช้',
   cancelled: 'ยกเลิก',
   ยกเลิก: 'ยกเลิก',
   draft: 'ร่าง',
@@ -1046,7 +1049,7 @@ function lawTypeBadgeKey(lawType: string | null | undefined): DocBadgeKey | null
 }
 
 function useStatusClass(status: string | null | undefined): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้') return 'law-use-status--active';
+  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'law-use-status--active';
   if (status === 'cancelled' || status === 'ยกเลิก') return 'law-use-status--cancelled';
   return 'law-use-status--draft';
 }

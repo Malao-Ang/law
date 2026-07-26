@@ -51,10 +51,18 @@ class LawSearchTest extends TestCase
                 'summary' => 's',
                 'published_date' => '2565',
                 'agency' => 'ก',
+                'confidence' => 0.93,
+                'match_mode' => 'exact',
                 'snippets' => ['<mark>ภาษี</mark>'],
             ]],
             'facets' => [
                 'law_type' => [['value' => 'phrb', 'count' => 1]],
+            ],
+            'meta' => [
+                'engine' => 'elastic',
+                'mode' => 'exact',
+                'confidence' => 0.93,
+                'suggestions' => [],
             ],
         ];
 
@@ -64,6 +72,9 @@ class LawSearchTest extends TestCase
             ->assertOk()
             ->assertJsonPath('total', 1)
             ->assertJsonPath('results.0.law_id', 'L1')
+            ->assertJsonPath('results.0.confidence', 0.93)
+            ->assertJsonPath('meta.engine', 'elastic')
+            ->assertJsonPath('meta.confidence', 0.93)
             ->assertJsonPath('results.0.snippets.0', '<mark>ภาษี</mark>');
     }
 
@@ -128,7 +139,9 @@ class LawSearchTest extends TestCase
         $response = $this->postJson('/api/laws/search', ['q' => 'ภาษีที่ดิน'])
             ->assertOk()
             ->assertJsonPath('total', 1)
-            ->assertJsonPath('results.0.law_id', $documentId);
+            ->assertJsonPath('results.0.law_id', $documentId)
+            ->assertJsonPath('results.0.match_mode', 'file_exact')
+            ->assertJsonPath('meta.engine', 'file');
 
         // Snippet is highlighted around the matched content.
         $snippet = $response->json('results.0.snippets.0');
@@ -162,5 +175,34 @@ class LawSearchTest extends TestCase
             ->assertOk()
             ->assertJsonPath('total', 1)
             ->assertJsonPath('results.0.law_id', $documentId);
+    }
+
+    public function test_file_based_search_finds_nearby_title_when_query_has_typo(): void
+    {
+        $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('es down')));
+
+        $store = app(ReviewStore::class);
+        $documentId = 'law_fuzzy_'.uniqid();
+
+        $store->setStatus($documentId, ['status' => 'ingested']);
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'pages' => [],
+            'law_meta' => [
+                'title' => 'ประกาศมหาวิทยาลัยว่าด้วยการทดสอบระบบ',
+                'law_type' => 'ประกาศ',
+                'status' => 'มีผลบังคับใช้',
+                'access_scope' => 'public',
+            ],
+        ]);
+
+        cache()->forget('law-meta-list');
+
+        $this->postJson('/api/laws/search', ['q' => 'มหาวิทยาลับ'])
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('results.0.law_id', $documentId)
+            ->assertJsonPath('results.0.match_mode', 'file_fuzzy')
+            ->assertJsonPath('meta.mode', 'file_fuzzy');
     }
 }

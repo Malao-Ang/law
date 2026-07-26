@@ -172,6 +172,11 @@ import AppShell from '../../components/shared/AppShell.vue';
 const router = useRouter();
 
 const STATUS_CHIP: Record<string, string> = {
+  active: 'success',
+  มีผลบังคับใช้: 'success',
+  มีผลใช้บังคับ: 'success',
+  ใช้บังคับ: 'success',
+  บังคับใช้: 'success',
   done: 'success',
   exported: 'success',
   ingested: 'success',

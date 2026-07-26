@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Top nav from Figma eLaw_MainPage (node 67:5748). TH Sarabun New Bold 22px #4e4538.
+// Top nav from Figma eLaw_MainPage (node 67:5748).
 import { computed } from 'vue';
-import { RouterLink, useRoute, type RouteLocationRaw } from 'vue-router';
+import { useRoute, type RouteLocationRaw } from 'vue-router';
 
 interface NavItem {
   label: string;
@@ -22,59 +22,70 @@ const items: NavItem[] = [
 const activeRoutePath = computed(() => route.path);
 
 function isActive(item: NavItem): boolean {
-  if (item.hash) {
-    return activeRoutePath.value === item.activePath && route.hash === item.hash;
-  }
+  const path = activeRoutePath.value;
 
   if (item.activePath === '/database') {
-    return activeRoutePath.value === '/database' || activeRoutePath.value.startsWith('/law/');
+    return path === '/database' || path.startsWith('/law/');
   }
 
-  return activeRoutePath.value === item.activePath;
+  if (item.hash) {
+    return path === item.activePath && route.hash === item.hash;
+  }
+
+  return path === item.activePath && route.hash === '';
 }
 </script>
 
 <template>
   <nav class="main-nav">
-    <RouterLink
+    <v-btn
       v-for="item in items"
       :key="item.label"
       :to="item.to"
-      class="main-nav__item"
+      :active="false"
+      variant="text"
+      rounded="0"
+      height="40"
+      :ripple="false"
+      class="main-nav__item text-none"
       :class="{ 'main-nav__item--active': isActive(item) }"
     >
       {{ item.label }}
-    </RouterLink>
+    </v-btn>
   </nav>
 </template>
 
 <style scoped>
 .main-nav {
   display: flex;
-  gap: 19px;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .main-nav__item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 37px;
-  padding: 10px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  padding-inline: 16px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-weight: 700;
-  font-size: 22px;
-  line-height: 30px;
+  font-size: 16px;
   letter-spacing: 0;
   color: #4e4538;
-  text-decoration: none;
-  white-space: nowrap;
+  position: relative;
 }
 
 .main-nav__item--active {
   color: #7b580d;
-  border-bottom: 1px solid #7b580d;
+}
+
+.main-nav__item--active::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: #7b580d;
 }
 </style>

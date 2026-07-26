@@ -32,7 +32,7 @@
           class="mb-4"
           icon="mdi-alert-circle-outline"
         >
-          กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อนดำเนินการต่อ: ชื่อเอกสาร, ประเภทเอกสาร, กลุ่มกฎหมาย, หน่วยงานรับผิดชอบ, วันที่มีผลบังคับใช้
+          กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน ยกเว้นคำสำคัญ และเลือกวันที่สิ้นสุดการใช้หรือเลือกไม่มีวันสิ้นสุด
         </v-alert>
 
         <!-- ข้อมูลพื้นฐาน -->
@@ -45,9 +45,9 @@
             <v-col cols="12">
               <v-text-field
                 v-model="form.title"
-                label="ชื่อเอกสาร"
+                :label="requiredLabel('ชื่อเอกสาร')"
                 variant="outlined"
-                :rules="[v => !!v || 'จำเป็นต้องกรอก']"
+                :rules="requiredTextRules('ชื่อเอกสาร')"
                 required
               />
             </v-col>
@@ -57,10 +57,10 @@
                 :items="documentTypes"
                 item-title="title"
                 item-value="value"
-                label="ประเภทเอกสาร"
+                :label="requiredLabel('ประเภทเอกสาร')"
                 placeholder="- เลือกประเภทเอกสาร -"
                 variant="outlined"
-                :rules="[v => !!v || 'จำเป็นต้องเลือก']"
+                :rules="requiredTextRules('ประเภทเอกสาร')"
                 required
               />
             </v-col>
@@ -70,10 +70,12 @@
                 :items="statuses"
                 item-title="title"
                 item-value="value"
-                label="สถานะการบังคับใช้"
+                :label="requiredLabel('สถานะการบังคับใช้')"
                 placeholder="- เลือกสถานะ -"
                 variant="outlined"
                 clearable
+                :rules="requiredTextRules('สถานะการบังคับใช้')"
+                required
               />
             </v-col>
             <v-col cols="12" sm="6">
@@ -82,10 +84,12 @@
                 :items="changeStatuses"
                 item-title="title"
                 item-value="value"
-                label="สถานะการเปลี่ยนแปลง"
+                :label="requiredLabel('สถานะการเปลี่ยนแปลง')"
                 placeholder="- เลือกสถานะการเปลี่ยนแปลง -"
                 variant="outlined"
                 clearable
+                :rules="requiredTextRules('สถานะการเปลี่ยนแปลง')"
+                required
               />
             </v-col>
             <v-col cols="12">
@@ -94,7 +98,7 @@
                 :items="lawGroups"
                 item-title="title"
                 item-value="value"
-                label="กลุ่มกฎหมาย"
+                :label="requiredLabel('กลุ่มกฎหมาย')"
                 placeholder="- เลือกกลุ่มกฎหมาย -"
                 multiple
                 chips
@@ -102,7 +106,8 @@
                 variant="outlined"
                 clearable
                 :custom-filter="searchSelectableOption"
-                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 กลุ่ม']"
+                :rules="requiredArrayRules('กลุ่มกฎหมาย')"
+                required
               >
                 <template #item="{ props: itemProps, item }">
                   <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
@@ -117,9 +122,11 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 :model-value="sectionCountDisplay"
-                label="จำนวนข้อ/มาตรา"
+                :label="requiredLabel('จำนวนข้อ/มาตรา')"
                 variant="outlined"
                 readonly
+                :rules="[() => articleCount >= 0 || 'ไม่พบจำนวนข้อ/มาตรา']"
+                required
               />
             </v-col>
             <v-col cols="12">
@@ -150,30 +157,35 @@
             <v-col cols="12" sm="6">
               <ThaiDatePicker
                 v-model="form.promulgation_date"
-                label="วันที่ประกาศ"
+                :label="requiredLabel('วันที่ประกาศ')"
+                required
+                :rules="promulgationDateRules"
               />
             </v-col>
             <v-col cols="12" sm="6">
               <ThaiDatePicker
                 v-model="form.effective_date"
-                label="วันที่มีผลบังคับใช้ *"
+                :label="requiredLabel('วันที่มีผลบังคับใช้')"
                 required
-                :rules="[v => !!v || 'จำเป็นต้องระบุ']"
+                :rules="effectiveDateRules"
               />
             </v-col>
             <v-col cols="12" sm="6">
               <ThaiDatePicker
                 v-model="form.expiry_date"
-                label="วันที่สิ้นสุดการใช้"
+                :label="requiredLabel('วันที่สิ้นสุดการใช้')"
+                required
                 :disabled="noExpiry"
                 disabled-placeholder="ไม่มีวันสิ้นสุด"
+                :rules="expiryDateRules"
               />
               <v-checkbox
                 v-model="noExpiry"
                 label="ไม่มีวันสิ้นสุด"
                 density="compact"
-                hide-details
+                hide-details="auto"
                 class="mt-1"
+                :rules="noExpiryRules"
                 @update:model-value="v => { if (v) form.expiry_date = null }"
               />
             </v-col>
@@ -189,8 +201,7 @@
           <v-row dense>
             <v-col cols="12">
               <div class="d-flex align-center ga-2 mb-2">
-                <span class="text-body-2 font-weight-medium">หน่วยงานรับผิดชอบ</span>
-                <span class="text-caption text-error">*</span>
+                <span class="text-body-2 font-weight-medium">{{ requiredLabel('หน่วยงานรับผิดชอบ') }}</span>
                 <v-chip v-if="form.agencies.length === 0" size="x-small" color="error" class="ml-1">จำเป็น</v-chip>
               </div>
               <v-autocomplete
@@ -198,7 +209,7 @@
                 :items="agencies"
                 item-title="title"
                 item-value="value"
-                label="หน่วยงานรับผิดชอบ"
+                :label="requiredLabel('หน่วยงานรับผิดชอบ')"
                 placeholder="- เลือกหน่วยงานรับผิดชอบ -"
                 prepend-inner-icon="mdi-office-building-outline"
                 multiple
@@ -207,7 +218,8 @@
                 variant="outlined"
                 clearable
                 :custom-filter="searchSelectableOption"
-                :rules="[v => v.length > 0 || 'จำเป็นต้องเลือกอย่างน้อย 1 หน่วยงาน']"
+                :rules="requiredArrayRules('หน่วยงานรับผิดชอบ')"
+                required
               >
                 <template #item="{ props: itemProps, item }">
                   <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
@@ -217,10 +229,12 @@
             <v-col cols="12" sm="6" class="mt-2">
               <v-text-field
                 v-model="form.imported_by"
-                label="ผู้นำเข้าข้อมูล"
+                :label="requiredLabel('ผู้นำเข้าข้อมูล')"
                 variant="outlined"
                 prepend-inner-icon="mdi-account-outline"
                 readonly
+                :rules="requiredTextRules('ผู้นำเข้าข้อมูล')"
+                required
               />
             </v-col>
           </v-row>
@@ -272,6 +286,68 @@ const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_law
 const noExpiry = ref(false);
 const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
+
+function requiredLabel(label: string): string {
+  return `${label} *`;
+}
+
+function hasText(value: unknown): boolean {
+  return typeof value === 'string' ? value.trim().length > 0 : !!value;
+}
+
+function hasArrayValue(value: unknown): boolean {
+  return Array.isArray(value) && value.some((entry) => typeof entry === 'string' ? entry.trim().length > 0 : !!entry);
+}
+
+function requiredTextRules(label: string): Array<(v: unknown) => boolean | string> {
+  return [(v: unknown) => hasText(v) || `กรุณากรอก${label}`];
+}
+
+function requiredArrayRules(label: string): Array<(v: unknown) => boolean | string> {
+  return [(v: unknown) => hasArrayValue(v) || `กรุณาเลือก${label}`];
+}
+
+function dateMs(value: unknown): number | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const t = new Date(`${value}T00:00:00`).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+const promulgationDateRules = [
+  ...requiredTextRules('วันที่ประกาศ'),
+  (v: unknown) => {
+    const prom = dateMs(v);
+    const eff = dateMs(form.value.effective_date);
+    if (prom == null || eff == null) return true;
+    return prom <= eff || 'ต้องไม่หลังวันที่มีผลบังคับใช้';
+  },
+];
+
+const effectiveDateRules = [
+  (v: unknown) => !!v || 'จำเป็นต้องระบุ',
+  (v: unknown) => {
+    const eff = dateMs(v);
+    const prom = dateMs(form.value.promulgation_date);
+    if (eff == null || prom == null) return true;
+    return eff >= prom || 'ต้องไม่ก่อนวันที่ประกาศ';
+  },
+];
+
+const expiryDateRules = [
+  (v: unknown) => {
+    if (noExpiry.value) return true;
+    if (!hasText(v)) return 'กรุณาเลือกวันที่สิ้นสุดการใช้ หรือเลือกไม่มีวันสิ้นสุด';
+    const exp = dateMs(v);
+    const eff = dateMs(form.value.effective_date);
+    if (exp == null || eff == null) return true;
+    return exp > eff || 'ต้องอยู่หลังวันที่มีผลบังคับใช้';
+  },
+];
+
+const noExpiryRules = [
+  (v: unknown) => !!v || hasText(form.value.expiry_date) || 'ถ้าไม่มีวันที่สิ้นสุด กรุณาเลือกไม่มีวันสิ้นสุด',
+];
+
 const articleBlocks = computed<DocumentBlock[]>(() =>
   (documentStore.review?.pages ?? [])
     .flatMap((page) => page.blocks)
@@ -396,12 +472,23 @@ function buildLawMetaPayload(): LawMeta {
   };
 }
 
+function focusFirstError(errors: { id: string | number; errorMessages: string[] }[]): void {
+  const firstId = errors[0]?.id;
+  if (firstId == null) return;
+
+  const el = document.getElementById(String(firstId));
+  if (!el) return;
+
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  requestAnimationFrame(() => el.focus());
+}
+
 async function saveAndNext(): Promise<void> {
   const result = await formRef.value?.validate();
   if (!result?.valid) {
     validationFailed.value = true;
     await nextTick();
-    document.querySelector('.v-alert[type="warning"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    focusFirstError(result?.errors ?? []);
     return;
   }
   validationFailed.value = false;
@@ -413,6 +500,20 @@ async function saveAndNext(): Promise<void> {
   if (!progressed) return;
   router.push(`/documents/${props.documentId}/relations`);
 }
+
+async function clearValidationBannerIfValid(): Promise<void> {
+  if (!validationFailed.value) return;
+  const result = await formRef.value?.validate();
+  if (result?.valid) validationFailed.value = false;
+}
+
+watch(form, () => {
+  void clearValidationBannerIfValid();
+}, { deep: true });
+
+watch(noExpiry, () => {
+  void clearValidationBannerIfValid();
+});
 
 onMounted(() => {
   void loadLookups();

@@ -55,7 +55,8 @@ class LawSearchServiceTest extends TestCase
                 'signer_group' => ['buckets' => []],
                 'years' => ['buckets' => []],
             ],
-            'hits' => ['hits' => [[
+            'hits' => ['max_score' => 12.0, 'hits' => [[
+                '_score' => 12.0,
                 '_source' => [
                     'law_id' => 'L1',
                     'title' => 'พ.ร.บ. ทดสอบ',
@@ -85,7 +86,12 @@ class LawSearchServiceTest extends TestCase
         $this->assertCount(1, $out['results']);
         $this->assertSame('L1', $out['results'][0]['law_id']);
         $this->assertSame(['ว่าด้วย<mark>ภาษี</mark>อากร'], $out['results'][0]['snippets']);
+        $this->assertSame(1.0, $out['results'][0]['confidence']);
+        $this->assertSame('exact', $out['results'][0]['match_mode']);
         $this->assertSame([['value' => 'phrb', 'count' => 3]], $out['facets']['law_type']);
+        $this->assertSame('elastic', $out['meta']['engine']);
+        $this->assertSame('exact', $out['meta']['mode']);
+        $this->assertSame(1.0, $out['meta']['confidence']);
     }
 
     public function test_short_queries_do_not_trigger_fuzzy_retry(): void
@@ -106,5 +112,46 @@ class LawSearchServiceTest extends TestCase
         ]);
 
         $this->assertSame(1, $calls);
+    }
+
+    public function test_empty_exact_results_retry_with_fuzzy_query(): void
+    {
+        $bodies = [];
+        $empty = ['hits' => ['hits' => []], 'aggregations' => ['total_laws' => ['value' => 0]]];
+        $raw = [
+            'aggregations' => [
+                'total_laws' => ['value' => 1],
+                'law_type' => ['buckets' => []],
+                'status' => ['buckets' => []],
+                'change_status' => ['buckets' => []],
+                'agency' => ['buckets' => []],
+                'law_group' => ['buckets' => []],
+                'signer_group' => ['buckets' => []],
+                'years' => ['buckets' => []],
+            ],
+            'hits' => ['max_score' => 5.0, 'hits' => [[
+                '_score' => 5.0,
+                '_source' => ['law_id' => 'L2', 'title' => 'ประกาศมหาวิทยาลัย'],
+            ]]],
+        ];
+
+        $mock = \Mockery::mock(ElasticClient::class);
+        $mock->shouldReceive('search')->twice()->andReturnUsing(function (array $body) use (&$bodies, $empty, $raw): array {
+            $bodies[] = $body;
+
+            return count($bodies) === 1 ? $empty : $raw;
+        });
+
+        $out = (new LawSearchService($mock))->search([
+            'q' => 'มหาวิทยาลับ',
+            'filters' => [],
+            'page' => 1,
+            'per_page' => 20,
+        ]);
+
+        $this->assertSame('fuzzy', $out['results'][0]['match_mode']);
+        $this->assertSame(0.7, $out['results'][0]['confidence']);
+        $this->assertSame('fuzzy', $out['meta']['mode']);
+        $this->assertSame('AUTO', $bodies[1]['query']['bool']['must']['bool']['should'][1]['multi_match']['fuzziness']);
     }
 }

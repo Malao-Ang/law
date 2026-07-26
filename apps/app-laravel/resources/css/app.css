@@ -153,14 +153,14 @@
 
 body {
   margin: 0;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   background: linear-gradient(180deg, #f6f4ef 0%, #eef2f5 100%);
   color: var(--text);
 }
 
 /* Override Vuetify's default Roboto on all UI */
 .v-application {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
 
 textarea {

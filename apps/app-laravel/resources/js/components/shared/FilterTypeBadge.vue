@@ -35,11 +35,11 @@ withDefaults(defineProps<{ options?: string[] }>(), {
   background: #ffffff;
   border: 1px solid #d2c5b3;
   border-radius: 9999px;
-  padding: 9px 21px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  padding: 7px 18px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-weight: 700;
-  font-size: 18px;
-  line-height: 24px;
+  font-size: 16px;
+  line-height: 22px;
   letter-spacing: 0.36px;
   color: #3c2900;
   cursor: pointer;
@@ -55,6 +55,6 @@ withDefaults(defineProps<{ options?: string[] }>(), {
 .filter-pill--active {
   background: #b68d40;
   border-color: #b68d40;
-  color: #3c2900;
+  color: #ffffff;
 }
 </style>

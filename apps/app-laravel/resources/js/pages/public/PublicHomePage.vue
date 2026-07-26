@@ -453,7 +453,7 @@ function toDate(value?: string | null): Date | undefined {
 .elaw-section-heading__bar--prakat { background: #fb923c; }
 
 .elaw-section-heading__text {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 32px;
   font-weight: 700;
   color: #1e293b;
@@ -461,7 +461,7 @@ function toDate(value?: string | null): Date | undefined {
 }
 
 .elaw-section-heading__sub {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16px;
   color: #64748b;
   margin: 0;
@@ -479,7 +479,7 @@ function toDate(value?: string | null): Date | undefined {
   border: 1px solid #d2c5b3;
   border-radius: 9999px;
   background: #ffffff;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: #3c2900;
@@ -494,7 +494,7 @@ function toDate(value?: string | null): Date | undefined {
 }
 
 .elaw-section-link {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16px;
   color: rgb(var(--v-theme-primary));
   cursor: pointer;
@@ -507,7 +507,7 @@ function toDate(value?: string | null): Date | undefined {
   color: #ffffff;
   text-align: center;
   padding: 24px 16px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16px;
 }
 

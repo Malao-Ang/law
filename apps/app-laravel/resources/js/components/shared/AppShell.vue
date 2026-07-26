@@ -7,17 +7,13 @@
     permanent
     class="app-drawer"
   >
-    <!-- Drawer header: logo + collapse toggle -->
     <div class="app-drawer__header" :class="{ 'app-drawer__header--rail': rail }">
-      <div class="d-flex align-center ga-2 min-width-0">
-        <v-avatar color="admin-primary" rounded="lg" size="36" class="flex-shrink-0">
-          <v-icon icon="mdi-bank-outline" size="18" />
+      <div class="app-drawer__brand">
+        <v-avatar color="admin-primary" rounded="lg" size="36" class="app-drawer__brand-icon">
+          <v-icon icon="mdi-scale-balance" size="18" />
         </v-avatar>
         <Transition name="fade-slide">
-          <div v-if="!rail" class="min-width-0">
-            <p class="text-subtitle-2 font-weight-bold mb-0 text-no-wrap">LAWSPACE</p>
-            <p class="text-caption text-medium-emphasis mb-0 text-no-wrap">ระบบจัดการกฎหมาย</p>
-          </div>
+          <p v-if="!rail" class="app-drawer__brand-title">e-Law</p>
         </Transition>
       </div>
       <v-btn
@@ -28,8 +24,6 @@
         @click="rail = !rail"
       />
     </div>
-
-    <v-divider />
 
     <v-list nav density="comfortable" class="pt-2">
       <template v-for="group in resolvedNavGroups" :key="group.label">
@@ -199,11 +193,37 @@ function isActive(item: NavItem): boolean {
   padding: 12px 12px 12px 16px;
 }
 
+.app-drawer__brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-drawer__brand-icon {
+  flex-shrink: 0;
+}
+
+.app-drawer__brand-title {
+  color: rgb(var(--v-theme-admin-primary));
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-drawer__header--rail {
   flex-direction: column;
   gap: 4px;
   justify-content: center;
   padding: 12px 0;
+}
+
+.app-drawer__header--rail .app-drawer__brand {
+  justify-content: center;
 }
 
 .app-drawer__user {
@@ -259,6 +279,22 @@ function isActive(item: NavItem): boolean {
 
 .app-shell__content {
   background: #f8f7f5;
+}
+
+.app-shell__main :deep(.v-field) {
+  background: #ffffff;
+}
+
+.app-shell__main :deep(.v-field--variant-outlined),
+.app-shell__main :deep(.v-field--variant-solo),
+.app-shell__main :deep(.v-field--variant-filled),
+.app-shell__main :deep(.v-field--variant-underlined) {
+  background: #ffffff;
+}
+
+.app-shell__main :deep(.v-field__overlay) {
+  background: #ffffff;
+  opacity: 1;
 }
 
 .app-shell__main--full-height {

@@ -144,14 +144,16 @@
                 :key="rel.id"
                 class="lawx-relrow"
                 :class="`is-${group.type}`"
-                :href="safeUrl(rel.url) ?? undefined"
+                :href="relationHref(rel) ?? undefined"
                 :target="safeUrl(rel.url) ? '_blank' : undefined"
                 rel="noopener"
               >
                 <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
-                <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                <span class="lawx-relrow__main">
+                  <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                  <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+                </span>
                 <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
-                <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
               </a>
             </div>
           </div>
@@ -277,6 +279,12 @@ function safeUrl(url: string | null): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
+function relationHref(rel: LawRelation): string | null {
+  const external = safeUrl(rel.url);
+  if (external) return external;
+  return rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : null;
+}
+
 function printPage(): void {
   window.print();
 }
@@ -362,7 +370,7 @@ onBeforeUnmount(() => observer?.disconnect());
 <style scoped>
 .lawx {
   min-height: 100vh;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   color: #1e293b;
   background: #f6f4ef;
 }
@@ -391,7 +399,7 @@ onBeforeUnmount(() => observer?.disconnect());
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 14px;
   color: #4e4538;
   background: none;
@@ -473,7 +481,7 @@ onBeforeUnmount(() => observer?.disconnect());
   overflow-y: auto;
 }
 
-.lawx-toc__title { font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
+.lawx-toc__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
 .lawx-toc__items { display: flex; flex-direction: column; padding: 5px 0 4px 8px; }
 .lawx-toc__item { text-align: left; background: transparent; border: none; border-left: 2px solid transparent; padding: 7px 10px; font-size: 13px; color: #475569; border-radius: 0; cursor: pointer; font-family: inherit; }
 .lawx-toc__item:hover { color: #7b580d; }
@@ -494,9 +502,9 @@ onBeforeUnmount(() => observer?.disconnect());
   box-shadow: 0 10px 40px rgba(75, 70, 61, 0.08);
 }
 
-.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
-.lawx-headcard__title { font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
-.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'TH Sarabun New', 'Sarabun', sans-serif; font-size: 14px; color: #4e4538; }
+.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+.lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
+.lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
 
 .lawx-card {
@@ -512,8 +520,22 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-card__badge { align-self: flex-start; flex-shrink: 0; max-width: 100%; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 10px; height: fit-content; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
 .lawx-card__badge--chapter { background: #eef2ff; color: #4338ca; }
 .lawx-card__content { flex: 1; min-width: 0; }
-.lawx-card__content :deep(.block-flow) { font-size: 13px; line-height: 1.72; }
-.lawx-card__content :deep(table) { font-size: 12px; }
+.lawx-card__content :deep(.block-flow) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+  line-height: 1.78;
+}
+.lawx-card__content :deep(.block-flow *) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+  line-height: inherit !important;
+}
+.lawx-card__content :deep(table),
+.lawx-card__content :deep(th),
+.lawx-card__content :deep(td) {
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
+  font-size: 16px !important;
+}
 
 .lawx-relcard {
   margin-top: 14px;
@@ -544,7 +566,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-relgroup__label.is-issued_under { color: #7c3aed; }
 
 .lawx-relrow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
   padding: 9px 12px;
@@ -563,9 +586,40 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-relrow.is-amends .lawx-relrow__icon { color: #0d9488; }
 .lawx-relrow.is-issued_under .lawx-relrow__icon { color: #7c3aed; }
 .lawx-relrow.is-related .lawx-relrow__icon { color: #2563eb; }
-.lawx-relrow__title { font-weight: 500; }
-.lawx-relrow__sec { color: #64748b; font-size: 12px; }
-.lawx-relrow__note { color: #94a3b8; font-size: 12px; }
+.lawx-relrow__main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lawx-relrow__title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.lawx-relrow__sec {
+  color: #64748b;
+  font-size: 12px;
+  justify-self: end;
+  min-width: 34px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lawx-relrow__note {
+  color: #94a3b8;
+  flex: 0 1 auto;
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .lawx-info {
   position: sticky;
@@ -609,6 +663,16 @@ onBeforeUnmount(() => observer?.disconnect());
 
   .lawx-card__body {
     flex-direction: column;
+  }
+
+  .lawx-relrow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .lawx-relrow__sec {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 }
 

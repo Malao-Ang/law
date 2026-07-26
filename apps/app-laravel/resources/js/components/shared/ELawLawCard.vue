@@ -135,7 +135,7 @@ const visibilityIcon = computed(() =>
 }
 
 .elaw-tag--fallback {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: #6b7280;

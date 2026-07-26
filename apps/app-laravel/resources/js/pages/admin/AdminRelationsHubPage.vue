@@ -85,29 +85,15 @@
               </v-chip>
             </td>
             <td>
-              <div class="d-flex flex-column ga-1">
-                <v-chip
-                  v-if="doc.metaStatus"
-                  size="x-small"
-                  :color="metaStatusColor(doc.metaStatus)"
-                  variant="tonal"
-                  rounded="pill"
-                >
-                  <v-icon start icon="mdi-circle" size="8" />
-                  {{ doc.metaStatus }}
-                </v-chip>
-                <v-chip
-                  v-else
-                  size="x-small"
-                  :color="workflowStageColor(doc.workflowStage)"
-                  variant="tonal"
-                  rounded="pill"
-                >
-                  <v-icon start icon="mdi-circle" size="8" />
-                  {{ doc.workflowStage }}
-                </v-chip>
-                <span v-if="doc.metaStatus" class="text-caption text-medium-emphasis">{{ doc.workflowStage }}</span>
-              </div>
+              <v-chip
+                size="x-small"
+                :color="doc.metaStatus ? metaStatusColor(doc.metaStatus) : workflowStageColor(doc.workflowStage)"
+                variant="tonal"
+                rounded="pill"
+              >
+                <v-icon start icon="mdi-circle" size="8" />
+                {{ doc.metaStatus || doc.workflowStage }}
+              </v-chip>
             </td>
             <td>
               <v-chip
@@ -598,7 +584,7 @@ function workflowStageColor(stage: string): string {
 }
 
 function metaStatusColor(status: string): string {
-  if (status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
+  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
   if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';

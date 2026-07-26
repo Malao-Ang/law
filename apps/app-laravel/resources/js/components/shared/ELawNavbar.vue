@@ -1,15 +1,15 @@
 <template>
-  <header class="elaw-header">
-    <div class="elaw-header__inner">
+  <v-app-bar class="elaw-header" height="96" flat>
+    <v-container class="elaw-header__inner" fluid>
       <!-- Logo -->
-      <div class="elaw-logo">
-        <div class="elaw-logo__icon">
+      <v-btn class="elaw-logo text-none" variant="text" :active="false" :ripple="false" to="/">
+        <v-avatar class="elaw-logo__icon" rounded="lg" size="40">
           <v-icon icon="mdi-scale-balance" color="white" size="20" />
-        </div>
+        </v-avatar>
         <span class="elaw-logo__text">
-          <span class="elaw-logo__e">e-</span><span class="elaw-logo__law">Law</span>
+          <span class="elaw-logo__law">e-Law</span>
         </span>
-      </div>
+      </v-btn>
 
       <!-- Nav -->
       <div class="elaw-header__nav">
@@ -18,24 +18,35 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
-        <button type="button" class="elaw-btn-login" @click="router.push('/login')">
-          <v-icon icon="mdi-login" size="17" />
+        <v-btn
+          class="elaw-btn-login text-none"
+          prepend-icon="mdi-login"
+          variant="text"
+          rounded="pill"
+          @click="router.push('/login')"
+        >
           เข้าสู่ระบบ
-        </button>
-        <button type="button" class="elaw-btn-staff" @click="$emit('go-admin')">
-          <v-icon icon="mdi-shield-account-outline" size="15" color="white" />
+        </v-btn>
+        <v-btn
+          class="elaw-btn-staff text-none"
+          color="#343028"
+          prepend-icon="mdi-shield-account-outline"
+          rounded="pill"
+          variant="flat"
+          @click="emit('go-admin')"
+        >
           สำหรับบุคลากรองค์กร
-        </button>
+        </v-btn>
       </div>
-    </div>
-  </header>
+    </v-container>
+  </v-app-bar>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import MainNav from './MainNav.vue';
 
-defineEmits<{ 'go-admin': [] }>();
+const emit = defineEmits<{ 'go-admin': [] }>();
 const router = useRouter();
 </script>
 
@@ -46,7 +57,6 @@ const router = useRouter();
   top: 0;
   z-index: 100;
   width: 100%;
-  height: var(--elaw-navbar-height);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid rgba(210, 197, 179, 0.5);
@@ -58,6 +68,7 @@ const router = useRouter();
   align-items: center;
   justify-content: space-between;
   height: var(--elaw-navbar-height);
+  width: 100%;
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 28px;
@@ -69,15 +80,24 @@ const router = useRouter();
 .elaw-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
   flex-shrink: 0;
+  padding: 0;
+  min-width: 0;
+  color: inherit;
+}
+
+.elaw-logo :deep(.v-btn__content) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.elaw-logo :deep(.v-btn__overlay) {
+  display: none;
 }
 
 .elaw-logo__icon {
-  width: 40px;
-  height: 40px;
   background: #b68d40;
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,8 +105,8 @@ const router = useRouter();
 }
 
 .elaw-logo__text {
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 32px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 20px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -117,42 +137,30 @@ const router = useRouter();
 }
 
 .elaw-btn-login {
-  display: inline-flex;
-  align-items: center;
   gap: 5px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 20px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 16px;
   font-weight: 400;
   color: #4e4538;
   letter-spacing: 0.36px;
   white-space: nowrap;
-  padding: 4px 8px;
 }
 
 .elaw-btn-staff {
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  background: #343028;
-  border: none;
-  cursor: pointer;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
-  font-size: 20px;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-size: 16px;
   font-weight: 400;
   color: #f9efe3;
   letter-spacing: 0.36px;
   white-space: nowrap;
   padding: 12px 24px;
-  border-radius: 9999px;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
 
 @media (max-width: 768px) {
   .elaw-header {
-    height: auto;
+    height: auto !important;
   }
 
   .elaw-header__inner {

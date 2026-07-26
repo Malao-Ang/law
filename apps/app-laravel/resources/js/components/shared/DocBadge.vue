@@ -41,7 +41,7 @@ const props = defineProps<{ type: BadgeType; label?: string }>();
   gap: 5px;
   padding: 2px 10px;
   border-radius: 9999px;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 16px;
   line-height: 20px;
   font-weight: 700;

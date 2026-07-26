@@ -143,29 +143,15 @@
               <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ law.lawType }}</v-chip>
             </td>
             <td>
-              <div class="d-flex flex-column ga-1">
-                <v-chip
-                  v-if="law.metaStatus"
-                  size="x-small"
-                  :color="metaStatusColor(law.metaStatus)"
-                  variant="tonal"
-                  rounded="pill"
-                >
-                  <v-icon start icon="mdi-circle" size="8" />
-                  {{ law.metaStatus }}
-                </v-chip>
-                <v-chip
-                  v-else
-                  size="x-small"
-                  :color="workflowStageColor(law.workflowStage)"
-                  variant="tonal"
-                  rounded="pill"
-                >
-                  <v-icon start icon="mdi-circle" size="8" />
-                  {{ law.workflowStage }}
-                </v-chip>
-                <span v-if="law.metaStatus" class="text-caption text-medium-emphasis">{{ law.workflowStage }}</span>
-              </div>
+              <v-chip
+                size="x-small"
+                :color="law.metaStatus ? metaStatusColor(law.metaStatus) : workflowStageColor(law.workflowStage)"
+                variant="tonal"
+                rounded="pill"
+              >
+                <v-icon start icon="mdi-circle" size="8" />
+                {{ law.metaStatus || law.workflowStage }}
+              </v-chip>
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
             <td>
@@ -387,7 +373,7 @@ function typeColor(type: string): string {
 }
 
 function metaStatusColor(status: string): string {
-  if (status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
+  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
   if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';

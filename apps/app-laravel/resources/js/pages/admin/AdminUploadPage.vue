@@ -626,7 +626,7 @@ async function uploadAll(): Promise<void> {
   gap: 6px;
   border: none;
   cursor: pointer;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 17px;
   font-weight: 700;
   border-radius: 10px;
@@ -664,7 +664,7 @@ async function uploadAll(): Promise<void> {
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  font-family: 'TH Sarabun New', 'Sarabun', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   font-size: 14px;
   font-weight: 700;
   border-radius: 8px;
