@@ -57,7 +57,7 @@ services:
     # For bulk throughput, run multiple workers:
     #   docker compose up -d --scale queue-worker=3 --no-recreate
     # Each worker processes one document concurrently; throughput scales linearly
-    # up to ~3-4 workers before the GPU becomes the bottleneck.
+    # up to ~3-4 workers before OCR/CPU becomes the bottleneck.
     #
     # Vendor is baked into the image, so no vendor-install handshake is needed;
     # depends_on laravel-app (service_healthy) gates startup instead.
@@ -90,9 +90,6 @@ services:
     image: ${OCR_IMAGE:-thai-ocr-service:local}
     build:
       context: ./apps/ocr-service
-      # GPU (recommended when NVIDIA driver + nvidia-container-toolkit are present):
-      #   dockerfile: Dockerfile.gpu
-      # CPU fallback:
       dockerfile: Dockerfile.simple
     container_name: thai-ocr-service
     working_dir: /app
@@ -110,16 +107,6 @@ services:
     ports:
       - "${OCR_HOST_PORT:-8010}:8010"
     user: "0:0"  # Run as root to handle volume permissions
-    # Uncomment the deploy block below when using Dockerfile.gpu.
-    # Requires nvidia-container-toolkit installed in WSL2:
-    #   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
 
   pdf-service:
     image: ${PDF_IMAGE:-thai-ocr-pdf-service:local}
