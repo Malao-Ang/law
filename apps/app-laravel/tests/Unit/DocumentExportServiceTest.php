@@ -596,8 +596,10 @@ class DocumentExportServiceTest extends TestCase
         // Four paragraphs (2 text + 2 blank), each carrying the 1.85 line box so
         // LibreOffice cannot collapse the blanks.
         $this->assertSame(4, substr_count($xml, 'w:line="444"'));
-        // Blank paragraphs carry a zero-width space run to hold their height.
-        $this->assertStringContainsString("\u{200B}", $xml);
+        // Every paragraph — including the two blanks — carries a preserved-whitespace
+        // text run so the blank lines hold their height. Assert the invariant, not
+        // the exact filler character (it has churned between ZWSP and space).
+        $this->assertSame(4, substr_count($xml, 'xml:space="preserve"'));
     }
 
     public function test_blockHtmlOrFallback_emits_font_size_from_formatting(): void
