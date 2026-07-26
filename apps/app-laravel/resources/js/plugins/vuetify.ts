@@ -56,5 +56,13 @@ export const vuetify = createVuetify({
     VTextField: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
     VSelect: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
     VTextarea: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
+    VAutocomplete: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
+    VCombobox: { variant: 'outlined', density: 'comfortable', hideDetails: 'auto' },
+    VList: { density: 'comfortable' },
+    VListItem: { rounded: 'lg' },
+    VChip: { rounded: 'lg' },
+    VDataTable: { density: 'comfortable' },
+    VAlert: { rounded: 'lg' },
+    VDialog: { rounded: 'lg' },
   },
 });
