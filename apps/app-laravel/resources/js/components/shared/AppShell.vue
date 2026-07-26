@@ -233,7 +233,7 @@ function isActive(item: NavItem): boolean {
   gap: 12px;
   justify-content: space-between;
   min-height: 52px;
-  padding: 8px 24px;
+  padding: 12px 24px;
 }
 
 .app-shell__breadcrumbs {
@@ -254,7 +254,7 @@ function isActive(item: NavItem): boolean {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  padding: 14px 24px 16px;
+  padding: 16px 24px;
 }
 
 .app-shell__content {
