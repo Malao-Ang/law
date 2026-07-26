@@ -72,7 +72,7 @@
 
               <v-text-field
                 v-model="search"
-                label="ค้นหากลุ่มสิทธิ์"
+                placeholder="พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อแสดงรายการกลุ่มที่มีในระบบ"
                 variant="outlined"
                 prepend-inner-icon="mdi-magnify"
                 hide-details
