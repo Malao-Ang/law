@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\EsignCallbackController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ImageController;
@@ -59,3 +60,7 @@ Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::cla
 
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');
+
+Route::post('/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
+    ->where('documentId', '[A-Za-z0-9_\-]+')
+    ->name('esign.callback');
