@@ -44,7 +44,7 @@
     <div v-else class="law-rel-picker__columns">
       <!-- Column 1: root laws -->
       <div class="law-rel-col">
-        <div class="law-rel-col__head">กฎหมายหลัก</div>
+        <div class="law-rel-col__head">กฎหมายที่อ้างถึง</div>
         <v-text-field
           v-model="searchCol1"
           density="compact"
@@ -55,7 +55,7 @@
           variant="outlined"
           class="law-rel-col__search"
         />
-        <div class="law-rel-col__list" role="listbox" aria-label="กฎหมายหลัก">
+        <div class="law-rel-col__list" role="listbox" aria-label="กฎหมายที่อ้างถึง">
           <button
             v-for="doc in filteredCol1"
             :key="doc.document_id"
@@ -105,7 +105,7 @@
               :aria-selected="rootWholeSelected && !selectedChild"
               @click="selectRootWhole"
             >
-              <span class="law-rel-col__label">— ทั้งกฎหมายหลัก —</span>
+              <span class="law-rel-col__label">— ไม่มี —</span>
               <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
             </button>
             <button
@@ -125,13 +125,13 @@
               {{ hasChildren(selectedRoot.document_id) ? 'ไม่พบรายการ' : 'ไม่มีกฎหมายย่อย — เลือกมาตราในคอลัมน์ถัดไป' }}
             </div>
           </template>
-          <div v-else class="law-rel-col__empty">เลือกกฎหมายหลักก่อน</div>
+          <div v-else class="law-rel-col__empty">เลือกกฎหมายที่อ้างถึงก่อน</div>
         </div>
       </div>
 
       <!-- Column 3: sections / articles -->
       <div class="law-rel-col">
-        <div class="law-rel-col__head">มาตรา / ข้อ</div>
+        <div class="law-rel-col__head">ข้อ</div>
         <v-text-field
           v-model="searchCol3"
           density="compact"
@@ -143,7 +143,7 @@
           class="law-rel-col__search"
           :disabled="!activeDocumentId"
         />
-        <div class="law-rel-col__list" role="listbox" aria-label="มาตรา / ข้อ">
+        <div class="law-rel-col__list" role="listbox" aria-label="ข้อ">
           <template v-if="activeDocumentId">
             <div v-if="sectionsLoading" class="law-rel-col__empty">
               <v-progress-circular indeterminate color="primary" size="20" />
@@ -173,7 +173,7 @@
                 <span v-if="section.preview" class="law-rel-col__preview">{{ section.preview }}</span>
               </button>
               <div v-if="!sectionsLoading && filteredCol3.length === 0" class="law-rel-col__empty">
-                ไม่พบมาตรา/ข้อ
+                ไม่พบข้อ
               </div>
             </template>
           </template>

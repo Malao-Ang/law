@@ -3,7 +3,7 @@
     <div class="document-editor-header pa-3 pb-0">
       <div>
         <p class="text-subtitle-2 font-weight-bold mb-0">Document HTML Review</p>
-        <p class="text-caption text-medium-emphasis mb-0">แก้ไขเอกสารทั้งฉบับในรูปแบบใกล้เคียงต้นฉบับก่อนสร้าง RAG</p>
+        <p class="text-caption text-medium-emphasis mb-0">แก้ไขเอกสารทั้งฉบับในรูปแบบใกล้เคียงต้นฉบับก่อนจัดลำดับเนื้อหา</p>
       </div>
       <v-chip
         :color="outOfSync ? 'warning' : 'success'"

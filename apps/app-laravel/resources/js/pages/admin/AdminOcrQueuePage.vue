@@ -157,6 +157,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
+import { formatThaiDateTime } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
 
 interface QueueRow {
@@ -237,13 +238,7 @@ function formatDuration(timings: Record<string, number> | null | undefined): str
 
 function formatDate(iso?: string | null): string {
   if (!iso) return '-';
-  return new Date(iso).toLocaleString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatThaiDateTime(iso) || '-';
 }
 
 function statusColor(status: string): string {

@@ -100,13 +100,13 @@
           <v-text-field
             v-model="form.target_title"
             label="ชื่อกฎหมาย"
-            placeholder="พ.ร.บ. ..."
+            placeholder="กฎหมายภายนอก ..."
             class="mb-3"
           />
           <v-text-field
             v-model="form.target_section"
-            label="มาตรา (ไม่บังคับ)"
-            placeholder="มาตรา ๕"
+            label="ข้อ (ไม่บังคับ)"
+            placeholder="ข้อ ๕"
             class="mb-3"
           />
           <v-text-field
@@ -190,8 +190,8 @@ const canSave = computed(() => {
 
 function relationSourceLabel(relation: LawRelation): string {
   if (relation.scope === 'document') return 'ทั้งเอกสาร';
-  if (!relation.block_id) return 'มาตรา / ข้อ';
-  return props.sectionLabels?.[relation.block_id] ?? 'มาตรา / ข้อ';
+  if (!relation.block_id) return 'ข้อ';
+  return props.sectionLabels?.[relation.block_id] ?? 'ข้อ';
 }
 
 watch(mode, () => {
