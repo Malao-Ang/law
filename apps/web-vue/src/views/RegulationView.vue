@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import AppHeader from '../components/AppHeader.vue'
+import { formatThaiDate } from '../utils/thaiDate'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,7 +156,7 @@ const filteredSections = computed(() => {
                                 <v-text-field
                                     v-model="searchQuery"
                                     prepend-inner-icon="mdi-magnify"
-                                    label="ค้นหามาตรา/ข้อ"
+                                    label="ค้นหาข้อ"
                                     hide-details
                                     dense
                                     outlined
@@ -190,7 +191,7 @@ const filteredSections = computed(() => {
                                 </v-list>
 
                                 <v-alert v-if="filteredSections.length === 0" type="info" class="ma-4">
-                                    ไม่พบมาตราที่ค้นหา
+                                    ไม่พบข้อที่ค้นหา
                                 </v-alert>
                             </v-card-text>
                         </v-card>
@@ -211,10 +212,10 @@ const filteredSections = computed(() => {
                                     <p class="mt-2 text-body-1">
                                         <v-chip size="small" class="mr-2">{{ regulation.regulation_type }}</v-chip>
                                         <span v-if="regulation.enacted_date">
-                                            ประกาศใช้: {{ new Date(regulation.enacted_date).toLocaleDateString('th-TH') }}
+                                            ประกาศใช้: {{ formatThaiDate(regulation.enacted_date) }}
                                         </span>
                                     </p>
-                                    <p class="mt-6 text-grey">เลือกมาตราจากรายการด้านซ้ายเพื่อดูรายละเอียด</p>
+                                    <p class="mt-6 text-grey">เลือกข้อจากรายการด้านซ้ายเพื่อดูรายละเอียด</p>
                                 </div>
                             </v-card-text>
 
@@ -236,7 +237,7 @@ const filteredSections = computed(() => {
 
                             <v-card-text v-else class="text-center py-12">
                                 <v-icon size="80" color="grey-lighten-1">mdi-file-alert-outline</v-icon>
-                                <p class="mt-4">ไม่พบข้อมูลมาตรา</p>
+                                <p class="mt-4">ไม่พบข้อมูลข้อ</p>
                             </v-card-text>
                         </v-card>
                     </v-col>

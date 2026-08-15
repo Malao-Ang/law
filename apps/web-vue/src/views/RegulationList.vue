@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppHeader from '../components/AppHeader.vue'
+import { formatThaiDate } from '../utils/thaiDate'
 
 const router = useRouter()
 const regulations = ref([])
@@ -16,7 +17,7 @@ const regulationTypes = [
     { value: 'announcement', title: 'ประกาศ' },
     { value: 'rule', title: 'ระเบียบ' },
     { value: 'guideline', title: 'แนวปฏิบัติ' },
-    { value: 'order', title: 'คำสั่ง' },
+    { value: 'external', title: 'กฎหมายภายนอก' },
 ]
 
 const mockRegulations = [
@@ -171,12 +172,12 @@ const getTypeColor = (type) => {
                                     </v-col>
                                     <v-col v-if="regulation.enacted_date" cols="auto">
                                         <v-chip size="small" variant="outlined" prepend-icon="mdi-calendar">
-                                            {{ new Date(regulation.enacted_date).toLocaleDateString('th-TH') }}
+                                            {{ formatThaiDate(regulation.enacted_date) }}
                                         </v-chip>
                                     </v-col>
                                     <v-col v-if="regulation.sections_count" cols="auto">
                                         <v-chip size="small" variant="outlined" prepend-icon="mdi-file-document-multiple">
-                                            {{ regulation.sections_count }} มาตรา
+                                            {{ regulation.sections_count }} ข้อ
                                         </v-chip>
                                     </v-col>
                                 </v-row>
@@ -188,7 +189,7 @@ const getTypeColor = (type) => {
                                 </v-btn>
                                 <v-spacer></v-spacer>
                                 <span class="text-caption text-grey">
-                                    อัปเดต: {{ new Date(regulation.updated_at).toLocaleDateString('th-TH') }}
+                                    อัปเดต: {{ formatThaiDate(regulation.updated_at) }}
                                 </span>
                             </v-card-actions>
                         </v-card>
