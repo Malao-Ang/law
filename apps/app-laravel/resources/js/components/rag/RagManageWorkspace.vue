@@ -1,5 +1,5 @@
 <template>
-  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดการ RAG บล็อก']" title="" full-height>
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดลำดับเนื้อหา']" title="" full-height>
     <WorkflowFooterBar
       :step="3"
       :next-disabled="blockBusy"
@@ -77,7 +77,7 @@
                     v-for="ct in HEAD_CHUNK_TYPES"
                     :key="ct"
                     :title="CHUNK_TYPE_LABELS[ct]"
-                    :active="section.headBlock.meta.chunk_type === ct"
+                    :active="normalizeChunkType(section.headBlock.meta.chunk_type) === ct"
                     @click="setChunkType(section.headBlock, ct)"
                   />
                 </v-list>
@@ -216,7 +216,7 @@ import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import BlockFlow from '../shared/BlockFlow.vue';
 import SplitBlockDialog from './SplitBlockDialog.vue';
-import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS } from '../../types/chunkType';
+import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS, normalizeChunkType } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
 
@@ -234,7 +234,7 @@ type HistoryEntry = { id: string; label: string; snapshot: PageBlocks[] };
 const sections = computed(() => buildSections(composeStore.review));
 
 function containerType(section: LawSection): ChunkType | null {
-  const stored = section.headBlock.meta.chunk_type as ChunkType | null | undefined;
+  const stored = normalizeChunkType(section.headBlock.meta.chunk_type);
   if (stored) return stored;
   if (section.isHeader) return 'TITLE';
   return suggestChunkType(section.headBlock);
@@ -405,10 +405,10 @@ async function reloadBlocks(): Promise<void> {
 
 // A head chunk-type to assign when a block should start a section.
 function headTypeFor(block: DocumentBlock): ChunkType {
-  return suggestChunkType(block) ?? 'SECTION';
+  return suggestChunkType(block) ?? 'CLAUSE';
 }
 
-async function persistChunkType(block: DocumentBlock, chunkType: ChunkType): Promise<void> {
+async function persistChunkType(block: DocumentBlock, chunkType: ChunkType | null): Promise<void> {
   const pageNo = blockPage.value.get(block.block_id) ?? 1;
   await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
 }
@@ -420,20 +420,12 @@ async function mergeSelected(): Promise<void> {
   const historyId = pushHistory(`รวม ${selected.length} บล็อก`);
   blockBusy.value = true;
   try {
-    // First selected becomes the container head; the rest become its children.
-    const [head, ...rest] = selected;
-    const headType = headTypeFor(head);
-    head.meta.chunk_type = headType;                 // optimistic
-    rest.forEach((b) => { b.meta.chunk_type = 'PARAGRAPH'; });
-    await Promise.all([
-      persistChunkType(head, headType),
-      ...rest.map((b) => persistChunkType(b, 'PARAGRAPH')),
-    ]);
-    clearSelection();
-    snackbar.success('จัดกลุ่มเป็นคอนเทนเนอร์เดียวแล้ว');
+    await blockStore.merge(props.documentId, selected.map((block) => block.block_id));
+    await reloadBlocks();
+    snackbar.success('รวมบล็อกแล้ว');
   } catch (e) {
     removeHistoryEntry(historyId);
-    snackbar.error(e instanceof Error ? e.message : 'จัดกลุ่มไม่สำเร็จ');
+    snackbar.error(e instanceof Error ? e.message : 'รวมบล็อกไม่สำเร็จ');
     await reloadBlocks();
   } finally {
     blockBusy.value = false;
@@ -481,7 +473,7 @@ async function onLineSplitConfirm(pieces: string[]): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
-  const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(block.meta.chunk_type);
+  const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(normalizeChunkType(block.meta.chunk_type) ?? '');
 
   if (isHead) {
     // Splitting a header detaches its body: the header stays its own section and

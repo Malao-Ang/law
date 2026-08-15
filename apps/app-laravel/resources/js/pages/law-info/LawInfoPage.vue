@@ -122,10 +122,10 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 :model-value="sectionCountDisplay"
-                :label="requiredLabel('จำนวนข้อ/มาตรา')"
+                :label="requiredLabel('จำนวนข้อ')"
                 variant="outlined"
                 readonly
-                :rules="[() => articleCount >= 0 || 'ไม่พบจำนวนข้อ/มาตรา']"
+                :rules="[() => articleCount >= 0 || 'ไม่พบจำนวนข้อ']"
                 required
               />
             </v-col>
@@ -253,6 +253,7 @@ import type { SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
+import { normalizeChunkType } from '../../types/chunkType';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
@@ -264,12 +265,12 @@ const documentStore = useDocumentStore();
 const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
-  [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พ.ร.บ.'],
+  [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
   [/ประกาศ/u, 'ประกาศ'],
-  [/คำสั่ง/u, 'คำสั่ง'],
-  [/มติ/u, 'มติ'],
+  [/คำสั่ง/u, 'ประกาศ'],
+  [/มติ/u, 'ประกาศ'],
 ];
 
 const EMPTY: LawMeta = {
@@ -351,17 +352,10 @@ const noExpiryRules = [
 const articleBlocks = computed<DocumentBlock[]>(() =>
   (documentStore.review?.pages ?? [])
     .flatMap((page) => page.blocks)
-    .filter((block) => block.meta?.chunk_type === 'ARTICLE' || block.meta?.chunk_type === 'CLAUSE'),
+    .filter(isClauseBlock),
 );
 const articleCount = computed(() => articleBlocks.value.length);
-const articleUnitLabel = computed(() => {
-  const hasClause = articleBlocks.value.some((b) => b.meta?.chunk_type === 'CLAUSE');
-  const hasArticle = articleBlocks.value.some((b) => b.meta?.chunk_type === 'ARTICLE');
-  if (hasClause && hasArticle) return 'ข้อ/มาตรา';
-  if (hasClause) return 'ข้อ';
-  if (hasArticle) return 'มาตรา';
-  return 'ข้อ/มาตรา';
-});
+const articleUnitLabel = computed(() => 'ข้อ');
 const sectionCountDisplay = computed(() => `${articleCount.value} ${articleUnitLabel.value}`);
 
 watch(() => documentStore.review, (review) => {
@@ -392,6 +386,15 @@ watch(() => documentStore.review, (review) => {
 
 function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();
+}
+
+function isClauseBlock(block: DocumentBlock): boolean {
+  if (normalizeChunkType(block.meta?.chunk_type) === 'CLAUSE') return true;
+
+  const markerType = block.meta?.list_marker?.type;
+  if (markerType === 'legal-มาตรา' || markerType === 'legal-ข้อ') return true;
+
+  return /^(มาตรา|ข้อ)\s*[๐-๙0-9]/u.test(blockText(block));
 }
 
 function isImageBlock(block: DocumentBlock): boolean {

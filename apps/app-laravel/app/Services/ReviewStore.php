@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use RuntimeException;
 
 class ReviewStore
@@ -16,7 +17,7 @@ class ReviewStore
         private readonly MongoBlobStore $blob,
         ?string $basePath = null,
     ) {
-        $this->basePath = $basePath ?? storage_path('app/poc');
+        $this->basePath = $basePath ?? $this->configuredBasePath();
         $this->ensureDirectories();
     }
 
@@ -47,6 +48,14 @@ class ReviewStore
     public function absolutePath(string $relativePath): string
     {
         return $this->basePath.'/'.str_replace('\\', '/', ltrim($relativePath, '/'));
+    }
+
+    public function displayPath(string $relativePath): string
+    {
+        $prefix = trim((string) config('services.poc_storage_display_prefix', 'storage/app/poc'), '/');
+        $relative = ltrim(str_replace('\\', '/', $relativePath), '/');
+
+        return $prefix.'/'.$relative;
     }
 
     public function absoluteUploadPath(string $relativePath): string
@@ -81,6 +90,34 @@ class ReviewStore
     public function getStatus(string $documentId): ?array
     {
         return $this->blob->read('status', $documentId);
+    }
+
+    public function deleteDocument(string $documentId): bool
+    {
+        $status = $this->blob->read('status', $documentId);
+        $review = $this->blob->read('review', $documentId);
+
+        if ($status === null && $review === null) {
+            return false;
+        }
+
+        if (is_array($status) && isset($status['source_path'])) {
+            $this->deletePath($this->absolutePath((string) $status['source_path']));
+        }
+
+        foreach ([
+            $this->absolutePath($this->reviewRelativePath($documentId)),
+            $this->absolutePath($this->exportRelativePath($documentId)),
+            $this->absolutePath($this->ingestRelativePath($documentId)),
+            $this->absoluteImagesDir($documentId),
+            $this->basePath.'/pages/'.basename($documentId),
+        ] as $path) {
+            $this->deletePath($path);
+        }
+
+        $this->blob->delete($documentId);
+
+        return true;
     }
 
     /**
@@ -171,6 +208,9 @@ class ReviewStore
 
                 $title = trim((string) ($meta['title'] ?? '')) ?: (string) ($status['source_file'] ?? $documentId);
                 $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+                $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null)
+                    ? array_values(array_filter(array_map('strval', $meta['permission_group_ids'])))
+                    : [];
 
                 $rows[] = [
                     'document_id' => $documentId,
@@ -178,8 +218,9 @@ class ReviewStore
                     'status' => (string) ($status['status'] ?? 'unknown'),
                     'updated_at' => $status['updated_at'] ?? null,
                     'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
+                    'permission_group_ids' => $permissionGroupIds,
                     'law_type' => trim((string) ($meta['law_type'] ?? '')),
-                    'meta_status' => trim((string) ($meta['status'] ?? '')),
+                    'meta_status' => LawMetaNormalizer::legacyStatus($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
                     'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
                     'law_groups' => $groups,
@@ -296,7 +337,7 @@ class ReviewStore
                 'table' => $table,
                 'table_html' => $table['html'] ?? null,
                 'formatting' => $mergedFormatting,
-                'chunk_type' => $patch['chunk_type'] ?? $existingMeta['chunk_type'] ?? null,
+                'chunk_type' => array_key_exists('chunk_type', $patch) ? $patch['chunk_type'] : ($existingMeta['chunk_type'] ?? null),
                 'review' => [
                     'approved_by' => $patch['approved_by'] ?? null,
                     'notes' => $patch['notes'] ?? null,
@@ -730,19 +771,11 @@ class ReviewStore
                 $ordered,
             ));
 
-            // Every block must contribute visible HTML: use its reviewed_html when present,
-            // otherwise fall back to an escaped paragraph built from its text — so no content
-            // silently disappears when a merged block has no reviewed_html.
-            $mergedHtml = implode('', array_map(
-                static function (array $b): string {
-                    $html = (string) ($b['meta']['reviewed_html'] ?? '');
-                    if (trim($html) !== '') {
-                        return $html;
-                    }
-                    $text = (string) ($b['approved_text'] ?? $b['normalized_text'] ?? $b['raw_text'] ?? '');
-
-                    return '<p>'.nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8')).'</p>';
-                },
+            // Preserve each source block as its own visual line/paragraph. Some
+            // reviewed_html fragments are inline-only; concatenating them directly
+            // makes separate source lines collapse into one line after merge.
+            $mergedHtml = implode("\n", array_map(
+                fn (array $b): string => $this->mergeBlockHtml($b),
                 $ordered,
             ));
 
@@ -1186,6 +1219,45 @@ class ReviewStore
         }
     }
 
+    private function configuredBasePath(): string
+    {
+        $path = trim((string) config('services.poc_storage_root', 'app/poc'));
+        if ($path === '') {
+            $path = 'app/poc';
+        }
+
+        if (str_starts_with($path, DIRECTORY_SEPARATOR) || preg_match('/^[A-Za-z]:[\/\\\\]/', $path) === 1) {
+            return rtrim(str_replace('\\', '/', $path), '/');
+        }
+
+        return rtrim(storage_path($path), '/');
+    }
+
+    private function deletePath(string $path): void
+    {
+        $baseRealPath = realpath($this->basePath);
+        $targetRealPath = realpath($path);
+        if ($baseRealPath === false || $targetRealPath === false) {
+            return;
+        }
+
+        $insideBasePath = $targetRealPath === $baseRealPath
+            || str_starts_with($targetRealPath, $baseRealPath.DIRECTORY_SEPARATOR);
+        if (! $insideBasePath) {
+            return;
+        }
+
+        if (is_dir($path)) {
+            File::deleteDirectory($path);
+
+            return;
+        }
+
+        if (is_file($path)) {
+            File::delete($path);
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $document
      */
@@ -1406,7 +1478,7 @@ class ReviewStore
                 }
 
                 $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
-                if ($chunkType === 'ARTICLE' || $chunkType === 'CLAUSE') {
+                if (in_array($chunkType, ['BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM'], true)) {
                     $count++;
                 }
             }
@@ -1440,6 +1512,20 @@ class ReviewStore
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     */
+    private function mergeBlockHtml(array $block): string
+    {
+        $html = trim((string) ($block['meta']['reviewed_html'] ?? ''));
+        if ($html === '') {
+            $text = (string) ($block['approved_text'] ?? $block['normalized_text'] ?? $block['raw_text'] ?? '');
+            $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+        }
+
+        return '<div class="merged-block">'.$html.'</div>';
     }
 
     /**

@@ -56,16 +56,6 @@
         {{ pdfExportError }}
       </v-alert>
 
-      <v-alert
-        v-if="meta.access_scope === 'private'"
-        type="warning"
-        variant="tonal"
-        density="comfortable"
-        class="ma-4"
-      >
-        เอกสารนี้ถูกกำหนดให้เป็น Private และไม่แสดงบนหน้าสาธารณะ
-      </v-alert>
-
       <div
         class="lawx-grid"
         :class="{
@@ -74,21 +64,23 @@
         }"
       >
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
-        <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญมาตรา</p>
-        <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
-          <v-btn variant="text" block class="justify-space-between font-weight-bold text-body-2 mt-2 px-2"
-            style="color:#1d4ed8" @click="toggleGroup(group.label)">
-            <span>{{ group.label }}</span>
-            <v-icon :icon="collapsed.has(group.label) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
-          </v-btn>
-          <div v-show="!collapsed.has(group.label)" class="lawx-toc__items">
-            <button
-              v-for="sid in group.sectionIds"
-              :key="sid"
-              class="lawx-toc__item"
-              :class="{ 'is-active': activeId === sid }"
-              @click="scrollTo(sid)"
-            >{{ badgeOf(sid) }}</button>
+        <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญข้อ</p>
+        <div class="lawx-toc__scroll">
+          <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
+            <v-btn variant="text" block class="justify-space-between font-weight-bold text-body-2 mt-2 px-2"
+              style="color:#1d4ed8" @click="toggleGroup(group.label)">
+              <span>{{ group.label }}</span>
+              <v-icon :icon="collapsed.has(group.label) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
+            </v-btn>
+            <div v-show="!collapsed.has(group.label)" class="lawx-toc__items">
+              <button
+                v-for="sid in group.sectionIds"
+                :key="sid"
+                class="lawx-toc__item"
+                :class="{ 'is-active': activeId === sid }"
+                @click="scrollTo(sid)"
+              >{{ badgeOf(sid) }}</button>
+            </div>
           </div>
         </div>
       </v-card>
@@ -98,7 +90,7 @@
           <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
           <div class="lawx-headcard__meta">
-            <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ meta.promulgation_date }}</span>
+            <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
             <span v-if="meta.gazette_reference"><span class="mdi mdi-book-open-variant" /> {{ meta.gazette_reference }}</span>
             <span v-if="meta.royal_command"><span class="mdi mdi-crown-outline" /> {{ meta.royal_command }}</span>
           </div>
@@ -185,6 +177,7 @@ import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
 import ELawNavbar from '../shared/ELawNavbar.vue';
+import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
@@ -234,11 +227,15 @@ const articleCount = computed(() =>
 const articleUnitLabel = computed(() => {
   const hasClause = sections.value.some((s) => s.badge.startsWith('ข้อ'));
   const hasArticle = sections.value.some((s) => s.badge.startsWith('มาตรา'));
-  if (hasClause && hasArticle) return 'ข้อ/มาตรา';
+  if (hasClause && hasArticle) return 'ข้อ';
   if (hasClause) return 'ข้อ';
-  if (hasArticle) return 'มาตรา';
-  return 'ข้อ/มาตรา';
+  if (hasArticle) return 'ข้อ';
+  return 'ข้อ';
 });
+
+function formatLawDate(value: string | null | undefined): string {
+  return formatThaiDate(value) || value || '';
+}
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const tocOpen = ref(true);
@@ -474,14 +471,17 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-toc {
   border-radius: 18px;
+  display: flex;
+  flex-direction: column;
   padding: 14px;
   position: sticky;
   top: 84px;
   max-height: calc(100vh - 108px);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .lawx-toc__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
+.lawx-toc__scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .lawx-toc__items { display: flex; flex-direction: column; padding: 5px 0 4px 8px; }
 .lawx-toc__item { text-align: left; background: transparent; border: none; border-left: 2px solid transparent; padding: 7px 10px; font-size: 13px; color: #475569; border-radius: 0; cursor: pointer; font-family: inherit; }
 .lawx-toc__item:hover { color: #7b580d; }
@@ -638,6 +638,14 @@ onBeforeUnmount(() => observer?.disconnect());
   .lawx-info {
     position: static;
     max-height: none;
+  }
+
+  .lawx-toc {
+    overflow: visible;
+  }
+
+  .lawx-toc__scroll {
+    overflow: visible;
   }
 }
 

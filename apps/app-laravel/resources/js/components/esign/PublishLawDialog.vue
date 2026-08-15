@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { formatThaiDateTime } from '../../utils/thaiDate';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -83,7 +84,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   confirm: [];
 }>();
@@ -103,13 +104,7 @@ const checks = [
 
 function formatWhen(iso?: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatThaiDateTime(iso) || '—';
 }
 </script>
 

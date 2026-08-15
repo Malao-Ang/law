@@ -1,5 +1,5 @@
 import type { DocumentBlock, LawRelation, ReviewDocument } from '../types/document';
-import { CHUNK_TYPE_LABELS, HEAD_CHUNK_TYPES } from '../types/chunkType';
+import { CHUNK_TYPE_LABELS, HEAD_CHUNK_TYPES, normalizeChunkType } from '../types/chunkType';
 import type { ChunkType } from '../types/chunkType';
 
 export interface LawSection {
@@ -40,7 +40,7 @@ function headerRegionEnd(blocks: DocumentBlock[]): number {
   if (dividerIdx < 0) return -1;
   if (!blocks.slice(0, dividerIdx + 1).some((b) => b.type === 'image')) return -1;
   for (let i = 1; i <= dividerIdx; i += 1) {
-    const ct = blocks[i].meta?.chunk_type;
+    const ct = normalizeChunkType(blocks[i].meta?.chunk_type);
     if (ct && HEAD_CHUNK_TYPE_SET.has(ct)) return i - 1;
   }
   return dividerIdx;
@@ -50,9 +50,17 @@ function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();
 }
 
+function legalMarkerText(block: DocumentBlock): string | null {
+  const marker = block.meta?.list_marker;
+  if (marker?.type !== 'legal-มาตรา' && marker?.type !== 'legal-ข้อ') return null;
+  return (marker.text || marker.raw_match || '').trim() || null;
+}
+
 function isHead(block: DocumentBlock): boolean {
   const ct = block.meta?.chunk_type;
-  if (ct) return HEAD_CHUNK_TYPE_SET.has(ct); // explicit type wins both ways
+  if (ct) return HEAD_CHUNK_TYPE_SET.has(normalizeChunkType(ct) ?? ''); // explicit type wins both ways
+
+  if (legalMarkerText(block)) return true;
 
   if (block.type === 'title' || block.type === 'section_header') return true;
 
@@ -61,18 +69,23 @@ function isHead(block: DocumentBlock): boolean {
 
 // Content-word → chunk type. First matching rule wins; null when nothing matches.
 const SUGGEST_RULES: ReadonlyArray<[RegExp, ChunkType]> = [
-  [/^ภาคผนวก/u, 'ANNEX'],
-  [/^บทเฉพาะกาล/u, 'TRANSITIONAL_PROVISION'],
-  [/^ภาค\s*[๐-๙0-9]/u, 'BOOK'],
-  [/^ลักษณะ\s*[๐-๙0-9]/u, 'PART'],
-  [/^หมวด\s*[๐-๙0-9]/u, 'CHAPTER'],
-  [/^ส่วนที่\s*[๐-๙0-9]/u, 'SECTION'],
-  [/^มาตรา\s*[๐-๙0-9]/u, 'ARTICLE'],
-  [/^ข้อ\s*[๐-๙0-9]/u, 'CLAUSE'],
+  [/^ชื่อประกาศ/u, 'TITLE'],
   [/^คำปรารภ/u, 'PREAMBLE'],
+  [/^บทนิยาม/u, 'DEFINITION_SECTION'],
+  [/^บทเฉพาะกาล/u, 'TRANSITIONAL_PROVISION'],
+  [/อาศัยอำนาจ/u, 'AUTHORITY'],
+  [/(วันบังคับใช้|บังคับใช้|ใช้บังคับ)/u, 'EFFECTIVE_DATE'],
+  [/(ให้ยกเลิก|ยกเลิก)/u, 'REPEAL'],
+  [/รักษาการ/u, 'CUSTODIAN'],
+  [/^คำนิยาม/u, 'DEFINITION'],
+  [/^นิยาม/u, 'DEFINITION'],
+  [/^มาตรา\s*[๐-๙0-9]/u, 'CLAUSE'],
+  [/^ข้อ\s*[๐-๙0-9]/u, 'CLAUSE'],
 ];
 
 export function suggestChunkType(block: DocumentBlock): ChunkType | null {
+  if (legalMarkerText(block)) return 'CLAUSE';
+
   const text = blockText(block);
   for (const [re, type] of SUGGEST_RULES) {
     if (re.test(text)) return type;
@@ -85,9 +98,12 @@ function markerFor(block: DocumentBlock): string {
   const match = text.match(HEAD_RE);
   if (match) return match[1].replace(/\s+/g, ' ').trim(); // number comes from the text
 
-  const ct = block.meta?.chunk_type;
-  if (ct && CHUNK_TYPE_LABELS[ct as ChunkType]) return CHUNK_TYPE_LABELS[ct as ChunkType];
-  if (block.type === 'title') return 'คำปรารภ';
+  const marker = legalMarkerText(block);
+  if (marker) return marker.replace(/\s+/g, ' ').trim();
+
+  const ct = normalizeChunkType(block.meta?.chunk_type);
+  if (ct) return CHUNK_TYPE_LABELS[ct];
+  if (block.type === 'title') return 'ชื่อประกาศ';
 
   return blockText(block).slice(0, 24);
 }
@@ -103,7 +119,7 @@ export function buildSections(review: ReviewDocument | null): LawSection[] {
   if (headerEnd >= 0) {
     const headBlock = blocks[0];
     const text = blockText(headBlock);
-    const badge = 'ชื่อกฎหมาย';
+    const badge = 'ชื่อประกาศ';
     sections.push({
       id: headBlock.block_id,
       badge,
@@ -142,7 +158,7 @@ export function buildSections(review: ReviewDocument | null): LawSection[] {
 
 export function buildTocGroups(sections: LawSection[]): TocGroup[] {
   const groups: TocGroup[] = [];
-  let current: TocGroup = { label: 'คำปรารภ / มาตราทั่วไป', sectionIds: [] };
+  let current: TocGroup = { label: 'คำปรารภ / ข้อทั่วไป', sectionIds: [] };
   groups.push(current);
 
   for (const section of sections) {

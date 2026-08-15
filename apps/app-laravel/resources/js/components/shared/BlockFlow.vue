@@ -111,6 +111,15 @@ const bodyHtml = computed<string>(() => {
   width: 24px;
 }
 
+.block-flow :deep(.merged-block) {
+  display: block;
+  margin: 0 0 4px;
+}
+
+.block-flow :deep(.merged-block:last-child) {
+  margin-bottom: 0;
+}
+
 .block-flow :deep(.bf-img) {
   max-width: 100%;
   height: auto;

@@ -1,54 +1,78 @@
 export const CHUNK_TYPES = [
-  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION',
-  'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM', 'DEFINITION', 'TRANSITIONAL_PROVISION',
-  'ANNEX', 'TABLE', 'NOTE', 'FOOTNOTE', 'SIGNATURE_BLOCK', 'OTHER',
+  'TITLE',
+  'PREAMBLE',
+  'AUTHORITY',
+  'CLAUSE',
+  'EFFECTIVE_DATE',
+  'REPEAL',
+  'DEFINITION_SECTION',
+  'DEFINITION',
+  'CUSTODIAN',
+  'TRANSITIONAL_PROVISION',
 ] as const;
 
 export type ChunkType = typeof CHUNK_TYPES[number];
 
 // Structural heading types — the ones isHead() treats as section heads.
 export const HEAD_CHUNK_TYPES: readonly ChunkType[] = [
-  'TITLE', 'PREAMBLE', 'BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'ANNEX', 'TRANSITIONAL_PROVISION',
+  'TITLE',
+  'PREAMBLE',
+  'AUTHORITY',
+  'CLAUSE',
+  'EFFECTIVE_DATE',
+  'REPEAL',
+  'DEFINITION_SECTION',
+  'CUSTODIAN',
+  'TRANSITIONAL_PROVISION',
 ];
 
 export const CHUNK_TYPE_LABELS: Record<ChunkType, string> = {
-  TITLE: 'ชื่อกฎหมาย',
+  TITLE: 'ชื่อประกาศ',
   PREAMBLE: 'คำปรารภ',
-  BOOK: 'ภาค',
-  PART: 'ลักษณะ',
-  CHAPTER: 'หมวด',
-  SECTION: 'ส่วน',
-  ARTICLE: 'มาตรา',
+  AUTHORITY: 'บทอาศัยอำนาจ',
   CLAUSE: 'ข้อ',
-  PARAGRAPH: 'วรรค',
-  ITEM: 'รายการ',
-  DEFINITION: 'นิยาม',
+  EFFECTIVE_DATE: 'วันบังคับใช้',
+  REPEAL: 'บทยกเลิก',
+  DEFINITION_SECTION: 'บทนิยาม',
+  DEFINITION: 'คำนิยาม',
+  CUSTODIAN: 'บทรักษาการ',
   TRANSITIONAL_PROVISION: 'บทเฉพาะกาล',
-  ANNEX: 'ภาคผนวก',
-  TABLE: 'ตาราง',
-  NOTE: 'หมายเหตุ',
-  FOOTNOTE: 'เชิงอรรถ',
-  SIGNATURE_BLOCK: 'ลายเซ็น',
-  OTHER: 'อื่นๆ',
 };
 
 export const CHUNK_TYPE_COLORS: Record<ChunkType, string> = {
   TITLE: 'indigo',
   PREAMBLE: 'success',
-  BOOK: 'pink',
-  PART: 'purple',
-  CHAPTER: 'deep-purple',
-  SECTION: 'red',
-  ARTICLE: 'primary',
+  AUTHORITY: 'deep-purple',
   CLAUSE: 'orange',
-  PARAGRAPH: 'teal',
-  ITEM: 'warning',
+  EFFECTIVE_DATE: 'teal',
+  REPEAL: 'red',
+  DEFINITION_SECTION: 'amber-darken-2',
   DEFINITION: 'amber',
+  CUSTODIAN: 'brown',
   TRANSITIONAL_PROVISION: 'cyan',
-  ANNEX: 'light-blue',
-  TABLE: 'blue-grey',
-  NOTE: 'grey',
-  FOOTNOTE: 'grey',
-  SIGNATURE_BLOCK: 'brown',
-  OTHER: 'grey',
 };
+
+const LEGACY_CHUNK_TYPE_MAP: Partial<Record<string, ChunkType>> = {
+  TITLE: 'TITLE',
+  PREAMBLE: 'PREAMBLE',
+  AUTHORITY: 'AUTHORITY',
+  CLAUSE: 'CLAUSE',
+  EFFECTIVE_DATE: 'EFFECTIVE_DATE',
+  REPEAL: 'REPEAL',
+  DEFINITION_SECTION: 'DEFINITION_SECTION',
+  DEFINITION: 'DEFINITION',
+  CUSTODIAN: 'CUSTODIAN',
+  TRANSITIONAL_PROVISION: 'TRANSITIONAL_PROVISION',
+  BOOK: 'CLAUSE',
+  PART: 'CLAUSE',
+  CHAPTER: 'CLAUSE',
+  SECTION: 'CLAUSE',
+  ARTICLE: 'CLAUSE',
+  PARAGRAPH: 'CLAUSE',
+  ITEM: 'CLAUSE',
+};
+
+export function normalizeChunkType(value: string | null | undefined): ChunkType | undefined {
+  if (!value) return undefined;
+  return LEGACY_CHUNK_TYPE_MAP[value.trim().toUpperCase()];
+}

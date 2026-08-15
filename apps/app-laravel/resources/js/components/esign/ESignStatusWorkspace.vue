@@ -357,6 +357,7 @@ import {
 } from '../../data/esignSession';
 import type { ESignSession, ESignSigner } from '../../types/esign';
 import type { LawMeta } from '../../types/document';
+import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
@@ -415,7 +416,7 @@ const agencyLabel = computed(() => {
 const updatedAtLabel = computed(() => {
   const iso = documentStore.review?.document_review?.updated_at;
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatThaiDate(iso);
 });
 
 const packageName = computed(() => {
@@ -519,12 +520,7 @@ function initials(name: string): string {
 }
 
 function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatThaiDateTime(iso);
 }
 
 function activityColor(title: string): string {

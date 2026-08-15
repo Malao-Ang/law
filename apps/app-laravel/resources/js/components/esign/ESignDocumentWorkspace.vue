@@ -373,6 +373,7 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { buildSections, buildTocGroups } from '../../composables/useLawSections';
 import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
+import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
@@ -427,10 +428,10 @@ const articleCount = computed(() =>
 const articleUnitLabel = computed(() => {
   const hasClause = sections.value.some((s) => s.badge.startsWith('ข้อ'));
   const hasArticle = sections.value.some((s) => s.badge.startsWith('มาตรา'));
-  if (hasClause && hasArticle) return 'ข้อ/มาตรา';
+  if (hasClause && hasArticle) return 'ข้อ';
   if (hasClause) return 'ข้อ';
-  if (hasArticle) return 'มาตรา';
-  return 'ข้อ/มาตรา';
+  if (hasArticle) return 'ข้อ';
+  return 'ข้อ';
 });
 
 const agencyLabel = computed(() => {
@@ -446,11 +447,7 @@ const lawGroupLabel = computed(() => {
 const updatedAtLabel = computed(() => {
   const iso = documentStore.review?.document_review?.updated_at;
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('th-TH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatThaiDate(iso);
 });
 
 const signatoryLabel = computed(() => {

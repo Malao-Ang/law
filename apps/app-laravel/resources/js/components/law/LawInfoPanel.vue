@@ -6,32 +6,32 @@
         ข้อมูลกฎหมาย
       </v-card-title>
       <v-card-text>
-        <div v-if="meta.status" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">สถานะ</span>
-          <span class="text-success font-weight-semibold d-flex align-center ga-1">
+        <div v-if="meta.status" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">สถานะ</span>
+          <span class="law-info-row__value text-success font-weight-semibold d-flex align-center justify-end ga-1">
             <v-icon icon="mdi-circle" size="x-small" />
             {{ meta.status }}
           </span>
         </div>
-        <div v-if="meta.promulgation_date" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">วันที่ประกาศ</span>
-          <span class="font-weight-semibold">{{ meta.promulgation_date }}</span>
+        <div v-if="meta.promulgation_date" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">วันที่ประกาศ</span>
+          <span class="law-info-row__value font-weight-semibold">{{ formatLawDate(meta.promulgation_date) }}</span>
         </div>
-        <div v-if="meta.effective_date" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">วันที่มีผลบังคับ</span>
-          <span class="font-weight-semibold">{{ meta.effective_date }}</span>
+        <div v-if="meta.effective_date" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">วันที่มีผลบังคับ</span>
+          <span class="law-info-row__value font-weight-semibold">{{ formatLawDate(meta.effective_date) }}</span>
         </div>
-        <div v-if="meta.law_type" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">ประเภท</span>
-          <span class="font-weight-semibold">{{ meta.law_type }}</span>
+        <div v-if="meta.law_type" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">ประเภท</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.law_type }}</span>
         </div>
-        <div v-if="meta.law_group" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">กลุ่มกฎหมาย</span>
-          <span class="font-weight-semibold">{{ meta.law_group }}</span>
+        <div v-if="meta.law_group" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.law_group }}</span>
         </div>
-        <div v-if="meta.agency" class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">หน่วยงาน</span>
-          <span class="font-weight-semibold">{{ meta.agency }}</span>
+        <div v-if="meta.agency" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">หน่วยงาน</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.agency }}</span>
         </div>
         <div v-if="meta.keywords.length" class="mt-3">
           <div class="text-caption text-medium-emphasis font-weight-bold mb-2">คำสำคัญ</div>
@@ -47,9 +47,9 @@
             </v-chip>
           </div>
         </div>
-        <div class="d-flex justify-space-between ga-4 py-1">
-          <span class="text-medium-emphasis">จำนวนข้อ</span>
-          <span class="font-weight-semibold">{{ articleCount }} {{ articleUnitLabel ?? 'ข้อ/มาตรา' }}</span>
+        <div class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">จำนวนข้อ</span>
+          <span class="law-info-row__value font-weight-semibold">{{ articleCount }} {{ articleUnitLabel ?? 'ข้อ' }}</span>
         </div>
 
         <div v-if="meta.repealed_laws.length" class="mt-3">
@@ -107,8 +107,13 @@ import {
   RELATION_TYPE_ICONS,
   relationTypeLabel,
 } from '../../types/lawRelation';
+import { formatThaiDate } from '../../utils/thaiDate';
 
 defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[] }>();
+
+function formatLawDate(value: string | null | undefined): string {
+  return formatThaiDate(value) || value || '';
+}
 
 function relationRowClass(type: RelationType): string {
   if (type === 'repeals') return 'text-error';
@@ -118,3 +123,22 @@ function relationRowClass(type: RelationType): string {
   return 'text-medium-emphasis';
 }
 </script>
+
+<style scoped>
+.law-info-row {
+  align-items: start;
+  column-gap: 16px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.law-info-row__label {
+  min-width: 0;
+}
+
+.law-info-row__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+</style>
