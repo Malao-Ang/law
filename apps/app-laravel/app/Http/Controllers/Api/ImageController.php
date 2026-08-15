@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\ReviewStore;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\File;
 class ImageController extends Controller
 {
     private static array $ALLOWED_EXTENSIONS = ['png', 'jpeg', 'jpg', 'gif', 'webp', 'bmp', 'tiff'];
+
+    public function __construct(private readonly ReviewStore $reviewStore) {}
 
     public function show(Request $request, string $documentId, string $filename): Response
     {
@@ -23,7 +26,7 @@ class ImageController extends Controller
             abort(400, 'Unsupported image type.');
         }
 
-        $path = storage_path('app/poc/images/'.basename($documentId).'/'.basename($filename));
+        $path = $this->reviewStore->absolutePath('images/'.basename($documentId).'/'.basename($filename));
 
         if (! File::exists($path)) {
             abort(404, 'Image not found.');
@@ -53,7 +56,7 @@ class ImageController extends Controller
 
         $safeDocumentId = basename($documentId);
         $safePageNo = (int) $pageNo;
-        $pageDir = storage_path('app/poc/pages/'.$safeDocumentId);
+        $pageDir = $this->reviewStore->absolutePath('pages/'.$safeDocumentId);
         $candidates = glob($pageDir.'/page-'.$safePageNo.'*');
 
         if (! $candidates) {

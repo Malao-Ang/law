@@ -310,7 +310,7 @@ export function suggestLaws(params: LawSuggestParams, signal?: AbortSignal): Pro
   });
 }
 
-export function reprocessPageWithLandingAI(
+export function reprocessPageWithGemini(
   documentId: string,
   pageNo: number,
   scanExtractionMode: ScanExtractionMode = 'gemini',
@@ -400,6 +400,12 @@ export function createBlock(
 
 export function listDocuments(): Promise<{ documents: DocumentListItem[] }> {
   return jsonRequest('/api/documents');
+}
+
+export function deleteDocument(documentId: string): Promise<{ document_id: string; status: string }> {
+  return jsonRequest<{ document_id: string; status: string }>(`/api/documents/${documentId}`, {
+    method: 'DELETE',
+  });
 }
 
 export function fetchReportSummary(filters: ReportFilters = {}): Promise<ReportSummary> {

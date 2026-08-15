@@ -37,6 +37,9 @@ return [
         'normalize_autocorrect_min_confidence' => env('OCR_NORMALIZE_AUTOCORRECT_MIN_CONFIDENCE', 0.85),
     ],
 
+    'poc_storage_root' => env('POC_STORAGE_ROOT', 'app/poc'),
+    'poc_storage_display_prefix' => env('POC_STORAGE_DISPLAY_PREFIX', 'storage/app/poc'),
+
     'pdf' => [
         'base_url' => env('PDF_SERVICE_URL', 'http://pdf-service:3001'),
     ],

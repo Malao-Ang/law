@@ -130,7 +130,7 @@ export interface DocumentBlock {
   meta: BlockMeta;
 }
 
-export type ScanExtractionMode = 'auto' | 'local' | 'landingai' | 'gemini';
+export type ScanExtractionMode = 'local' | 'gemini';
 
 export interface DocumentPage {
   page_no: number;

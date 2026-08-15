@@ -17,6 +17,10 @@
       density="comfortable"
       class="pipeline-table"
     >
+      <template #item.no="{ item }">
+        <span class="text-caption text-medium-emphasis">{{ item.no }}</span>
+      </template>
+
       <template #item.title="{ item }">
         <span class="text-body-2 font-weight-medium">{{ item.title }}</span>
       </template>
@@ -49,6 +53,17 @@
             {{ actionLabel(item.stage) }}
           </v-btn>
 
+          <v-btn
+            icon="mdi-delete-outline"
+            size="small"
+            variant="text"
+            color="error"
+            title="ลบประวัติอัปโหลด"
+            :loading="deletingId === item.documentId"
+            :disabled="deletingId !== null && deletingId !== item.documentId"
+            @click="confirmDelete(item)"
+          />
+
           <v-menu>
             <template #activator="{ props: menuProps }">
               <v-btn icon="mdi-dots-vertical" size="small" variant="text" color="grey" v-bind="menuProps" />
@@ -77,15 +92,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { listDocuments } from '../../api/client';
+import Swal from 'sweetalert2';
+import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
+import { useSnackbarStore } from '../../stores/snackbarStore';
+import { formatThaiDate } from '../../utils/thaiDate';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
-  deriveStage, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
+  deleteStage, deriveStage, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
 
 interface Row {
+  no: number;
   documentId: string;
   title: string;
   updatedAt: string;
@@ -93,12 +112,15 @@ interface Row {
 }
 
 const router = useRouter();
+const snackbar = useSnackbarStore();
 const docs = ref<DocumentListItem[]>([]);
 const localStages = ref<Record<string, StageKey>>(readStages());
 const loading = ref(false);
+const deletingId = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const headers = [
+  { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 72 },
   { title: 'เอกสาร', key: 'title', sortable: false },
   { title: 'สถานะ', key: 'stage', sortable: false },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false },
@@ -116,7 +138,8 @@ function effectiveStage(doc: DocumentListItem): StageKey {
 }
 
 const rows = computed<Row[]>(() =>
-  docs.value.map((doc) => ({
+  docs.value.map((doc, index) => ({
+    no: index + 1,
     documentId: doc.document_id,
     title: doc.title || doc.document_id,
     updatedAt: formatDate(doc.updated_at),
@@ -159,9 +182,37 @@ function rollback(row: Row): void {
   setStage(row.documentId, prevStage(row.stage));
 }
 
+async function confirmDelete(row: Row): Promise<void> {
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'ลบประวัติอัปโหลด?',
+    text: row.title,
+    showCancelButton: true,
+    confirmButtonText: 'ลบ',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318',
+    cancelButtonColor: '#64748b',
+  });
+  if (!confirmed.isConfirmed) return;
+
+  deletingId.value = row.documentId;
+  try {
+    await deleteDocument(row.documentId);
+    delete localStages.value[row.documentId];
+    localStages.value = { ...localStages.value };
+    deleteStage(row.documentId);
+    await load();
+    snackbar.success('ลบประวัติอัปโหลดแล้ว');
+  } catch (err) {
+    snackbar.error(err instanceof Error ? err.message : 'ลบประวัติอัปโหลดไม่สำเร็จ');
+  } finally {
+    deletingId.value = null;
+  }
+}
+
 function formatDate(iso?: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatThaiDate(iso) || '—';
 }
 
 function hasActive(): boolean {

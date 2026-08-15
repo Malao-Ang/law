@@ -199,6 +199,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
 import type { ScanExtractionMode } from '../../types/document';
@@ -247,25 +248,19 @@ function modeOptionsFor(file: File) {
   return isPdf(file)
     ? [
         { title: 'Gemini Vision (แนะนำสำหรับ PDF scan)', value: 'gemini' },
-        { title: 'Auto — EasyOCR → cloud fallback', value: 'auto' },
-        { title: 'LandingAI — ADE Parse', value: 'landingai' },
-        { title: 'Local — EasyOCR ในเครื่อง', value: 'local' },
       ]
     : [
-        { title: 'Local — Fast PHP extraction (แนะนำ)', value: 'local' },
-        { title: 'Standard — Python Docling', value: 'auto' },
+        { title: 'Fast PHP extraction (แนะนำ)', value: 'local' },
       ];
 }
 
 function hintFor(item: PendingItem): string {
   if (isPdf(item.file) && item.scanMode === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY';
-  if (isPdf(item.file) && item.scanMode === 'landingai') return 'ต้องตั้งค่า VISION_AGENT_API_KEY';
   return '';
 }
 
 function engineFor(item: PendingItem): 'fast' | 'standard' {
-  if (isPdf(item.file) && item.scanMode !== 'auto') return 'standard';
-  return item.scanMode === 'local' ? 'fast' : 'standard';
+  return isPdf(item.file) ? 'standard' : 'fast';
 }
 
 function addFiles(files: FileList | File[]): void {
@@ -277,11 +272,38 @@ function addFiles(files: FileList | File[]): void {
   }
 }
 
-function removeItem(index: number): void {
+async function removeItem(index: number): Promise<void> {
+  const item = pendingItems.value[index];
+  if (!item) return;
+
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'ลบไฟล์นี้ออก?',
+    text: item.file.name,
+    showCancelButton: true,
+    confirmButtonText: 'ลบ',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318',
+    cancelButtonColor: '#64748b',
+  });
+  if (!confirmed.isConfirmed) return;
+
   pendingItems.value.splice(index, 1);
 }
 
-function clearAll(): void {
+async function clearAll(): Promise<void> {
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'ล้างรายการทั้งหมด?',
+    text: `ลบไฟล์ที่เลือกไว้ ${pendingItems.value.length} ไฟล์ออกจากรายการอัปโหลด`,
+    showCancelButton: true,
+    confirmButtonText: 'ล้างทั้งหมด',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318',
+    cancelButtonColor: '#64748b',
+  });
+  if (!confirmed.isConfirmed) return;
+
   pendingItems.value = [];
 }
 

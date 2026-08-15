@@ -19,8 +19,9 @@ class UploadController extends Controller
 
     public function store(StoreDocumentRequest $request): JsonResponse
     {
-        $scanExtractionMode = (string) ($request->validated('scan_extraction_mode') ?? 'gemini');
-        $extractionEngine = (string) ($request->validated('extraction_engine') ?? 'fast');
+        $extension = strtolower((string) $request->file('file')->getClientOriginalExtension());
+        $scanExtractionMode = $extension === 'pdf' ? 'gemini' : 'local';
+        $extractionEngine = $extension === 'pdf' ? 'standard' : 'fast';
 
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
@@ -61,5 +62,19 @@ class UploadController extends Controller
         }
 
         return response()->json($status);
+    }
+
+    public function destroy(string $documentId): JsonResponse
+    {
+        if (! $this->reviewStore->deleteDocument($documentId)) {
+            return response()->json([
+                'message' => 'Document not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'document_id' => $documentId,
+            'status' => 'deleted',
+        ]);
     }
 }

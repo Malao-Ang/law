@@ -65,10 +65,8 @@ const fileExt = computed(() => pendingFile.value?.name.split('.').pop()?.toLower
 
 const isPdf = computed(() => fileExt.value === 'pdf');
 
-// PDF + explicit OCR mode must use the Python pipeline (Gemini / LandingAI / EasyOCR).
 const extractionEngine = computed((): 'fast' | 'standard' => {
-  if (isPdf.value && scanMode.value !== 'auto') return 'standard';
-  return scanMode.value === 'local' ? 'fast' : 'standard';
+  return isPdf.value ? 'standard' : 'fast';
 });
 
 const fileTypeLabel = computed(() => ({ pdf: 'PDF', docx: 'DOCX', doc: 'DOC' }[fileExt.value] ?? fileExt.value.toUpperCase()));
@@ -81,25 +79,18 @@ const modeLabel = computed(() =>
   isPdf.value ? 'โหมด OCR สำหรับ PDF' : 'โหมดการประมวลผล',
 );
 
-// ponytail: PDF can't know scan vs text before upload — show all; Python decides per mode
 const modeOptions = computed(() =>
   isPdf.value
     ? [
         { title: 'Gemini Vision — Google AI (แนะนำสำหรับ PDF scan)', value: 'gemini' },
-        { title: 'Auto — EasyOCR → cloud fallback', value: 'auto' },
-        { title: 'LandingAI — ADE Parse', value: 'landingai' },
-        { title: 'Local — EasyOCR ในเครื่อง', value: 'local' },
       ]
     : [
-        { title: 'Local — Fast PHP extraction (แนะนำ)', value: 'local' },
-        { title: 'Standard — Python Docling', value: 'auto' },
+        { title: 'Fast PHP extraction (แนะนำ)', value: 'local' },
       ],
 );
 
 const modeHint = computed(() => {
   if (isPdf.value && scanMode.value === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY ใน .env';
-  if (isPdf.value && scanMode.value === 'landingai') return 'ต้องตั้งค่า VISION_AGENT_API_KEY ใน .env';
-  if (!isPdf.value && scanMode.value === 'auto') return 'ส่งไฟล์ผ่าน Python Docling pipeline';
   return '';
 });
 

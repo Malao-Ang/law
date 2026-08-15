@@ -18,7 +18,7 @@ class StoreDocumentRequest extends FormRequest
     {
         return [
             'file' => ['required', 'file', 'max:51200', 'mimes:pdf,doc,docx'],
-            'scan_extraction_mode' => ['nullable', 'in:auto,local,landingai,gemini'],
+            'scan_extraction_mode' => ['nullable', 'in:local,gemini'],
             'extraction_engine' => ['nullable', 'in:standard,fast'],
         ];
     }

@@ -9,7 +9,7 @@ import {
   patchBlockLayout,
   reorderBlocks,
   reprocessBlock,
-  reprocessPageWithLandingAI,
+  reprocessPageWithGemini,
   restoreBlocks,
   splitBlock,
 } from '../api/client';
@@ -109,7 +109,7 @@ export const useBlockStore = defineStore('blocks', () => {
     pageNo: number,
     mode: ScanExtractionMode = 'gemini',
   ): Promise<void> {
-    await reprocessPageWithLandingAI(documentId, pageNo, mode);
+    await reprocessPageWithGemini(documentId, pageNo, mode);
     invalidate(documentId);
   }
 

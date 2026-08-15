@@ -19,7 +19,7 @@ class DocumentPipelineClient
         string $relativeInputPath,
         bool $enableAiCorrection,
         string $callbackUrl,
-        string $scanExtractionMode = 'auto',
+        string $scanExtractionMode = 'gemini',
     ): void {
         $this->request(5)->post('/pipeline/extract', [
             'document_id' => $documentId,
@@ -39,7 +39,7 @@ class DocumentPipelineClient
         string $relativeInputPath,
         int $pageNo,
         string $callbackUrl,
-        string $scanExtractionMode = 'landingai',
+        string $scanExtractionMode = 'gemini',
     ): void {
         $this->request(5)->post('/pipeline/reprocess-page', [
             'document_id' => $documentId,

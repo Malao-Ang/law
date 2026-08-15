@@ -25,8 +25,8 @@ class ExtractDocumentJob implements ShouldQueue
         public readonly string $documentId,
         public readonly string $relativeFilePath,
         public readonly bool $enableAiCorrection,
-        public readonly string $scanExtractionMode = 'auto',
-        public readonly string $extractionEngine = 'standard',
+        public readonly string $scanExtractionMode = 'gemini',
+        public readonly string $extractionEngine = 'fast',
     ) {}
 
     public function handle(
@@ -46,8 +46,8 @@ class ExtractDocumentJob implements ShouldQueue
     }
 
     /**
-     * Cloud/local OCR modes require the Python pipeline. Fast PDF text extraction
-     * must not run first — it would bypass Gemini/LandingAI/EasyOCR for scans.
+     * Gemini OCR requires the Python pipeline. Fast PDF text extraction must not
+     * run first when the selected PDF path is Gemini.
      */
     private function shouldUseStandardPipeline(): bool
     {
@@ -66,7 +66,7 @@ class ExtractDocumentJob implements ShouldQueue
             return false;
         }
 
-        return in_array($this->scanExtractionMode, ['gemini', 'landingai', 'local'], true);
+        return $this->scanExtractionMode === 'gemini';
     }
 
     private function runFast(
@@ -106,7 +106,7 @@ class ExtractDocumentJob implements ShouldQueue
             'status' => 'done',
             'progress' => 60,
             'current_step' => 'fast_extract_done',
-            'review_path' => 'storage/app/poc/'.$store->reviewRelativePath($this->documentId),
+            'review_path' => $store->displayPath($store->reviewRelativePath($this->documentId)),
             'correction_status' => 'not_required',
             'timings' => $output['timings'] ?? null,
             'extraction_path' => $extraction['path'] ?? null,
