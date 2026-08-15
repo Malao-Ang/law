@@ -9,7 +9,7 @@ function assert(cond: boolean, msg: string): void {
 assert(docTypeToBadge('rabiap') === 'ระเบียบ', 'rabiap → ระเบียบ');
 assert(docTypeToBadge('kho-bangkhab') === 'ข้อบังคับ', 'kho-bangkhab → ข้อบังคับ');
 assert(docTypeToBadge('prakat') === 'ประกาศ', 'prakat → ประกาศ');
-assert(docTypeToBadge('kotmai-krung') === 'พ.ร.บ.', 'kotmai-krung → พ.ร.บ.');
+assert(docTypeToBadge('kotmai-phaainok') === 'กฎหมายภายนอก', 'kotmai-phaainok → กฎหมายภายนอก');
 assert(docTypeToBadge('other') === null, 'other → null (no design badge)');
 
 assert(changeStatusToBadge('new') === 'ใหม่ล่าสุด', 'new → ใหม่ล่าสุด');

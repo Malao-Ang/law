@@ -70,7 +70,7 @@
             <v-icon icon="mdi-check-circle-outline" color="success" />
             <div>
               <div class="text-caption text-medium-emphasis">อัปเดตล่าสุด</div>
-              <div class="text-body-2">{{ review.document_review.updated_at ?? '—' }}</div>
+              <div class="text-body-2">{{ formatThaiDateTime(review.document_review.updated_at) || '—' }}</div>
             </div>
           </div>
           <div class="d-flex align-start ga-3">
@@ -88,7 +88,7 @@
         <div class="d-flex flex-column ga-3">
           <div class="text-caption text-medium-emphasis">ดำเนินการกับเอกสารทั้งฉบับ</div>
           <v-btn color="primary" prepend-icon="mdi-download-outline" :disabled="exportDisabled || exportBusy" @click="$emit('export')">
-            ส่งออก RAG JSON
+            ส่งออก JSON จัดลำดับเนื้อหา
           </v-btn>
           <div v-if="exportDisabled" class="text-caption text-error">
             รอ AI correction ให้เสร็จก่อนจึงจะส่งออกได้
@@ -105,6 +105,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { DocumentMetadata, ReviewDocument } from '../../types/document';
+import { formatThaiDateTime } from '../../utils/thaiDate';
 
 const props = defineProps<{
   modelValue: DocumentMetadata;
@@ -143,4 +144,3 @@ function patch(key: keyof DocumentMetadata, value: string): void {
   emit('update:modelValue', { ...props.modelValue, [key]: value });
 }
 </script>
-

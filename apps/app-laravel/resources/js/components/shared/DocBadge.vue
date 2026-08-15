@@ -6,11 +6,11 @@
 // SVGs if pixel-exact icons are required.
 
 type BadgeType =
-  | 'พ.ร.บ.' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ'
+  | 'กฎหมายภายนอก' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ'
   | 'ใหม่ล่าสุด' | 'ปรับปรุงรายมาตรา' | 'ปรับปรุงทั้งฉบับ' | 'ยกเลิกบางส่วน' | 'ยกเลิกแล้ว';
 
 const STYLES: Record<BadgeType, { bg: string; fg: string; icon: string }> = {
-  'พ.ร.บ.':            { bg: '#854d0e', fg: '#ffffff', icon: 'mdi-bank' },
+  'กฎหมายภายนอก':     { bg: '#854d0e', fg: '#ffffff', icon: 'mdi-bank' },
   'ระเบียบ':           { bg: '#3b82f6', fg: '#ffffff', icon: 'mdi-file-document-outline' },
   'ข้อบังคับ':          { bg: '#10b981', fg: '#ffffff', icon: 'mdi-gavel' },
   'ประกาศ':            { bg: '#fb923c', fg: '#ffffff', icon: 'mdi-bullhorn-outline' },

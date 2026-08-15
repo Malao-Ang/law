@@ -4,7 +4,7 @@
 const model = defineModel<string>({ default: 'ทั้งหมด' });
 
 withDefaults(defineProps<{ options?: string[] }>(), {
-  options: () => ['ทั้งหมด', 'พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'],
+  options: () => ['ทั้งหมด', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'กฎหมายภายนอก'],
 });
 </script>
 

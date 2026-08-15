@@ -24,7 +24,6 @@
 
       <div class="d-flex flex-wrap ga-2 mt-3">
         <v-chip size="x-small" color="primary" variant="tonal">{{ group.counts.units }} หน่วยงาน</v-chip>
-        <v-chip size="x-small" color="success" variant="tonal">{{ group.counts.positions }} ตำแหน่ง</v-chip>
         <v-chip size="x-small" color="secondary" variant="tonal">{{ group.counts.users }} บุคคล</v-chip>
       </div>
     </div>

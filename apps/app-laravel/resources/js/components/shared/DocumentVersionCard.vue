@@ -49,6 +49,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
+import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{
   version: DocumentVersion;
@@ -60,7 +61,7 @@ const props = defineProps<{
 defineEmits<{ click: [] }>();
 
 const documentTypeLabelMap: Record<DocumentType, string> = {
-  phrb: 'พ.ร.บ.',
+  'kotmai-phaainok': 'กฎหมายภายนอก',
   rabiap: 'ระเบียบ',
   'kho-bangkhab': 'ข้อบังคับ',
   prakat: 'ประกาศ',
@@ -68,7 +69,7 @@ const documentTypeLabelMap: Record<DocumentType, string> = {
 };
 
 const documentTypeColorMap: Record<DocumentType, string> = {
-  phrb: 'doc-phrb',
+  'kotmai-phaainok': 'doc-phaainok',
   rabiap: 'doc-rabiap',
   'kho-bangkhab': 'doc-kho-bangkhab',
   prakat: 'doc-prakat',
@@ -105,15 +106,7 @@ const publishedDateLabel = computed(() => formatDate(
 
 function formatDate(value?: Date): string {
   if (!value) return 'ไม่ระบุวันที่';
-
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return 'ไม่ระบุวันที่';
-
-  return new Intl.DateTimeFormat('th-TH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
+  return formatThaiDate(value) || 'ไม่ระบุวันที่';
 }
 </script>
 
@@ -128,8 +121,8 @@ function formatDate(value?: Date): string {
   box-shadow: 0 12px 30px rgba(26, 46, 82, 0.06);
 }
 
-.document-version-card--phrb {
-  border-left-color: rgb(var(--v-theme-doc-phrb)) !important;
+.document-version-card--kotmai-phaainok {
+  border-left-color: rgb(var(--v-theme-doc-phaainok)) !important;
 }
 
 .document-version-card--rabiap {

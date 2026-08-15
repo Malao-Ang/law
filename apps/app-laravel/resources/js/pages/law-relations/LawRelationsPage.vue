@@ -32,15 +32,15 @@
             <span class="text-subtitle-1 font-weight-bold">ลำดับชั้นเอกสาร</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            กำหนดว่าเอกสารนี้อยู่ภายใต้กฎหมายแม่ใด (เช่น พ.ร.บ. ฉบับแก้ไข → พ.ร.บ. ฉบับหลัก)
+            กำหนดว่าเอกสารนี้อ้างถึงกฎหมายใด
           </p>
           <v-select
             v-model="parentId"
             :items="parentItems"
             item-title="title"
             item-value="document_id"
-            label="กฎหมายแม่ (ไม่บังคับ)"
-            placeholder="- ไม่มี / เป็นกฎหมายหลัก -"
+            label="กฎหมายที่อ้างถึง (ไม่บังคับ)"
+            placeholder="- ไม่มี -"
             clearable
             prepend-inner-icon="mdi-file-tree"
             :loading="catalogLoading"
@@ -60,7 +60,7 @@
             <v-progress-circular indeterminate size="24" color="admin-primary" />
           </div>
           <div v-else-if="children.length === 0" class="text-body-2 text-medium-emphasis pa-2">
-            ยังไม่มีเอกสารที่อ้างอิงเอกสารนี้เป็นกฎหมายแม่
+            ยังไม่มีเอกสารที่อ้างอิงเอกสารนี้
           </div>
           <v-list v-else density="compact" lines="one">
             <v-list-item
@@ -130,13 +130,13 @@
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-2">
             <v-icon icon="mdi-vector-link" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์ระดับมาตรา / ข้อ</span>
+            <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์ระดับข้อ</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            แก้ไขเพิ่มเติม · ยกเลิก · เกี่ยวข้อง — ผูกมาตรา/ข้อในเอกสารนี้กับกฎหมายเป้าหมาย
+            แก้ไขเพิ่มเติม · ยกเลิก · เกี่ยวข้อง — ผูกข้อในเอกสารนี้กับกฎหมายเป้าหมาย
           </p>
           <div v-if="sections.length === 0" class="text-body-2 text-medium-emphasis">
-            ไม่พบมาตรา/ข้อในเอกสาร
+            ไม่พบข้อในเอกสาร
           </div>
           <div v-else class="d-flex flex-column ga-3">
             <div v-for="entry in sectionRelationEntries" :key="entry.section.id" class="relations-section">

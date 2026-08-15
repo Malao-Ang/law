@@ -9,7 +9,7 @@ import '@mdi/font/css/materialdesignicons.css';
 // Shared across both themes so every component color name resolves in either.
 const sharedColors = {
   'admin-primary': '#1e3a8a',
-  'doc-phrb': '#854D0E',        // พระราชบัญญัติ
+  'doc-phaainok': '#854D0E',    // กฎหมายภายนอก
   'doc-rabiap': '#3B82F6',      // ระเบียบ
   'doc-kho-bangkhab': '#10B981', // ข้อบังคับ
   'doc-prakat': '#FB923C',      // ประกาศ

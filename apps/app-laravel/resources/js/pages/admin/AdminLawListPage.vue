@@ -114,7 +114,7 @@
                 <span class="text-body-2 font-weight-bold">{{ law.title }}</span>
                 <v-chip v-if="law.isParent" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
                   <v-icon start icon="mdi-link-variant" size="11" />
-                  กฎหมายแม่บท
+                  กฎหมายที่อ้างถึง
                 </v-chip>
               </div>
               <div v-if="law.childCount" class="d-flex ga-2 mb-1">
@@ -135,7 +135,7 @@
                 <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
                 <span v-if="law.pages > 0 || law.sections != null">
                   <v-icon size="11" icon="mdi-file-multiple" />
-                  {{ law.pages }} หน้า<template v-if="law.sections != null"> / {{ law.sections }} ข้อ/มาตรา</template>
+                  {{ law.pages }} หน้า<template v-if="law.sections != null"> / {{ law.sections }} ข้อ</template>
                 </span>
               </div>
             </td>
@@ -166,7 +166,7 @@
                     <v-list-item :to="`/documents/${law.id}/law-info`" prepend-icon="mdi-information-outline" title="ข้อมูลกฎหมาย" />
                     <v-list-item :to="`/documents/${law.id}/relations`" prepend-icon="mdi-graph-outline" title="ความสัมพันธ์" />
                     <v-divider class="my-1" />
-                    <v-list-item :to="`/documents/${law.id}/rag`" prepend-icon="mdi-database-export-outline" title="RAG Export" />
+                    <v-list-item :to="`/documents/${law.id}/rag`" prepend-icon="mdi-database-export-outline" title="จัดลำดับเนื้อหา" />
                   </v-list>
                 </v-menu>
               </div>
@@ -190,6 +190,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
+import { formatThaiDate } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const PAGE_SIZE = 20;
@@ -223,13 +224,13 @@ watch([search, filterType, filterStatus, sortOrder], () => {
 });
 
 const TYPE_META: Record<string, { color: string; icon: string }> = {
-  พระราชบัญญัติ: { color: 'doc-phrb', icon: 'mdi-bank-outline' },
+  กฎหมายภายนอก: { color: 'doc-phaainok', icon: 'mdi-bank-outline' },
   ข้อบังคับ: { color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
   ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
   ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
 
-const FEATURED_TYPES = ['พระราชบัญญัติ', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
+const FEATURED_TYPES = ['กฎหมายภายนอก', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
 
 const statCards = computed(() => {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -309,9 +310,7 @@ const laws = computed<LawRow[]>(() =>
     group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
     pages: doc.page_count ?? 0,
     sections: doc.section_count ?? null,
-    editedAt: doc.date
-      ? new Date(doc.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
-      : '-',
+    editedAt: formatThaiDate(doc.date) || '-',
     rawDate: doc.date ?? '',
   })),
 );

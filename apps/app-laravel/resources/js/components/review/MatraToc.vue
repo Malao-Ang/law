@@ -4,14 +4,14 @@
       class="matra-toc__header d-flex align-center ga-2 px-3 py-2"
       @click="collapsed = !collapsed"
     >
-      <span class="text-caption font-weight-semibold">มาตรา</span>
+      <span class="text-caption font-weight-semibold">ข้อ</span>
       <span class="text-caption text-medium-emphasis">{{ items.length }}</span>
       <v-spacer />
       <v-icon :icon="collapsed ? 'mdi-chevron-right' : 'mdi-chevron-down'" size="x-small" />
     </div>
 
     <div v-if="!collapsed" class="matra-toc__body">
-      <div v-if="items.length === 0" class="text-caption text-medium-emphasis pa-3">ไม่พบมาตรา</div>
+      <div v-if="items.length === 0" class="text-caption text-medium-emphasis pa-3">ไม่พบข้อ</div>
       <v-list v-else nav density="compact" bg-color="transparent">
         <v-list-item
           v-for="item in items"

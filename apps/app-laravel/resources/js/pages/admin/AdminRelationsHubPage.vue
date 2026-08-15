@@ -67,7 +67,7 @@
                 <span class="text-body-2 font-weight-bold">{{ doc.title }}</span>
                 <v-chip v-if="doc.hasChildren" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
                   <v-icon start icon="mdi-link-variant" size="11" />
-                  กฎหมายแม่บท
+                  กฎหมายที่อ้างถึง
                 </v-chip>
               </div>
               <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
@@ -75,7 +75,7 @@
                 <span v-if="doc.group"><v-icon size="11" icon="mdi-tag" /> {{ doc.group }}</span>
                 <span v-if="doc.pages > 0 || doc.sections != null">
                   <v-icon size="11" icon="mdi-file-multiple" />
-                  {{ doc.pages }} หน้า<template v-if="doc.sections != null"> / {{ doc.sections }} ข้อ/มาตรา</template>
+                  {{ doc.pages }} หน้า<template v-if="doc.sections != null"> / {{ doc.sections }} ข้อ</template>
                 </span>
               </div>
             </td>
@@ -269,9 +269,9 @@
             <!-- Section-level relations -->
             <div class="rh-section-title mb-3">
               <v-icon icon="mdi-vector-link" color="admin-primary" size="16" />
-              ความสัมพันธ์ระดับมาตรา / ข้อ
+              ความสัมพันธ์ระดับข้อ
             </div>
-            <div v-if="sections.length === 0" class="text-body-2 text-medium-emphasis">ไม่พบมาตรา/ข้อในเอกสาร</div>
+            <div v-if="sections.length === 0" class="text-body-2 text-medium-emphasis">ไม่พบข้อในเอกสาร</div>
             <div v-else class="d-flex flex-column ga-3">
               <div v-for="entry in sectionRelationEntries" :key="entry.section.id" class="rh-section-block">
                 <div class="d-flex align-center ga-2 mb-2">
@@ -333,7 +333,7 @@
           <div class="text-body-2 font-weight-bold text-truncate">{{ documentStore.review?.law_meta?.title || quickEditTitle }}</div>
           <div class="text-caption text-medium-emphasis mt-1">
             {{ documentLevelRelations.length }} ความสัมพันธ์ระดับเอกสาร ·
-            {{ sectionRelationEntries.filter(e => e.relations.length).length }} มาตรา/ข้อที่มีความสัมพันธ์
+            {{ sectionRelationEntries.filter(e => e.relations.length).length }} ข้อที่มีความสัมพันธ์
           </div>
         </div>
         <div class="d-flex justify-end ga-2">
@@ -374,6 +374,7 @@ import {
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
+import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -456,7 +457,7 @@ const sortOptions = [
 
 // ── Type colors (same as AdminLawListPage) ─────────────────
 const TYPE_META: Record<string, { color: string }> = {
-  พระราชบัญญัติ: { color: 'doc-phrb' },
+  กฎหมายภายนอก: { color: 'doc-phaainok' },
   ข้อบังคับ: { color: 'doc-kho-bangkhab' },
   ระเบียบ: { color: 'doc-rabiap' },
   ประกาศ: { color: 'doc-prakat' },
@@ -500,9 +501,7 @@ const docs = computed<DocRow[]>(() =>
     group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
     pages: doc.page_count ?? 0,
     sections: doc.section_count ?? null,
-    editedAt: doc.date
-      ? new Date(doc.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
-      : '-',
+    editedAt: formatThaiDate(doc.date) || '-',
     rawDate: doc.date ?? '',
   })),
 );
@@ -567,7 +566,7 @@ function logChange(action: 'add' | 'remove', relation: LawRelation): void {
 }
 
 function formatDateTime(date: Date): string {
-  return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return formatThaiDateTime(date) || '-';
 }
 
 // ── Table helpers ─────────────────────────────────────────

@@ -71,10 +71,10 @@ onBeforeUnmount(() => {
   searchStore.clearSuggestions();
 });
 
-const typeOptions = ['ทั้งหมด', 'พ.ร.บ.', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
+const typeOptions = ['ทั้งหมด', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'กฎหมายภายนอก'];
 
 const typeToValue: Record<string, string> = {
-  'พ.ร.บ.': 'phrb',
+  'กฎหมายภายนอก': 'kotmai-phaainok',
   'ข้อบังคับ': 'kho-bangkhab',
   'ระเบียบ': 'rabiap',
   'ประกาศ': 'prakat',
@@ -120,7 +120,7 @@ async function applyPopularTag(tag: string): Promise<void> {
         ได้อย่างสะดวกรวดเร็ว
       </h1>
       <p class="text-center mb-7 elaw-hero__subtitle">
-        อัปเดตข้อมูลล่าสุด รวบรวมพระราชบัญญัติ กฎกระทรวง และประกาศต่าง ๆ ไว้ในที่เดียว
+        อัปเดตข้อมูลล่าสุด รวบรวมกฎหมายภายนอก ระเบียบ ข้อบังคับ และประกาศต่าง ๆ ไว้ในที่เดียว
       </p>
 
       <v-card flat rounded="xl" class="pa-5 pa-md-6 elaw-search-card">

@@ -111,7 +111,7 @@
         size="small"
         variant="tonal"
         color="primary"
-        :title="props.correctionInProgress ? 'รอ AI correction เสร็จ' : 'ส่งออก RAG JSON'"
+        :title="props.correctionInProgress ? 'รอ AI correction เสร็จ' : 'ส่งออก JSON จัดลำดับเนื้อหา'"
         @click="emit('action', 'export')"
       >
         Export

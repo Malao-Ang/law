@@ -26,7 +26,7 @@ export const STAGES: StageDef[] = [
   { key: 'processing', label: 'กำลังประมวลผล',   color: 'info',             icon: 'mdi-progress-clock',       action: { type: 'none' } },
   { key: 'processed',  label: 'ประมวลผลแล้ว',    color: 'primary',          icon: 'mdi-check-circle-outline', action: { type: 'route', label: 'เริ่มตรวจ', to: (id) => `/documents/${id}/review` } },
   { key: 'normalize',  label: 'ปรับข้อความ',      color: 'warning',          icon: 'mdi-format-text',          action: { type: 'route', label: 'แก้ไขข้อความ', to: (id) => `/documents/${id}/review` } },
-  { key: 'rag',        label: 'จัดการ RAG',       color: 'admin-primary',    icon: 'mdi-database-cog-outline', action: { type: 'route', label: 'จัดการ RAG', to: (id) => `/documents/${id}/rag` } },
+  { key: 'rag',        label: 'จัดลำดับเนื้อหา', color: 'admin-primary',    icon: 'mdi-database-cog-outline', action: { type: 'route', label: 'จัดลำดับเนื้อหา', to: (id) => `/documents/${id}/rag` } },
   { key: 'info',       label: 'กรอกข้อมูลเอกสาร',  color: 'doc-kho-bangkhab', icon: 'mdi-information-outline',   action: { type: 'route', label: 'กรอกข้อมูล', to: (id) => `/documents/${id}/law-info` } },
   { key: 'relation',   label: 'เพิ่มความสัมพันธ์', color: 'doc-rabiap',       icon: 'mdi-graph-outline',        action: { type: 'route', label: 'เพิ่มความสัมพันธ์', to: (id) => `/documents/${id}/relations` } },
   { key: 'complete',   label: 'เสร็จสมบูรณ์',      color: 'success',          icon: 'mdi-check-decagram-outline', action: { type: 'route', label: 'กำหนดสิทธิ์', to: (id) => `/documents/${id}/permissions` } },
@@ -107,5 +107,11 @@ export function readStages(): Record<string, StageKey> {
 export function writeStage(documentId: string, stage: StageKey): void {
   const map = readStages();
   map[documentId] = stage;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+}
+
+export function deleteStage(documentId: string): void {
+  const map = readStages();
+  delete map[documentId];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }

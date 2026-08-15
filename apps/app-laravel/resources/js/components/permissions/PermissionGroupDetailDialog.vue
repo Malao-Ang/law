@@ -18,7 +18,7 @@
           </v-alert>
 
           <v-row dense>
-            <v-col cols="12" md="4">
+            <v-col cols="12" md="6">
               <v-card flat border rounded="lg" class="pa-4 fill-height">
                 <div class="d-flex align-center justify-space-between mb-3">
                   <span class="text-subtitle-2 font-weight-bold">หน่วยงาน</span>
@@ -30,19 +30,7 @@
                 </v-list>
               </v-card>
             </v-col>
-            <v-col cols="12" md="4">
-              <v-card flat border rounded="lg" class="pa-4 fill-height">
-                <div class="d-flex align-center justify-space-between mb-3">
-                  <span class="text-subtitle-2 font-weight-bold">ตำแหน่ง</span>
-                  <v-chip size="x-small" color="success" variant="tonal">{{ group.counts.positions }}</v-chip>
-                </div>
-                <div v-if="group.positions.length === 0" class="text-body-2 text-medium-emphasis">ไม่มีรายการ</div>
-                <v-list v-else density="compact">
-                  <v-list-item v-for="position in group.positions" :key="position.id" :title="position.name" />
-                </v-list>
-              </v-card>
-            </v-col>
-            <v-col cols="12" md="4">
+            <v-col cols="12" md="6">
               <v-card flat border rounded="lg" class="pa-4 fill-height">
                 <div class="d-flex align-center justify-space-between mb-3">
                   <span class="text-subtitle-2 font-weight-bold">รายบุคคล</span>

@@ -23,7 +23,7 @@
           </div>
           <div class="d-flex flex-wrap ga-2">
             <v-chip v-if="meta?.status" size="small" color="primary" variant="tonal">{{ meta.status }}</v-chip>
-            <v-chip v-if="meta?.promulgation_date" size="small" variant="outlined">ประกาศ {{ meta.promulgation_date }}</v-chip>
+            <v-chip v-if="meta?.promulgation_date" size="small" variant="outlined">ประกาศ {{ formatThaiDate(meta.promulgation_date) }}</v-chip>
             <v-chip
               v-if="meta?.access_scope === 'private'"
               size="small"
@@ -211,7 +211,7 @@
               prepend-icon="mdi-database-cog-outline"
               @click="router.push(`/documents/${props.documentId}/rag`)"
             >
-              แก้ไข RAG บล็อก
+              จัดลำดับเนื้อหา
             </v-btn>
             <v-btn
               variant="outlined"
@@ -257,6 +257,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { confirmEsign, downloadOriginalPdfExport, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
 import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/document';
+import { formatThaiDate } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const props = defineProps<{ documentId: string }>();
@@ -300,9 +301,6 @@ const isPublished = computed(() => {
   return s === 'ingested' || s === 'exported';
 });
 
-function formatThaiDate(iso: string): string {
-  return new Date(iso).toLocaleString('th-TH');
-}
 
 async function handleWordExport(): Promise<void> {
   exportingDocx.value = true;

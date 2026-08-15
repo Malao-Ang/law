@@ -2,7 +2,7 @@ export type ObjectId = string;
 
 export type DocumentVersionStatus = 'draft' | 'published' | 'scheduled' | 'repealed' | 'archived';
 
-export type DocumentType = 'phrb' | 'rabiap' | 'kho-bangkhab' | 'prakat' | 'other';
+export type DocumentType = 'kotmai-phaainok' | 'rabiap' | 'kho-bangkhab' | 'prakat' | 'other';
 
 export type PublicationScope = 'public' | 'private' | 'organization';
 

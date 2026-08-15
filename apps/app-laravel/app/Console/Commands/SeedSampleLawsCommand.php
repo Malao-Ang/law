@@ -23,7 +23,7 @@ class SeedSampleLawsCommand extends Command
         $samples = [
             [
                 'title' => 'พระราชบัญญัติภาษีที่ดินและสิ่งปลูกสร้าง พ.ศ. ๒๕๖๒',
-                'law_type' => 'พ.ร.บ.',
+                'law_type' => 'กฎหมายภายนอก',
                 'status' => 'มีผลบังคับใช้',
                 'change_status' => 'กฎหมายใหม่',
                 'agency' => 'กระทรวงการคลัง',
