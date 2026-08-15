@@ -234,15 +234,21 @@ async function applyPopularTag(tag: string): Promise<void> {
 <style scoped>
 /* ── Hero section ──────────────────────────────────── */
 .elaw-hero {
+  position: relative;
+  z-index: 30;
   background: linear-gradient(180deg, #f8f7f1 8.17%, #fff4b5 100%);
   border-bottom: 1px solid #eadfcb;
   padding: 50px 24px 60px;
+  overflow: visible;
 }
 
 .elaw-hero__container {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: visible;
 }
 
 /* Eyebrow pill — exact Figma: white bg, border rgba(123,88,13,0.3), text #7b580d 12px */
@@ -285,6 +291,8 @@ async function applyPopularTag(tag: string): Promise<void> {
 
 /* ── Search card — exact Figma: rounded-32px, blur, border #e7e2d9, shadow ── */
 .elaw-search-card {
+  position: relative;
+  z-index: 20;
   background: rgba(255, 255, 255, 0.8) !important;
   backdrop-filter: blur(6px) !important;
   border: 1px solid #e7e2d9 !important;
@@ -292,6 +300,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   box-shadow: 0 10px 40px 0 rgba(75, 70, 61, 0.08) !important;
   max-width: 992px;
   width: 100%;
+  overflow: visible !important;
 }
 
 /* Label */
@@ -319,6 +328,8 @@ async function applyPopularTag(tag: string): Promise<void> {
 .elaw-search-card__search-row {
   width: 100%;
   position: relative;
+  z-index: 60;
+  overflow: visible;
 }
 
 /* Live suggestion dropdown */
@@ -327,7 +338,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: 4000;
   overflow: hidden;
   border-radius: 16px !important;
   background: #ffffff;

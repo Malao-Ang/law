@@ -1101,9 +1101,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .elaw-db-header {
+  position: relative;
+  z-index: 40;
   background: linear-gradient(180deg, #f8f7f1 8%, #fff4b5 100%);
   border-bottom: 1px solid #eadfcb;
   padding: 28px 24px 34px;
+  overflow: visible;
 }
 
 .elaw-db-header__title {
@@ -1221,6 +1224,8 @@ onBeforeUnmount(() => {
 
 .elaw-search-shell {
   position: relative;
+  z-index: 100;
+  overflow: visible;
 }
 
 .elaw-suggest-card {
@@ -1228,10 +1233,11 @@ onBeforeUnmount(() => {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: 4000;
   overflow: hidden;
   border-radius: 12px !important;
   background: rgb(var(--v-theme-detail-surface));
+  box-shadow: 0 16px 42px rgba(75, 70, 61, 0.16) !important;
 }
 
 .elaw-suggest-item {
