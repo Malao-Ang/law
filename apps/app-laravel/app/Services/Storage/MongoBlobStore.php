@@ -48,6 +48,14 @@ final class MongoBlobStore
         ]) > 0;
     }
 
+    public function delete(string $id): bool
+    {
+        $result = $this->collection->deleteOne(['_id' => $id]);
+        Cache::forget('law-meta-list');
+
+        return $result->getDeletedCount() > 0;
+    }
+
     /** @param callable(array<int|string, mixed> &): void $cb */
     public function withLock(string $kind, string $id, callable $cb): void
     {

@@ -52,7 +52,7 @@ class ExportService
         return [
             'document_id' => $documentId,
             'status' => 'exported',
-            'export_path' => 'storage/app/poc/'.$relativePath,
+            'export_path' => $this->reviewStore->displayPath($relativePath),
         ];
     }
 

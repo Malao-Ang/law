@@ -35,6 +35,7 @@ class DocumentExportService
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly LibreOfficeConverter $libreOffice,
+        private readonly ReviewStore $reviewStore,
     ) {}
 
     public function buildHtml(array $document): string
@@ -280,7 +281,7 @@ class DocumentExportService
 
         $srcPath = (string) ($imgMeta['src_path'] ?? $meta['image_path'] ?? '');
         if ($srcPath !== '') {
-            $absolute = storage_path('app/poc/'.ltrim(str_replace('\\', '/', $srcPath), '/'));
+            $absolute = $this->reviewStore->absolutePath($srcPath);
             if (is_file($absolute)) {
                 return [$absolute, false];
             }

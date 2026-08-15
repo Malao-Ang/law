@@ -29,7 +29,7 @@ class RagIngestService
             'status' => 'ingested',
             'ingested_at' => now()->toIso8601String(),
             'chunk_count' => count($chunks),
-            'source_export_path' => 'storage/app/poc/'.$this->reviewStore->exportRelativePath($documentId),
+            'source_export_path' => $this->reviewStore->displayPath($this->reviewStore->exportRelativePath($documentId)),
             'chunks' => array_map(function (array $chunk): array {
                 return [
                     'chunk_id' => (string) ($chunk['chunk_id'] ?? ''),
@@ -44,7 +44,7 @@ class RagIngestService
         return [
             'document_id' => $documentId,
             'status' => 'ingested',
-            'ingest_path' => 'storage/app/poc/'.$relativePath,
+            'ingest_path' => $this->reviewStore->displayPath($relativePath),
             'chunk_count' => count($chunks),
         ];
     }

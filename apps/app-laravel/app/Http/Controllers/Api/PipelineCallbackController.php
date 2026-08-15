@@ -73,7 +73,7 @@ class PipelineCallbackController
             'status' => 'done',
             'progress' => 100,
             'current_step' => 'completed',
-            'review_path' => 'storage/app/poc/'.$reviewStore->reviewRelativePath($documentId),
+            'review_path' => $reviewStore->displayPath($reviewStore->reviewRelativePath($documentId)),
             'scan_extraction_mode_requested' => $extraction['scan_extraction_mode_requested'] ?? null,
             'scan_extraction_mode_effective' => $extraction['scan_extraction_mode_effective'] ?? null,
             'extraction_path' => $extraction['path'] ?? null,
