@@ -42,6 +42,8 @@ defineEmits<{ select: [] }>();
   cursor: pointer;
   display: flex;
   gap: 14px;
+  height: 100%;
+  min-height: 104px;
   padding: 16px 18px;
   text-align: left;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -69,6 +71,7 @@ defineEmits<{ select: [] }>();
 }
 
 .scope-card__content {
+  align-self: center;
   flex: 1 1 auto;
   min-width: 0;
 }

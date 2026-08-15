@@ -44,8 +44,9 @@ class LawSuggestService
                     'filter' => [[
                         'bool' => [
                             'should' => [
+                                ['term' => ['visibility' => 'public']],
                                 ['term' => ['access_scope' => 'public']],
-                                ['bool' => ['must_not' => [['exists' => ['field' => 'access_scope']]]]],
+                                ['bool' => ['must_not' => [['exists' => ['field' => 'visibility']]]]],
                             ],
                             'minimum_should_match' => 1,
                         ],
@@ -109,8 +110,9 @@ class LawSuggestService
                     'filter' => [[
                         'bool' => [
                             'should' => [
+                                ['term' => ['visibility' => 'public']],
                                 ['term' => ['access_scope' => 'public']],
-                                ['bool' => ['must_not' => [['exists' => ['field' => 'access_scope']]]]],
+                                ['bool' => ['must_not' => [['exists' => ['field' => 'visibility']]]]],
                             ],
                             'minimum_should_match' => 1,
                         ],

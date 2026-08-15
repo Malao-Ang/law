@@ -3,6 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 // Use dynamic imports (route-level code splitting)
 const PublicHomePage = () => import('../pages/public/PublicHomePage.vue');
 const LawDatabasePage = () => import('../pages/public/LawDatabasePage.vue');
+const LoginPage = () => import('../pages/auth/LoginPage.vue');
 const AdminDashboardPage = () => import('../pages/admin/AdminDashboardPage.vue');
 const AdminLawListPage = () => import('../pages/admin/AdminLawListPage.vue');
 const AdminUploadPage = () => import('../pages/admin/AdminUploadPage.vue');
@@ -25,6 +26,7 @@ const LawPage = () => import('../pages/law/LawPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
+  { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
   { path: '/admin', name: 'admin', component: AdminDashboardPage, meta: { bareLayout: true } },
   { path: '/admin/laws', name: 'admin-laws', component: AdminLawListPage, meta: { bareLayout: true } },

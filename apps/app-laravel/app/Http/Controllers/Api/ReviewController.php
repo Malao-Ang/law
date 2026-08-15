@@ -13,10 +13,13 @@ use App\Services\DocumentHtmlService;
 use App\Services\DocumentPipelineClient;
 use App\Services\Permissions\PermissionStore;
 use App\Services\ReviewStore;
+use App\Services\Search\LawIndexer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class ReviewController extends Controller
 {
@@ -25,6 +28,7 @@ class ReviewController extends Controller
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly DocumentPipelineClient $pipelineClient,
         private readonly PermissionStore $permissionStore,
+        private readonly LawIndexer $lawIndexer,
     ) {}
 
     public function show(string $documentId): JsonResponse
@@ -145,11 +149,23 @@ class ReviewController extends Controller
                 $payload['law_meta'] = $this->normalizePermissionLawMeta($payload['law_meta']);
             }
 
+            $shouldReindex = isset($payload['law_meta']) && is_array($payload['law_meta']);
             $payload = $this->reviewStore->updateDocumentReview($documentId, $payload);
         } catch (ValidationException $exception) {
             throw $exception;
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
+        }
+
+        if ($shouldReindex) {
+            try {
+                $this->lawIndexer->index($documentId);
+            } catch (Throwable $exception) {
+                Log::warning('Law indexing failed after review metadata update (non-fatal)', [
+                    'document_id' => $documentId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
@@ -183,12 +199,6 @@ class ReviewController extends Controller
         }
 
         $groupIds = $this->permissionStore->validateGroupIds((array) ($lawMeta['permission_group_ids'] ?? []));
-
-        if ($scope === 'private' && $groupIds === []) {
-            throw ValidationException::withMessages([
-                'law_meta.permission_group_ids' => ['ต้องเลือกกลุ่มสิทธิ์อย่างน้อย 1 กลุ่มเมื่อกำหนดเป็น Private'],
-            ]);
-        }
 
         if ($hasGroupIds || $scope === 'private') {
             $lawMeta['permission_group_ids'] = $groupIds;

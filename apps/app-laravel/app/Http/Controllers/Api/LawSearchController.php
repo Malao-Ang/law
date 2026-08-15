@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
+use App\Services\LawMetaNormalizer;
 use App\Services\ReviewStore;
+use App\Services\Search\LawSearchQuery;
 use App\Services\Search\LawSearchService;
 use App\Services\Search\LawSuggestService;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +31,12 @@ class LawSearchController extends Controller
                     $fileBased['results'],
                     fn (array $r): bool => ! isset($esLawIds[$r['law_id']]),
                 ));
-                $results = array_merge($esResult['results'] ?? [], $supplement);
+                $fileRowsById = array_column($fileBased['results'], null, 'law_id');
+                $esRows = array_map(
+                    fn (array $row): array => $this->overlayCurrentAccessState($row, $fileRowsById[(string) ($row['law_id'] ?? '')] ?? null),
+                    $esResult['results'] ?? [],
+                );
+                $results = array_merge($esRows, $supplement);
 
                 return response()->json($this->withSearchSuggestions([
                     'total' => ($esResult['total'] ?? 0) + count($supplement),
@@ -51,10 +58,31 @@ class LawSearchController extends Controller
         return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
     }
 
+    /**
+     * @param  array<string,mixed>  $row
+     * @param  array<string,mixed>|null  $fileRow
+     * @return array<string,mixed>
+     */
+    private function overlayCurrentAccessState(array $row, ?array $fileRow): array
+    {
+        if ($fileRow === null) {
+            return $row;
+        }
+
+        $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
+        $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
+        if ($row['restricted']) {
+            $row['snippets'] = [];
+        }
+
+        return $row;
+    }
+
     /** @param array<string,mixed> $params */
     private function fileBasedSearch(array $params, ReviewStore $store): array
     {
-        $q = mb_strtolower(trim((string) ($params['q'] ?? '')));
+        $rawQuery = trim((string) ($params['q'] ?? ''));
+        $query = LawSearchQuery::parse($rawQuery);
         $filters = is_array($params['filters'] ?? null) ? $params['filters'] : [];
         $page = max(1, (int) ($params['page'] ?? 1));
         $perPage = max(1, (int) ($params['per_page'] ?? 20));
@@ -76,8 +104,8 @@ class LawSearchController extends Controller
                 continue;
             }
 
-            $match = $this->fileSearchMatch($row, $q, $store);
-            if ($q !== '') {
+            $match = $this->fileSearchMatch($row, $query, $store);
+            if (! $query->isEmpty()) {
                 if (! $match['matched']) {
                     continue;
                 }
@@ -113,14 +141,15 @@ class LawSearchController extends Controller
             }
         }
 
-        $results = array_map(function (array $r) use ($q, $store, $childTypeIndex): array {
-            $restricted = (string) ($r['access_scope'] ?? 'public') === 'private';
+        $results = array_map(function (array $r) use ($query, $store, $childTypeIndex): array {
+            $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
+            $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
 
             return [
                 'law_id' => $id,
                 'title' => $r['title'],
-                'title_highlighted' => $this->highlightTitle((string) ($r['title'] ?? ''), $q),
+                'title_highlighted' => $this->highlightTitle((string) ($r['title'] ?? ''), $query),
                 'law_type' => $r['law_type'],
                 'status' => $r['meta_status'],
                 'change_status' => $r['change_status'],
@@ -130,10 +159,11 @@ class LawSearchController extends Controller
                 'law_group' => $r['law_groups'][0] ?? null,
                 'signer_group' => $r['signer_group'],
                 'restricted' => $restricted,
+                'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
-                'snippets' => $restricted ? [] : $this->makeFileBasedSnippets($id, $q, $store, (string) ($r['title'] ?? '')),
+                'snippets' => $restricted ? [] : $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')),
             ];
         }, $paged);
 
@@ -150,25 +180,41 @@ class LawSearchController extends Controller
 
     /**
      * @param  array<string,mixed>  $row
+     */
+    private function hasPermissionGroups(array $row): bool
+    {
+        return is_array($row['permission_group_ids'] ?? null)
+            && array_values(array_filter(
+                $row['permission_group_ids'],
+                static fn (mixed $value): bool => trim((string) $value) !== '',
+            )) !== [];
+    }
+
+    /**
+     * @param  array<string,mixed>  $row
      * @return array{matched:bool,mode:string,confidence:float}
      */
-    private function fileSearchMatch(array $row, string $q, ReviewStore $store): array
+    private function fileSearchMatch(array $row, LawSearchQuery $query, ReviewStore $store): array
     {
-        if ($q === '') {
+        if ($query->isEmpty()) {
             return ['matched' => true, 'mode' => 'file_browse', 'confidence' => 0.5];
         }
 
         $title = (string) ($row['title'] ?? '');
-        if ($title !== '' && mb_stripos($title, $q) !== false) {
-            return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.84];
+        if ($title !== '' && $query->matchesText($title)) {
+            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.82 : 0.84];
         }
 
-        $restricted = (string) ($row['access_scope'] ?? 'public') === 'private';
-        if (! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $q, $store)) {
-            return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.7];
+        $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
+        if (! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
+            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.74 : 0.7];
         }
 
-        $similarity = $this->textSimilarity($q, $title);
+        if ($query->isBoolean()) {
+            return ['matched' => false, 'mode' => 'file_boolean', 'confidence' => 0.0];
+        }
+
+        $similarity = $this->textSimilarity($query->raw(), $title);
 
         return [
             'matched' => $similarity >= 0.42,
@@ -297,7 +343,7 @@ class LawSearchController extends Controller
 
     private function normalizeSearchText(string $text): string
     {
-        $normalized = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($text));
+        $normalized = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(LawSearchQuery::normalizeDigits($text)));
 
         return trim($normalized);
     }
@@ -400,15 +446,15 @@ class LawSearchController extends Controller
         return $texts === [] ? [] : [['chunk_id' => $documentId.'_review', 'text' => implode("\n", $texts)]];
     }
 
-    /** True when $q (already lowercased) appears in any export chunk text. */
-    private function contentMatches(string $documentId, string $q, ReviewStore $store): bool
+    /** True when the parsed query appears in any export chunk text. */
+    private function contentMatches(string $documentId, LawSearchQuery $query, ReviewStore $store): bool
     {
-        if ($q === '') {
+        if ($query->isEmpty()) {
             return false;
         }
 
         foreach ($this->loadExportChunks($documentId, $store) as $chunk) {
-            if (mb_stripos((string) ($chunk['text'] ?? ''), $q) !== false) {
+            if ($query->matchesText((string) ($chunk['text'] ?? ''))) {
                 return true;
             }
         }
@@ -419,26 +465,28 @@ class LawSearchController extends Controller
     /**
      * @return string[]
      */
-    private function makeFileBasedSnippets(string $documentId, string $q, ReviewStore $store, string $title): array
+    private function makeFileBasedSnippets(string $documentId, LawSearchQuery $query, ReviewStore $store, string $title): array
     {
-        if ($q === '') {
+        if ($query->isEmpty()) {
             return [];
         }
 
+        $needles = $query->isBoolean() ? $query->positiveVariants() : $query->rawVariants();
         $snippets = [];
         foreach ($this->loadExportChunks($documentId, $store) as $chunk) {
             $text = (string) ($chunk['text'] ?? '');
             if ($text === '') {
                 continue;
             }
-            $pos = mb_stripos($text, $q);
-            if ($pos === false) {
+            $match = $this->firstNeedleMatch($text, $needles);
+            if ($match === null) {
                 continue;
             }
+            [$needle, $pos] = $match;
             $start = max(0, $pos - 60);
-            $end = min(mb_strlen($text), $pos + mb_strlen($q) + 100);
+            $end = min(mb_strlen($text), $pos + mb_strlen($needle) + 100);
             $excerpt = ($start > 0 ? '…' : '').mb_substr($text, $start, $end - $start).($end < mb_strlen($text) ? '…' : '');
-            $snippets[] = (string) preg_replace('/('.preg_quote($q, '/').')/iu', '<mark>$1</mark>', $excerpt);
+            $snippets[] = $this->highlightNeedles($excerpt, $needles);
             if (count($snippets) >= 2) {
                 break;
             }
@@ -448,8 +496,8 @@ class LawSearchController extends Controller
         }
 
         // Fall back to title highlight when export is absent or query is only in title
-        if ($title !== '' && mb_stripos($title, $q) !== false) {
-            return [(string) preg_replace('/('.preg_quote($q, '/').')/iu', '<mark>$1</mark>', $title)];
+        if ($title !== '' && $this->firstNeedleMatch($title, $needles) !== null) {
+            return [$this->highlightNeedles($title, $needles)];
         }
 
         return [];
@@ -519,7 +567,7 @@ class LawSearchController extends Controller
         $changeCounts = ['new' => 0, 'amended' => 0, 'repealed' => 0];
 
         foreach ($store->listLawMeta() as $row) {
-            if (($row['access_scope'] ?? '') === 'private') {
+            if (LawMetaNormalizer::effectiveVisibility($row) === 'restricted') {
                 continue;
             }
 
@@ -582,10 +630,10 @@ class LawSearchController extends Controller
     private function canonicalType(string $lawType): string
     {
         return match (true) {
-            str_contains($lawType, 'พระราชบัญญัติ'), $lawType === 'พ.ร.บ.', $lawType === 'phrb' => 'phrb',
+            str_contains($lawType, 'พระราชบัญญัติ'), $lawType === 'พ.ร.บ.', $lawType === 'phrb', $lawType === 'kotmai-krung', $lawType === 'กฎหมายภายนอก', $lawType === 'kotmai-phaainok' => 'kotmai-phaainok',
             str_contains($lawType, 'ข้อบังคับ'), $lawType === 'kho-bangkhab' => 'kho-bangkhab',
             str_contains($lawType, 'ระเบียบ'), $lawType === 'rabiap' => 'rabiap',
-            str_contains($lawType, 'ประกาศ'), $lawType === 'prakat' => 'prakat',
+            str_contains($lawType, 'ประกาศ'), $lawType === 'prakat', $lawType === 'command', $lawType === 'resolution', str_contains($lawType, 'คำสั่ง'), str_contains($lawType, 'มติ') => 'prakat',
             default => 'other',
         };
     }
@@ -598,13 +646,49 @@ class LawSearchController extends Controller
     }
 
     /** Wrap the exact (case-insensitive) query substring in <mark>; plain otherwise. */
-    private function highlightTitle(string $title, string $query): string
+    private function highlightTitle(string $title, LawSearchQuery $query): string
     {
-        $q = trim($query);
-        if ($q === '' || mb_stripos($title, $q) === false) {
+        $needles = $query->isBoolean() ? $query->positiveVariants() : $query->rawVariants();
+        if ($needles === [] || $this->firstNeedleMatch($title, $needles) === null) {
             return $title;
         }
 
-        return (string) preg_replace('/('.preg_quote($q, '/').')/iu', '<mark>$1</mark>', $title);
+        return $this->highlightNeedles($title, $needles);
+    }
+
+    /**
+     * @param  array<int,string>  $needles
+     * @return array{string,int}|null
+     */
+    private function firstNeedleMatch(string $text, array $needles): ?array
+    {
+        foreach ($needles as $needle) {
+            $needle = trim($needle);
+            if ($needle === '') {
+                continue;
+            }
+            $pos = mb_stripos($text, $needle);
+            if ($pos !== false) {
+                return [$needle, $pos];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int,string>  $needles
+     */
+    private function highlightNeedles(string $text, array $needles): string
+    {
+        $needles = array_values(array_unique(array_filter(array_map('trim', $needles), static fn (string $needle): bool => $needle !== '')));
+        usort($needles, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+        if ($needles === []) {
+            return $text;
+        }
+
+        $pattern = '/('.implode('|', array_map(static fn (string $needle): string => preg_quote($needle, '/'), $needles)).')/iu';
+
+        return (string) preg_replace($pattern, '<mark>$1</mark>', $text);
     }
 }

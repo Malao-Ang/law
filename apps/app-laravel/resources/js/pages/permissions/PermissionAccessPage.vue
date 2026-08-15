@@ -45,7 +45,7 @@
             <v-col cols="12" md="6">
               <AccessScopeCard
                 title="Private"
-                subtitle="เฉพาะกลุ่ม"
+                subtitle="เฉพาะกลุ่ม — ถ้าไม่เลือกกลุ่ม จะแสดงให้ผู้ใช้ที่ล็อกอินทุกคนเห็น"
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
@@ -65,7 +65,7 @@
               <div class="d-flex flex-column flex-md-row align-md-center justify-space-between ga-3 mb-3">
                 <div>
                   <div class="text-subtitle-1 font-weight-bold">ค้นหากลุ่มสิทธิ์</div>
-                  <div class="text-body-2 text-medium-emphasis">เลือกอย่างน้อย 1 กลุ่มเพื่อกำหนดผู้มีสิทธิ์เข้าถึง</div>
+                  <div class="text-body-2 text-medium-emphasis">เลือกกลุ่มเพื่อจำกัดการเข้าถึง หรือไม่เลือกกลุ่มเพื่อเปิดให้ผู้ใช้ที่ล็อกอินทุกคนเห็น</div>
                 </div>
                 <v-btn color="admin-primary" prepend-icon="mdi-plus" @click="createDialog = true">สร้างกลุ่มใหม่</v-btn>
               </div>
@@ -119,7 +119,7 @@
             <div v-if="selectedGroups.length === 0" class="permission-empty-state">
               <v-icon icon="mdi-lock-outline" size="36" color="grey-lighten-1" />
               <div class="text-subtitle-2 font-weight-bold mt-2">ยังไม่ได้เลือกกลุ่มสิทธิ์</div>
-              <div class="text-body-2 text-medium-emphasis">ค้นหากลุ่มจากด้านบนหรือสร้างกลุ่มใหม่เพื่อเริ่มต้น</div>
+              <div class="text-body-2 text-medium-emphasis">เอกสาร Private นี้จะแสดงให้ผู้ใช้ที่ล็อกอินทุกคนเห็นในระหว่างที่ระบบยังไม่มี auth middleware</div>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
@@ -133,9 +133,6 @@
               />
             </div>
 
-            <v-alert v-if="selectedGroups.length === 0" variant="tonal" color="warning" class="mt-4">
-              ต้องเลือกกลุ่มสิทธิ์อย่างน้อย 1 กลุ่มเมื่อกำหนดเป็น Private
-            </v-alert>
           </template>
         </v-card>
       </template>
@@ -207,7 +204,7 @@ const availableGroups = computed(() => {
     });
 });
 
-const nextDisabled = computed(() => scope.value === 'private' && selectedGroups.value.length === 0);
+const nextDisabled = computed(() => false);
 
 function addGroup(groupId: string): void {
   if (!selectedGroupIds.value.includes(groupId)) {

@@ -17,7 +17,7 @@ class PermissionStore
     public function __construct(private readonly MongoBlobStore $blob) {}
 
     /**
-     * @return array{units: array<int, array<string, string|null>>, positions: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
+     * @return array{units: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
      */
     public function directory(): array
     {
@@ -29,7 +29,6 @@ class PermissionStore
 
         return [
             'units' => array_values(array_filter((array) ($directory['units'] ?? []), 'is_array')),
-            'positions' => array_values(array_filter((array) ($directory['positions'] ?? []), 'is_array')),
             'users' => array_values(array_filter((array) ($directory['users'] ?? []), 'is_array')),
         ];
     }
@@ -196,10 +195,9 @@ class PermissionStore
         $directory = $this->directory();
 
         $unitIds = $this->normalizeMemberIds($payload['unit_ids'] ?? [], $directory['units'], 'unit_ids');
-        $positionIds = $this->normalizeMemberIds($payload['position_ids'] ?? [], $directory['positions'], 'position_ids');
         $userIds = $this->normalizeMemberIds($payload['user_ids'] ?? [], $directory['users'], 'user_ids');
 
-        if ($unitIds === [] && $positionIds === [] && $userIds === []) {
+        if ($unitIds === [] && $userIds === []) {
             throw ValidationException::withMessages([
                 'unit_ids' => ['ต้องเลือกสมาชิกอย่างน้อย 1 รายการ'],
             ]);
@@ -209,7 +207,6 @@ class PermissionStore
             'name' => trim((string) ($payload['name'] ?? '')),
             'description' => $this->nullableTrimmedString($payload['description'] ?? null),
             'unit_ids' => $unitIds,
-            'position_ids' => $positionIds,
             'user_ids' => $userIds,
         ];
     }
@@ -274,26 +271,22 @@ class PermissionStore
     {
         $directory = $this->directory();
         $unitsById = $this->indexById($directory['units']);
-        $positionsById = $this->indexById($directory['positions']);
         $usersById = $this->indexById($directory['users']);
 
         $unitIds = array_values(array_filter((array) ($group['unit_ids'] ?? []), 'is_string'));
-        $positionIds = array_values(array_filter((array) ($group['position_ids'] ?? []), 'is_string'));
         $userIds = array_values(array_filter((array) ($group['user_ids'] ?? []), 'is_string'));
 
         $units = array_values(array_filter(array_map(static fn (string $id): ?array => $unitsById[$id] ?? null, $unitIds)));
-        $positions = array_values(array_filter(array_map(static fn (string $id): ?array => $positionsById[$id] ?? null, $positionIds)));
         $users = array_values(array_filter(array_map(static fn (string $id): ?array => $usersById[$id] ?? null, $userIds)));
+        unset($group['position_ids']);
 
         return array_merge($group, [
             'units' => $units,
-            'positions' => $positions,
             'users' => $users,
             'counts' => [
                 'units' => count($units),
-                'positions' => count($positions),
                 'users' => count($users),
-                'total' => count($units) + count($positions) + count($users),
+                'total' => count($units) + count($users),
             ],
         ]);
     }
@@ -324,7 +317,7 @@ class PermissionStore
     }
 
     /**
-     * @return array{units: array<int, array<string, string|null>>, positions: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
+     * @return array{units: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
      */
     private function defaultDirectory(): array
     {
@@ -336,14 +329,6 @@ class PermissionStore
                 ['id' => 'unit_finance', 'name' => 'กองคลัง'],
                 ['id' => 'unit_procurement', 'name' => 'กองพัสดุ'],
                 ['id' => 'unit_academic', 'name' => 'สำนักวิชาการ'],
-            ],
-            'positions' => [
-                ['id' => 'position_president', 'name' => 'อธิการบดี'],
-                ['id' => 'position_vice_president', 'name' => 'รองอธิการบดี'],
-                ['id' => 'position_finance_director', 'name' => 'ผู้อำนวยการกองคลัง'],
-                ['id' => 'position_legal_officer', 'name' => 'นิติกร'],
-                ['id' => 'position_procurement_officer', 'name' => 'เจ้าหน้าที่พัสดุ'],
-                ['id' => 'position_dean', 'name' => 'คณบดี'],
             ],
             'users' => [
                 ['id' => 'user_somchai', 'name' => 'สมชาย ใจดี', 'email' => 'somchai@example.local'],

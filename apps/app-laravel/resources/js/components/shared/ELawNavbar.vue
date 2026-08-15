@@ -20,12 +20,12 @@
       <div class="elaw-header__actions">
         <v-btn
           class="elaw-btn-login text-none"
-          prepend-icon="mdi-login"
+          :prepend-icon="auth.isAuthenticated ? 'mdi-account-check-outline' : 'mdi-login'"
           variant="text"
           rounded="pill"
-          @click="router.push('/login')"
+          @click="auth.isAuthenticated ? logout() : router.push('/login')"
         >
-          เข้าสู่ระบบ
+          {{ auth.isAuthenticated ? 'ออกจากระบบ' : 'เข้าสู่ระบบ' }}
         </v-btn>
         <v-btn
           class="elaw-btn-staff text-none"
@@ -44,10 +44,17 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '../../stores/authStore';
 import MainNav from './MainNav.vue';
 
 const emit = defineEmits<{ 'go-admin': [] }>();
 const router = useRouter();
+const auth = useAuthStore();
+
+function logout(): void {
+  auth.logout();
+  router.push('/');
+}
 </script>
 
 <style scoped>

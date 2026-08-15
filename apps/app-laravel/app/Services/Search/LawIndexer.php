@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Services\LawMetaNormalizer;
 use App\Services\ReviewStore;
 
 class LawIndexer
@@ -83,6 +84,9 @@ class LawIndexer
     private function buildDoc(string $documentId, array $chunk, array $meta): array
     {
         $keywords = $this->normalizeKeywords($meta['keywords'] ?? []);
+        $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null)
+            ? array_values(array_filter(array_map('strval', $meta['permission_group_ids'])))
+            : [];
 
         return [
             'law_id'         => $documentId,
@@ -95,7 +99,7 @@ class LawIndexer
             'title'          => $meta['title'] ?? null,
             'title_suggest'  => $meta['title'] ?? null,
             'law_type'       => $meta['law_type'] ?? null,
-            'status'         => $meta['status'] ?? null,
+            'status'         => LawMetaNormalizer::legacyStatus($meta['status'] ?? null) ?: null,
             'change_status'  => $meta['change_status'] ?? null,
             'agency'         => $meta['agency'] ?? null,
             'agencies'       => $meta['agencies'] ?? [],
@@ -103,6 +107,8 @@ class LawIndexer
             'law_groups'     => $meta['law_groups'] ?? [],
             'signer_group'   => $meta['signer_group'] ?? null,
             'access_scope'   => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
+            'permission_group_ids' => $permissionGroupIds,
+            'visibility'     => LawMetaNormalizer::effectiveVisibility($meta),
             'keywords'       => $keywords,
             'keywords_text'  => implode(' ', $keywords),
             'keywords_suggest' => implode(' ', $keywords),

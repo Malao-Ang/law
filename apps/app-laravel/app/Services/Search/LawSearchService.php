@@ -41,7 +41,8 @@ class LawSearchService
         if ($q === '') {
             $must = ['match_all' => (object) []];
         } else {
-            $must = [
+            $query = LawSearchQuery::parse($q);
+            $must = $query->requiresExpandedDsl() ? $this->buildExpandedMust($query, false) : [
                 'bool' => [
                     'should' => [
                         [
@@ -74,7 +75,8 @@ class LawSearchService
      */
     private function buildFuzzyBody(string $q, array $filters, int $page, int $perPage): array
     {
-        $must = [
+        $query = LawSearchQuery::parse($q);
+        $must = $query->requiresExpandedDsl() ? $this->buildExpandedMust($query, true) : [
             'bool' => [
                 'should' => [
                     [
@@ -105,6 +107,94 @@ class LawSearchService
     }
 
     /**
+     * @return array<string,mixed>
+     */
+    private function buildExpandedMust(LawSearchQuery $query, bool $fuzzy): array
+    {
+        $groups = [];
+        foreach ($query->orGroups() as $group) {
+            $must = [];
+            $mustNot = [];
+            foreach ($group as $term) {
+                $clause = $this->termSearchClause($term['variants'], $term['quoted'], $fuzzy && ! $term['negated']);
+                if ($term['negated']) {
+                    $mustNot[] = $clause;
+                } else {
+                    $must[] = $clause;
+                }
+            }
+
+            $bool = [];
+            if ($must !== []) {
+                $bool['must'] = $must;
+            }
+            if ($mustNot !== []) {
+                $bool['must_not'] = $mustNot;
+            }
+            if ($bool !== []) {
+                $groups[] = ['bool' => $bool];
+            }
+        }
+
+        if ($groups === []) {
+            return ['match_all' => (object) []];
+        }
+
+        return [
+            'bool' => [
+                'should' => $groups,
+                'minimum_should_match' => 1,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int,string>  $variants
+     * @return array<string,mixed>
+     */
+    private function termSearchClause(array $variants, bool $quoted, bool $fuzzy): array
+    {
+        $should = [];
+        foreach ($variants as $variant) {
+            $should[] = [
+                'multi_match' => [
+                    'query' => $variant,
+                    'type' => $quoted ? 'phrase' : 'best_fields',
+                    'fields' => ['title^5', 'keywords_text^4', 'section_path^2', 'summary^1.5', 'text'],
+                ],
+            ];
+            $should[] = [
+                'term' => [
+                    'keywords' => [
+                        'value' => $variant,
+                        'boost' => 8,
+                    ],
+                ],
+            ];
+            if ($fuzzy && ! $quoted && mb_strlen($variant) >= self::FUZZY_MIN_QUERY_LENGTH) {
+                $should[] = [
+                    'multi_match' => [
+                        'query' => $variant,
+                        'type' => 'best_fields',
+                        'fields' => ['title^3', 'keywords_text^3', 'section_path^2', 'summary', 'text'],
+                        'fuzziness' => 'AUTO',
+                        'prefix_length' => 2,
+                        'max_expansions' => 20,
+                        'boost' => 0.5,
+                    ],
+                ];
+            }
+        }
+
+        return [
+            'bool' => [
+                'should' => $should,
+                'minimum_should_match' => 1,
+            ],
+        ];
+    }
+
+    /**
      * @param  array<string,mixed>  $must
      * @param  array<string,mixed>  $filters
      * @return array<string,mixed>
@@ -112,7 +202,7 @@ class LawSearchService
     private function buildBodyFromMust(array $must, array $filters, int $page, int $perPage): array
     {
 
-        $filterClauses = [$this->publicAccessFilter()];
+        $filterClauses = [$this->visibleAccessFilter()];
         foreach (self::TERM_FILTERS as $field) {
             if (! empty($filters[$field])) {
                 $filterClauses[] = ['terms' => [$field => array_values((array) $filters[$field])]];
@@ -200,6 +290,8 @@ class LawSearchService
                 $snippets[] = mb_substr((string) $source['text'], 0, 200);
             }
 
+            $restricted = $this->isRestrictedSource($source);
+
             $results[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
@@ -211,11 +303,12 @@ class LawSearchService
                 'agency' => $source['agency'] ?? null,
                 'law_group' => $source['law_group'] ?? null,
                 'signer_group' => $source['signer_group'] ?? null,
-                'restricted' => false,
+                'restricted' => $restricted,
+                'requires_permission' => $restricted && $this->hasPermissionGroups($source),
                 'child_types' => (object) [],
                 'confidence' => $confidence,
                 'match_mode' => $mode,
-                'snippets' => array_values(array_unique($snippets)),
+                'snippets' => $restricted ? [] : array_values(array_unique($snippets)),
             ];
         }
 
@@ -291,20 +384,44 @@ class LawSearchService
     }
 
     /**
-     * Keep legacy indexed docs visible until they are reindexed with access_scope.
+     * Keep indexed public docs and private teasers visible.
      *
      * @return array<string, mixed>
      */
-    private function publicAccessFilter(): array
+    private function visibleAccessFilter(): array
     {
         return [
             'bool' => [
                 'should' => [
+                    ['term' => ['visibility' => 'public']],
+                    ['term' => ['visibility' => 'restricted']],
                     ['term' => ['access_scope' => 'public']],
-                    ['bool' => ['must_not' => [['exists' => ['field' => 'access_scope']]]]],
+                    ['term' => ['access_scope' => 'private']],
+                    ['bool' => ['must_not' => [['exists' => ['field' => 'visibility']]]]],
                 ],
                 'minimum_should_match' => 1,
             ],
         ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $source
+     */
+    private function isRestrictedSource(array $source): bool
+    {
+        return ($source['visibility'] ?? null) === 'restricted'
+            || ($source['access_scope'] ?? null) === 'private';
+    }
+
+    /**
+     * @param  array<string,mixed>  $source
+     */
+    private function hasPermissionGroups(array $source): bool
+    {
+        return is_array($source['permission_group_ids'] ?? null)
+            && array_values(array_filter(
+                $source['permission_group_ids'],
+                static fn (mixed $value): bool => trim((string) $value) !== '',
+            )) !== [];
     }
 }

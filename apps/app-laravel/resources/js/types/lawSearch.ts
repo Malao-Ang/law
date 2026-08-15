@@ -54,6 +54,7 @@ export interface LawSearchResult {
   law_group?: string | null;
   signer_group?: string | null;
   restricted?: boolean;
+  requires_permission?: boolean;
   child_types?: Record<string, number>;
   confidence?: number;
   match_mode?: string;

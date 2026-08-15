@@ -344,8 +344,8 @@
                 :class="`law-list-card--${toDocType(law.law_type)}`"
                 role="article"
                 tabindex="0"
-                @click="law.restricted ? goLogin() : router.push({ name: 'law', params: { documentId: law.law_id } })"
-                @keydown.enter="law.restricted ? goLogin() : router.push({ name: 'law', params: { documentId: law.law_id } })"
+                @click="openLaw(law)"
+                @keydown.enter="openLaw(law)"
               >
                 <div class="law-list-card__body">
                   <div class="law-list-card__tags">
@@ -406,8 +406,8 @@
                 <div v-if="law.restricted" class="law-list-card__restricted">
                   <v-icon icon="mdi-lock-outline" size="16" />
                   <span class="law-list-card__restricted-label">Private · เฉพาะผู้ได้รับสิทธิ์</span>
-                  <button type="button" class="law-restricted-btn" @click.stop="goLogin">
-                    เข้าสู่ระบบเพื่อดูเอกสาร
+                  <button type="button" class="law-restricted-btn" @click.stop="openLaw(law)">
+                    {{ auth.isAuthenticated ? 'เปิดเอกสาร' : 'เข้าสู่ระบบเพื่อดูเอกสาร' }}
                     <v-icon size="14" icon="mdi-arrow-right" />
                   </button>
                 </div>
@@ -442,26 +442,31 @@ import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import type { ChangeStatus, DocType } from '../../components/shared/lawBadge';
+import { useAuthStore } from '../../stores/authStore';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
+import { canDisplayLawResult } from '../../utils/lawAccess';
 
 const PER_PAGE = 20;
 
 const LAW_TYPE_LABELS: Record<string, string> = {
-  phrb: 'พ.ร.บ.',
-  'พ.ร.บ.': 'พ.ร.บ.',
-  พระราชบัญญัติ: 'พ.ร.บ.',
+  phrb: 'กฎหมายภายนอก',
+  'พ.ร.บ.': 'กฎหมายภายนอก',
+  พระราชบัญญัติ: 'กฎหมายภายนอก',
+  'kotmai-krung': 'กฎหมายภายนอก',
+  'kotmai-phaainok': 'กฎหมายภายนอก',
+  กฎหมายภายนอก: 'กฎหมายภายนอก',
   'kho-bangkhab': 'ข้อบังคับ',
   ข้อบังคับ: 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
   ระเบียบ: 'ระเบียบ',
   prakat: 'ประกาศ',
   ประกาศ: 'ประกาศ',
-  command: 'คำสั่ง',
-  คำสั่ง: 'คำสั่ง',
-  resolution: 'มติ',
-  มติ: 'มติ',
+  command: 'ประกาศ',
+  คำสั่ง: 'ประกาศ',
+  resolution: 'ประกาศ',
+  มติ: 'ประกาศ',
 };
 
 const CHANGE_STATUS_LABELS: Record<string, string> = {
@@ -484,39 +489,40 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
-  phrb: 'phrb',
-  'พ.ร.บ.': 'phrb',
-  พระราชบัญญัติ: 'phrb',
+  phrb: 'kotmai-phaainok',
+  'พ.ร.บ.': 'kotmai-phaainok',
+  พระราชบัญญัติ: 'kotmai-phaainok',
+  'kotmai-krung': 'kotmai-phaainok',
+  'kotmai-phaainok': 'kotmai-phaainok',
+  กฎหมายภายนอก: 'kotmai-phaainok',
   'kho-bangkhab': 'kho-bangkhab',
   ข้อบังคับ: 'kho-bangkhab',
   rabiap: 'rabiap',
   ระเบียบ: 'rabiap',
   prakat: 'prakat',
   ประกาศ: 'prakat',
-  command: 'command',
-  คำสั่ง: 'command',
-  resolution: 'resolution',
-  มติ: 'resolution',
+  command: 'prakat',
+  คำสั่ง: 'prakat',
+  resolution: 'prakat',
+  มติ: 'prakat',
 };
 
 const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
-  phrb: ['phrb', 'พ.ร.บ.', 'พระราชบัญญัติ'],
+  'kotmai-phaainok': ['kotmai-phaainok', 'kotmai-krung', 'phrb', 'พ.ร.บ.', 'พระราชบัญญัติ', 'กฎหมายภายนอก'],
   'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
   rabiap: ['rabiap', 'ระเบียบ'],
-  prakat: ['prakat', 'ประกาศ'],
-  command: ['command', 'คำสั่ง'],
-  resolution: ['resolution', 'มติ'],
+  prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ'],
 };
 
 const CHILD_CHIP_LABELS: Record<string, string> = {
-  phrb: 'พ.ร.บ.',
+  'kotmai-phaainok': 'กฎหมายภายนอก',
   'kho-bangkhab': 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
   prakat: 'ประกาศ',
   other: 'อื่น ๆ',
 };
 
-const LAW_TYPE_ORDER = ['phrb', 'prakat', 'kho-bangkhab', 'rabiap'];
+const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
   academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
@@ -534,6 +540,7 @@ type SortValue = 'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest';
 const router = useRouter();
 const route = useRoute();
 const searchStore = useLawSearchStore();
+const auth = useAuthStore();
 const baseFacets = ref<LawSearchFacets | null>(null);
 const lookupFacets = ref<LawSearchFacets | null>(null);
 
@@ -626,7 +633,7 @@ const years = computed(() => {
 });
 
 const sortedResults = computed(() => {
-  const items = [...searchStore.results];
+  const items = searchStore.results.filter((law) => canDisplayLawResult(law, auth.isAuthenticated));
 
   switch (sortBy.value) {
     case 'thai-asc':
@@ -1003,9 +1010,12 @@ function extractYear(item: LawSearchResult): number {
 }
 
 const LAW_TYPE_TO_DOC_TYPE: Record<string, DocType> = {
-  phrb: 'kotmai-krung',
-  'พ.ร.บ.': 'kotmai-krung',
-  พระราชบัญญัติ: 'kotmai-krung',
+  phrb: 'kotmai-phaainok',
+  'พ.ร.บ.': 'kotmai-phaainok',
+  พระราชบัญญัติ: 'kotmai-phaainok',
+  'kotmai-krung': 'kotmai-phaainok',
+  'kotmai-phaainok': 'kotmai-phaainok',
+  กฎหมายภายนอก: 'kotmai-phaainok',
   prakat: 'prakat',
   ประกาศ: 'prakat',
   'kho-bangkhab': 'kho-bangkhab',
@@ -1015,18 +1025,27 @@ const LAW_TYPE_TO_DOC_TYPE: Record<string, DocType> = {
 };
 
 function toDocType(lawType: string | null | undefined): DocType {
-  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? 'other';
+  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(lawType ?? '')] ?? 'other';
 }
 
 function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
   const types = law.child_types ?? {};
   return Object.entries(types)
     .filter(([, count]) => count > 0)
-    .map(([type, count]) => ({ type, label: CHILD_CHIP_LABELS[type] ?? type, count }));
+    .map(([type, count]) => {
+      const canonical = canonicalLawTypeValue(type);
+      return { type: canonical, label: CHILD_CHIP_LABELS[canonical] ?? type, count };
+    });
 }
 
-function goLogin(): void {
-  router.push('/login');
+function openLaw(law: LawSearchResult): void {
+  const lawPath = `/law/${encodeURIComponent(law.law_id)}`;
+  if (law.restricted && !auth.isAuthenticated) {
+    router.push({ path: '/login', query: { redirect: lawPath } });
+    return;
+  }
+
+  router.push(lawPath);
 }
 
 function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined {
@@ -1034,10 +1053,10 @@ function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined
   return undefined;
 }
 
-type DocBadgeKey = 'พ.ร.บ.' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ';
+type DocBadgeKey = 'กฎหมายภายนอก' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ';
 
 const LAW_TYPE_TO_BADGE: Partial<Record<string, DocBadgeKey>> = {
-  phrb: 'พ.ร.บ.',
+  'kotmai-phaainok': 'กฎหมายภายนอก',
   'kho-bangkhab': 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
   prakat: 'ประกาศ',
@@ -1397,7 +1416,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
 }
 
-.law-list-card--kotmai-krung { border-left-color: #854d0e; }
+.law-list-card--kotmai-phaainok { border-left-color: #854d0e; }
 .law-list-card--rabiap       { border-left-color: #3b82f6; }
 .law-list-card--kho-bangkhab { border-left-color: #10b981; }
 .law-list-card--prakat       { border-left-color: #fb923c; }
@@ -1532,7 +1551,7 @@ onBeforeUnmount(() => {
   color: #374151;
 }
 
-.law-child-chip--phrb {
+.law-child-chip--kotmai-phaainok {
   background: #fef3c7;
   color: #92400e;
 }

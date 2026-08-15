@@ -41,6 +41,17 @@
       <span>{{ lawGroup }}</span>
     </div>
 
+    <div v-if="visibility === 'private'" class="elaw-card__private-panel">
+      <div>
+        <div class="elaw-card__private-label">สิทธิ์การเข้าถึง</div>
+        <div class="elaw-card__private-title">
+          <v-icon icon="mdi-lock-outline" size="16" />
+          Private
+        </div>
+        <div class="elaw-card__private-note">เฉพาะผู้ได้รับสิทธิ์</div>
+      </div>
+    </div>
+
     <!-- Footer: date + link -->
     <div class="elaw-card__footer">
       <div v-if="date" class="elaw-card__date">
@@ -80,7 +91,7 @@ const typeLabels: Record<DocType, string> = {
   rabiap: 'ระเบียบ',
   'kho-bangkhab': 'ข้อบังคับ',
   prakat: 'ประกาศ',
-  'kotmai-krung': 'กฎหมายหลัก',
+  'kotmai-phaainok': 'กฎหมายภายนอก',
   other: 'อื่น ๆ',
 };
 
@@ -90,9 +101,6 @@ const statusBadge = computed(() => (props.changeStatus ? changeStatusToBadge(pro
 
 const visibilityLabel = computed(() =>
   ({ public: 'Public', private: 'Private', organization: 'Org' } as Record<Visibility, string>)[props.visibility!] ?? '',
-);
-const visibilityColor = computed(() =>
-  ({ public: '#f0fdf4', private: '#fff1f2', organization: '#eff6ff' } as Record<Visibility, string>)[props.visibility!] ?? '#f9fafb',
 );
 const visibilityIcon = computed(() =>
   ({ public: 'mdi-earth', private: 'mdi-lock-outline', organization: 'mdi-domain' } as Record<Visibility, string>)[props.visibility!] ?? 'mdi-eye-outline',
@@ -121,7 +129,7 @@ const visibilityIcon = computed(() =>
 .elaw-card--rabiap       { border-left-color: #3b82f6; }
 .elaw-card--kho-bangkhab { border-left-color: #10b981; }
 .elaw-card--prakat       { border-left-color: #fb923c; }
-.elaw-card--kotmai-krung { border-left-color: #854d0e; }
+.elaw-card--kotmai-phaainok { border-left-color: #854d0e; }
 .elaw-card--other        { border-left-color: #9e9e9e; }
 
 /* Tags row */
@@ -247,6 +255,35 @@ const visibilityIcon = computed(() =>
   white-space: nowrap;
 }
 
+.elaw-card__private-panel {
+  border-top: 1px solid #e9dfcf;
+  margin: 0 0 14px;
+  padding-top: 14px;
+}
+
+.elaw-card__private-label {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.elaw-card__private-title {
+  align-items: center;
+  color: #0f172a;
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 800;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.elaw-card__private-note {
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
 /* Footer */
 .elaw-card__footer {
   display: flex;
@@ -276,5 +313,12 @@ const visibilityIcon = computed(() =>
   color: #3b82f6;
   padding: 0;
   white-space: nowrap;
+}
+
+.elaw-card:has(.elaw-card__private-panel) .elaw-card__read-btn {
+  background: #b7790b;
+  border-radius: 8px;
+  color: #fff;
+  padding: 9px 13px;
 }
 </style>
