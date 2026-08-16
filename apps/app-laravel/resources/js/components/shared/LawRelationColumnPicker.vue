@@ -69,7 +69,7 @@
             <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
           </button>
           <div v-if="filteredCol1.length === 0" class="law-rel-col__empty">
-            {{ documentsLoaded ? 'ไม่พบรายการ' : 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย' }}
+            {{ col1EmptyMessage }}
           </div>
         </div>
       </div>
@@ -138,6 +138,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
+  documentsUnderParents,
   filterByQuery,
   pickableDocuments,
 } from '../../composables/useLawCatalog';
@@ -147,6 +148,8 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 const props = defineProps<{
   excludeDocumentId?: string | null;
+  parentDocumentIds?: string[] | null;
+  restrictToParentChildren?: boolean;
   modelValue?: LawRelationTarget | null;
 }>();
 
@@ -172,9 +175,20 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const catalogQuery = computed(() => globalSearch.value.trim() || searchCol1.value.trim());
 
+const col1EmptyMessage = computed(() => {
+  if (props.restrictToParentChildren && !(props.parentDocumentIds?.length)) {
+    return 'เลือกกฎหมายแม่ก่อน จึงจะเลือกเอกสารที่เกี่ยวข้องได้';
+  }
+  if (!documentsLoaded.value) return 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย';
+  if (props.restrictToParentChildren) return 'ไม่พบเอกสารภายใต้กฎหมายแม่ที่เลือก';
+  return 'ไม่พบรายการ';
+});
+
 const filteredCol1 = computed(() => {
   if (!documentsLoaded.value) return [];
-  const docs = pickableDocuments(documents.value, props.excludeDocumentId);
+  const docs = props.restrictToParentChildren
+    ? documentsUnderParents(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId)
+    : pickableDocuments(documents.value, props.excludeDocumentId);
   return filterByQuery(docs, catalogQuery.value) as DocumentListItem[];
 });
 

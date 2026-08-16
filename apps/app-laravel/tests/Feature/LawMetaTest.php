@@ -49,6 +49,8 @@ class LawMetaTest extends TestCase
         $this->assertSame([], $doc['law_meta']['permission_group_ids']);
         $this->assertSame([], $doc['law_meta']['keywords']);
         $this->assertSame([], $doc['law_meta']['repealed_laws']);
+        $this->assertSame([], $doc['law_meta']['parent_document_ids']);
+        $this->assertNull($doc['law_meta']['parent_document_id']);
     }
 
     public function test_update_document_review_persists_law_meta(): void
@@ -307,6 +309,33 @@ class LawMetaTest extends TestCase
 
         $doc = $store->getReviewDocument($childId);
         $this->assertSame($parentId, $doc['law_meta']['parent_document_id']);
+        $this->assertSame([$parentId], $doc['law_meta']['parent_document_ids']);
+    }
+
+    public function test_parent_document_ids_persist_and_keep_legacy_first_parent(): void
+    {
+        $store = app(ReviewStore::class);
+        $parentA = 'doc_parent_a_'.uniqid();
+        $parentB = 'doc_parent_b_'.uniqid();
+        $childId = 'doc_child_multi_'.uniqid();
+        $this->seedDocument($store, $parentA);
+        $this->seedDocument($store, $parentB);
+        $this->seedDocument($store, $childId);
+
+        $response = $this->putJson("/api/documents/{$childId}/document-review", [
+            'law_meta' => [
+                'title' => 'กฎหมายลูกหลายแม่',
+                'parent_document_ids' => [$parentA, $parentB],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('law_meta.parent_document_id', $parentA);
+        $response->assertJsonPath('law_meta.parent_document_ids', [$parentA, $parentB]);
+
+        $doc = $store->getReviewDocument($childId);
+        $this->assertSame($parentA, $doc['law_meta']['parent_document_id']);
+        $this->assertSame([$parentA, $parentB], $doc['law_meta']['parent_document_ids']);
     }
 
     public function test_update_document_review_normalizes_multi_value_law_meta_and_legacy_fields(): void
@@ -401,9 +430,11 @@ class LawMetaTest extends TestCase
         $this->assertNotNull($parent);
         $this->assertSame('พ.ร.บ. แม่', $parent['title']);
         $this->assertNull($parent['parent_document_id']);
+        $this->assertSame([], $parent['parent_document_ids']);
 
         $this->assertNotNull($child);
         $this->assertSame('กฎกระทรวงลูก', $child['title']);
         $this->assertSame($parentId, $child['parent_document_id']);
+        $this->assertSame([$parentId], $child['parent_document_ids']);
     }
 }

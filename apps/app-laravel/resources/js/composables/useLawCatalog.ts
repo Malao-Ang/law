@@ -7,6 +7,18 @@ export function isPickableDocument(doc: DocumentListItem): boolean {
   return PICKABLE_STATUSES.has(doc.status) || (doc.workflow_completed_step ?? 0) >= RELATION_READY_STEP;
 }
 
+export function parentIdsOf(doc: {
+  parent_document_id?: string | null;
+  parent_document_ids?: string[] | null;
+}): string[] {
+  const ids = (doc.parent_document_ids ?? [])
+    .map((id) => id.trim())
+    .filter((id) => id !== '');
+  if (ids.length) return [...new Set(ids)];
+  const legacy = doc.parent_document_id?.trim();
+  return legacy ? [legacy] : [];
+}
+
 export function rootDocuments(
   documents: DocumentListItem[],
   excludeDocumentId?: string | null,
@@ -16,10 +28,11 @@ export function rootDocuments(
   return documents.filter((doc) => {
     if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
     if (!isPickableDocument(doc)) return false;
-    if (!doc.parent_document_id) return true;
+    const parents = parentIdsOf(doc);
+    if (parents.length === 0) return true;
 
-    // Show orphan children at root when their parent is not in the catalog.
-    return !byId.has(doc.parent_document_id);
+    // Show orphan children at root when none of their parents are in the catalog.
+    return parents.every((parentId) => !byId.has(parentId));
   });
 }
 
@@ -41,7 +54,22 @@ export function childDocuments(
   return documents.filter((doc) => {
     if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
     if (!isPickableDocument(doc)) return false;
-    return doc.parent_document_id === parentDocumentId;
+    return parentIdsOf(doc).includes(parentDocumentId);
+  });
+}
+
+export function documentsUnderParents(
+  documents: DocumentListItem[],
+  parentDocumentIds: string[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  const parents = new Set(parentDocumentIds.map((id) => id.trim()).filter(Boolean));
+  if (parents.size === 0) return [];
+
+  return documents.filter((doc) => {
+    if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
+    if (!isPickableDocument(doc)) return false;
+    return parentIdsOf(doc).some((id) => parents.has(id));
   });
 }
 
@@ -50,7 +78,7 @@ export function documentHasChildren(
   documentId: string,
 ): boolean {
   return documents.some(
-    (doc) => doc.parent_document_id === documentId && isPickableDocument(doc),
+    (doc) => parentIdsOf(doc).includes(documentId) && isPickableDocument(doc),
   );
 }
 

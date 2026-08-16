@@ -133,6 +133,7 @@ class ReviewStore
             }
             $title = (string) ($status['source_file'] ?? $documentId);
             $parentDocumentId = null;
+            $parentDocumentIds = [];
             $accessScope = 'public';
 
             $review = $this->blob->read('review', $documentId);
@@ -142,10 +143,8 @@ class ReviewStore
                 if ($metaTitle !== '') {
                     $title = $metaTitle;
                 }
-                $parentRaw = trim((string) ($meta['parent_document_id'] ?? ''));
-                if ($parentRaw !== '') {
-                    $parentDocumentId = $parentRaw;
-                }
+                $parentDocumentIds = LawMetaNormalizer::parentDocumentIds($meta);
+                $parentDocumentId = $parentDocumentIds[0] ?? null;
                 $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
             }
 
@@ -162,6 +161,7 @@ class ReviewStore
                 'timings' => is_array($status['timings'] ?? null) ? $status['timings'] : null,
                 'error' => isset($status['error']) ? (string) $status['error'] : null,
                 'parent_document_id' => $parentDocumentId,
+                'parent_document_ids' => $parentDocumentIds,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,
@@ -207,7 +207,8 @@ class ReviewStore
                 }
 
                 $title = trim((string) ($meta['title'] ?? '')) ?: (string) ($status['source_file'] ?? $documentId);
-                $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+                $parentDocumentIds = LawMetaNormalizer::parentDocumentIds($meta);
+                $parentDocumentId = $parentDocumentIds[0] ?? '';
                 $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null)
                     ? array_values(array_filter(array_map('strval', $meta['permission_group_ids'])))
                     : [];
@@ -238,6 +239,7 @@ class ReviewStore
                         : 0,
                     'page_count' => is_array($review['summary'] ?? null) ? (int) ($review['summary']['page_count'] ?? 0) : 0,
                     'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
+                    'parent_document_ids' => $parentDocumentIds,
                     'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 ];
             }
@@ -1406,7 +1408,7 @@ class ReviewStore
             }
         }
 
-        $parentDocumentId = trim((string) ($meta['parent_document_id'] ?? ''));
+        $parentDocumentIds = LawMetaNormalizer::parentDocumentIds($meta);
         $lawGroups = is_array($meta['law_groups'] ?? null) ? array_values(array_filter(array_map(
             static fn (mixed $entry): string => trim((string) $entry),
             $meta['law_groups'],
@@ -1448,6 +1450,7 @@ class ReviewStore
             'gazette_reference' => '',
             'royal_command' => '',
             'parent_document_id' => null,
+            'parent_document_ids' => [],
             'access_scope' => 'public',
             'permission_group_ids' => [],
         ], $meta, [
@@ -1458,7 +1461,8 @@ class ReviewStore
             'keywords' => $keywords,
             'repealed_laws' => $repealed,
             'section_count' => $sectionCount,
-            'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
+            'parent_document_id' => $parentDocumentIds[0] ?? null,
+            'parent_document_ids' => $parentDocumentIds,
             'access_scope' => $accessScope,
             'permission_group_ids' => $accessScope === 'public' ? [] : $permissionGroupIds,
         ]);

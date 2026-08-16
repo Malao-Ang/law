@@ -94,6 +94,8 @@
           v-if="mode === 'picker'"
           v-model="pickerTarget"
           :exclude-document-id="excludeDocumentId"
+          :parent-document-ids="parentDocumentIds"
+          :restrict-to-parent-children="scope === 'document'"
         />
 
         <template v-else>
@@ -153,6 +155,7 @@ const props = defineProps<{
   blockId?: string | null;
   defaultType?: RelationType;
   excludeDocumentId?: string | null;
+  parentDocumentIds?: string[];
   existingRelations?: LawRelation[];
   sectionLabels?: Record<string, string>;
 }>();

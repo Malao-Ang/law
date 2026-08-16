@@ -207,6 +207,7 @@ export interface LawMeta {
   repealed_laws: string[];
   imported_by: string;
   parent_document_id: string | null;
+  parent_document_ids: string[];
   access_scope: 'public' | 'private';
   permission_group_ids: string[];
 }
@@ -239,6 +240,7 @@ export interface DocumentListItem {
   timings?: Record<string, number> | null;
   error?: string | null;
   parent_document_id?: string | null;
+  parent_document_ids?: string[];
   access_scope?: 'public' | 'private';
   workflow_completed_step?: number | null;
   workflow_current_step?: number | null;
@@ -391,6 +393,7 @@ export interface ReportDocument {
   section_count: number | null;
   page_count: number;
   parent_document_id: string | null;
+  parent_document_ids?: string[];
   workflow_completed_step: number | null;
 }
 

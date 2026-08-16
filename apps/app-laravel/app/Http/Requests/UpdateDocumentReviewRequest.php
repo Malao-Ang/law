@@ -72,6 +72,8 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.title' => ['nullable', 'string', 'max:500'],
             'law_meta.imported_by' => ['nullable', 'string', 'max:255'],
             'law_meta.parent_document_id' => ['nullable', 'string', 'max:128'],
+            'law_meta.parent_document_ids' => ['nullable', 'array'],
+            'law_meta.parent_document_ids.*' => ['nullable', 'string', 'max:128'],
             'law_meta.access_scope' => ['nullable', 'string', 'in:public,private'],
             'law_meta.permission_group_ids' => ['nullable', 'array'],
             'law_meta.permission_group_ids.*' => ['nullable', 'string', 'max:128'],

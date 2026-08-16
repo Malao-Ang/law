@@ -90,12 +90,10 @@ class LawSearchController extends Controller
         $allMeta = $store->listLawMeta();
         $childTypeIndex = [];
         foreach ($allMeta as $meta) {
-            $parentId = trim((string) ($meta['parent_document_id'] ?? ''));
-            if ($parentId === '') {
-                continue;
-            }
             $type = $this->canonicalType((string) ($meta['law_type'] ?? ''));
-            $childTypeIndex[$parentId][$type] = ($childTypeIndex[$parentId][$type] ?? 0) + 1;
+            foreach (LawMetaNormalizer::parentDocumentIds($meta) as $parentId) {
+                $childTypeIndex[$parentId][$type] = ($childTypeIndex[$parentId][$type] ?? 0) + 1;
+            }
         }
 
         $rows = [];
@@ -572,10 +570,12 @@ class LawSearchController extends Controller
             }
 
             $publicCount++;
-            $parentId = trim((string) ($row['parent_document_id'] ?? ''));
-            if ($parentId !== '') {
+            $parentIdsList = LawMetaNormalizer::parentDocumentIds($row);
+            if ($parentIdsList !== []) {
                 $childCount++;
-                $parentIds[$parentId] = true;
+                foreach ($parentIdsList as $parentId) {
+                    $parentIds[$parentId] = true;
+                }
             }
             $cs = (string) ($row['change_status'] ?? '');
             if (isset($changeCounts[$cs])) {

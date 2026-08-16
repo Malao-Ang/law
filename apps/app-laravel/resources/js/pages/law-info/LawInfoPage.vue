@@ -279,7 +279,7 @@ const EMPTY: LawMeta = {
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [], keywords: [],
-  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, signer_group: null,
+  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, parent_document_ids: [], signer_group: null,
   access_scope: 'public', permission_group_ids: [],
 };
 
@@ -380,6 +380,9 @@ watch(() => documentStore.review, (review) => {
     imported_by: meta?.imported_by?.trim() || CURRENT_ADMIN_LABEL,
     expiry_date: meta?.expiry_date ?? null,
     parent_document_id: meta?.parent_document_id ?? null,
+    parent_document_ids: meta?.parent_document_ids?.length
+      ? [...meta.parent_document_ids]
+      : (meta?.parent_document_id ? [meta.parent_document_id] : []),
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });

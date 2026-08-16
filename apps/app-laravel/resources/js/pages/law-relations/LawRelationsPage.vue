@@ -43,15 +43,18 @@
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
             เลือกได้ว่าเอกสารนี้ออกภายใต้กฎหมายฉบับใด เช่น ระเบียบนี้ออกตาม พ.ร.บ. เรื่องนั้น
-            เลือกได้แค่ 1 ฉบับ ไม่บังคับ
+            เลือกได้หลายฉบับ ไม่บังคับ
           </p>
-          <v-select
-            v-model="parentId"
+          <v-autocomplete
+            v-model="parentIds"
             :items="parentItems"
             item-title="title"
             item-value="document_id"
             label="ออกภายใต้กฎหมาย (ไม่บังคับ)"
-            placeholder="- ไม่มี -"
+            placeholder="ค้นหากฎหมายแม่"
+            multiple
+            chips
+            closable-chips
             clearable
             prepend-inner-icon="mdi-file-tree"
             :loading="catalogLoading"
@@ -110,7 +113,7 @@
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
             บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง
-            เพิ่มได้หลายรายการ
+            เพิ่มได้หลายรายการ เลือกได้เฉพาะเอกสารที่ออกภายใต้กฎหมายแม่ด้านบน
           </p>
           <div v-if="documentLevelRelations.length" class="relations-list">
             <div v-for="rel in documentLevelRelations" :key="rel.id" class="relations-list__row">
@@ -207,6 +210,7 @@
       :block-id="relationDialog.blockId"
       :default-type="relationDialog.defaultType"
       :exclude-document-id="props.documentId"
+      :parent-document-ids="parentIds"
       :existing-relations="relations"
       :section-labels="sectionLabels"
       @close="closeRelationDialog"
@@ -242,7 +246,7 @@ const snackbar = useSnackbarStore();
 
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);
-const parentId = ref<string | null>(null);
+const parentIds = ref<string[]>([]);
 const esignLeaving = ref(false);
 
 const relationDialog = ref<{
@@ -320,7 +324,10 @@ async function onRelationSave(relation: LawRelation): Promise<void> {
 }
 
 async function persistStepFive(): Promise<boolean> {
-  const saved = await documentStore.saveLawMeta({ parent_document_id: parentId.value });
+  const saved = await documentStore.saveLawMeta({
+    parent_document_ids: parentIds.value,
+    parent_document_id: parentIds.value[0] ?? null,
+  });
   if (!saved) return false;
   return documentStore.completeWorkflowStep(5);
 }
@@ -343,7 +350,10 @@ async function saveAndEsign(): Promise<void> {
 
 onMounted(async () => {
   await documentStore.fetch(props.documentId);
-  parentId.value = documentStore.review?.law_meta?.parent_document_id ?? null;
+  const meta = documentStore.review?.law_meta;
+  parentIds.value = meta?.parent_document_ids?.length
+    ? [...meta.parent_document_ids]
+    : (meta?.parent_document_id ? [meta.parent_document_id] : []);
   catalogLoading.value = true;
   try {
     const res = await listDocuments();

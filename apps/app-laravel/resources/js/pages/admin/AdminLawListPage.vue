@@ -191,6 +191,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { parentIdsOf } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const PAGE_SIZE = 20;
@@ -253,8 +254,8 @@ const infoCompletedDocs = computed(() =>
 const childCountMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = {};
   for (const doc of infoCompletedDocs.value) {
-    if (doc.parent_document_id) {
-      map[doc.parent_document_id] = (map[doc.parent_document_id] ?? 0) + 1;
+    for (const parentId of parentIdsOf(doc)) {
+      map[parentId] = (map[parentId] ?? 0) + 1;
     }
   }
   return map;
