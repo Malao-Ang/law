@@ -280,6 +280,9 @@ async function removeItem(index: number): Promise<void> {
     icon: 'warning',
     title: 'ลบไฟล์นี้ออก?',
     text: item.file.name,
+    customClass: {
+      container: 'adm-upload-confirm-swal',
+    },
     showCancelButton: true,
     confirmButtonText: 'ลบ',
     cancelButtonText: 'ยกเลิก',
@@ -296,6 +299,9 @@ async function clearAll(): Promise<void> {
     icon: 'warning',
     title: 'ล้างรายการทั้งหมด?',
     text: `ลบไฟล์ที่เลือกไว้ ${pendingItems.value.length} ไฟล์ออกจากรายการอัปโหลด`,
+    customClass: {
+      container: 'adm-upload-confirm-swal',
+    },
     showCancelButton: true,
     confirmButtonText: 'ล้างทั้งหมด',
     cancelButtonText: 'ยกเลิก',
@@ -627,6 +633,10 @@ async function uploadAll(): Promise<void> {
   font-weight: 600;
   color: #475569;
   white-space: nowrap;
+}
+
+:global(.adm-upload-confirm-swal) {
+  z-index: 10000;
 }
 
 /* ── Empty state ────────────────────────────────────────── */
