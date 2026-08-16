@@ -6,7 +6,7 @@
   >
     <template #title-actions>
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" rounded="lg" to="/admin/upload">
-        เพิ่มกฎหมายใหม่
+        เพิ่มกฎหมายล่าสุด
       </v-btn>
     </template>
 
@@ -127,7 +127,7 @@
                   @click.stop
                 >
                   <v-icon start icon="mdi-sitemap" size="10" />
-                  มีกฎหมายลูก {{ law.childCount }} ฉบับ
+                  มีเอกสารที่อ้างถึง {{ law.childCount }} ฉบับ
                 </v-chip>
               </div>
               <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">

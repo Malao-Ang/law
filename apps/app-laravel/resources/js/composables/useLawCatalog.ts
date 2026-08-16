@@ -23,6 +23,16 @@ export function rootDocuments(
   });
 }
 
+export function pickableDocuments(
+  documents: DocumentListItem[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  return documents.filter((doc) => {
+    if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
+    return isPickableDocument(doc);
+  });
+}
+
 export function childDocuments(
   documents: DocumentListItem[],
   parentDocumentId: string,

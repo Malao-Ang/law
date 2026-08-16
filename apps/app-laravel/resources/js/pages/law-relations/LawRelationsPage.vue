@@ -7,9 +7,15 @@
     <WorkflowFooterBar
       :step="5"
       next-label="ถัดไป"
-      :next-loading="documentStore.saving"
+      extra-label="ส่งไป E-Sign"
+      extra-icon="mdi-draw-pen"
+      :next-loading="documentStore.saving && !esignLeaving"
+      :extra-loading="documentStore.saving && esignLeaving"
+      :next-disabled="documentStore.saving"
+      :extra-disabled="documentStore.saving"
       @back="router.push(`/documents/${props.documentId}/law-info`)"
       @next="saveAndNext"
+      @extra="saveAndEsign"
     />
     <div class="mx-auto relations-page" style="max-width:960px; padding-bottom:60px">
       <WorkflowStepper :step="5" />
@@ -20,6 +26,10 @@
       </div>
 
       <template v-else>
+        <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+          ขั้นตอนนี้ยังไม่บังคับ กรอกตอนนี้หรือส่งไป E-Sign ก่อนแล้วค่อยกลับมาก็ได้
+        </v-alert>
+
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
@@ -32,14 +42,15 @@
             <span class="text-subtitle-1 font-weight-bold">ลำดับชั้นเอกสาร</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            กำหนดว่าเอกสารนี้อ้างถึงกฎหมายใด
+            เลือกได้ว่าเอกสารนี้ออกภายใต้กฎหมายฉบับใด เช่น ระเบียบนี้ออกตาม พ.ร.บ. เรื่องนั้น
+            เลือกได้แค่ 1 ฉบับ ไม่บังคับ
           </p>
           <v-select
             v-model="parentId"
             :items="parentItems"
             item-title="title"
             item-value="document_id"
-            label="กฎหมายที่อ้างถึง (ไม่บังคับ)"
+            label="ออกภายใต้กฎหมาย (ไม่บังคับ)"
             placeholder="- ไม่มี -"
             clearable
             prepend-inner-icon="mdi-file-tree"
@@ -49,18 +60,21 @@
 
         <!-- Hierarchy: child documents (read-only) -->
         <v-card flat border rounded="lg" class="pa-6 mb-4">
-          <div class="d-flex align-center ga-2 mb-4">
+          <div class="d-flex align-center ga-2 mb-2">
             <v-icon icon="mdi-file-tree-outline" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">เอกสารที่สังกัด (เอกสารลูก)</span>
+            <span class="text-subtitle-1 font-weight-bold">เอกสารที่ออกภายใต้ฉบับนี้</span>
             <v-chip v-if="children.length" size="x-small" color="admin-primary" class="ml-1">
               {{ children.length }}
             </v-chip>
           </div>
+          <p class="text-caption text-medium-emphasis mb-4">
+            เอกสารอื่นที่เลือกฉบับนี้ไว้แล้ว ดูได้อย่างเดียว ถ้าจะเพิ่มต้องไปแก้ที่เอกสารนั้น
+          </p>
           <div v-if="catalogLoading" class="d-flex align-center justify-center pa-6">
             <v-progress-circular indeterminate size="24" color="admin-primary" />
           </div>
           <div v-else-if="children.length === 0" class="text-body-2 text-medium-emphasis pa-2">
-            ยังไม่มีเอกสารที่อ้างอิงเอกสารนี้
+            ยังไม่มีเอกสารที่ออกภายใต้ฉบับนี้
           </div>
           <v-list v-else density="compact" lines="one">
             <v-list-item
@@ -95,7 +109,8 @@
             >เพิ่ม</v-btn>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            ออกตามอำนาจ · แทนที่ · เกี่ยวข้อง — ผูกทั้งเอกสารนี้กับกฎหมายอื่น
+            บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง
+            เพิ่มได้หลายรายการ
           </p>
           <div v-if="documentLevelRelations.length" class="relations-list">
             <div v-for="rel in documentLevelRelations" :key="rel.id" class="relations-list__row">
@@ -133,7 +148,8 @@
             <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์ระดับข้อ</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            แก้ไขเพิ่มเติม · ยกเลิก · เกี่ยวข้อง — ผูกข้อในเอกสารนี้กับกฎหมายเป้าหมาย
+            บอกว่าข้อไหนในเอกสารนี้เกี่ยวข้องกับกฎหมายอื่น เช่น แก้ไขหรือยกเลิกข้อของกฎหมายฉบับอื่น
+            กดเพิ่มที่ข้อที่ต้องการ
           </p>
           <div v-if="sections.length === 0" class="text-body-2 text-medium-emphasis">
             ไม่พบข้อในเอกสาร
@@ -227,6 +243,7 @@ const snackbar = useSnackbarStore();
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);
 const parentId = ref<string | null>(null);
+const esignLeaving = ref(false);
 
 const relationDialog = ref<{
   open: boolean;
@@ -302,12 +319,26 @@ async function onRelationSave(relation: LawRelation): Promise<void> {
   if (ok) snackbar.success('เพิ่มความสัมพันธ์แล้ว');
 }
 
-async function saveAndNext(): Promise<void> {
+async function persistStepFive(): Promise<boolean> {
   const saved = await documentStore.saveLawMeta({ parent_document_id: parentId.value });
-  if (!saved) return;
-  const relationProgressed = await documentStore.completeWorkflowStep(5);
-  if (!relationProgressed) return;
+  if (!saved) return false;
+  return documentStore.completeWorkflowStep(5);
+}
+
+async function saveAndNext(): Promise<void> {
+  esignLeaving.value = false;
+  if (!await persistStepFive()) return;
   router.push(`/documents/${props.documentId}/permissions`);
+}
+
+async function saveAndEsign(): Promise<void> {
+  esignLeaving.value = true;
+  try {
+    if (!await persistStepFive()) return;
+    router.push(`/documents/${props.documentId}/esign`);
+  } finally {
+    esignLeaving.value = false;
+  }
 }
 
 onMounted(async () => {

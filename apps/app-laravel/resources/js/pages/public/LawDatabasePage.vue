@@ -383,7 +383,7 @@
                   <div class="law-list-card__children" :class="{ 'law-list-card__children--empty': childChips(law).length === 0 }">
                     <span v-if="childChips(law).length" class="law-list-card__children-label">
                       <v-icon size="12" icon="mdi-link-variant" />
-                      กฎหมายลูก
+                      เอกสารที่อ้างถึง
                     </span>
                     <span
                       v-for="chip in childChips(law)"

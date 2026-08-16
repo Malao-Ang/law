@@ -128,15 +128,15 @@ class LawMetaTest extends TestCase
 
         $response = $this->putJson("/api/documents/{$id}/document-review", [
             'law_meta' => [
-                'change_status' => 'กฎหมายใหม่',
+                'change_status' => 'กฎหมายล่าสุด',
             ],
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.change_status', 'กฎหมายใหม่');
+        $response->assertJsonPath('law_meta.change_status', 'กฎหมายล่าสุด');
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('กฎหมายใหม่', $doc['law_meta']['change_status']);
+        $this->assertSame('กฎหมายล่าสุด', $doc['law_meta']['change_status']);
     }
 
     public function test_public_access_scope_clears_permission_groups(): void

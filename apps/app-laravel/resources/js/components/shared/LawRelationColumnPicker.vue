@@ -42,7 +42,6 @@
     </div>
 
     <div v-else class="law-rel-picker__columns">
-      <!-- Column 1: root laws -->
       <div class="law-rel-col">
         <div class="law-rel-col__head">กฎหมายที่อ้างถึง</div>
         <v-text-field
@@ -61,18 +60,13 @@
             :key="doc.document_id"
             type="button"
             class="law-rel-col__item"
-            :class="{ 'is-active': selectedRoot?.document_id === doc.document_id }"
+            :class="{ 'is-active': selectedDocument?.document_id === doc.document_id }"
             role="option"
-            :aria-selected="selectedRoot?.document_id === doc.document_id"
-            @click="selectRoot(doc)"
+            :aria-selected="selectedDocument?.document_id === doc.document_id"
+            @click="selectDocument(doc)"
           >
             <span class="law-rel-col__label">{{ doc.title }}</span>
-            <v-icon
-              v-if="hasChildren(doc.document_id)"
-              icon="mdi-chevron-right"
-              size="18"
-              class="law-rel-col__chev"
-            />
+            <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
           </button>
           <div v-if="filteredCol1.length === 0" class="law-rel-col__empty">
             {{ documentsLoaded ? 'ไม่พบรายการ' : 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย' }}
@@ -80,56 +74,6 @@
         </div>
       </div>
 
-      <!-- Column 2: child laws -->
-      <div class="law-rel-col">
-        <div class="law-rel-col__head">กฎหมายย่อย</div>
-        <v-text-field
-          v-model="searchCol2"
-          density="compact"
-          hide-details
-          single-line
-          placeholder="ค้นหา..."
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          class="law-rel-col__search"
-          :disabled="!selectedRoot"
-        />
-        <div class="law-rel-col__list" role="listbox" aria-label="กฎหมายย่อย">
-          <template v-if="selectedRoot">
-            <button
-              v-if="hasChildren(selectedRoot.document_id)"
-              type="button"
-              class="law-rel-col__item"
-              :class="{ 'is-active': rootWholeSelected && !selectedChild }"
-              role="option"
-              :aria-selected="rootWholeSelected && !selectedChild"
-              @click="selectRootWhole"
-            >
-              <span class="law-rel-col__label">— ไม่มี —</span>
-              <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
-            </button>
-            <button
-              v-for="doc in filteredCol2"
-              :key="doc.document_id"
-              type="button"
-              class="law-rel-col__item"
-              :class="{ 'is-active': selectedChild?.document_id === doc.document_id }"
-              role="option"
-              :aria-selected="selectedChild?.document_id === doc.document_id"
-              @click="selectChild(doc)"
-            >
-              <span class="law-rel-col__label">{{ doc.title }}</span>
-              <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
-            </button>
-            <div v-if="filteredCol2.length === 0" class="law-rel-col__empty">
-              {{ hasChildren(selectedRoot.document_id) ? 'ไม่พบรายการ' : 'ไม่มีกฎหมายย่อย — เลือกมาตราในคอลัมน์ถัดไป' }}
-            </div>
-          </template>
-          <div v-else class="law-rel-col__empty">เลือกกฎหมายที่อ้างถึงก่อน</div>
-        </div>
-      </div>
-
-      <!-- Column 3: sections / articles -->
       <div class="law-rel-col">
         <div class="law-rel-col__head">ข้อ</div>
         <v-text-field
@@ -177,7 +121,7 @@
               </div>
             </template>
           </template>
-          <div v-else class="law-rel-col__empty">เลือกกฎหมายก่อน</div>
+          <div v-else class="law-rel-col__empty">เลือกกฎหมายที่อ้างถึงก่อน</div>
         </div>
       </div>
     </div>
@@ -194,10 +138,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
-  childDocuments,
-  documentHasChildren,
   filterByQuery,
-  rootDocuments,
+  pickableDocuments,
 } from '../../composables/useLawCatalog';
 import type { DocumentListItem, LawCatalogSection, LawRelationTarget } from '../../types/document';
 
@@ -215,9 +157,7 @@ const emit = defineEmits<{
 const loading = ref(false);
 const documentsLoaded = ref(false);
 const documents = ref<DocumentListItem[]>([]);
-const selectedRoot = ref<DocumentListItem | null>(null);
-const selectedChild = ref<DocumentListItem | null>(null);
-const rootWholeSelected = ref(false);
+const selectedDocument = ref<DocumentListItem | null>(null);
 const selectedSection = ref<LawCatalogSection | null>(null);
 const sectionTouched = ref(false);
 const sections = ref<LawCatalogSection[]>([]);
@@ -226,7 +166,6 @@ const sectionsCache = new Map<string, LawCatalogSection[]>();
 
 const globalSearch = ref('');
 const searchCol1 = ref('');
-const searchCol2 = ref('');
 const searchCol3 = ref('');
 
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -235,15 +174,8 @@ const catalogQuery = computed(() => globalSearch.value.trim() || searchCol1.valu
 
 const filteredCol1 = computed(() => {
   if (!documentsLoaded.value) return [];
-  const roots = rootDocuments(documents.value, props.excludeDocumentId);
-  return filterByQuery(roots, catalogQuery.value) as DocumentListItem[];
-});
-
-const filteredCol2 = computed(() => {
-  if (!selectedRoot.value || !documentsLoaded.value) return [];
-  const children = childDocuments(documents.value, selectedRoot.value.document_id, props.excludeDocumentId);
-  const query = globalSearch.value.trim() || searchCol2.value.trim();
-  return filterByQuery(children, query) as DocumentListItem[];
+  const docs = pickableDocuments(documents.value, props.excludeDocumentId);
+  return filterByQuery(docs, catalogQuery.value) as DocumentListItem[];
 });
 
 const filteredCol3 = computed(() => {
@@ -257,22 +189,13 @@ const filteredCol3 = computed(() => {
   );
 });
 
-const activeDocument = computed(() => {
-  if (selectedChild.value) return selectedChild.value;
-  if (selectedRoot.value && (rootWholeSelected.value || !hasChildren(selectedRoot.value.document_id))) {
-    return selectedRoot.value;
-  }
-  return null;
-});
+const activeDocument = computed(() => selectedDocument.value);
 const activeDocumentId = computed(() => activeDocument.value?.document_id ?? null);
 
 const breadcrumbs = computed(() => {
   const crumbs: Array<{ key: string; label: string }> = [];
-  if (selectedRoot.value) {
-    crumbs.push({ key: selectedRoot.value.document_id, label: selectedRoot.value.title });
-  }
-  if (selectedChild.value) {
-    crumbs.push({ key: selectedChild.value.document_id, label: selectedChild.value.title });
+  if (selectedDocument.value) {
+    crumbs.push({ key: selectedDocument.value.document_id, label: selectedDocument.value.title });
   }
   if (sectionTouched.value) {
     crumbs.push({
@@ -283,7 +206,7 @@ const breadcrumbs = computed(() => {
   return crumbs;
 });
 
-const canGoBack = computed(() => Boolean(selectedRoot.value));
+const canGoBack = computed(() => Boolean(selectedDocument.value));
 
 const selectionSummary = computed(() => {
   if (!activeDocument.value || !sectionTouched.value) return '';
@@ -293,8 +216,18 @@ const selectionSummary = computed(() => {
   return parts.join(' › ');
 });
 
-function hasChildren(documentId: string): boolean {
-  return documentHasChildren(documents.value, documentId);
+function emitSelection(): void {
+  if (!activeDocument.value || !sectionTouched.value) {
+    emit('update:modelValue', null);
+    return;
+  }
+
+  emit('update:modelValue', {
+    document_id: activeDocument.value.document_id,
+    title: activeDocument.value.title,
+    section: selectedSection.value?.badge ?? null,
+    block_id: selectedSection.value?.block_id ?? null,
+  });
 }
 
 async function loadDocuments(): Promise<void> {
@@ -356,54 +289,12 @@ async function loadSections(documentId: string): Promise<void> {
   }
 }
 
-function emitSelection(): void {
-  if (!activeDocument.value || !sectionTouched.value) {
-    emit('update:modelValue', null);
-    return;
-  }
-
-  emit('update:modelValue', {
-    document_id: activeDocument.value.document_id,
-    title: activeDocument.value.title,
-    section: selectedSection.value?.badge ?? null,
-    block_id: selectedSection.value?.block_id ?? null,
-  });
-}
-
-function selectRoot(doc: DocumentListItem): void {
-  selectedRoot.value = doc;
-  selectedChild.value = null;
-  rootWholeSelected.value = false;
+function selectDocument(doc: DocumentListItem): void {
+  selectedDocument.value = doc;
   selectedSection.value = null;
   sectionTouched.value = false;
-  searchCol2.value = '';
   searchCol3.value = '';
   sections.value = [];
-
-  if (!hasChildren(doc.document_id)) {
-    void loadSections(doc.document_id);
-  }
-
-  emitSelection();
-}
-
-function selectRootWhole(): void {
-  if (!selectedRoot.value) return;
-  selectedChild.value = null;
-  rootWholeSelected.value = true;
-  selectedSection.value = null;
-  sectionTouched.value = false;
-  searchCol3.value = '';
-  void loadSections(selectedRoot.value.document_id);
-  emitSelection();
-}
-
-function selectChild(doc: DocumentListItem): void {
-  selectedChild.value = doc;
-  rootWholeSelected.value = false;
-  selectedSection.value = null;
-  sectionTouched.value = false;
-  searchCol3.value = '';
   void loadSections(doc.document_id);
   emitSelection();
 }
@@ -428,20 +319,8 @@ function goBack(): void {
     return;
   }
 
-  if (selectedChild.value || rootWholeSelected.value) {
-    selectedChild.value = null;
-    rootWholeSelected.value = false;
-    selectedSection.value = null;
-    sectionTouched.value = false;
-    sections.value = [];
-    emitSelection();
-    return;
-  }
-
-  if (selectedRoot.value) {
-    selectedRoot.value = null;
-    selectedChild.value = null;
-    rootWholeSelected.value = false;
+  if (selectedDocument.value) {
+    selectedDocument.value = null;
     selectedSection.value = null;
     sectionTouched.value = false;
     sections.value = [];
@@ -517,7 +396,7 @@ onBeforeUnmount(() => {
 
 .law-rel-picker__columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   min-height: 320px;
 }

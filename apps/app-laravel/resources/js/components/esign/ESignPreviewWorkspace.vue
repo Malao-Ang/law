@@ -290,25 +290,24 @@ const metaOk = computed(() => {
 
 const structureOk = computed(() => (documentStore.review?.summary.block_count ?? 0) > 0);
 
-const relationsOk = computed(() => (documentStore.review?.relations?.length ?? 0) > 0
-  || (documentStore.review?.workflow_completed_step ?? 0) >= 5);
+const relationsOk = computed(() => (documentStore.review?.relations?.length ?? 0) > 0);
 
 const esignOk = computed(() => signers.value.length > 0);
 
 const checklist = computed(() => [
   { key: 'meta', label: 'ข้อมูล METADATA', ok: metaOk.value, status: metaOk.value ? 'ผ่าน' : 'ไม่ครบ' },
   { key: 'structure', label: 'โครงสร้างหมวด/ข้อ', ok: structureOk.value, status: structureOk.value ? 'ผ่าน' : 'ไม่ครบ' },
-  { key: 'relations', label: 'ระบุความสัมพันธ์กฎหมายครบ', ok: relationsOk.value, status: relationsOk.value ? 'ผ่าน' : 'รอดำเนินการ' },
+  { key: 'relations', label: 'ความสัมพันธ์กฎหมาย (ไม่บังคับก่อนลงนาม)', ok: relationsOk.value, status: relationsOk.value ? 'ผ่าน' : 'ทำภายหลังได้' },
   { key: 'esign', label: 'ระบบ E-SIGN', ok: esignOk.value, status: esignOk.value ? 'พร้อมส่ง' : 'รอลงนาม' },
 ]);
 
 const completenessPct = computed(() => {
-  const items = checklist.value;
-  const passed = items.filter((i) => i.ok).length;
-  return Math.round((passed / items.length) * 100);
+  const required = [metaOk.value, structureOk.value, esignOk.value];
+  const passed = required.filter(Boolean).length + (relationsOk.value ? 1 : 0);
+  return Math.round((passed / 4) * 100);
 });
 
-const canSend = computed(() => signers.value.length > 0 && completenessPct.value >= 75);
+const canSend = computed(() => signers.value.length > 0 && metaOk.value && structureOk.value);
 
 const packageName = computed(() => {
   const base = (documentStore.review?.source_file || previewStore.data?.source_file || 'Draft_Regulation')
@@ -326,7 +325,7 @@ function hydrateSigners(): void {
     if (md?.signatory_name) {
       signers.value = [{
         id: createClientId('signer'),
-        roleType: 'delegate',
+        roleType: 'president',
         name: md.signatory_name,
         position: md.signatory_position || '',
       }];

@@ -83,7 +83,7 @@ class LawSearchTest extends TestCase
         $this->mock(LawSearchService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
-                ->with(\Mockery::on(fn (array $params): bool => ($params['filters']['change_status'] ?? null) === ['กฎหมายใหม่']))
+                ->with(\Mockery::on(fn (array $params): bool => ($params['filters']['change_status'] ?? null) === ['กฎหมายล่าสุด']))
                 ->andReturn([
                     'total' => 0,
                     'results' => [],
@@ -93,7 +93,7 @@ class LawSearchTest extends TestCase
 
         $this->postJson('/api/laws/search', [
             'q' => '',
-            'filters' => ['change_status' => ['กฎหมายใหม่']],
+            'filters' => ['change_status' => ['กฎหมายล่าสุด']],
         ])->assertOk();
     }
 
