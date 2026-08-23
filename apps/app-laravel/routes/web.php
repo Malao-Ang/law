@@ -13,6 +13,7 @@ Route::view('/database', 'app');
 Route::view('/admin', 'app');
 Route::view('/admin/laws', 'app');
 Route::view('/admin/upload', 'app');
+Route::view('/admin/upload/historical', 'app');
 Route::view('/admin/ocr-queue', 'app');
 Route::view('/admin/relations', 'app');
 Route::view('/admin/reports', 'app');

@@ -35,11 +35,12 @@ export type SelectableOption = {
 };
 
 export type LookupData = {
-  document_types: SelectableOption[];
+  document_types: (SelectableOption & { source?: string })[];
   statuses: SelectableOption[];
   change_statuses: SelectableOption[];
   agencies: SelectableOption[];
   law_groups: SelectableOption[];
+  law_sources: SelectableOption[];
 };
 
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
