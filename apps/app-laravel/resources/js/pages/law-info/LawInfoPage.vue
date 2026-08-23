@@ -65,10 +65,11 @@
               />
             </v-col>
             <v-col v-if="form.law_type === 'ประกาศ'" cols="12">
-              <div class="text-body-2 font-weight-medium mb-1">{{ requiredLabel('ออกโดย') }}</div>
               <v-radio-group
                 v-model="form.issuer"
+                :label="requiredLabel('ออกโดย')"
                 :rules="issuerRules"
+                required
                 inline
                 hide-details="auto"
               >
