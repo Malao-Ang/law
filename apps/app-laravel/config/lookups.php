@@ -2,10 +2,20 @@
 
 return [
     'document_types' => [
-        ['title' => 'ข้อบังคับ', 'value' => 'ข้อบังคับ'],
-        ['title' => 'ระเบียบ', 'value' => 'ระเบียบ'],
-        ['title' => 'ประกาศ', 'value' => 'ประกาศ'],
-        ['title' => 'กฎหมายภายนอก', 'value' => 'กฎหมายภายนอก'],
+        ['title' => 'ประกาศ', 'value' => 'ประกาศ', 'source' => 'internal'],
+        ['title' => 'ระเบียบ', 'value' => 'ระเบียบ', 'source' => 'internal'],
+        ['title' => 'ข้อบังคับ', 'value' => 'ข้อบังคับ', 'source' => 'internal'],
+        ['title' => 'พระราชกำหนด', 'value' => 'พระราชกำหนด', 'source' => 'external'],
+        ['title' => 'พระราชบัญญัติ', 'value' => 'พระราชบัญญัติ', 'source' => 'external'],
+        ['title' => 'กฎกระทรวง', 'value' => 'กฎกระทรวง', 'source' => 'external'],
+        ['title' => 'ประกาศกระทรวง', 'value' => 'ประกาศกระทรวง', 'source' => 'external'],
+        // legacy value kept so pre-existing documents still validate
+        ['title' => 'กฎหมายภายนอก', 'value' => 'กฎหมายภายนอก', 'source' => 'external'],
+    ],
+
+    'law_sources' => [
+        ['title' => 'เอกสารภายในหน่วยงาน', 'value' => 'internal'],
+        ['title' => 'เอกสารภายนอกหน่วยงาน', 'value' => 'external'],
     ],
 
     // สถานะการบังคับใช้
