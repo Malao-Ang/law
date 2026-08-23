@@ -64,6 +64,22 @@
                 required
               />
             </v-col>
+            <v-col v-if="form.law_type === 'ประกาศ'" cols="12">
+              <div class="text-body-2 font-weight-medium mb-1">{{ requiredLabel('ออกโดย') }}</div>
+              <v-radio-group
+                v-model="form.issuer"
+                :rules="issuerRules"
+                inline
+                hide-details="auto"
+              >
+                <v-radio
+                  v-for="opt in ISSUER_OPTIONS"
+                  :key="opt.value"
+                  :label="opt.title"
+                  :value="opt.value"
+                />
+              </v-radio-group>
+            </v-col>
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.status"
@@ -273,13 +289,18 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/มติ/u, 'ประกาศ'],
 ];
 
+const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
+  { title: 'ออกโดยมหาวิทยาลัย', value: 'มหาวิทยาลัย' },
+  { title: 'ออกโดยสภามหาวิทยาลัย', value: 'สภามหาวิทยาลัย' },
+];
+
 const EMPTY: LawMeta = {
   status: '', law_type: '', law_group: '', law_groups: [],
   change_status: null,
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [], keywords: [],
-  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, signer_group: null,
+  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, signer_group: null, issuer: null,
   access_scope: 'public', permission_group_ids: [],
 };
 
@@ -307,6 +328,10 @@ function requiredTextRules(label: string): Array<(v: unknown) => boolean | strin
 function requiredArrayRules(label: string): Array<(v: unknown) => boolean | string> {
   return [(v: unknown) => hasArrayValue(v) || `กรุณาเลือก${label}`];
 }
+
+const issuerRules = [
+  (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
+];
 
 function dateMs(value: unknown): number | null {
   if (typeof value !== 'string' || value === '') return null;
@@ -472,6 +497,7 @@ function buildLawMetaPayload(): LawMeta {
     keywords: normalizeKeywords(form.value.keywords),
     imported_by: form.value.imported_by.trim() || CURRENT_ADMIN_LABEL,
     section_count: articleCount.value,
+    issuer: form.value.law_type === 'ประกาศ' ? (form.value.issuer ?? null) : null,
   };
 }
 
@@ -516,6 +542,10 @@ watch(form, () => {
 
 watch(noExpiry, () => {
   void clearValidationBannerIfValid();
+});
+
+watch(() => form.value.law_type, (lawType) => {
+  if (lawType !== 'ประกาศ') form.value.issuer = null;
 });
 
 onMounted(() => {

@@ -194,6 +194,7 @@ export interface LawMeta {
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
   signer_group?: string | null;
+  issuer?: string | null;   // ผู้ออกประกาศ — only set when law_type === 'ประกาศ'
   agencies: string[];      // multi-chip หน่วยงานที่รับผิดชอบ
   keywords: string[];
   promulgation_date: string;
