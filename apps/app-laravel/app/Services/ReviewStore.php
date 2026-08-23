@@ -1441,6 +1441,7 @@ class ReviewStore
             'law_groups' => [],
             'agency' => '',
             'signer_group' => null,
+            'issuer' => null,
             'agencies' => [],
             'keywords' => [],
             'promulgation_date' => '',
