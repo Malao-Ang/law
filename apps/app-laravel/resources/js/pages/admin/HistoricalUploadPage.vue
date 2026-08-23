@@ -1,7 +1,7 @@
 <template>
   <AppShell>
     <div class="hist-wrap">
-      <WorkflowStepper :step="1" />
+      <WorkflowStepper :step="1" variant="historical" />
 
       <v-card class="pa-6 mb-4" elevation="0" rounded="lg">
         <h2 class="text-h6 mb-1">กำหนดประเภทเอกสาร</h2>

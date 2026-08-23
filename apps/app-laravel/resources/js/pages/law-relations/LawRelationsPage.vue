@@ -12,7 +12,7 @@
       @next="saveAndNext"
     />
     <div class="mx-auto relations-page" style="max-width:960px; padding-bottom:60px">
-      <WorkflowStepper :step="5" />
+      <WorkflowStepper :step="isOld ? 3 : 5" :variant="isOld ? 'historical' : 'default'" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -223,6 +223,7 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
+const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);

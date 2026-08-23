@@ -11,7 +11,7 @@
       @next="saveAndNext"
     />
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="4" description="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้" />
+      <WorkflowStepper :step="isOld ? 2 : 4" :variant="isOld ? 'historical' : 'default'" description="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -279,6 +279,7 @@ import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
