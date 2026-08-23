@@ -25,6 +25,10 @@
           <span class="law-info-row__label text-medium-emphasis">ประเภท</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.law_type }}</span>
         </div>
+        <div v-if="meta.issuer" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">ออกโดย</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.issuer }}</span>
+        </div>
         <div v-if="meta.law_group" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.law_group }}</span>
