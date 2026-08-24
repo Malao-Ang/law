@@ -21,6 +21,7 @@
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
+import type { VersionChain } from '../types/versionChain';
 
 type ApiErrorPayload = {
   message?: string;
@@ -112,6 +113,10 @@ export function fetchPreview(documentId: string): Promise<PreviewData> {
 
 export function getLookups(): Promise<LookupData> {
   return jsonRequest<LookupData>('/api/lookups');
+}
+
+export function getDocumentVersions(documentId: string): Promise<VersionChain> {
+  return jsonRequest<VersionChain>(`/api/documents/${encodeURIComponent(documentId)}/versions`);
 }
 
 export function saveDocumentReview(
