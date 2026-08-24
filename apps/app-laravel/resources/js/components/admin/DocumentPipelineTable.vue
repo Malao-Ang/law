@@ -8,6 +8,39 @@
     </div>
     <v-divider />
 
+    <div class="d-flex flex-wrap gap-3 pa-4 pb-0">
+      <v-select
+        v-model="filterSource"
+        :items="[{ title: 'ภายใน', value: 'internal' }, { title: 'ภายนอก', value: 'external' }]"
+        clearable
+        density="compact"
+        variant="outlined"
+        hide-details
+        label="แหล่งที่มา: ทั้งหมด"
+        style="max-width: 220px"
+      />
+      <v-select
+        v-model="filterType"
+        :items="lawTypeOptions"
+        clearable
+        density="compact"
+        variant="outlined"
+        hide-details
+        label="ประเภท: ทั้งหมด"
+        style="max-width: 220px"
+      />
+      <v-select
+        v-model="filterStatus"
+        :items="['queued', 'processing', 'done', 'failed', 'exported', 'ingested']"
+        clearable
+        density="compact"
+        variant="outlined"
+        hide-details
+        label="สถานะ: ทั้งหมด"
+        style="max-width: 220px"
+      />
+    </div>
+
     <v-data-table
       :headers="headers"
       :items="rows"
@@ -23,6 +56,17 @@
 
       <template #item.title="{ item }">
         <span class="text-body-2 font-weight-medium">{{ item.title }}</span>
+      </template>
+
+      <template #item.source="{ item }">
+        <v-chip size="small" :color="item.source === 'internal' ? 'blue' : 'purple'" variant="tonal">
+          {{ item.source === 'internal' ? 'ภายใน' : item.source === 'external' ? 'ภายนอก' : '—' }}
+        </v-chip>
+      </template>
+
+      <template #item.lawType="{ item }">
+        <span>{{ item.lawType || '—' }}</span>
+        <v-chip v-if="item.documentType === 'old'" size="x-small" color="grey" variant="tonal" class="ml-2">เอกสารเก่า</v-chip>
       </template>
 
       <template #item.stage="{ item }">
@@ -99,7 +143,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import { formatThaiDate } from '../../utils/thaiDate';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
-  deleteStage, deriveStage, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
+  deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
 
@@ -109,6 +153,9 @@ interface Row {
   title: string;
   updatedAt: string;
   stage: StageKey;
+  source: string;
+  lawType: string;
+  documentType: 'new' | 'old';
 }
 
 const router = useRouter();
@@ -119,31 +166,63 @@ const loading = ref(false);
 const deletingId = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
+const filterSource = ref<string | null>(null);
+const filterType = ref<string | null>(null);
+const filterStatus = ref<string | null>(null);
+
+const filteredDocs = computed(() =>
+  docs.value.filter((d) =>
+    (!filterSource.value || d.source === filterSource.value) &&
+    (!filterType.value || d.law_type === filterType.value) &&
+    (!filterStatus.value || d.status === filterStatus.value)
+  ),
+);
+
+// Unique law_type values from loaded docs for the type filter
+const lawTypeOptions = computed(() =>
+  [...new Set(docs.value.map((d) => d.law_type).filter(Boolean))] as string[]
+);
+
 const headers = [
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 72 },
   { title: 'เอกสาร', key: 'title', sortable: false },
+  { title: 'แหล่งที่มา', key: 'source', sortable: false },
+  { title: 'ประเภท', key: 'lawType', sortable: false },
   { title: 'สถานะ', key: 'stage', sortable: false },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false },
   { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'end' as const },
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
-  const workflowStage = deriveStageFromWorkflow(doc.workflow_completed_step);
+  // Old docs follow a fixed path — no localStorage overrides needed
+  if (doc.document_type === 'old') {
+    return deriveStageForDocument({
+      status: doc.status,
+      document_type: doc.document_type,
+      workflow_completed_step: doc.workflow_completed_step,
+    });
+  }
+  // New docs: derive backend+workflow stage, then apply localStorage admin override on top
+  const base = deriveStageForDocument({
+    status: doc.status,
+    document_type: doc.document_type,
+    workflow_completed_step: doc.workflow_completed_step,
+  });
+  if (base === 'failed') return 'failed';
   const stored = localStages.value[doc.document_id];
-  if (workflowStage) return stored ? laterStage(workflowStage, stored) : workflowStage;
-
-  const derived = deriveStage(doc.status);
-  if (derived === 'failed') return 'failed';
-  return stored ? laterStage(derived, stored) : derived;
+  return stored ? laterStage(base, stored) : base;
 }
 
 const rows = computed<Row[]>(() =>
-  docs.value.map((doc, index) => ({
+  filteredDocs.value.map((doc, index) => ({
     no: index + 1,
     documentId: doc.document_id,
     title: doc.title || doc.document_id,
     updatedAt: formatDate(doc.updated_at),
     stage: effectiveStage(doc),
+    source: doc.source ?? '',
+    lawType: doc.law_type ?? '',
+    documentType: doc.document_type ?? 'new',
   })),
 );
 
