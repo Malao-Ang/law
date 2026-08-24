@@ -100,6 +100,53 @@ class SeedSampleLawsCommand extends Command
             $this->info("Seeded + indexed {$documentId}");
         }
 
+        $versionChain = [
+            ['id' => 'sample_ver_1', 'title' => 'ระเบียบมหาวิทยาลัยบูรพา ว่าด้วยการจัดการเอกสารอิเล็กทรอนิกส์ พ.ศ. ๒๕๖๖', 'parent' => null, 'status' => 'ยกเลิกการใช้งาน', 'change_status' => 'กฎหมายใหม่', 'promulgation_date' => '2566-06-01', 'agency' => 'สำนักงานอธิการบดี'],
+            ['id' => 'sample_ver_2', 'title' => 'ระเบียบมหาวิทยาลัยบูรพา ว่าด้วยการจัดการเอกสารอิเล็กทรอนิกส์ พ.ศ. ๒๕๖๗', 'parent' => 'sample_ver_1', 'status' => 'ยกเลิกการใช้งาน', 'change_status' => 'ปรับปรุงทั้งฉบับ', 'promulgation_date' => '2567-02-12', 'agency' => 'สถาบันธรรมาภิบาล'],
+            ['id' => 'sample_ver_3', 'title' => 'ระเบียบมหาวิทยาลัยบูรพา ว่าด้วยการจัดการเอกสารอิเล็กทรอนิกส์ พ.ศ. ๒๕๖๘', 'parent' => 'sample_ver_2', 'status' => 'มีผลบังคับใช้', 'change_status' => 'ปรับปรุงทั้งฉบับ', 'promulgation_date' => '2568-05-20', 'agency' => 'สถาบันธรรมาภิบาล'],
+        ];
+
+        foreach ($versionChain as $version) {
+            $store->setStatus($version['id'], ['status' => 'done', 'source_file' => "{$version['id']}.pdf"]);
+            $store->writeReviewDocument($version['id'], [
+                'document_id' => $version['id'],
+                'source_file' => "{$version['id']}.pdf",
+                'source_type' => 'pdf',
+                'language' => 'th',
+                'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+                'law_meta' => [
+                    'title' => $version['title'],
+                    'law_type' => 'ระเบียบ',
+                    'status' => $version['status'],
+                    'change_status' => $version['change_status'],
+                    'agency' => $version['agency'],
+                    'law_group' => 'ด้านโครงสร้างองค์กรและระบบการบริหาร',
+                    'promulgation_date' => $version['promulgation_date'],
+                    'effective_date' => $version['promulgation_date'],
+                    'parent_document_id' => $version['parent'],
+                    'keywords' => ['เอกสารอิเล็กทรอนิกส์'],
+                    'summary' => $version['title'],
+                ],
+                'pages' => [['page_no' => 1, 'blocks' => []]],
+            ]);
+
+            $store->writeExport($version['id'], [
+                'document_id' => $version['id'],
+                'document_title' => $version['title'],
+                'chunks' => [[
+                    'chunk_id' => "{$version['id']}-c1",
+                    'page_no' => 1,
+                    'block_ids' => ["{$version['id']}-p1-b1"],
+                    'section_path' => 'ข้อ ๑',
+                    'text' => 'ระเบียบนี้เรียกว่า '.$version['title'],
+                    'meta' => [],
+                ]],
+            ]);
+
+            $indexer->index($version['id']);
+            $this->info("Seeded version chain doc {$version['id']}");
+        }
+
         $this->info('Done. Try searching for "ภาษี" on the Database page.');
 
         return self::SUCCESS;
