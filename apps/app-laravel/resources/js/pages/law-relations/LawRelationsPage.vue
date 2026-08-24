@@ -5,7 +5,8 @@
     subtitle="ขั้นตอนที่ 5 จาก 6: ความสัมพันธ์กฎหมาย"
   >
     <WorkflowFooterBar
-      :step="5"
+      :step="isOld ? 3 : 5"
+      :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
       :next-loading="documentStore.saving"
       @back="router.push(`/documents/${props.documentId}/law-info`)"

@@ -5,6 +5,7 @@
   >
     <WorkflowFooterBar
       :step="isOld ? 4 : 6"
+      :variant="isOld ? 'historical' : 'default'"
       :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"

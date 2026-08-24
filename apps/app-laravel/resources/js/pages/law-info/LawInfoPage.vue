@@ -4,10 +4,11 @@
     title=""
   >
     <WorkflowFooterBar
-      :step="4"
+      :step="isOld ? 2 : 4"
+      :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
       :next-loading="documentStore.saving"
-      @back="router.push(`/documents/${props.documentId}/rag`)"
+      @back="router.push(isOld ? '/admin/upload' : `/documents/${props.documentId}/rag`)"
       @next="saveAndNext"
     />
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
