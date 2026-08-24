@@ -9,7 +9,7 @@
     >{{ backLabel }}</v-btn>
 
     <span class="wf-footer__counter">
-      <strong>{{ WORKFLOW_STEPS[step - 1] }}</strong>&nbsp;·&nbsp;{{ step }} จาก {{ WORKFLOW_STEPS.length }}
+      <strong>{{ steps[step - 1] }}</strong>&nbsp;·&nbsp;{{ step }} จาก {{ steps.length }}
     </span>
 
     <v-btn
@@ -26,10 +26,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { WORKFLOW_STEPS } from '../../constants/workflowSteps';
 
-withDefaults(defineProps<{
+const HISTORICAL_STEPS = [
+  'ประเภทเอกสาร',
+  'ข้อมูล',
+  'เอกสารที่เกี่ยวข้อง',
+  'กำหนดสิทธิ์',
+  'เผยแพร่',
+] as const;
+
+const props = withDefaults(defineProps<{
   step: number;
+  variant?: 'default' | 'historical';
   backLabel?: string;
   nextLabel?: string;
   backDisabled?: boolean;
@@ -37,6 +47,7 @@ withDefaults(defineProps<{
   nextLoading?: boolean;
   nextHidden?: boolean;
 }>(), {
+  variant: 'default',
   backLabel: 'ย้อนกลับ',
   nextLabel: 'ถัดไป',
   backDisabled: false,
@@ -44,6 +55,8 @@ withDefaults(defineProps<{
   nextLoading: false,
   nextHidden: false,
 });
+
+const steps = computed(() => props.variant === 'historical' ? HISTORICAL_STEPS : WORKFLOW_STEPS);
 
 const emit = defineEmits<{ back: []; next: [] }>();
 </script>

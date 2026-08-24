@@ -115,3 +115,23 @@ export function deleteStage(documentId: string): void {
   delete map[documentId];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
+
+// Old (historical) docs skip review/rag/esign. Backend marks them 'done'
+// immediately; floor them at 'info' and follow workflow progress from there.
+export function deriveStageForDocument(doc: {
+  status: string;
+  document_type?: 'new' | 'old';
+  workflow_completed_step?: number | null;
+}): StageKey {
+  if (doc.document_type !== 'old') {
+    const backend = deriveStage(doc.status);
+    const wf = deriveStageFromWorkflow(doc.workflow_completed_step);
+    return wf ? laterStage(backend, wf) : backend;
+  }
+  switch (doc.workflow_completed_step) {
+    case 4: return 'relation';   // historical step 2 (info) done
+    case 5: return 'complete';   // historical step 3 (relations) done
+    case 6: return 'public';     // permissions saved -> published
+    default: return 'info';      // fresh old doc -> start at ข้อมูล
+  }
+}

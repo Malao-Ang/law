@@ -135,6 +135,7 @@ class ReviewStore
             $parentDocumentId = null;
             $accessScope = 'public';
 
+            $meta = [];
             $review = $this->blob->read('review', $documentId);
             if ($review !== null) {
                 $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
@@ -161,6 +162,9 @@ class ReviewStore
                     ?? null,
                 'timings' => is_array($status['timings'] ?? null) ? $status['timings'] : null,
                 'error' => isset($status['error']) ? (string) $status['error'] : null,
+                'document_type' => $meta['document_type'] ?? 'new',
+                'source' => $meta['source'] ?? '',
+                'law_type' => trim((string) ($meta['law_type'] ?? '')),
                 'parent_document_id' => $parentDocumentId,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
@@ -336,6 +340,29 @@ class ReviewStore
     {
         $this->syncDocumentReview($document);
         $this->blob->write('review', $documentId, $document);
+    }
+
+    /**
+     * Create an empty review doc for a historical (old) PDF so the metadata
+     * wizard can run immediately, before background OCR indexing completes.
+     *
+     * @param  array{source?: string, law_type?: string}  $meta
+     */
+    public function createHistoricalStub(string $documentId, string $sourceFile, array $meta = []): void
+    {
+        $this->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'source_file' => $sourceFile,
+            'source_type' => 'pdf_scan',
+            'pages' => [],
+            'summary' => ['page_count' => 0, 'block_count' => 0, 'review_required_count' => 0],
+            'relations' => [],
+            'law_meta' => [
+                'document_type' => 'old',
+                'source' => $meta['source'] ?? '',
+                'law_type' => $meta['law_type'] ?? '',
+            ],
+        ]);
     }
 
     /**
@@ -1517,6 +1544,8 @@ class ReviewStore
         $sectionCount = $this->countLawSections($document);
 
         $document['law_meta'] = array_merge([
+            'document_type' => 'new',
+            'source' => '',
             'status' => '',
             'law_type' => '',
             'law_group' => '',

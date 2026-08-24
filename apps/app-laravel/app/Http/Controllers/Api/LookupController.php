@@ -15,6 +15,7 @@ class LookupController extends Controller
             'change_statuses' => config('lookups.change_statuses'),
             'agencies' => config('lookups.agencies'),
             'law_groups' => config('lookups.law_groups'),
+            'law_sources' => config('lookups.law_sources'),
         ]);
     }
 }

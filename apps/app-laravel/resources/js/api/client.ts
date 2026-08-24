@@ -36,11 +36,12 @@ export type SelectableOption = {
 };
 
 export type LookupData = {
-  document_types: SelectableOption[];
+  document_types: (SelectableOption & { source?: string })[];
   statuses: SelectableOption[];
   change_statuses: SelectableOption[];
   agencies: SelectableOption[];
   law_groups: SelectableOption[];
+  law_sources: SelectableOption[];
 };
 
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -83,16 +84,24 @@ export async function uploadDocument(
   file: File,
   scanExtractionMode: ScanExtractionMode = 'gemini',
   extractionEngine: 'standard' | 'fast' = 'standard',
+  opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string } = {},
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
   form.append('scan_extraction_mode', scanExtractionMode);
   form.append('extraction_engine', extractionEngine);
+  if (opts.documentType) form.append('document_type', opts.documentType);
+  if (opts.source) form.append('source', opts.source);
+  if (opts.lawType) form.append('law_type', opts.lawType);
 
   return jsonRequest<UploadResponse>('/api/documents', {
     method: 'POST',
     body: form,
   });
+}
+
+export function documentFileUrl(documentId: string): string {
+  return `/api/documents/${documentId}/file`;
 }
 
 export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {

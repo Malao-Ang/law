@@ -4,7 +4,7 @@
       <div class="wf-stepper__header-row">
         <v-stepper :model-value="step" alt-labels flat bg-color="white" class="wf-stepper">
           <v-stepper-header>
-            <template v-for="(label, i) in WORKFLOW_STEPS" :key="i">
+            <template v-for="(label, i) in steps" :key="i">
               <v-stepper-item
                 :value="i + 1"
                 :title="label"
@@ -12,7 +12,7 @@
                 color="admin-primary"
                 complete-icon="mdi-check"
               />
-              <v-divider v-if="i < WORKFLOW_STEPS.length - 1" />
+              <v-divider v-if="i < steps.length - 1" />
             </template>
           </v-stepper-header>
         </v-stepper>
@@ -41,15 +41,25 @@
 import { computed, ref } from 'vue';
 import { WORKFLOW_STEPS } from '../../constants/workflowSteps';
 
-const props = defineProps<{ step: number; description?: string }>();
+const HISTORICAL_STEPS = [
+  'ประเภทเอกสาร',
+  'ข้อมูล',
+  'เอกสารที่เกี่ยวข้อง',
+  'กำหนดสิทธิ์',
+  'เผยแพร่',
+] as const;
+
+const props = defineProps<{ step: number; description?: string; variant?: 'default' | 'historical' }>();
+
+const steps = computed(() => props.variant === 'historical' ? HISTORICAL_STEPS : WORKFLOW_STEPS);
 
 const isExpanded = ref(true);
 const progressPercent = computed(() => {
-  if (WORKFLOW_STEPS.length <= 1) {
+  if (steps.value.length <= 1) {
     return 100;
   }
 
-  return Math.max(0, Math.min(100, ((props.step - 1) / (WORKFLOW_STEPS.length - 1)) * 100));
+  return Math.max(0, Math.min(100, ((props.step - 1) / (steps.value.length - 1)) * 100));
 });
 </script>
 

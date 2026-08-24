@@ -132,6 +132,9 @@ export interface DocumentBlock {
 
 export type ScanExtractionMode = 'local' | 'gemini';
 
+export type DocumentType = 'new' | 'old';
+export type DocumentSource = '' | 'internal' | 'external';
+
 export interface DocumentPage {
   page_no: number;
   image_path: string | null;
@@ -210,6 +213,8 @@ export interface LawMeta {
   parent_document_id: string | null;
   access_scope: 'public' | 'private';
   permission_group_ids: string[];
+  document_type?: DocumentType;
+  source?: DocumentSource;
 }
 
 export type RelationType = 'related' | 'repeals' | 'amends' | 'issued_under' | 'supersedes';
@@ -244,6 +249,9 @@ export interface DocumentListItem {
   workflow_completed_step?: number | null;
   workflow_current_step?: number | null;
   workflow_updated_at?: string | null;
+  document_type?: DocumentType;
+  source?: DocumentSource;
+  law_type?: string;
 }
 
 export interface LawCatalogSection {

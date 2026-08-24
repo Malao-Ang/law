@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\EsignCallbackController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\DocumentFileController;
 use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LawSearchController;
 use App\Http\Controllers\Api\LawSuggestController;
@@ -57,6 +58,7 @@ Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, '
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
+Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
 

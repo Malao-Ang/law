@@ -7,6 +7,27 @@
   >
     <div class="adm-up">
 
+      <!-- ── Document type selection cards ─────────────────── -->
+      <div class="d-flex ga-4 mb-6 flex-wrap">
+        <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
+          <v-icon size="32" color="primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
+          <h3 class="text-h6">เอกสารใหม่ (New Document)</h3>
+          <p class="text-body-2 text-medium-emphasis">
+            เอกสารที่ยังไม่ผ่านกระบวนการจัดการของระบบ จะต้องผ่านขั้นตอนการตรวจทาน และจัดลำดับเนื้อหา (Structuring) ด้วย AI
+          </p>
+          <v-btn block color="primary" variant="flat" @click="openNewDocumentUpload">ดำเนินการต่อ</v-btn>
+        </v-card>
+
+        <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
+          <v-icon size="32" color="success" class="mb-2">mdi-file-check-outline</v-icon>
+          <h3 class="text-h6">เอกสารเก่า (Historical Document)</h3>
+          <p class="text-body-2 text-medium-emphasis">
+            เอกสารที่ผ่านการลงนามเสร็จสิ้นแล้ว ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบเอกสารต้นฉบับ
+          </p>
+          <v-btn block color="success" variant="flat" @click="router.push('/admin/upload/historical')">ดำเนินการต่อ</v-btn>
+        </v-card>
+      </div>
+
       <!-- ── Drop zone ─────────────────────────────────────── -->
       <div
         class="adm-drop"
@@ -199,6 +220,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
@@ -214,6 +236,7 @@ interface PendingItem {
   error: string;
 }
 
+const router = useRouter();
 const uploadStore = useUploadStore();
 const snackbar = useSnackbarStore();
 
@@ -226,6 +249,10 @@ const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(nul
 const isUploading = computed(() => pendingItems.value.some(i => i.uploading));
 const allDone = computed(() => pendingItems.value.length > 0 && pendingItems.value.every(i => i.done));
 const pendingCount = computed(() => pendingItems.value.filter(i => !i.done).length);
+
+function openNewDocumentUpload(): void {
+  fileInputEl.value?.click();
+}
 
 function isPdf(file: File): boolean {
   return file.name.split('.').pop()?.toLowerCase() === 'pdf';
