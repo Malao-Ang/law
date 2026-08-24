@@ -63,6 +63,7 @@
           'is-info-hidden': !infoOpen,
         }"
       >
+      <template v-if="!isOld">
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
         <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญข้อ</p>
         <div class="lawx-toc__scroll">
@@ -84,6 +85,7 @@
           </div>
         </div>
       </v-card>
+      </template>
 
       <main class="lawx-doc">
         <v-card tag="section" class="lawx-headcard" elevation="0">
@@ -96,6 +98,17 @@
           </div>
         </v-card>
 
+        <template v-if="isOld">
+          <v-card tag="section" class="lawx-card" elevation="0">
+            <div class="d-flex justify-end mb-2">
+              <v-btn :href="fileUrl" target="_blank" prepend-icon="mdi-download" variant="tonal" size="small">
+                ดาวน์โหลด PDF
+              </v-btn>
+            </div>
+            <iframe :src="fileUrl" title="เอกสารต้นฉบับ" style="width:100%;height:80vh;border:0;border-radius:8px" />
+          </v-card>
+        </template>
+        <template v-else>
         <v-card
           v-for="section in sections"
           :id="`sec-${section.id}`"
@@ -150,6 +163,7 @@
             </div>
           </div>
         </v-card>
+        </template>
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
@@ -172,7 +186,7 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { downloadPdfExport } from '../../api/client';
+import { downloadPdfExport, documentFileUrl } from '../../api/client';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -220,6 +234,8 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
+const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+const fileUrl = computed(() => documentFileUrl(props.documentId));
 
 const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
