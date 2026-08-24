@@ -36,6 +36,7 @@ Route::post('/documents', [UploadController::class, 'store']);
 Route::get('/documents/{documentId}', [UploadController::class, 'show']);
 Route::delete('/documents/{documentId}', [UploadController::class, 'destroy']);
 Route::get('/documents/{documentId}/review', [ReviewController::class, 'show']);
+Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions']);
 Route::get('/documents/{documentId}/preview', [ReviewController::class, 'preview']);
 Route::put('/documents/{documentId}/document-review', [ReviewController::class, 'updateDocumentReview']);
 Route::patch('/documents/{documentId}/workflow-progress', [ReviewController::class, 'updateWorkflowProgress']);

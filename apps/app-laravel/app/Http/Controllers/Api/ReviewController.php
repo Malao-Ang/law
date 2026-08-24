@@ -44,6 +44,17 @@ class ReviewController extends Controller
         return $this->withRevalidation($response);
     }
 
+    public function versions(string $documentId): JsonResponse
+    {
+        try {
+            $chain = $this->reviewStore->getVersionChain($documentId);
+        } catch (RuntimeException) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        return response()->json($chain);
+    }
+
     /**
      * Tag the response with a content ETag and force revalidation. The browser then
      * sends If-None-Match on reload / new tab; if the document is unchanged we return

@@ -226,6 +226,8 @@ class ReviewStore
                     'law_groups' => $groups,
                     'agencies' => $agencies,
                     'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
+                    'effective_date' => trim((string) ($meta['effective_date'] ?? '')),
+                    'issuer' => trim((string) ($meta['issuer'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
                     'relations_count' => is_array($review['relations'] ?? null)
                         ? count($review['relations'])
@@ -244,6 +246,85 @@ class ReviewStore
 
             return $rows;
         });
+    }
+
+    /**
+     * Build the version chain (documents linked by law_meta.parent_document_id) that contains
+     * $documentId, ordered oldest -> newest. The newest node (leaf) is the current version.
+     *
+     * @return array{current_document_id: string, versions: list<array<string, mixed>>}
+     */
+    public function getVersionChain(string $documentId): array
+    {
+        $rows = $this->listLawMeta();
+        $byId = [];
+        foreach ($rows as $row) {
+            $byId[$row['document_id']] = $row;
+        }
+
+        if (! isset($byId[$documentId])) {
+            throw new RuntimeException("Document {$documentId} not found.");
+        }
+
+        $childrenByParent = [];
+        foreach ($rows as $row) {
+            $parentId = (string) ($row['parent_document_id'] ?? '');
+            if ($parentId !== '' && isset($byId[$parentId])) {
+                $childrenByParent[$parentId][] = $row['document_id'];
+            }
+        }
+
+        // Walk up parent links to the root of this document's chain.
+        $rootId = $documentId;
+        $guard = 0;
+        while ($guard++ < 200) {
+            $parentId = (string) ($byId[$rootId]['parent_document_id'] ?? '');
+            if ($parentId === '' || ! isset($byId[$parentId])) {
+                break;
+            }
+            $rootId = $parentId;
+        }
+
+        // BFS every descendant of the root to gather the connected component.
+        // ponytail: linear chains are expected; BFS + date sort still yields a sane order if a parent ever branches.
+        $component = [];
+        $seen = [$rootId => true];
+        $queue = [$rootId];
+        while ($queue !== []) {
+            $id = array_shift($queue);
+            $component[] = $byId[$id];
+            foreach ($childrenByParent[$id] ?? [] as $childId) {
+                if (! isset($seen[$childId])) {
+                    $seen[$childId] = true;
+                    $queue[] = $childId;
+                }
+            }
+        }
+
+        // Order oldest -> newest by effective_date, then promulgation_date, then id.
+        usort($component, static function (array $a, array $b): int {
+            return [$a['effective_date'] ?? '', $a['promulgation_date'] ?? '', $a['document_id']]
+                <=> [$b['effective_date'] ?? '', $b['promulgation_date'] ?? '', $b['document_id']];
+        });
+
+        $currentId = $component[count($component) - 1]['document_id'];
+
+        $versions = [];
+        foreach ($component as $index => $row) {
+            $versions[] = [
+                'document_id' => $row['document_id'],
+                'version_label' => 'v'.($index + 1).'.0',
+                'is_current' => $row['document_id'] === $currentId,
+                'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
+                'change_status' => (string) ($row['change_status'] ?? ''),
+                'issuer' => (string) ($row['issuer'] ?? ''),
+                'agency' => $row['agencies'][0] ?? '',
+                'promulgation_date' => (string) ($row['promulgation_date'] ?? ''),
+                'title' => (string) ($row['title'] ?? ''),
+            ];
+        }
+
+        return ['current_document_id' => $currentId, 'versions' => $versions];
     }
 
     /**
