@@ -11,6 +11,9 @@ export const useVersionStore = defineStore('versions', () => {
 
   async function fetch(id: string): Promise<void> {
     documentId.value = id;
+    // Clear stale chain up-front so navigating A -> B never flashes A's timeline/banner while B loads.
+    versions.value = [];
+    currentDocumentId.value = '';
     loading.value = true;
     try {
       const data = await getDocumentVersions(id);
