@@ -165,6 +165,7 @@
                   <v-list density="compact" rounded="lg" min-width="160">
                     <v-list-item :to="`/documents/${law.id}/law-info`" prepend-icon="mdi-information-outline" title="ข้อมูลกฎหมาย" />
                     <v-list-item :to="`/documents/${law.id}/relations`" prepend-icon="mdi-graph-outline" title="ความสัมพันธ์" />
+                    <v-list-item prepend-icon="mdi-history" title="ประวัติเวอร์ชัน" @click="openVersions(law.id)" />
                     <v-divider class="my-1" />
                     <v-list-item :to="`/documents/${law.id}/rag`" prepend-icon="mdi-database-export-outline" title="จัดลำดับเนื้อหา" />
                   </v-list>
@@ -183,6 +184,27 @@
         <v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" rounded="circle" density="compact" />
       </div>
     </v-card>
+
+    <v-dialog v-model="versionDialogOpen" max-width="440">
+      <v-card rounded="lg">
+        <v-card-title class="d-flex align-center ga-2 text-body-1 font-weight-bold">
+          <v-icon icon="mdi-history" size="small" /> ประวัติเวอร์ชัน
+        </v-card-title>
+        <v-card-text>
+          <div v-if="versionStore.loading" class="text-center pa-6">
+            <v-progress-circular indeterminate color="admin-primary" />
+          </div>
+          <div v-else-if="versionStore.versions.length === 0" class="text-center text-medium-emphasis pa-6">
+            ไม่มีประวัติเวอร์ชัน
+          </div>
+          <VersionHistoryTimeline v-else :versions="versionStore.versions" viewed-document-id="" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="versionDialogOpen = false">ปิด</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </AppShell>
 </template>
 
@@ -192,6 +214,8 @@ import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
+import { useVersionStore } from '../../stores/versionStore';
+import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
 
 const PAGE_SIZE = 20;
 
@@ -209,6 +233,14 @@ const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const sortOrder = ref('newest');
 const page = ref(1);
+
+const versionStore = useVersionStore();
+const versionDialogOpen = ref(false);
+
+function openVersions(id: string): void {
+  versionDialogOpen.value = true;
+  void versionStore.fetch(id);
+}
 
 onMounted(async () => {
   loading.value = true;
