@@ -4,8 +4,8 @@
     title=""
   >
     <WorkflowFooterBar
-      :step="6"
-      next-label="ไปหน้าลงนาม"
+      :step="isOld ? 4 : 6"
+      :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"
       @back="router.push(`/documents/${props.documentId}/relations`)"
@@ -13,7 +13,7 @@
     />
 
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="6" description="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่" />
+      <WorkflowStepper :step="isOld ? 4 : 6" :variant="isOld ? 'historical' : 'default'" description="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่" />
 
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
@@ -188,6 +188,8 @@ const createDialog = ref(false);
 const detailDialog = ref(false);
 const detailGroup = ref<PermissionGroup | null>(null);
 
+const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+
 const selectedGroups = computed(() =>
   selectedGroupIds.value
     .map((id) => groups.value.find((group) => group.id === id) ?? null)
@@ -265,6 +267,17 @@ async function saveAndPublish(): Promise<void> {
   });
   if (!saved) return;
 
+  if (isOld.value) {
+    // Old docs are already-final PDFs: no RAG export, no eSign ceremony.
+    // Still advance the workflow step so the pipeline table derives the
+    // 'public' stage (deriveStageForDocument maps completed_step 6 -> public).
+    const progressed = await documentStore.completeWorkflowStep(6);
+    if (!progressed) return;
+    writeStage(props.documentId, 'public');
+    router.push(`/law/${props.documentId}`);
+    return;
+  }
+
   try {
     await exportDocument(props.documentId);
   } catch (error) {
@@ -283,7 +296,7 @@ onMounted(async () => {
 
   try {
     const status = await fetchStatus(props.documentId);
-    if ((status.workflow_completed_step ?? 0) >= 6) {
+    if (!isOld.value && (status.workflow_completed_step ?? 0) >= 6) {
       router.push(`/documents/${props.documentId}/esign`);
       return;
     }
