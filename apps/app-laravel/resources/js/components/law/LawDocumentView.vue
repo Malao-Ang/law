@@ -52,6 +52,22 @@
       </v-alert>
 
       <template v-else-if="documentStore.review">
+      <v-alert
+        v-if="notCurrentVersion"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="ma-4"
+        prepend-icon="mdi-history"
+      >
+        <div class="d-flex align-center justify-space-between ga-3 flex-wrap">
+          <div>
+            <strong>คุณกำลังดูเอกสารเวอร์ชันเก่า</strong>
+            <div class="text-caption">เอกสารฉบับนี้ถูกแทนที่แล้ว แนะนำให้เปิดเวอร์ชันปัจจุบัน</div>
+          </div>
+          <v-btn size="small" color="warning" variant="flat" @click="openCurrentVersion">เปิด Version ล่าสุด</v-btn>
+        </div>
+      </v-alert>
       <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
         {{ pdfExportError }}
       </v-alert>
@@ -85,7 +101,7 @@
         </div>
       </v-card>
 
-      <main class="lawx-doc">
+      <main class="lawx-doc" :class="{ 'is-superseded': notCurrentVersion }">
         <v-card tag="section" class="lawx-headcard" elevation="0">
           <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
@@ -153,7 +169,7 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" />
+        <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
       </template>
@@ -167,6 +183,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
+import { useVersionStore } from '../../stores/versionStore';
 import { buildSections, buildTocGroups, relationsForSection, documentRelations } from '../../composables/useLawSections';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
@@ -182,6 +199,7 @@ import { formatThaiDate } from '../../utils/thaiDate';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const versionStore = useVersionStore();
 const exportingPdf = ref(false);
 const pdfExportError = ref('');
 
@@ -190,6 +208,10 @@ onMounted(() => {
     documentStore.fetch(props.documentId);
   }
 });
+
+watch(() => props.documentId, (id) => {
+  void versionStore.fetch(id);
+}, { immediate: true });
 
 const sections = computed(() => buildSections(documentStore.review));
 const tocGroups = computed(() => buildTocGroups(sections.value));
@@ -238,6 +260,17 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
+
+const notCurrentVersion = computed(() =>
+  versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
+);
+
+function openCurrentVersion(): void {
+  if (versionStore.currentDocumentId) {
+    router.push(`/law/${encodeURIComponent(versionStore.currentDocumentId)}`);
+  }
+}
+
 const tocOpen = ref(true);
 const infoOpen = ref(true);
 
@@ -489,6 +522,24 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-doc {
   min-width: 0;
+}
+
+.lawx-doc.is-superseded {
+  position: relative;
+}
+.lawx-doc.is-superseded::before {
+  content: 'SUPERSEDED';
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-24deg);
+  font-size: 5rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  z-index: 0;
+  white-space: nowrap;
 }
 
 .lawx-headcard {

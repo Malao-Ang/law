@@ -76,7 +76,11 @@
         ดำเนินการ
       </v-card-title>
       <v-card-text class="d-flex flex-column ga-2">
-        <v-btn flat variant="outlined" disabled prepend-icon="mdi-history" class="justify-start text-none">ดูประวัติการแก้ไข</v-btn>
+        <template v-if="versions && versions.length >= 2">
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-1">ประวัติเวอร์ชัน</div>
+          <VersionHistoryTimeline :versions="versions" :viewed-document-id="viewedDocumentId ?? ''" />
+        </template>
+        <v-btn v-else flat variant="outlined" disabled prepend-icon="mdi-history" class="justify-start text-none">ดูประวัติการแก้ไข</v-btn>
         <v-btn flat variant="outlined" disabled prepend-icon="mdi-sitemap-outline" class="justify-start text-none">ความสัมพันธ์กฎหมาย</v-btn>
       </v-card-text>
     </v-card>
@@ -107,13 +111,15 @@
 
 <script setup lang="ts">
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
+import type { VersionChainItem } from '../../types/versionChain';
 import {
   RELATION_TYPE_ICONS,
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { formatThaiDate } from '../../utils/thaiDate';
+import VersionHistoryTimeline from './VersionHistoryTimeline.vue';
 
-defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[] }>();
+defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[]; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
