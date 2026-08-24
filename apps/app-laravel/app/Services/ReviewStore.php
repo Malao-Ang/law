@@ -313,6 +313,8 @@ class ReviewStore
         foreach ($component as $index => $row) {
             $versions[] = [
                 'document_id' => $row['document_id'],
+                // ponytail: positional label, not a stable id — if a middle version is later
+                // inserted, labels shift. Add a persisted label to law_meta if stability is needed.
                 'version_label' => 'v'.($index + 1).'.0',
                 'is_current' => $row['document_id'] === $currentId,
                 'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
