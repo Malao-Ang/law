@@ -577,7 +577,11 @@ watch(() => form.value.law_type, (lawType) => {
 });
 
 watch(() => form.value.source, () => {
-  if (isOld.value) form.value.law_type = '';
+  // Only clear law_type if it no longer fits the chosen source — keeps a stored
+  // value intact when the review load sets source+law_type together.
+  if (!isOld.value) return;
+  const stillValid = filteredDocumentTypes.value.some((t) => t.value === form.value.law_type);
+  if (!stillValid) form.value.law_type = '';
 });
 
 onMounted(() => {
