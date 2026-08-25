@@ -1,11 +1,12 @@
 import { ref } from 'vue';
 import { getLookups, type LookupData, type SelectableOption } from '../api/client';
 
-const documentTypes = ref<SelectableOption[]>([]);
+const documentTypes = ref<(SelectableOption & { source?: string })[]>([]);
 const statuses = ref<SelectableOption[]>([]);
 const changeStatuses = ref<SelectableOption[]>([]);
 const agencies = ref<SelectableOption[]>([]);
 const lawGroups = ref<SelectableOption[]>([]);
+const lawSources = ref<SelectableOption[]>([]);
 let loaded = false;
 let inFlight: Promise<void> | null = null;
 
@@ -19,6 +20,7 @@ async function load(): Promise<void> {
       changeStatuses.value = data.change_statuses;
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
+      lawSources.value = data.law_sources;
       loaded = true;
     }).finally(() => {
       inFlight = null;
@@ -29,5 +31,5 @@ async function load(): Promise<void> {
 }
 
 export function useLookups() {
-  return { documentTypes, statuses, changeStatuses, agencies, lawGroups, load };
+  return { documentTypes, statuses, changeStatuses, agencies, lawGroups, lawSources, load };
 }
