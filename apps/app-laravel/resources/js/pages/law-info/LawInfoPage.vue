@@ -72,9 +72,11 @@
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('ประเภทเอกสาร')"
-                placeholder="- เลือกประเภทเอกสาร -"
+                :placeholder="documentTypePlaceholder"
                 variant="outlined"
-                :rules="requiredTextRules('ประเภทเอกสาร')"
+                :disabled="documentTypeDisabled"
+                :rules="documentTypeRules"
+                no-data-text="ไม่พบประเภทเอกสารสำหรับแหล่งที่มานี้"
                 required
               />
             </v-col>
@@ -349,16 +351,30 @@ const issuerRules = [
   (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
 ];
 
+const documentTypeDisabled = computed(() => isOld.value && !hasText(form.value.source));
+const documentTypePlaceholder = computed(() =>
+  documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
+);
+
 // Old docs restrict law_type to the chosen source; new docs keep the full list.
-// ponytail: empty source falls back to all types (user hasn't picked yet).
 const filteredDocumentTypes = computed(() =>
-  isOld.value && form.value.source
-    ? documentTypes.value.filter((t) => t.source === form.value.source)
+  isOld.value
+    ? documentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
     : documentTypes.value,
 );
 
 const sourceRules = [
   (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
+];
+
+const documentTypeRules = [
+  () => !isOld.value || hasText(form.value.source) || 'กรุณาเลือกแหล่งที่มาของเอกสารก่อน',
+  (v: unknown) => hasText(v) || 'กรุณาเลือกประเภทเอกสาร',
+  (v: unknown) => {
+    if (!isOld.value || !hasText(v)) return true;
+    return filteredDocumentTypes.value.some((type) => type.value === v)
+      || 'ประเภทเอกสารไม่ตรงกับแหล่งที่มา';
+  },
 ];
 
 function dateMs(value: unknown): number | null {
@@ -419,10 +435,11 @@ watch(() => documentStore.review, (review) => {
   const inferredTitle = inferDocumentTitle(review);
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
   const savedLawType = meta?.law_type?.trim() ?? '';
+  const oldDocument = meta?.document_type === 'old';
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
-    law_type: savedLawType || inferLawType(documentTitle),
+    law_type: savedLawType || (oldDocument ? '' : inferLawType(documentTitle)),
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
     agency: agencies[0] ?? '',
@@ -580,6 +597,10 @@ watch(() => form.value.source, () => {
   // Only clear law_type if it no longer fits the chosen source — keeps a stored
   // value intact when the review load sets source+law_type together.
   if (!isOld.value) return;
+  if (!hasText(form.value.source)) {
+    form.value.law_type = '';
+    return;
+  }
   const stillValid = filteredDocumentTypes.value.some((t) => t.value === form.value.law_type);
   if (!stillValid) form.value.law_type = '';
 });

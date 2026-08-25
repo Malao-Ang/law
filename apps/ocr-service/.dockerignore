@@ -9,6 +9,7 @@
 
 # Python
 __pycache__
+**/__pycache__
 *.py[cod]
 *.pyo
 *.pyd
@@ -29,7 +30,12 @@ coverage.xml
 .git
 .mypy_cache
 .pytest_cache
+**/.pytest_cache
 .hypothesis
+tmp
+temp
+**/tmp
+**/temp
 
 # IDE
 .idea
@@ -49,7 +55,12 @@ Thumbs.db
 
 # Tests
 tests
+test_*.py
 .pytest_cache
+
+# Local/sample data and maintenance scripts
+data
+scripts
 
 # Documentation
 docs
