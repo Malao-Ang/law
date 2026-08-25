@@ -258,6 +258,8 @@ function engineFor(item: PendingItem): 'fast' | 'standard' {
 
 function addFiles(files: FileList | File[]): void {
   const incoming = uploadMode.value === 'old' ? Array.from(files).slice(0, 1) : Array.from(files);
+  // old = single file: reset here too so the dialog's "เพิ่มไฟล์" button (which
+  // skips pickFiles) still replaces rather than appends. New mode appends.
   if (uploadMode.value === 'old') pendingItems.value = [];
   for (const file of incoming) {
     const dup = pendingItems.value.some(i => i.file.name === file.name && i.file.size === file.size);
@@ -314,7 +316,6 @@ function onInputChange(event: Event): void {
   input.value = '';
   if (pendingItems.value.length) uploadDialog.value = true;
 }
-
 
 async function uploadAll(): Promise<void> {
   const toUpload = pendingItems.value.filter(i => !i.done && !i.uploading);
