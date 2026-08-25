@@ -58,6 +58,8 @@ bootstrap/cache/*
 public/build/*
 public/hot
 public/storage
+resources/js/pages/image.png
+resources/js/pages/public/image.png
 
 # Docker
 Dockerfile*

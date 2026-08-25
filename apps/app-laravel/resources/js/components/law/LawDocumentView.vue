@@ -28,10 +28,10 @@
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
           @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>
         <div class="lawx-actions">
-          <v-btn variant="outlined" size="small"
+          <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="tocOpen ? 'mdi-eye-off-outline' : 'mdi-table-of-contents'"
             @click="tocOpen = !tocOpen">{{ tocOpen ? 'ซ่อนสารบัญ' : 'เปิดสารบัญ' }}</v-btn>
-          <v-btn variant="outlined" size="small"
+          <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
             @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
           <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
@@ -77,9 +77,10 @@
         :class="{
           'is-toc-hidden': !tocOpen,
           'is-info-hidden': !infoOpen,
+          'is-original-pdf': usesOriginalPdfLayout,
         }"
       >
-      <template v-if="!isOld">
+      <template v-if="!usesOriginalPdfLayout">
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
         <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญข้อ</p>
         <div class="lawx-toc__scroll">
@@ -103,7 +104,13 @@
       </v-card>
       </template>
 
-      <main class="lawx-doc" :class="{ 'is-superseded': notCurrentVersion }">
+      <main
+        class="lawx-doc"
+        :class="{
+          'is-superseded': notCurrentVersion,
+          'is-original-pdf': usesOriginalPdfLayout,
+        }"
+      >
         <v-card tag="section" class="lawx-headcard" elevation="0">
           <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
@@ -114,7 +121,7 @@
           </div>
         </v-card>
 
-        <template v-if="isOld">
+        <template v-if="usesOriginalPdfLayout">
           <v-card tag="section" class="lawx-card" elevation="0">
             <div class="d-flex justify-end mb-2">
               <v-btn :href="fileUrl" target="_blank" prepend-icon="mdi-download" variant="tonal" size="small">
@@ -182,7 +189,7 @@
         </template>
       </main>
 
-      <aside v-show="infoOpen" class="lawx-info">
+      <aside v-if="!usesOriginalPdfLayout" v-show="infoOpen" class="lawx-info">
         <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
@@ -257,6 +264,8 @@ const EMPTY_META: LawMeta = {
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith('pdf') ?? false);
+const usesOriginalPdfLayout = computed(() => isOld.value || isPdfSource.value);
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 
 const articleCount = computed(() =>
@@ -511,6 +520,13 @@ onBeforeUnmount(() => observer?.disconnect());
   grid-template-columns: minmax(0, 920px);
 }
 
+.lawx-grid.is-original-pdf,
+.lawx-grid.is-original-pdf.is-toc-hidden,
+.lawx-grid.is-original-pdf.is-info-hidden,
+.lawx-grid.is-original-pdf.is-toc-hidden.is-info-hidden {
+  grid-template-columns: minmax(0, 960px);
+}
+
 .lawx-toc,
 .lawx-info :deep(.law-info-panel) {
   background: rgb(var(--v-theme-detail-surface));
@@ -538,6 +554,11 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-doc {
   min-width: 0;
+}
+
+.lawx-doc.is-original-pdf {
+  margin: 0 auto;
+  width: min(100%, 960px);
 }
 
 .lawx-doc.is-superseded {

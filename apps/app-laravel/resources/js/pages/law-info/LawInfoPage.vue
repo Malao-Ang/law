@@ -52,16 +52,31 @@
                 required
               />
             </v-col>
+            <v-col v-if="isOld" cols="12" sm="6">
+              <v-select
+                v-model="form.source"
+                :items="lawSources"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('แหล่งที่มาของเอกสาร')"
+                placeholder="- เลือกแหล่งที่มา -"
+                variant="outlined"
+                :rules="sourceRules"
+                required
+              />
+            </v-col>
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
-                :items="documentTypes"
+                :items="filteredDocumentTypes"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('ประเภทเอกสาร')"
-                placeholder="- เลือกประเภทเอกสาร -"
+                :placeholder="documentTypePlaceholder"
                 variant="outlined"
-                :rules="requiredTextRules('ประเภทเอกสาร')"
+                :disabled="documentTypeDisabled"
+                :rules="documentTypeRules"
+                no-data-text="ไม่พบประเภทเอกสารสำหรับแหล่งที่มานี้"
                 required
               />
             </v-col>
@@ -281,7 +296,7 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
+const { documentTypes, statuses, changeStatuses, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
@@ -298,7 +313,7 @@ const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
 ];
 
 const EMPTY: LawMeta = {
-  status: '', law_type: '', law_group: '', law_groups: [],
+  status: '', source: '', law_type: '', law_group: '', law_groups: [],
   change_status: null,
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
@@ -334,6 +349,32 @@ function requiredArrayRules(label: string): Array<(v: unknown) => boolean | stri
 
 const issuerRules = [
   (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
+];
+
+const documentTypeDisabled = computed(() => isOld.value && !hasText(form.value.source));
+const documentTypePlaceholder = computed(() =>
+  documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
+);
+
+// Old docs restrict law_type to the chosen source; new docs keep the full list.
+const filteredDocumentTypes = computed(() =>
+  isOld.value
+    ? documentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
+    : documentTypes.value,
+);
+
+const sourceRules = [
+  (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
+];
+
+const documentTypeRules = [
+  () => !isOld.value || hasText(form.value.source) || 'กรุณาเลือกแหล่งที่มาของเอกสารก่อน',
+  (v: unknown) => hasText(v) || 'กรุณาเลือกประเภทเอกสาร',
+  (v: unknown) => {
+    if (!isOld.value || !hasText(v)) return true;
+    return filteredDocumentTypes.value.some((type) => type.value === v)
+      || 'ประเภทเอกสารไม่ตรงกับแหล่งที่มา';
+  },
 ];
 
 function dateMs(value: unknown): number | null {
@@ -394,10 +435,11 @@ watch(() => documentStore.review, (review) => {
   const inferredTitle = inferDocumentTitle(review);
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
   const savedLawType = meta?.law_type?.trim() ?? '';
+  const oldDocument = meta?.document_type === 'old';
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
-    law_type: savedLawType || inferLawType(documentTitle),
+    law_type: savedLawType || (oldDocument ? '' : inferLawType(documentTitle)),
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
     agency: agencies[0] ?? '',
@@ -549,6 +591,18 @@ watch(noExpiry, () => {
 
 watch(() => form.value.law_type, (lawType) => {
   if (lawType !== 'ประกาศ') form.value.issuer = null;
+});
+
+watch(() => form.value.source, () => {
+  // Only clear law_type if it no longer fits the chosen source — keeps a stored
+  // value intact when the review load sets source+law_type together.
+  if (!isOld.value) return;
+  if (!hasText(form.value.source)) {
+    form.value.law_type = '';
+    return;
+  }
+  const stillValid = filteredDocumentTypes.value.some((t) => t.value === form.value.law_type);
+  if (!stillValid) form.value.law_type = '';
 });
 
 onMounted(() => {

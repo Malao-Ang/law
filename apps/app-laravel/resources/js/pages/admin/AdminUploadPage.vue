@@ -8,72 +8,38 @@
     <div class="adm-up">
 
       <!-- ── Document type selection cards ─────────────────── -->
-      <div class="d-flex ga-4 mb-6 flex-wrap">
+      <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row">
         <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
           <v-icon size="32" color="primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
           <h3 class="text-h6">เอกสารใหม่ (New Document)</h3>
           <p class="text-body-2 text-medium-emphasis">
             เอกสารที่ยังไม่ผ่านกระบวนการจัดการของระบบ จะต้องผ่านขั้นตอนการตรวจทาน และจัดลำดับเนื้อหา (Structuring) ด้วย AI
           </p>
-          <v-btn block color="primary" variant="flat" @click="openNewDocumentUpload">ดำเนินการต่อ</v-btn>
+          <v-btn block color="primary" variant="flat" @click="pickFiles('new')">ดำเนินการต่อ</v-btn>
         </v-card>
 
-        <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
+        <v-card class="flex-1-1 pa-6 position-relative" elevation="0" rounded="lg" style="min-width:320px">
+          <v-chip color="success" size="small" variant="flat" class="position-absolute" style="top:16px; right:16px">
+            <v-icon start icon="mdi-check" size="14" />ลงนามเสร็จสิ้น
+          </v-chip>
           <v-icon size="32" color="success" class="mb-2">mdi-file-check-outline</v-icon>
           <h3 class="text-h6">เอกสารเก่า (Historical Document)</h3>
           <p class="text-body-2 text-medium-emphasis">
             เอกสารที่ผ่านการลงนามเสร็จสิ้นแล้ว ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบเอกสารต้นฉบับ
           </p>
-          <v-btn block color="success" variant="flat" @click="router.push('/admin/upload/historical')">ดำเนินการต่อ</v-btn>
+          <v-btn block color="success" variant="flat" @click="pickFiles('old')">ดำเนินการต่อ</v-btn>
         </v-card>
       </div>
 
-      <!-- ── Drop zone ─────────────────────────────────────── -->
-      <div
-        class="adm-drop"
-        :class="{ 'adm-drop--over': dragOver }"
-        @dragover.prevent="dragOver = true"
-        @dragleave.prevent="dragOver = false"
-        @drop.prevent="onDrop"
-      >
-        <input
-          ref="fileInputEl"
-          type="file"
-          accept=".pdf,.doc,.docx"
-          multiple
-          class="adm-drop__input"
-          @change="onInputChange"
-        />
-
-        <div class="adm-drop__icon-ring" :class="{ 'adm-drop__icon-ring--active': dragOver }">
-          <v-icon
-            :icon="dragOver ? 'mdi-tray-arrow-down' : 'mdi-cloud-upload-outline'"
-            size="40"
-          />
-        </div>
-
-        <p class="adm-drop__title">
-          {{ dragOver ? 'ปล่อยไฟล์เพื่ออัปโหลด' : 'ลากไฟล์มาวางที่นี่' }}
-        </p>
-        <p class="adm-drop__sub">รองรับ PDF, DOCX และ DOC — เลือกได้หลายไฟล์พร้อมกัน</p>
-
-        <div class="adm-drop__or"><span>หรือ</span></div>
-
-        <button
-          type="button"
-          class="adm-btn adm-btn--primary adm-drop__cta"
-          @click.stop="fileInputEl?.click()"
-        >
-          <v-icon icon="mdi-folder-open-outline" size="18" />
-          เลือกไฟล์จากเครื่อง
-        </button>
-
-        <div class="adm-ftypes">
-          <span class="adm-ftype adm-ftype--pdf">PDF</span>
-          <span class="adm-ftype adm-ftype--docx">DOCX</span>
-          <span class="adm-ftype adm-ftype--doc">DOC</span>
-        </div>
-      </div>
+      <!-- Hidden file input, triggered by the cards -->
+      <input
+        ref="fileInputEl"
+        type="file"
+        :accept="uploadMode === 'old' ? '.pdf' : '.pdf,.doc,.docx'"
+        :multiple="uploadMode === 'new'"
+        style="display:none"
+        @change="onInputChange"
+      />
 
       <!-- ── Pending bar ─────────────────────────────────── -->
       <div v-if="pendingItems.length && !uploadDialog" class="adm-review-bar">
@@ -147,7 +113,7 @@
                 </div>
 
                 <!-- OCR mode row -->
-                <div v-if="!item.done" class="adm-file-ocr">
+                <div v-if="!item.done && uploadMode !== 'old'" class="adm-file-ocr">
                   <v-icon icon="mdi-cog-outline" size="14" color="grey-darken-1" />
                   <span class="adm-label-sm">โหมดสกัด:</span>
                   <v-select
@@ -220,7 +186,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
@@ -236,21 +201,22 @@ interface PendingItem {
   error: string;
 }
 
-const router = useRouter();
 const uploadStore = useUploadStore();
 const snackbar = useSnackbarStore();
 
 const fileInputEl = ref<HTMLInputElement | null>(null);
 const pendingItems = ref<PendingItem[]>([]);
-const dragOver = ref(false);
 const uploadDialog = ref(false);
+const uploadMode = ref<'new' | 'old'>('new');
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const isUploading = computed(() => pendingItems.value.some(i => i.uploading));
 const allDone = computed(() => pendingItems.value.length > 0 && pendingItems.value.every(i => i.done));
 const pendingCount = computed(() => pendingItems.value.filter(i => !i.done).length);
 
-function openNewDocumentUpload(): void {
+function pickFiles(mode: 'new' | 'old'): void {
+  uploadMode.value = mode;
+  pendingItems.value = [];
   fileInputEl.value?.click();
 }
 
@@ -291,7 +257,11 @@ function engineFor(item: PendingItem): 'fast' | 'standard' {
 }
 
 function addFiles(files: FileList | File[]): void {
-  for (const file of Array.from(files)) {
+  const incoming = uploadMode.value === 'old' ? Array.from(files).slice(0, 1) : Array.from(files);
+  // old = single file: reset here too so the dialog's "เพิ่มไฟล์" button (which
+  // skips pickFiles) still replaces rather than appends. New mode appends.
+  if (uploadMode.value === 'old') pendingItems.value = [];
+  for (const file of incoming) {
     const dup = pendingItems.value.some(i => i.file.name === file.name && i.file.size === file.size);
     if (!dup) {
       pendingItems.value.push({ file, scanMode: defaultMode(file), uploading: false, done: false, error: '' });
@@ -347,12 +317,6 @@ function onInputChange(event: Event): void {
   if (pendingItems.value.length) uploadDialog.value = true;
 }
 
-function onDrop(event: DragEvent): void {
-  dragOver.value = false;
-  if (event.dataTransfer?.files.length) addFiles(event.dataTransfer.files);
-  if (pendingItems.value.length) uploadDialog.value = true;
-}
-
 async function uploadAll(): Promise<void> {
   const toUpload = pendingItems.value.filter(i => !i.done && !i.uploading);
   if (!toUpload.length) return;
@@ -362,7 +326,7 @@ async function uploadAll(): Promise<void> {
       item.uploading = true;
       item.error = '';
       try {
-        await uploadStore.upload(item.file, item.scanMode, engineFor(item));
+        await uploadStore.upload(item.file, item.scanMode, engineFor(item), { documentType: uploadMode.value });
         item.done = true;
       } catch (err) {
         item.error = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';
@@ -389,124 +353,6 @@ async function uploadAll(): Promise<void> {
   max-width: 860px;
   margin: 0 auto;
 }
-
-/* ── Drop zone ──────────────────────────────────────────── */
-.adm-drop {
-  position: relative;
-  background: #f5f7ff;
-  border: 2px dashed #c7d2fe;
-  border-radius: 20px;
-  padding: 56px 40px 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  transition: border-color 0.18s, background 0.18s, transform 0.18s;
-}
-
-.adm-drop--over {
-  border-color: rgb(var(--v-theme-admin-primary));
-  background: rgba(var(--v-theme-admin-primary), 0.05);
-  transform: scale(1.005);
-}
-
-.adm-drop__input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-}
-
-/* Icon ring */
-.adm-drop__icon-ring {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  background: #e0e7ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
-  transition: background 0.18s;
-}
-
-.adm-drop__icon-ring :deep(.v-icon) {
-  color: rgb(var(--v-theme-admin-primary)) !important;
-  transition: color 0.18s;
-}
-
-.adm-drop__icon-ring--active {
-  background: rgba(var(--v-theme-admin-primary), 0.18);
-}
-
-/* Text */
-.adm-drop__title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 8px;
-  transition: color 0.18s;
-}
-
-.adm-drop--over .adm-drop__title {
-  color: rgb(var(--v-theme-admin-primary));
-}
-
-.adm-drop__sub {
-  font-size: 15px;
-  color: #64748b;
-  margin: 0 0 24px;
-}
-
-/* หรือ divider */
-.adm-drop__or {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  max-width: 280px;
-  margin-bottom: 20px;
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.adm-drop__or::before,
-.adm-drop__or::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #e2e8f0;
-}
-
-/* CTA button - on top of hidden input */
-.adm-drop__cta {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 28px;
-}
-
-/* File type badges */
-.adm-ftypes {
-  display: flex;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.adm-ftype {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 3px 10px;
-  border-radius: 20px;
-  border: 1px solid;
-}
-
-.adm-ftype--pdf  { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
-.adm-ftype--docx { color: #2563eb; border-color: #93c5fd; background: #eff6ff; }
-.adm-ftype--doc  { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
 
 /* ── Pending bar ────────────────────────────────────────── */
 .adm-review-bar {

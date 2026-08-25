@@ -12,10 +12,11 @@ services:
       && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
       && php artisan optimize:clear
       && touch storage/app/poc/.vendor_ready
-      && php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
+      && php artisan serve --host=0.0.0.0 --port=8000"
     volumes:
       - ./apps/app-laravel:/var/www/html
       - laravel_vendor:/var/www/html/vendor
+      - laravel_node_modules:/var/www/html/node_modules
       - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
       - poc_storage:/var/www/html/storage/app/poc
       - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
@@ -25,8 +26,7 @@ services:
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
     command: >
-      sh -c "test -x node_modules/.bin/vite
-      || { echo 'Missing apps/app-laravel/node_modules/.bin/vite. Run: cd apps/app-laravel && npm install'; exit 1; }
+      sh -c "npm install
       && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       - PORT=5173
@@ -39,6 +39,7 @@ services:
       - VITE_CACHE_DIR=/tmp/app-laravel-vite-cache
     volumes:
       - ./apps/app-laravel:/var/www/html
+      - laravel_node_modules:/var/www/html/node_modules
       - /tmp/app-laravel-vite-cache:/tmp/app-laravel-vite-cache
     ports:
       - "${VITE_HOST_PORT:-5173}:5173"
@@ -59,10 +60,25 @@ services:
       - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
 
   ocr-service:
+    command: >
+      sh -c "mkdir -p /data/poc/pages /data/poc/intermediate
+      && uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload --reload-dir /app/app"
+    environment:
+      - WATCHFILES_FORCE_POLLING=true
     volumes:
       - ./apps/ocr-service:/app
       - poc_storage:/data/poc
 
+  pdf-service:
+    command: >
+      sh -c "npm install
+      && node --watch index.js"
+    volumes:
+      - ./apps/pdf-service:/app
+      - pdf_node_modules:/app/node_modules
+
 volumes:
   laravel_vendor:
+  laravel_node_modules:
   laravel_bootstrap_cache:
+  pdf_node_modules:

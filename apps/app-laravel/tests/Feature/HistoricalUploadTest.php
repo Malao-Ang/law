@@ -17,8 +17,6 @@ class HistoricalUploadTest extends TestCase
         $response = $this->postJson('/api/documents', [
             'file' => UploadedFile::fake()->create('old.pdf', 40, 'application/pdf'),
             'document_type' => 'old',
-            'source' => 'internal',
-            'law_type' => 'ประกาศ',
         ]);
 
         $response->assertStatus(202);
@@ -30,7 +28,7 @@ class HistoricalUploadTest extends TestCase
         $this->assertSame('old', $status['document_type']);
 
         $review = $store->getReviewDocument($id);
-        $this->assertSame('internal', $review['law_meta']['source']);
+        $this->assertSame('', $review['law_meta']['source']);
 
         Queue::assertPushed(IndexHistoricalDocumentJob::class);
 
