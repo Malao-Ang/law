@@ -26,10 +26,9 @@ class StoreDocumentRequest extends FormRequest
             'scan_extraction_mode' => ['nullable', 'in:local,gemini'],
             'extraction_engine' => ['nullable', 'in:standard,fast'],
             'document_type' => ['nullable', 'in:new,old'],
-            'source' => ['nullable', 'required_if:document_type,old', 'in:internal,external'],
+            'source' => ['nullable', 'in:internal,external'],
             'law_type' => [
                 'nullable',
-                'required_if:document_type,old',
                 function (string $attribute, mixed $value, \Closure $fail, mixed $validator): void {
                     if ($value === null || $value === '') {
                         return;
