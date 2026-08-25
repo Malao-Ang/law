@@ -8,37 +8,51 @@
     </div>
     <v-divider />
 
-    <div class="d-flex flex-wrap gap-3 pa-4 pb-0">
-      <v-select
-        v-model="filterSource"
-        :items="[{ title: 'ภายใน', value: 'internal' }, { title: 'ภายนอก', value: 'external' }]"
+    <div class="pipeline-filter-bar d-flex flex-wrap pa-4 pb-0">
+      <v-text-field
+        v-model="filterText"
+        class="pipeline-filter-search"
+        prepend-inner-icon="mdi-magnify"
+        placeholder="ค้นหาเอกสาร..."
         clearable
         density="compact"
         variant="outlined"
         hide-details
-        label="แหล่งที่มา: ทั้งหมด"
-        style="max-width: 220px"
       />
-      <v-select
-        v-model="filterType"
-        :items="lawTypeOptions"
-        clearable
-        density="compact"
-        variant="outlined"
-        hide-details
-        label="ประเภท: ทั้งหมด"
-        style="max-width: 220px"
-      />
-      <v-select
-        v-model="filterStatus"
-        :items="['queued', 'processing', 'done', 'failed', 'exported', 'ingested']"
-        clearable
-        density="compact"
-        variant="outlined"
-        hide-details
-        label="สถานะ: ทั้งหมด"
-        style="max-width: 220px"
-      />
+      <div class="pipeline-filter-selects">
+        <v-select
+          v-model="filterSource"
+          class="pipeline-filter-select"
+          :items="[{ title: 'ภายใน', value: 'internal' }, { title: 'ภายนอก', value: 'external' }]"
+          clearable
+          density="compact"
+          variant="outlined"
+          hide-details
+          label="แหล่งที่มา: ทั้งหมด"
+        />
+        <v-select
+          v-model="filterType"
+          class="pipeline-filter-select"
+          :items="lawTypeOptions"
+          clearable
+          density="compact"
+          variant="outlined"
+          hide-details
+          label="ประเภท: ทั้งหมด"
+        />
+        <v-select
+          v-model="filterStatus"
+          class="pipeline-filter-select"
+          :items="statusOptions"
+          item-title="title"
+          item-value="value"
+          clearable
+          density="compact"
+          variant="outlined"
+          hide-details
+          label="สถานะ: ทั้งหมด"
+        />
+      </div>
     </div>
 
     <v-data-table
@@ -59,14 +73,21 @@
       </template>
 
       <template #item.source="{ item }">
-        <v-chip size="small" :color="item.source === 'internal' ? 'blue' : 'purple'" variant="tonal">
-          {{ item.source === 'internal' ? 'ภายใน' : item.source === 'external' ? 'ภายนอก' : '—' }}
+        <v-chip
+          v-if="item.source || item.documentType === 'old'"
+          size="small"
+          :color="item.source === 'internal' ? 'blue' : item.source === 'external' ? 'purple' : 'warning'"
+          variant="tonal"
+        >
+          {{ item.source === 'internal' ? 'ภายใน' : item.source === 'external' ? 'ภายนอก' : 'รอกรอกข้อมูล' }}
         </v-chip>
+        <span v-else>—</span>
       </template>
 
       <template #item.lawType="{ item }">
-        <span>{{ item.lawType || '—' }}</span>
-        <v-chip v-if="item.documentType === 'old'" size="x-small" color="grey" variant="tonal" class="ml-2">เอกสารเก่า</v-chip>
+        <span v-if="item.lawType">{{ item.lawType }}</span>
+        <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
+        <span v-else>—</span>
       </template>
 
       <template #item.stage="{ item }">
@@ -88,14 +109,14 @@
           />
           <v-btn
             v-else-if="stageDef(item.stage).action.type !== 'none'"
+            icon="mdi-eye-outline"
             size="small"
-            variant="tonal"
+            variant="text"
             color="admin-primary"
-            class="text-none"
+            :title="actionLabel(item.stage) || 'ดูเอกสาร'"
+            aria-label="ดูเอกสาร"
             @click="runAction(item)"
-          >
-            {{ actionLabel(item.stage) }}
-          </v-btn>
+          />
 
           <v-btn
             icon="mdi-delete-outline"
@@ -107,22 +128,6 @@
             :disabled="deletingId !== null && deletingId !== item.documentId"
             @click="confirmDelete(item)"
           />
-
-          <v-menu>
-            <template #activator="{ props: menuProps }">
-              <v-btn icon="mdi-dots-vertical" size="small" variant="text" color="grey" v-bind="menuProps" />
-            </template>
-            <v-list density="compact">
-              <v-list-item :disabled="item.stage === 'public' || item.stage === 'failed'" @click="advance(item)">
-                <template #prepend><v-icon icon="mdi-arrow-right" size="18" /></template>
-                <v-list-item-title>ขั้นถัดไป</v-list-item-title>
-              </v-list-item>
-              <v-list-item :disabled="!canRollback(item.stage)" @click="rollback(item)">
-                <template #prepend><v-icon icon="mdi-arrow-left" size="18" /></template>
-                <v-list-item-title>ย้อนกลับ</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
         </div>
       </template>
 
@@ -166,17 +171,33 @@ const loading = ref(false);
 const deletingId = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
+const filterText = ref<string | null>('');
 const filterSource = ref<string | null>(null);
 const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 
-const filteredDocs = computed(() =>
-  docs.value.filter((d) =>
+const statusOptions = [
+  { title: 'รออัปโหลด/รอประมวลผล', value: 'queued' },
+  { title: 'กำลังประมวลผล', value: 'processing' },
+  { title: 'ประมวลผลแล้ว', value: 'done' },
+  { title: 'กำลังนำเข้าระบบ', value: 'ingesting' },
+  { title: 'เผยแพร่แล้ว', value: 'exported' },
+  { title: 'นำเข้าระบบแล้ว', value: 'ingested' },
+  { title: 'ล้มเหลว', value: 'failed' },
+  { title: 'ยกเลิก', value: 'cancelled' },
+];
+
+const filteredDocs = computed(() => {
+  const needle = (filterText.value ?? '').trim().toLowerCase();
+
+  return docs.value.filter((d) => {
+    const searchableTitle = (d.title || d.document_id || d.source_file || '').toLowerCase();
+    return (!needle || searchableTitle.includes(needle)) &&
     (!filterSource.value || d.source === filterSource.value) &&
     (!filterType.value || d.law_type === filterType.value) &&
-    (!filterStatus.value || d.status === filterStatus.value)
-  ),
-);
+    (!filterStatus.value || d.status === filterStatus.value);
+  });
+});
 
 // Unique law_type values from loaded docs for the type filter
 const lawTypeOptions = computed(() =>
@@ -334,8 +355,62 @@ defineExpose({ load });
   font-weight: 600 !important;
 }
 
+.pipeline-filter-bar {
+  align-items: flex-start;
+  column-gap: 24px;
+  justify-content: space-between;
+  row-gap: 14px;
+}
+
+.pipeline-filter-search {
+  flex: 1 1 360px;
+  min-width: 320px;
+}
+
+.pipeline-filter-selects {
+  align-items: flex-start;
+  column-gap: 14px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  row-gap: 12px;
+}
+
+.pipeline-filter-select {
+  flex: 0 0 190px;
+  width: 190px;
+}
+
+.pipeline-filter-select:last-child {
+  flex-basis: 210px;
+  width: 210px;
+}
+
 .pipeline-sel-bar {
   background: rgba(var(--v-theme-admin-primary), 0.05);
   border-bottom: 1px solid rgba(var(--v-theme-admin-primary), 0.12);
+}
+
+@media (max-width: 1100px) {
+  .pipeline-filter-selects {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 720px) {
+  .pipeline-filter-search,
+  .pipeline-filter-select {
+    flex-basis: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pipeline-filter-selects {
+    flex-basis: 100%;
+    justify-content: stretch;
+  }
 }
 </style>

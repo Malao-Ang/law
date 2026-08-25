@@ -53,7 +53,7 @@
               />
             </v-col>
             <v-col v-if="isOld" cols="12" sm="6">
-              <v-select
+              <v-autocomplete
                 v-model="form.source"
                 :items="lawSources"
                 item-title="title"
@@ -61,12 +61,13 @@
                 :label="requiredLabel('แหล่งที่มาของเอกสาร')"
                 placeholder="- เลือกแหล่งที่มา -"
                 variant="outlined"
+                :custom-filter="searchSelectableOption"
                 :rules="sourceRules"
                 required
               />
             </v-col>
             <v-col cols="12" sm="6">
-              <v-select
+              <v-autocomplete
                 v-model="form.law_type"
                 :items="filteredDocumentTypes"
                 item-title="title"
@@ -75,6 +76,7 @@
                 :placeholder="documentTypePlaceholder"
                 variant="outlined"
                 :disabled="documentTypeDisabled"
+                :custom-filter="searchSelectableOption"
                 :rules="documentTypeRules"
                 no-data-text="ไม่พบประเภทเอกสารสำหรับแหล่งที่มานี้"
                 required
@@ -98,7 +100,7 @@
               </v-radio-group>
             </v-col>
             <v-col cols="12" sm="6">
-              <v-select
+              <v-autocomplete
                 v-model="form.status"
                 :items="statuses"
                 item-title="title"
@@ -107,6 +109,7 @@
                 placeholder="- เลือกสถานะ -"
                 variant="outlined"
                 clearable
+                :custom-filter="searchSelectableOption"
                 :rules="requiredTextRules('สถานะการบังคับใช้')"
                 required
               />

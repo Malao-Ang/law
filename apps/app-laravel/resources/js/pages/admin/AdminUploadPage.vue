@@ -350,8 +350,16 @@ async function uploadAll(): Promise<void> {
 
 <style scoped>
 .adm-up {
-  max-width: 860px;
+  width: 95%;
+  max-width: 1480px;
   margin: 0 auto;
+}
+
+@media (max-width: 960px) {
+  .adm-up {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 /* ── Pending bar ────────────────────────────────────────── */
