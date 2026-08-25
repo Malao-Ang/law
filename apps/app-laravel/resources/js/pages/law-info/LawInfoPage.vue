@@ -52,10 +52,23 @@
                 required
               />
             </v-col>
+            <v-col v-if="isOld" cols="12" sm="6">
+              <v-select
+                v-model="form.source"
+                :items="lawSources"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('แหล่งที่มาของเอกสาร')"
+                placeholder="- เลือกแหล่งที่มา -"
+                variant="outlined"
+                :rules="sourceRules"
+                required
+              />
+            </v-col>
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
-                :items="documentTypes"
+                :items="filteredDocumentTypes"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('ประเภทเอกสาร')"
@@ -281,7 +294,7 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, statuses, changeStatuses, agencies, lawGroups, load: loadLookups } = useLookups();
+const { documentTypes, statuses, changeStatuses, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
@@ -298,7 +311,7 @@ const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
 ];
 
 const EMPTY: LawMeta = {
-  status: '', law_type: '', law_group: '', law_groups: [],
+  status: '', source: '', law_type: '', law_group: '', law_groups: [],
   change_status: null,
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
@@ -334,6 +347,18 @@ function requiredArrayRules(label: string): Array<(v: unknown) => boolean | stri
 
 const issuerRules = [
   (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
+];
+
+// Old docs restrict law_type to the chosen source; new docs keep the full list.
+// ponytail: empty source falls back to all types (user hasn't picked yet).
+const filteredDocumentTypes = computed(() =>
+  isOld.value && form.value.source
+    ? documentTypes.value.filter((t) => t.source === form.value.source)
+    : documentTypes.value,
+);
+
+const sourceRules = [
+  (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
 ];
 
 function dateMs(value: unknown): number | null {
@@ -549,6 +574,10 @@ watch(noExpiry, () => {
 
 watch(() => form.value.law_type, (lawType) => {
   if (lawType !== 'ประกาศ') form.value.issuer = null;
+});
+
+watch(() => form.value.source, () => {
+  if (isOld.value) form.value.law_type = '';
 });
 
 onMounted(() => {
