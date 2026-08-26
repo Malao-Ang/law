@@ -312,6 +312,7 @@ export interface ReviewDocument {
 
 export interface DocumentStatus {
   document_id: string;
+  document_type?: DocumentType;
   status: 'queued' | 'processing' | 'done' | 'failed' | 'exported' | 'ingesting' | 'ingested';
   progress: number;
   current_step: string;
