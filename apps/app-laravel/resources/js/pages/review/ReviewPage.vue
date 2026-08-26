@@ -26,6 +26,7 @@ import { fetchStatus } from '../../api/client';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useReviewUiStore } from '../../stores/reviewUiStore';
 import { getPreviewCached } from '../../stores/reviewCache';
+import { useHistoricalRedirect } from '../../composables/useHistoricalRedirect';
 import type { DocumentStatus } from '../../types/document';
 
 const props = defineProps<{
@@ -36,6 +37,8 @@ const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
 const router = useRouter();
 const docStatus = ref<DocumentStatus | null>(null);
+
+useHistoricalRedirect(props.documentId);
 
 const locked = computed(() => docStatus.value?.esign_exported_at != null);
 

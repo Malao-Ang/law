@@ -4,8 +4,10 @@
 
 <script setup lang="ts">
 import DocumentComposeWorkspace from '../../components/compose/DocumentComposeWorkspace.vue';
+import { useHistoricalRedirect } from '../../composables/useHistoricalRedirect';
 
-defineProps<{
+const props = defineProps<{
   documentId: string;
 }>();
+useHistoricalRedirect(props.documentId);
 </script>

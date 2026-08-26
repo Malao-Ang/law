@@ -5,8 +5,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue';
 import RagManageWorkspace from '../../components/rag/RagManageWorkspace.vue';
+import { useHistoricalRedirect } from '../../composables/useHistoricalRedirect';
 
-defineProps<{ documentId: string }>();
+const props = defineProps<{ documentId: string }>();
+useHistoricalRedirect(props.documentId);
 
 onMounted(() => {
   document.body.classList.add('rag-page-lock-scroll');
