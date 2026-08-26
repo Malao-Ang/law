@@ -4,11 +4,19 @@
       <v-btn
         variant="text"
         prepend-icon="mdi-arrow-left"
-        :to="`/documents/${documentId}/review`"
-      >กลับแก้ไข</v-btn>
+        :to="isOld ? '/admin/upload' : `/documents/${documentId}/review`"
+      >{{ isOld ? 'กลับรายการ' : 'กลับแก้ไข' }}</v-btn>
       <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
       <v-spacer />
       <v-btn
+        v-if="isOld"
+        color="primary"
+        variant="flat"
+        append-icon="mdi-arrow-right"
+        :to="`/documents/${documentId}/law-info`"
+      >กรอกข้อมูล</v-btn>
+      <v-btn
+        v-else
         variant="tonal"
         prepend-icon="mdi-printer-outline"
         @click="printPage()"
@@ -16,7 +24,19 @@
     </v-toolbar>
 
     <div class="flex-grow-1 pa-8 d-flex justify-center">
-      <div v-if="previewStore.loading" class="d-flex flex-column align-center ga-3 pa-12">
+      <div v-if="checking" class="d-flex flex-column align-center ga-3 pa-12">
+        <v-progress-circular indeterminate color="primary" />
+        <p>กำลังโหลดตัวอย่าง...</p>
+      </div>
+
+      <iframe
+        v-else-if="isOld"
+        :src="pdfUrl"
+        class="preview-pdf"
+        title="ตัวอย่างเอกสาร PDF"
+      />
+
+      <div v-else-if="previewStore.loading" class="d-flex flex-column align-center ga-3 pa-12">
         <v-progress-circular indeterminate color="primary" />
         <p>กำลังโหลดตัวอย่าง...</p>
       </div>
@@ -35,14 +55,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import DOMPurify from 'dompurify';
 import { usePreviewStore } from '../../stores/previewStore';
+import { fetchStatus, documentFileUrl } from '../../api/client';
 
 const props = defineProps<{ documentId: string }>();
 
 const previewStore = usePreviewStore();
 
+const checking = ref(true);
+const isOld = ref(false);
+
+const pdfUrl = computed(() => documentFileUrl(props.documentId));
 const sourceFile = computed(() => previewStore.data?.source_file ?? '');
 
 const safeHtml = computed(() => {
@@ -61,7 +86,19 @@ function printPage(): void {
   window.print();
 }
 
-onMounted(() => previewStore.fetch(props.documentId));
+onMounted(async () => {
+  try {
+    const status = await fetchStatus(props.documentId);
+    isOld.value = status.document_type === 'old';
+  } catch {
+    isOld.value = false;
+  }
+  // Old docs have no review document; /preview would 404. Skip the fetch.
+  if (!isOld.value) {
+    await previewStore.fetch(props.documentId);
+  }
+  checking.value = false;
+});
 onUnmounted(() => previewStore.reset());
 </script>
 
@@ -77,6 +114,15 @@ onUnmounted(() => previewStore.reset());
   line-height: 1.8;
   font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
+
+.preview-pdf {
+  width: 210mm;
+  height: calc(100vh - 120px);
+  border: none;
+  background: white;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);
+}
+
 @media print {
   .preview-toolbar { display: none; }
   .preview-paper { box-shadow: none; width: 100%; padding: 0; }
