@@ -105,6 +105,55 @@ class BlockMutationTest extends TestCase
         $this->assertStringContainsString('Beta', $block['meta']['reviewed_html']);
     }
 
+    public function test_merge_preserves_image_block_html(): void
+    {
+        $this->store->writeReviewDocument($this->docId, [
+            'document_id' => $this->docId,
+            'source_file' => 'test.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'pages' => [[
+                'page_no' => 1,
+                'image_path' => null,
+                'blocks' => [
+                    ['block_id' => 'b1', 'type' => 'paragraph', 'bbox' => null, 'reading_order' => 1,
+                        'raw_text' => 'Alpha', 'normalized_text' => 'Alpha', 'ai_suggested_text' => '',
+                        'approved_text' => 'Alpha', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => ['reviewed_html' => '<p>Alpha</p>']],
+                    ['block_id' => 'img1', 'type' => 'image', 'bbox' => null, 'reading_order' => 2,
+                        'raw_text' => '', 'normalized_text' => '', 'ai_suggested_text' => '',
+                        'approved_text' => '', 'confidence' => 1.0, 'needs_review' => false, 'flags' => [],
+                        'meta' => [
+                            'reviewed_html' => '',
+                            'layout' => ['alignment' => 'center'],
+                            'image' => [
+                                'src_url' => '/api/documents/doc-mutation-test-001/images/image1.png',
+                                'caption' => 'รูปประกอบ',
+                                'display_width_px' => 320,
+                            ],
+                        ]],
+                ],
+            ]],
+            'summary' => ['page_count' => 1, 'block_count' => 2, 'review_required_count' => 0],
+        ]);
+
+        $response = $this->postJson("/api/documents/{$this->docId}/blocks/merge", [
+            'block_ids' => ['b1', 'img1'],
+        ]);
+        $response->assertStatus(200)->assertJsonFragment(['status' => 'merged']);
+
+        $doc = $this->store->getReviewDocument($this->docId);
+        $ids = array_column($doc['pages'][0]['blocks'], 'block_id');
+        $this->assertSame(['b1'], $ids);
+
+        $html = $doc['pages'][0]['blocks'][0]['meta']['reviewed_html'];
+        $this->assertStringContainsString('Alpha', $html);
+        $this->assertStringContainsString('<img', $html);
+        $this->assertStringContainsString('/api/documents/doc-mutation-test-001/images/image1.png', $html);
+        $this->assertStringContainsString('data-block-id="img1"', $html);
+        $this->assertStringContainsString('รูปประกอบ', $html);
+    }
+
     public function test_merge_orders_content_by_document_position_not_selection(): void
     {
         // Select in REVERSE document order; merged text and anchor must follow document order.

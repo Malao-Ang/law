@@ -861,9 +861,11 @@ class ReviewStore
             // Collect selected blocks in DOCUMENT order (not the caller's click/selection order).
             $ordered = [];
             foreach (($document['pages'] ?? []) as $page) {
+                $pageNo = (int) ($page['page_no'] ?? 0);
                 foreach (($page['blocks'] ?? []) as $b) {
                     $id = (string) ($b['block_id'] ?? '');
                     if (isset($idSet[$id])) {
+                        $b['_merge_page_no'] = $pageNo;
                         $ordered[] = $b;
                     }
                 }
@@ -1633,6 +1635,10 @@ class ReviewStore
     private function mergeBlockHtml(array $block): string
     {
         $html = trim((string) ($block['meta']['reviewed_html'] ?? ''));
+        $type = (string) ($block['type'] ?? 'paragraph');
+        if ($html === '' && in_array($type, ['image', 'table'], true)) {
+            $html = $this->documentHtmlService->buildBlockHtml($block, (int) ($block['_merge_page_no'] ?? 0));
+        }
         if ($html === '') {
             $text = (string) ($block['approved_text'] ?? $block['normalized_text'] ?? $block['raw_text'] ?? '');
             $html = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
@@ -1713,9 +1719,9 @@ class ReviewStore
         /** @var string[] $allowed */
         static $allowed = ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
             'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-            'span', 'div', 'sub', 'sup'];
+            'span', 'div', 'sub', 'sup', 'figure', 'figcaption', 'img'];
         /** @var string[] $allowedStyleProps */
-        static $allowedStyleProps = ['margin-left', 'text-indent', 'text-align', 'font-size', 'font-family'];
+        static $allowedStyleProps = ['margin-left', 'margin', 'text-indent', 'text-align', 'font-size', 'font-family', 'width', 'height', 'max-width'];
 
         $toReplace = [];
         $children = [];
@@ -1743,7 +1749,11 @@ class ReviewStore
                         } else {
                             $attr->value = $safe;
                         }
-                    } elseif (! in_array($name, ['class', 'colspan', 'rowspan'], true)) {
+                    } elseif ($name === 'src') {
+                        if ($tag !== 'img' || ! static::isSafeImageSource($attr->value)) {
+                            $attrsToRemove[] = $attr->name;
+                        }
+                    } elseif (! in_array($name, ['class', 'colspan', 'rowspan', 'alt', 'data-block-id', 'data-page-no'], true)) {
                         $attrsToRemove[] = $attr->name;
                     }
                 }
@@ -1791,6 +1801,10 @@ class ReviewStore
                 if (! preg_match('/^[\p{L}\p{N}\s,\'"\-]+$/u', $value)) {
                     continue;
                 }
+            } elseif ($prop === 'margin') {
+                if (! preg_match('/^(-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?|auto|0)(\s+(-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?|auto|0)){0,3}$/i', $value)) {
+                    continue;
+                }
             } elseif (! preg_match('/^-?[\d.]+(px|em|rem|%|pt|cm|mm|vw|vh)?$|^(left|center|right|justify|auto|inherit|initial|0)$/i', $value)) {
                 // Only allow safe CSS values: numbers with units, or alignment keywords
                 continue;
@@ -1799,6 +1813,19 @@ class ReviewStore
         }
 
         return implode('; ', $safe);
+    }
+
+    private static function isSafeImageSource(string $src): bool
+    {
+        $src = trim($src);
+        if ($src === '') {
+            return false;
+        }
+
+        return str_starts_with($src, '/')
+            || str_starts_with($src, 'http://')
+            || str_starts_with($src, 'https://')
+            || preg_match('/^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=\s]+$/i', $src) === 1;
     }
 
     private function normalizeHtmlForCompare(string $html): string
