@@ -156,7 +156,7 @@
             <td class="text-caption">{{ law.editedAt }}</td>
             <td>
               <div class="d-flex align-center ga-1">
-                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="admin-primary" :to="`/documents/${law.id}/review`" />
+                <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="admin-primary" :to="`/documents/${law.id}/edit`" />
                 <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}`" />
                 <v-menu>
                   <template #activator="{ props: menuProps }">

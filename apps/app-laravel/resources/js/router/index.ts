@@ -19,6 +19,7 @@ const ResultPage = () => import('../pages/result/ResultPage.vue');
 const LawInfoPage = () => import('../pages/law-info/LawInfoPage.vue');
 const LawRelationsPage = () => import('../pages/law-relations/LawRelationsPage.vue');
 const PermissionAccessPage = () => import('../pages/permissions/PermissionAccessPage.vue');
+const EditPage = () => import('../pages/edit/EditPage.vue');
 const ESignPage = () => import('../pages/esign/ESignPage.vue');
 const ESignPreviewPage = () => import('../pages/esign/ESignPreviewPage.vue');
 const ESignStatusPage = () => import('../pages/esign/ESignStatusPage.vue');
@@ -36,6 +37,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/relations', name: 'admin-relations', component: AdminRelationsHubPage, meta: { bareLayout: true } },
   { path: '/upload', name: 'upload-legacy', component: UploadPage },
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },
+  { path: '/documents/:documentId/edit', name: 'edit', component: EditPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/compose', name: 'compose', component: ComposePage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/law-info', name: 'law-info', component: LawInfoPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/relations', name: 'law-relations', component: LawRelationsPage, props: true, meta: { bareLayout: true } },
