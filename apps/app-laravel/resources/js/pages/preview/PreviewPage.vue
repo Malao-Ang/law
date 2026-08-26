@@ -4,7 +4,6 @@
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ตัวอย่างเอกสาร']"
     title="ตัวอย่างเอกสาร PDF"
     subtitle="ตรวจสอบความถูกต้องของไฟล์ต้นฉบับ จากนั้นกด “กรอกข้อมูล” เพื่อไปยังขั้นตอนข้อมูลเอกสาร"
-    full-height
   >
     <WorkflowFooterBar
       :step="1"
@@ -138,13 +137,8 @@ onUnmounted(() => previewStore.reset());
 }
 
 .old-preview {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
   width: min(100%, 1040px);
   margin: 0 auto;
-  overflow-y: auto;
   padding-bottom: 72px;
 }
 
