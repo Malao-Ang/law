@@ -14,9 +14,18 @@
         @click="router.push(`/documents/${documentId}/esign/preview`)"
       >ดูตัวอย่าง</v-btn>
       <v-btn
+        v-if="isEdit"
         color="admin-primary"
         size="small"
         prepend-icon="mdi-pencil-outline"
+        class="text-none"
+        @click="router.push(`/documents/${documentId}/review`)"
+      >แก้ไขเอกสาร</v-btn>
+      <v-btn
+        :color="isEdit ? undefined : 'admin-primary'"
+        :variant="isEdit ? 'outlined' : 'elevated'"
+        size="small"
+        prepend-icon="mdi-file-document-edit-outline"
         class="text-none"
         @click="router.push(`/documents/${documentId}/law-info`)"
       >แก้ไขข้อมูล</v-btn>
@@ -127,14 +136,14 @@
               <v-icon icon="mdi-calendar-outline" size="18" color="admin-primary" />
               <div>
                 <div class="esign-meta-cell__label">วันที่ประกาศ</div>
-                <div class="esign-meta-cell__value">{{ meta.promulgation_date || '—' }}</div>
+                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.promulgation_date) || '—' }}</div>
               </div>
             </div>
             <div class="esign-meta-cell">
               <v-icon icon="mdi-calendar-check-outline" size="18" color="admin-primary" />
               <div>
                 <div class="esign-meta-cell__label">วันที่มีผล</div>
-                <div class="esign-meta-cell__value">{{ meta.effective_date || '—' }}</div>
+                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.effective_date) || '—' }}</div>
               </div>
             </div>
             <div class="esign-meta-cell">
@@ -239,7 +248,7 @@
         </v-tabs>
 
         <div v-show="sideTab === 'info'" class="d-flex flex-column ga-3">
-          <div class="esign-wait-box">
+          <div v-if="!isEdit" class="esign-wait-box">
             <div class="d-flex align-start ga-2 mb-2">
               <v-icon icon="mdi-clock-outline" color="warning" />
               <div>
@@ -282,11 +291,11 @@
             </div>
             <div class="esign-kv">
               <span>วันที่ประกาศ</span>
-              <strong>{{ meta.promulgation_date || '—' }}</strong>
+              <strong>{{ formatThaiDate(meta.promulgation_date) || '—' }}</strong>
             </div>
             <div class="esign-kv">
               <span>วันที่มีผล</span>
-              <strong>{{ meta.effective_date || '—' }}</strong>
+              <strong>{{ formatThaiDate(meta.effective_date) || '—' }}</strong>
             </div>
             <div class="esign-kv">
               <span>วันที่เผยแพร่</span>
@@ -352,6 +361,14 @@
             @click="router.push(`/documents/${documentId}/relations`)"
           >ความสัมพันธ์กฎหมาย</v-btn>
           <v-btn
+            v-if="isEdit"
+            variant="outlined"
+            prepend-icon="mdi-file-document-edit-outline"
+            class="justify-start text-none"
+            @click="router.push(`/documents/${documentId}/review`)"
+          >แก้ไขเนื้อหา</v-btn>
+          <v-btn
+            v-else
             variant="outlined"
             prepend-icon="mdi-shield-lock-outline"
             class="justify-start text-none"
@@ -375,7 +392,10 @@ import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 
-const props = defineProps<{ documentId: string }>();
+const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
+  mode: 'esign',
+});
+const isEdit = computed(() => props.mode === 'edit');
 const router = useRouter();
 const documentStore = useDocumentStore();
 
@@ -562,7 +582,9 @@ onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
     void documentStore.fetch(props.documentId);
   }
-  writeStage(props.documentId, 'wait_esign');
+  if (!isEdit.value) {
+    writeStage(props.documentId, 'wait_esign');
+  }
 });
 
 watch(sections, async (value) => {
