@@ -4,24 +4,22 @@
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ตัวอย่างเอกสาร']"
     title="ตัวอย่างเอกสาร PDF"
     subtitle="ตรวจสอบความถูกต้องของไฟล์ต้นฉบับ จากนั้นกด “กรอกข้อมูล” เพื่อไปยังขั้นตอนข้อมูลเอกสาร"
+    full-height
   >
-    <template #title-actions>
-      <div class="d-flex align-center ga-2">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-arrow-left"
-          to="/admin/upload"
-        >กลับรายการ</v-btn>
-        <v-btn
-          color="admin-primary"
-          variant="flat"
-          append-icon="mdi-arrow-right"
-          :to="`/documents/${documentId}/law-info`"
-        >กรอกข้อมูล</v-btn>
-      </div>
-    </template>
-
+    <WorkflowFooterBar
+      :step="1"
+      variant="historical"
+      back-label="กลับรายการ"
+      next-label="กรอกข้อมูล"
+      @back="router.push('/admin/upload')"
+      @next="router.push(`/documents/${documentId}/law-info`)"
+    />
     <div class="old-preview">
+      <WorkflowStepper
+        :step="1"
+        variant="historical"
+        description="ตรวจสอบเอกสารต้นฉบับก่อนกรอกข้อมูลเอกสาร"
+      />
       <iframe
         :src="pdfUrl"
         class="preview-pdf"
@@ -72,14 +70,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import DOMPurify from 'dompurify';
 import { usePreviewStore } from '../../stores/previewStore';
 import { fetchStatus, documentFileUrl } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
+import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
+import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 
 const props = defineProps<{ documentId: string }>();
 
 const previewStore = usePreviewStore();
+const router = useRouter();
 
 const checking = ref(true);
 const isOld = ref(false);
@@ -136,8 +138,14 @@ onUnmounted(() => previewStore.reset());
 }
 
 .old-preview {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   width: min(100%, 1040px);
   margin: 0 auto;
+  overflow-y: auto;
+  padding-bottom: 72px;
 }
 
 .preview-pdf {
