@@ -42,7 +42,7 @@ import { computed, ref } from 'vue';
 import { WORKFLOW_STEPS } from '../../constants/workflowSteps';
 
 const HISTORICAL_STEPS = [
-  'ประเภทเอกสาร',
+  'ตัวอย่าง',
   'ข้อมูล',
   'เอกสารที่เกี่ยวข้อง',
   'กำหนดสิทธิ์',

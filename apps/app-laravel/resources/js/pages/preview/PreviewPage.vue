@@ -1,22 +1,45 @@
 <template>
-  <div class="d-flex flex-column" style="min-height:100vh; background:#f0f0f0">
+  <AppShell
+    v-if="isOld && !checking"
+    :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ตัวอย่างเอกสาร']"
+    title="ตัวอย่างเอกสาร PDF"
+    subtitle="ตรวจสอบความถูกต้องของไฟล์ต้นฉบับ จากนั้นกด “กรอกข้อมูล” เพื่อไปยังขั้นตอนข้อมูลเอกสาร"
+  >
+    <template #title-actions>
+      <div class="d-flex align-center ga-2">
+        <v-btn
+          variant="outlined"
+          prepend-icon="mdi-arrow-left"
+          to="/admin/upload"
+        >กลับรายการ</v-btn>
+        <v-btn
+          color="admin-primary"
+          variant="flat"
+          append-icon="mdi-arrow-right"
+          :to="`/documents/${documentId}/law-info`"
+        >กรอกข้อมูล</v-btn>
+      </div>
+    </template>
+
+    <div class="old-preview">
+      <iframe
+        :src="pdfUrl"
+        class="preview-pdf"
+        title="ตัวอย่างเอกสาร PDF"
+      />
+    </div>
+  </AppShell>
+
+  <div v-else class="d-flex flex-column" style="min-height:100vh; background:#f0f0f0">
     <v-toolbar flat border="b" density="comfortable" class="preview-toolbar px-2">
       <v-btn
         variant="text"
         prepend-icon="mdi-arrow-left"
-        :to="isOld ? '/admin/upload' : `/documents/${documentId}/review`"
-      >{{ isOld ? 'กลับรายการ' : 'กลับแก้ไข' }}</v-btn>
+        :to="`/documents/${documentId}/review`"
+      >กลับแก้ไข</v-btn>
       <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
       <v-spacer />
       <v-btn
-        v-if="isOld"
-        color="primary"
-        variant="flat"
-        append-icon="mdi-arrow-right"
-        :to="`/documents/${documentId}/law-info`"
-      >กรอกข้อมูล</v-btn>
-      <v-btn
-        v-else
         variant="tonal"
         prepend-icon="mdi-printer-outline"
         @click="printPage()"
@@ -25,19 +48,12 @@
 
     <div class="flex-grow-1 pa-8 d-flex justify-center">
       <div v-if="checking" class="d-flex flex-column align-center ga-3 pa-12">
-        <v-progress-circular indeterminate color="primary" />
+        <v-progress-circular indeterminate color="admin-primary" />
         <p>กำลังโหลดตัวอย่าง...</p>
       </div>
 
-      <iframe
-        v-else-if="isOld"
-        :src="pdfUrl"
-        class="preview-pdf"
-        title="ตัวอย่างเอกสาร PDF"
-      />
-
       <div v-else-if="previewStore.loading" class="d-flex flex-column align-center ga-3 pa-12">
-        <v-progress-circular indeterminate color="primary" />
+        <v-progress-circular indeterminate color="admin-primary" />
         <p>กำลังโหลดตัวอย่าง...</p>
       </div>
       <div v-else-if="previewStore.error" class="d-flex flex-column align-center ga-3 pa-12">
@@ -59,6 +75,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import DOMPurify from 'dompurify';
 import { usePreviewStore } from '../../stores/previewStore';
 import { fetchStatus, documentFileUrl } from '../../api/client';
+import AppShell from '../../components/shared/AppShell.vue';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -66,9 +83,10 @@ const previewStore = usePreviewStore();
 
 const checking = ref(true);
 const isOld = ref(false);
+const statusSourceFile = ref('');
 
 const pdfUrl = computed(() => documentFileUrl(props.documentId));
-const sourceFile = computed(() => previewStore.data?.source_file ?? '');
+const sourceFile = computed(() => previewStore.data?.source_file ?? statusSourceFile.value);
 
 const safeHtml = computed(() => {
   const raw = previewStore.data?.html ?? previewStore.data?.draft_html ?? '';
@@ -90,8 +108,10 @@ onMounted(async () => {
   try {
     const status = await fetchStatus(props.documentId);
     isOld.value = status.document_type === 'old';
+    statusSourceFile.value = status.source_file ?? '';
   } catch {
     isOld.value = false;
+    statusSourceFile.value = '';
   }
   // Old docs have no review document; /preview would 404. Skip the fetch.
   if (!isOld.value) {
@@ -115,9 +135,16 @@ onUnmounted(() => previewStore.reset());
   font-family: 'TH Sarabun PSK', 'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
 
+.old-preview {
+  width: min(100%, 1040px);
+  margin: 0 auto;
+}
+
 .preview-pdf {
-  width: 210mm;
-  height: calc(100vh - 120px);
+  display: block;
+  width: min(100%, 210mm);
+  height: 297mm;
+  margin: 0 auto;
   border: none;
   background: white;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.15);

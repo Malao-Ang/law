@@ -14,7 +14,7 @@
 
     <v-btn
       v-if="!nextHidden"
-      color="#1a3673"
+      color="admin-primary"
       append-icon="mdi-arrow-right"
       :disabled="nextDisabled"
       :loading="nextLoading"
@@ -30,7 +30,7 @@ import { computed } from 'vue';
 import { WORKFLOW_STEPS } from '../../constants/workflowSteps';
 
 const HISTORICAL_STEPS = [
-  'ประเภทเอกสาร',
+  'ตัวอย่าง',
   'ข้อมูล',
   'เอกสารที่เกี่ยวข้อง',
   'กำหนดสิทธิ์',

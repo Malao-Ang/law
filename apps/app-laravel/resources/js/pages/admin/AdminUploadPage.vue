@@ -10,12 +10,12 @@
       <!-- ── Document type selection cards ─────────────────── -->
       <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row">
         <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
-          <v-icon size="32" color="primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
+          <v-icon size="32" color="admin-primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
           <h3 class="text-h6">เอกสารใหม่ (New Document)</h3>
           <p class="text-body-2 text-medium-emphasis">
             เอกสารที่ยังไม่ผ่านกระบวนการจัดการของระบบ จะต้องผ่านขั้นตอนการตรวจทาน และจัดลำดับเนื้อหา (Structuring) ด้วย AI
           </p>
-          <v-btn block color="primary" variant="flat" @click="pickFiles('new')">ดำเนินการต่อ</v-btn>
+          <v-btn block color="admin-primary" variant="flat" @click="pickFiles('new')">ดำเนินการต่อ</v-btn>
         </v-card>
 
         <v-card class="flex-1-1 pa-6 position-relative" elevation="0" rounded="lg" style="min-width:320px">

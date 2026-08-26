@@ -109,14 +109,13 @@
           />
           <v-btn
             v-else-if="stageDef(item.stage).action.type !== 'none'"
-            icon="mdi-eye-outline"
             size="small"
-            variant="text"
+            variant="tonal"
             color="admin-primary"
             :title="rowActionLabel(item) || 'ดูเอกสาร'"
-            aria-label="ดูเอกสาร"
+            :aria-label="rowActionLabel(item) || 'ดูเอกสาร'"
             @click="runAction(item)"
-          />
+          >{{ rowActionLabel(item) || 'ดูเอกสาร' }}</v-btn>
 
           <v-btn
             icon="mdi-delete-outline"
