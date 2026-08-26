@@ -24,6 +24,16 @@ function escapeHtml(text: string): string {
 
 const bodyHtml = computed<string>(() => {
   const block = props.block;
+  const reviewedHtml = typeof block.meta?.reviewed_html === 'string' && block.meta.reviewed_html.trim() !== ''
+    ? block.meta.reviewed_html.trim()
+    : '';
+
+  if (reviewedHtml.includes('merged-block') && props.overrideText == null) {
+    return DOMPurify.sanitize(reviewedHtml, {
+      ALLOWED_TAGS: ['div', 'p', 'br', 'span', 'strong', 'em', 'u', 's', 'figure', 'figcaption', 'img'],
+      ALLOWED_ATTR: ['class', 'style', 'src', 'alt', 'data-block-id', 'data-page-no'],
+    });
+  }
 
   if (block.type === 'image' && block.meta.image) {
     const src = block.meta.image.src_url ?? block.meta.image.data_uri ?? '';
@@ -60,10 +70,6 @@ const bodyHtml = computed<string>(() => {
         : inner;
     }
   }
-
-  const reviewedHtml = typeof block.meta?.reviewed_html === 'string' && block.meta.reviewed_html.trim() !== ''
-    ? block.meta.reviewed_html.trim()
-    : '';
 
   if (reviewedHtml !== '' && props.overrideText == null) {
     return DOMPurify.sanitize(reviewedHtml, {
@@ -125,6 +131,16 @@ const bodyHtml = computed<string>(() => {
   height: auto;
   display: block;
   margin: 8px auto;
+}
+
+.block-flow :deep(.doc-image) {
+  margin: 8px 0;
+}
+
+.block-flow :deep(.doc-image img) {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
 }
 
 .block-flow :deep(.bf-table-wrap) {

@@ -53,8 +53,17 @@
           v-if="blockMatraMap.get(block.block_id) && block.meta.list_marker?.type !== 'legal-มาตรา'"
           class="block-editor__matra-pill"
         >{{ blockMatraMap.get(block.block_id)?.text }}</div>
+        <!-- Merged mixed-content block: render the preserved HTML as-is so
+             image and text fragments stay on separate visual lines. -->
+        <template v-if="hasMergedHtml(block)">
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div
+            class="block-editor__merged-html"
+            v-html="sanitizeHtml(block.meta.reviewed_html ?? '')"
+          />
+        </template>
         <!-- Image block -->
-        <template v-if="block.type === 'image'">
+        <template v-else-if="block.type === 'image'">
           <figure class="block-editor__image">
             <ResizableDragBlock
               v-if="block.meta.image?.src_url || block.meta.image?.data_uri"
@@ -280,7 +289,7 @@
           </div>
 
           <v-btn
-            v-if="block.type !== 'image' && block.type !== 'table'"
+            v-if="!hasMergedHtml(block) && block.type !== 'image' && block.type !== 'table'"
             size="x-small"
             variant="outlined"
             @click.stop="startEdit(page.page_no, block)"
@@ -310,9 +319,13 @@ import type { DocumentBlock, DocumentPage, LayoutPatch, ListMarker } from '../..
 
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div', 'sub', 'sup'],
-    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan'],
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'div', 'sub', 'sup', 'figure', 'figcaption', 'img'],
+    ALLOWED_ATTR: ['class', 'style', 'colspan', 'rowspan', 'src', 'alt', 'data-block-id', 'data-page-no'],
   });
+}
+
+function hasMergedHtml(block: DocumentBlock): boolean {
+  return typeof block.meta?.reviewed_html === 'string' && block.meta.reviewed_html.includes('merged-block');
 }
 
 interface SpellSuggestion {
@@ -667,6 +680,33 @@ onBeforeUnmount(() => {
 
 .block-editor__error {
   color: #ef4444;
+}
+
+.block-editor__merged-html {
+  line-height: 1.95;
+}
+
+.block-editor__merged-html :deep(.merged-block) {
+  display: block;
+  margin: 0 0 4px;
+}
+
+.block-editor__merged-html :deep(.merged-block:last-child) {
+  margin-bottom: 0;
+}
+
+.block-editor__merged-html :deep(.doc-image) {
+  margin: 8px 0;
+}
+
+.block-editor__merged-html :deep(img) {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
+.block-editor__merged-html :deep(p) {
+  margin: 0 0 4px;
 }
 
 .block-editor__image {
