@@ -113,7 +113,7 @@
             size="small"
             variant="text"
             color="admin-primary"
-            :title="actionLabel(item.stage) || 'ดูเอกสาร'"
+            :title="rowActionLabel(item) || 'ดูเอกสาร'"
             aria-label="ดูเอกสาร"
             @click="runAction(item)"
           />
@@ -266,12 +266,25 @@ function setStage(documentId: string, stage: StageKey): void {
 }
 
 function runAction(row: Row): void {
+  if (isOldPreview(row)) {
+    router.push(`/documents/${row.documentId}/preview`);
+    return;
+  }
   const action = STAGE_MAP[row.stage].action;
   if (action.type === 'route') {
     router.push(action.to(row.documentId));
   } else if (action.type === 'advance') {
     setStage(row.documentId, nextStage(row.stage));
   }
+}
+
+function isOldPreview(row: Row): boolean {
+  return row.documentType === 'old' && row.stage === 'info';
+}
+
+function rowActionLabel(row: Row): string {
+  if (isOldPreview(row)) return 'ดูตัวอย่าง';
+  return actionLabel(row.stage);
 }
 
 function advance(row: Row): void {
