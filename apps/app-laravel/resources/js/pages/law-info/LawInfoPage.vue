@@ -155,7 +155,7 @@
                 </template>
               </v-autocomplete>
             </v-col>
-            <v-col cols="12" sm="6">
+            <v-col v-if="!isOld" cols="12" sm="6">
               <v-text-field
                 :model-value="sectionCountDisplay"
                 :label="requiredLabel('จำนวนข้อ')"
