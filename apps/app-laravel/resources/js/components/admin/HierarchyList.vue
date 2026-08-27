@@ -1,0 +1,144 @@
+<template>
+  <div class="h-node" :class="{ 'is-root': node.level === 0 }">
+    <div v-if="node.level > 0" class="h-edge">{{ relationTypeLabel(node.edgeType) }}</div>
+    <div class="h-row">
+      <v-icon :icon="rowIcon" size="20" class="h-icon" :color="node.level === 0 ? 'admin-primary' : undefined" />
+      <span class="h-title">{{ node.row.title }}</span>
+      <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="tonal" class="h-chip">
+        Root
+      </v-chip>
+      <v-chip
+        v-else-if="node.row.lawType"
+        size="x-small"
+        variant="flat"
+        :color="typeColor(node.row.lawType)"
+        class="h-chip font-weight-bold text-white"
+      >
+        {{ node.row.typeShort }}
+      </v-chip>
+      <v-chip
+        size="x-small"
+        :color="statusChipColor"
+        variant="tonal"
+        class="h-chip"
+      >
+        {{ statusLabel }}
+      </v-chip>
+    </div>
+    <ul v-if="node.children.length" class="h-list">
+      <li v-for="child in node.children" :key="child.row.id" class="h-item">
+        <HierarchyList :node="child" />
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import { relationTypeLabel } from '../../types/lawRelation';
+import {
+  metaStatusColor,
+  typeColor,
+  typeIcon,
+  workflowStageColor,
+  type RelTreeNode,
+} from '../../composables/useShowRelations';
+
+defineOptions({ name: 'HierarchyList' });
+
+const props = defineProps<{ node: RelTreeNode }>();
+
+const rowIcon = computed(() =>
+  props.node.level === 0 ? 'mdi-office-building' : typeIcon(props.node.row.lawType),
+);
+
+const statusLabel = computed(() =>
+  props.node.row.metaStatus || props.node.row.workflowStage || '—',
+);
+
+const statusChipColor = computed(() =>
+  props.node.row.metaStatus
+    ? metaStatusColor(props.node.row.metaStatus)
+    : workflowStageColor(props.node.row.workflowStage),
+);
+</script>
+
+<style scoped>
+.h-node {
+  min-width: 0;
+}
+
+.h-edge {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 4px 28px;
+}
+
+.h-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.h-icon {
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.h-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.h-chip {
+  flex-shrink: 0;
+}
+
+.h-list {
+  list-style: none;
+  margin: 0 0 0 10px;
+  padding: 0 0 0 18px;
+  position: relative;
+}
+
+.h-list::before {
+  background: #cbd5e1;
+  bottom: 18px;
+  content: '';
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.h-item {
+  padding: 10px 0 2px;
+  position: relative;
+}
+
+.h-item::before {
+  background: #cbd5e1;
+  content: '';
+  height: 1px;
+  left: -18px;
+  position: absolute;
+  top: 22px;
+  width: 18px;
+}
+
+.h-item:last-child::after {
+  background: #fff;
+  bottom: 0;
+  content: '';
+  left: -19px;
+  position: absolute;
+  top: 23px;
+  width: 3px;
+}
+</style>

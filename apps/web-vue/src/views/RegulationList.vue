@@ -96,7 +96,7 @@ const getTypeColor = (type) => {
             title="คลังกฎหมาย"
             :breadcrumbs="[
                 { text: 'คลังกฎหมาย', to: '/regulations' },
-                'จัดเก็บกฎหมายใหม่'
+                'จัดเก็บกฎหมายล่าสุด'
             ]"
         >
         </AppHeader>

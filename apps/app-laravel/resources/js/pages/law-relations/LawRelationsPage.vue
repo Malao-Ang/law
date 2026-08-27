@@ -8,9 +8,15 @@
       :step="isOld ? 3 : 5"
       :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
-      :next-loading="documentStore.saving"
+      extra-label="ส่งไป E-Sign"
+      extra-icon="mdi-draw-pen"
+      :next-loading="documentStore.saving && !esignLeaving"
+      :extra-loading="documentStore.saving && esignLeaving"
+      :next-disabled="documentStore.saving"
+      :extra-disabled="documentStore.saving"
       @back="router.push(`/documents/${props.documentId}/law-info`)"
       @next="saveAndNext"
+      @extra="saveAndEsign"
     />
     <div class="mx-auto relations-page" style="max-width:960px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
@@ -19,6 +25,13 @@
       </div>
 
       <template v-else>
+        <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+          ขั้นตอนนี้ยังไม่บังคับ กรอกตอนนี้หรือส่งไป E-Sign ก่อนแล้วค่อยกลับมาก็ได้
+          <span v-if="changeStatus">
+            — อิงสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย: <strong>{{ changeStatus }}</strong>
+          </span>
+        </v-alert>
+
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
@@ -31,56 +44,27 @@
             <span class="text-subtitle-1 font-weight-bold">ลำดับชั้นเอกสาร</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            กำหนดว่าเอกสารนี้อ้างถึงกฎหมายใด
+            {{ parentPickerHint }}
           </p>
-          <v-select
-            v-model="parentId"
+          <v-autocomplete
+            v-model="parentIds"
             :items="parentItems"
             item-title="title"
             item-value="document_id"
-            label="กฎหมายที่อ้างถึง (ไม่บังคับ)"
-            placeholder="- ไม่มี -"
+            item-subtitle="law_type"
+            label="ออกภายใต้กฎหมาย (ไม่บังคับ)"
+            placeholder="ค้นหากฎหมายแม่"
+            multiple
+            chips
+            closable-chips
             clearable
             prepend-inner-icon="mdi-file-tree"
             :loading="catalogLoading"
           />
         </v-card>
 
-        <!-- Hierarchy: child documents (read-only) -->
-        <v-card flat border rounded="lg" class="pa-6 mb-4">
-          <div class="d-flex align-center ga-2 mb-4">
-            <v-icon icon="mdi-file-tree-outline" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">เอกสารที่สังกัด (เอกสารลูก)</span>
-            <v-chip v-if="children.length" size="x-small" color="admin-primary" class="ml-1">
-              {{ children.length }}
-            </v-chip>
-          </div>
-          <div v-if="catalogLoading" class="d-flex align-center justify-center pa-6">
-            <v-progress-circular indeterminate size="24" color="admin-primary" />
-          </div>
-          <div v-else-if="children.length === 0" class="text-body-2 text-medium-emphasis pa-2">
-            ยังไม่มีเอกสารที่อ้างอิงเอกสารนี้
-          </div>
-          <v-list v-else density="compact" lines="one">
-            <v-list-item
-              v-for="doc in children"
-              :key="doc.document_id"
-              :title="doc.title"
-              :subtitle="doc.document_id"
-              prepend-icon="mdi-file-document-outline"
-              :href="`/documents/${doc.document_id}/law-info`"
-            >
-              <template #append>
-                <v-chip size="x-small" :color="statusColor(doc.status)" variant="tonal">
-                  {{ doc.status }}
-                </v-chip>
-              </template>
-            </v-list-item>
-          </v-list>
-        </v-card>
-
         <!-- Document-level edges -->
-        <v-card flat border rounded="lg" class="pa-6 mb-4">
+        <v-card v-if="showDocumentRelations" flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-2 flex-wrap">
             <v-icon icon="mdi-link-variant" color="admin-primary" size="20" />
             <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์ระดับเอกสาร</span>
@@ -94,7 +78,7 @@
             >เพิ่ม</v-btn>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            ออกตามอำนาจ · แทนที่ · เกี่ยวข้อง — ผูกทั้งเอกสารนี้กับกฎหมายอื่น
+            {{ documentRelationsHint }}
           </p>
           <div v-if="documentLevelRelations.length" class="relations-list">
             <div v-for="rel in documentLevelRelations" :key="rel.id" class="relations-list__row">
@@ -126,13 +110,13 @@
         </v-card>
 
         <!-- Section-level edges -->
-        <v-card flat border rounded="lg" class="pa-6 mb-4">
+        <v-card v-if="showSectionRelations" flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-2">
             <v-icon icon="mdi-vector-link" color="admin-primary" size="20" />
             <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์ระดับข้อ</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
-            แก้ไขเพิ่มเติม · ยกเลิก · เกี่ยวข้อง — ผูกข้อในเอกสารนี้กับกฎหมายเป้าหมาย
+            {{ sectionRelationsHint }}
           </p>
           <div v-if="sections.length === 0" class="text-body-2 text-medium-emphasis">
             ไม่พบข้อในเอกสาร
@@ -190,6 +174,10 @@
       :block-id="relationDialog.blockId"
       :default-type="relationDialog.defaultType"
       :exclude-document-id="props.documentId"
+      :parent-document-ids="parentIds"
+      :catalog-mode="relationCatalogMode"
+      :require-section="isSectionChange"
+      :whole-document-only="isWholeDocumentChange"
       :existing-relations="relations"
       :section-labels="sectionLabels"
       @close="closeRelationDialog"
@@ -205,7 +193,7 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import { listDocuments } from '../../api/client';
 import type { DocumentListItem, LawRelation, RelationScope, RelationType } from '../../types/document';
-import { childDocuments, isPickableDocument } from '../../composables/useLawCatalog';
+import { isCouncilAnnouncementType, isUniversityAnnouncementType, parentDocumentsForChildType } from '../../composables/useLawCatalog';
 import { buildSections, documentRelations, relationsForSection, type LawSection } from '../../composables/useLawSections';
 import {
   RELATION_TYPE_COLORS,
@@ -225,7 +213,8 @@ const isOld = computed(() => documentStore.review?.law_meta?.document_type === '
 
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);
-const parentId = ref<string | null>(null);
+const parentIds = ref<string[]>([]);
+const esignLeaving = ref(false);
 
 const relationDialog = ref<{
   open: boolean;
@@ -239,6 +228,37 @@ const relationDialog = ref<{
 });
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
+const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
+const isWholeDocumentChange = computed(() =>
+  changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ยกเลิกทั้งฉบับ',
+);
+const isSectionChange = computed(() =>
+  changeStatus.value === 'ปรับปรุงรายมาตรา' || changeStatus.value === 'ยกเลิกรายมาตรา',
+);
+const showDocumentRelations = computed(() => !isSectionChange.value);
+const showSectionRelations = computed(() => !isWholeDocumentChange.value);
+const suggestedRelationType = computed<RelationType | undefined>(() => {
+  if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
+  if (changeStatus.value === 'ยกเลิกทั้งฉบับ' || changeStatus.value === 'ยกเลิกรายมาตรา') return 'repeals';
+  return undefined;
+});
+const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
+  if (isWholeDocumentChange.value) return 'siblings';
+  if (isSectionChange.value) return 'parents';
+  return relationDialog.value.scope === 'document' ? 'siblings' : 'all';
+});
+const documentRelationsHint = computed(() => {
+  if (isWholeDocumentChange.value) {
+    return 'เลือกกฎหมายชั้นเดียวกัน (พี่น้องภายใต้กฎหมายแม่เดียวกัน) ทั้งฉบับ ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย';
+  }
+  return 'บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง เลือกได้เฉพาะเอกสารที่ออกภายใต้กฎหมายแม่ด้านบน';
+});
+const sectionRelationsHint = computed(() => {
+  if (isSectionChange.value) {
+    return 'เลือกข้อหรือมาตราย่อยของกฎหมายแม่ (กฎหมายเป้าหมาย) ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย ไม่เลือกทั้งฉบับ';
+  }
+  return 'บอกว่าข้อไหนในเอกสารนี้เกี่ยวข้องกับกฎหมายอื่น เช่น แก้ไขหรือยกเลิกข้อของกฎหมายฉบับอื่น กดเพิ่มที่ข้อที่ต้องการ';
+});
 const sections = computed(() => buildSections(documentStore.review));
 const sectionLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(sections.value.map((section) => [section.id, section.badge])),
@@ -253,27 +273,31 @@ const sectionRelationEntries = computed(() =>
 );
 
 const parentItems = computed(() =>
-  catalog.value.filter(
-    (doc) => doc.document_id !== props.documentId && isPickableDocument(doc),
+  parentDocumentsForChildType(
+    catalog.value,
+    documentStore.review?.law_meta?.law_type,
+    props.documentId,
+    parentIds.value,
   ),
 );
 
-const children = computed(() =>
-  childDocuments(catalog.value, props.documentId),
-);
-
-function statusColor(status: string): string {
-  if (status === 'exported' || status === 'ingested') return 'success';
-  if (status === 'done') return 'admin-primary';
-  return 'default';
-}
+const parentPickerHint = computed(() => {
+  const lawType = documentStore.review?.law_meta?.law_type;
+  if (isUniversityAnnouncementType(lawType)) {
+    return 'ประกาศที่ออกโดยมหาวิทยาลัย เลือกกฎหมายแม่ได้เฉพาะระเบียบและข้อบังคับ';
+  }
+  if (isCouncilAnnouncementType(lawType)) {
+    return 'ประกาศที่ออกโดยสภามหาวิทยาลัย เลือกกฎหมายแม่ได้จาก พ.ร.บ. ระเบียบ ข้อบังคับ และประกาศ';
+  }
+  return 'เลือกได้ว่าเอกสารนี้ออกภายใต้กฎหมายฉบับใด เช่น ระเบียบนี้ออกตาม พ.ร.บ. เรื่องนั้น เลือกได้หลายฉบับ ไม่บังคับ';
+});
 
 function openSectionRelation(section: LawSection, defaultType?: RelationType): void {
   relationDialog.value = {
     open: true,
     scope: 'section',
     blockId: section.id,
-    defaultType,
+    defaultType: defaultType ?? suggestedRelationType.value,
   };
 }
 
@@ -282,7 +306,7 @@ function openDocumentRelation(defaultType?: RelationType): void {
     open: true,
     scope: 'document',
     blockId: null,
-    defaultType,
+    defaultType: defaultType ?? suggestedRelationType.value,
   };
 }
 
@@ -301,17 +325,37 @@ async function onRelationSave(relation: LawRelation): Promise<void> {
   if (ok) snackbar.success('เพิ่มความสัมพันธ์แล้ว');
 }
 
+async function persistStepFive(): Promise<boolean> {
+  const saved = await documentStore.saveLawMeta({
+    parent_document_ids: parentIds.value,
+    parent_document_id: parentIds.value[0] ?? null,
+  });
+  if (!saved) return false;
+  return documentStore.completeWorkflowStep(5);
+}
+
 async function saveAndNext(): Promise<void> {
-  const saved = await documentStore.saveLawMeta({ parent_document_id: parentId.value });
-  if (!saved) return;
-  const relationProgressed = await documentStore.completeWorkflowStep(5);
-  if (!relationProgressed) return;
+  esignLeaving.value = false;
+  if (!await persistStepFive()) return;
   router.push(`/documents/${props.documentId}/permissions`);
+}
+
+async function saveAndEsign(): Promise<void> {
+  esignLeaving.value = true;
+  try {
+    if (!await persistStepFive()) return;
+    router.push(`/documents/${props.documentId}/esign`);
+  } finally {
+    esignLeaving.value = false;
+  }
 }
 
 onMounted(async () => {
   await documentStore.fetch(props.documentId);
-  parentId.value = documentStore.review?.law_meta?.parent_document_id ?? null;
+  const meta = documentStore.review?.law_meta;
+  parentIds.value = meta?.parent_document_ids?.length
+    ? [...meta.parent_document_ids]
+    : (meta?.parent_document_id ? [meta.parent_document_id] : []);
   catalogLoading.value = true;
   try {
     const res = await listDocuments();

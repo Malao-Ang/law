@@ -430,6 +430,7 @@ const EMPTY_META: LawMeta = {
   repealed_laws: [],
   imported_by: '',
   parent_document_id: null,
+  parent_document_ids: [],
   access_scope: 'public',
   permission_group_ids: [],
 };

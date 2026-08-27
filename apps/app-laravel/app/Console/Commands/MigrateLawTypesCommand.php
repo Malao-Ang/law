@@ -51,7 +51,9 @@ class MigrateLawTypesCommand extends Command
         return match (true) {
             $compact === 'ข้อบังคับ' => 'ข้อบังคับ',
             $compact === 'ระเบียบ' => 'ระเบียบ',
-            $compact === 'ประกาศ' => 'ประกาศ',
+            str_contains($compact, 'ประกาศที่ออกโดยสภามหาวิทยาลัย') => 'ประกาศที่ออกโดยสภามหาวิทยาลัย',
+            $compact === 'ประกาศ',
+            str_contains($compact, 'ประกาศที่ออกโดยมหาวิทยาลัย') => 'ประกาศที่ออกโดยมหาวิทยาลัย',
             str_contains($compact, 'พระราชบัญญัติ'),
                 $compact === 'พ.ร.บ.',
                 $compact === 'พรบ',
@@ -60,9 +62,9 @@ class MigrateLawTypesCommand extends Command
                 $compact === 'kotmai-phaainok',
                 $compact === 'กฎหมายภายนอก' => 'กฎหมายภายนอก',
             $compact === 'คำสั่ง',
-                $compact === 'command',
-                $compact === 'มติ',
-                $compact === 'resolution' => 'ประกาศ',
+                $compact === 'command' => 'ประกาศที่ออกโดยมหาวิทยาลัย',
+            $compact === 'มติ',
+                $compact === 'resolution' => 'ประกาศที่ออกโดยสภามหาวิทยาลัย',
             default => null,
         };
     }

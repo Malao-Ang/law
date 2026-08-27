@@ -352,6 +352,7 @@
       :block-id="relationDialog.blockId"
       :default-type="relationDialog.defaultType"
       :exclude-document-id="quickEditId ?? ''"
+      :parent-document-ids="quickEditParentIds"
       :existing-relations="relations"
       :section-labels="sectionLabels"
       @close="closeRelationDialog"
@@ -375,6 +376,7 @@ import {
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
+import { parentIdsOf } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -428,6 +430,11 @@ const confirmSaveOpen = ref(false);
 
 // ── Pending relations (staged before confirm-save) ────────
 const pendingRelations = ref<LawRelation[]>([]);
+const quickEditParentIds = computed(() => {
+  const meta = documentStore.review?.law_meta;
+  if (!meta) return [];
+  return parentIdsOf(meta);
+});
 
 // ── Change log ────────────────────────────────────────────
 const changeLog = ref<ChangeLogEntry[]>([]);
@@ -461,14 +468,16 @@ const TYPE_META: Record<string, { color: string }> = {
   ข้อบังคับ: { color: 'doc-kho-bangkhab' },
   ระเบียบ: { color: 'doc-rabiap' },
   ประกาศ: { color: 'doc-prakat' },
+  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat' },
+  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat' },
 };
 
 // ── Derived table rows ─────────────────────────────────────
 const childCountMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = {};
   for (const doc of summary.value.documents) {
-    if (doc.parent_document_id) {
-      map[doc.parent_document_id] = (map[doc.parent_document_id] ?? 0) + 1;
+    for (const parentId of parentIdsOf(doc)) {
+      map[parentId] = (map[parentId] ?? 0) + 1;
     }
   }
   return map;
@@ -571,7 +580,7 @@ function formatDateTime(date: Date): string {
 
 // ── Table helpers ─────────────────────────────────────────
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? 'grey';
+  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
 }
 
 function workflowStageColor(stage: string): string {

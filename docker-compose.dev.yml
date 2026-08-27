@@ -9,7 +9,7 @@ services:
       sh -c "git config --global --add safe.directory '*'
       && mkdir -p storage/app/poc
       && rm -f storage/app/poc/.vendor_ready storage/app/poc/vite.hot public/hot
-      && (test -f vendor/autoload.php || composer install --no-interaction --prefer-dist --optimize-autoloader)
+      && composer install --no-interaction --prefer-dist --optimize-autoloader
       && php artisan optimize:clear
       && touch storage/app/poc/.vendor_ready
       && php artisan serve --host=0.0.0.0 --port=8000"
@@ -26,7 +26,8 @@ services:
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
     command: >
-      sh -c "npm install
+      sh -c "test -x node_modules/.bin/vite && test -d node_modules/@rollup/rollup-linux-x64-gnu
+      || npm ci
       && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       - PORT=5173

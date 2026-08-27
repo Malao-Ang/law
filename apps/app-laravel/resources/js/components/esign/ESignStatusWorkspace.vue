@@ -399,6 +399,7 @@ const EMPTY_META: LawMeta = {
   repealed_laws: [],
   imported_by: '',
   parent_document_id: null,
+  parent_document_ids: [],
   access_scope: 'public',
   permission_group_ids: [],
 };
@@ -428,13 +429,13 @@ const pdfPreviewUrl = computed(() => `${reviewPdfPreviewUrl(props.documentId)}?v
 
 const metaOk = computed(() => Boolean(meta.value.title && meta.value.law_type && (meta.value.promulgation_date || meta.value.effective_date)));
 const structureOk = computed(() => (documentStore.review?.summary.block_count ?? 0) > 0);
-const relationsOk = computed(() => (documentStore.review?.relations?.length ?? 0) > 0 || (documentStore.review?.workflow_completed_step ?? 0) >= 5);
+const relationsOk = computed(() => (documentStore.review?.relations?.length ?? 0) > 0);
 const previewOk = computed(() => true);
 
 const checklist = computed(() => [
   { key: 'meta', label: 'ข้อมูล METADATA', ok: metaOk.value, status: metaOk.value ? 'ผ่าน' : 'ไม่ครบ' },
   { key: 'structure', label: 'โครงสร้างหมวด/ข้อ', ok: structureOk.value, status: structureOk.value ? 'ผ่าน' : 'ไม่ครบ' },
-  { key: 'relations', label: 'ระบุความสัมพันธ์กฎหมายครบ', ok: relationsOk.value, status: relationsOk.value ? 'ผ่าน' : 'รอดำเนินการ' },
+  { key: 'relations', label: 'ความสัมพันธ์กฎหมาย (ไม่บังคับก่อนลงนาม)', ok: relationsOk.value, status: relationsOk.value ? 'ผ่าน' : 'ทำภายหลังได้' },
   {
     key: 'esign',
     label: 'ระบบ E-SIGN',
@@ -502,7 +503,7 @@ const sideAlert = computed(() => {
   return {
     type: 'warning' as const,
     title: 'โปรดตรวจสอบก่อนส่ง',
-    body: '• ตรวจสอบผู้ลงนามและความสัมพันธ์กฎหมาย\n• หลังส่งแล้วจะแก้ไขเอกสารไม่ได้\n• สถานะจะเปลี่ยนเป็นรอลงนาม',
+    body: '• ตรวจสอบผู้ลงนามก่อนส่ง\n• ความสัมพันธ์กฎหมายเพิ่มได้ภายหลัง\n• หลังส่งแล้วจะแก้ไขเอกสารไม่ได้\n• สถานะจะเปลี่ยนเป็นรอลงนาม',
   };
 });
 

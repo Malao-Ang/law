@@ -171,6 +171,7 @@ class ReportController extends Controller
             'section_count' => isset($r['section_count']) ? (int) $r['section_count'] : null,
             'page_count' => (int) ($r['page_count'] ?? 0),
             'parent_document_id' => $r['parent_document_id'] ?? null,
+            'parent_document_ids' => is_array($r['parent_document_ids'] ?? null) ? $r['parent_document_ids'] : [],
             'workflow_completed_step' => isset($r['workflow_completed_step']) ? (int) $r['workflow_completed_step'] : null,
         ], array_values($rows));
     }

@@ -12,14 +12,26 @@
       <strong>{{ steps[step - 1] }}</strong>&nbsp;·&nbsp;{{ step }} จาก {{ steps.length }}
     </span>
 
-    <v-btn
-      v-if="!nextHidden"
-      color="admin-primary"
-      append-icon="mdi-arrow-right"
-      :disabled="nextDisabled"
-      :loading="nextLoading"
-      @click="emit('next')"
-    >{{ nextLabel }}</v-btn>
+    <div v-if="!nextHidden || extraLabel" class="wf-footer__actions">
+      <v-btn
+        v-if="extraLabel"
+        variant="outlined"
+        color="admin-primary"
+        :prepend-icon="extraIcon"
+        :disabled="extraDisabled"
+        :loading="extraLoading"
+        class="text-none"
+        @click="emit('extra')"
+      >{{ extraLabel }}</v-btn>
+      <v-btn
+        v-if="!nextHidden"
+        color="admin-primary"
+        append-icon="mdi-arrow-right"
+        :disabled="nextDisabled"
+        :loading="nextLoading"
+        @click="emit('next')"
+      >{{ nextLabel }}</v-btn>
+    </div>
     <!-- placeholder keeps space-between layout when next is hidden -->
     <div v-else style="width:120px" />
   </div>
@@ -42,23 +54,31 @@ const props = withDefaults(defineProps<{
   variant?: 'default' | 'historical';
   backLabel?: string;
   nextLabel?: string;
+  extraLabel?: string;
+  extraIcon?: string;
   backDisabled?: boolean;
   nextDisabled?: boolean;
   nextLoading?: boolean;
+  extraLoading?: boolean;
+  extraDisabled?: boolean;
   nextHidden?: boolean;
 }>(), {
   variant: 'default',
   backLabel: 'ย้อนกลับ',
   nextLabel: 'ถัดไป',
+  extraLabel: '',
+  extraIcon: 'mdi-draw-pen',
   backDisabled: false,
   nextDisabled: false,
   nextLoading: false,
+  extraLoading: false,
+  extraDisabled: false,
   nextHidden: false,
 });
 
 const steps = computed(() => props.variant === 'historical' ? HISTORICAL_STEPS : WORKFLOW_STEPS);
 
-const emit = defineEmits<{ back: []; next: [] }>();
+const emit = defineEmits<{ back: []; next: []; extra: [] }>();
 </script>
 
 <style scoped>
@@ -86,5 +106,11 @@ const emit = defineEmits<{ back: []; next: [] }>();
 .wf-footer__counter strong {
   color: #475569;
   font-weight: 600;
+}
+
+.wf-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

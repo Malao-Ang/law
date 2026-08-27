@@ -303,9 +303,10 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
-  [/ประกาศ/u, 'ประกาศ'],
-  [/คำสั่ง/u, 'ประกาศ'],
-  [/มติ/u, 'ประกาศ'],
+  [/สภามหาวิทยาลัย/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
+  [/ประกาศ/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
+  [/คำสั่ง/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
+  [/มติ/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
 ];
 
 const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
@@ -319,7 +320,7 @@ const EMPTY: LawMeta = {
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [], keywords: [],
-  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, signer_group: null, issuer: null,
+  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, parent_document_ids: [], signer_group: null, issuer: null,
   access_scope: 'public', permission_group_ids: [],
 };
 
@@ -327,6 +328,23 @@ const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_law
 const noExpiry = ref(false);
 const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
+
+const lawTypeItems = computed(() => {
+  const items = [...documentTypes.value];
+  const current = form.value.law_type?.trim() ?? '';
+  if (current && !items.some((item) => item.value === current)) {
+    items.unshift({ title: current, value: current });
+  }
+  return items;
+});
+
+function normalizeSavedLawType(saved: string, selectedAgencies: string[]): string {
+  if (saved !== 'ประกาศ') return saved;
+  if (selectedAgencies.some((agency) => agency.includes('สภา'))) {
+    return 'ประกาศที่ออกโดยสภามหาวิทยาลัย';
+  }
+  return 'ประกาศที่ออกโดยมหาวิทยาลัย';
+}
 
 function requiredLabel(label: string): string {
   return `${label} *`;
@@ -440,7 +458,7 @@ watch(() => documentStore.review, (review) => {
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
-    law_type: savedLawType || (oldDocument ? '' : inferLawType(documentTitle)),
+    law_type: normalizeSavedLawType(savedLawType, agencies) || (oldDocument ? '' : inferLawType(documentTitle)),
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
     agency: agencies[0] ?? '',
@@ -451,6 +469,9 @@ watch(() => documentStore.review, (review) => {
     imported_by: meta?.imported_by?.trim() || CURRENT_ADMIN_LABEL,
     expiry_date: meta?.expiry_date ?? null,
     parent_document_id: meta?.parent_document_id ?? null,
+    parent_document_ids: meta?.parent_document_ids?.length
+      ? [...meta.parent_document_ids]
+      : (meta?.parent_document_id ? [meta.parent_document_id] : []),
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });
