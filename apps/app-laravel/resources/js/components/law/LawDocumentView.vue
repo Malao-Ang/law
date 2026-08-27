@@ -34,12 +34,6 @@
           <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
             @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
-          <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
-            @click="printPage()">พิมพ์</v-btn>
-          <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
-            :loading="exportingPdf"
-            :disabled="exportingPdf"
-            @click="downloadPdf()">ดาวน์โหลด PDF</v-btn>
         </div>
       </div>
 
@@ -68,11 +62,8 @@
           <v-btn size="small" color="warning" variant="flat" @click="openCurrentVersion">เปิด Version ล่าสุด</v-btn>
         </div>
       </v-alert>
-      <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
-        {{ pdfExportError }}
-      </v-alert>
 
-      <div
+<div
         class="lawx-grid"
         :class="{
           'is-toc-hidden': !tocOpen,
@@ -189,8 +180,8 @@
         </template>
       </main>
 
-      <aside v-if="!usesOriginalPdfLayout" v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="articleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
+      <aside v-show="infoOpen" class="lawx-info">
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
       </template>
@@ -210,7 +201,7 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { downloadPdfExport, documentFileUrl } from '../../api/client';
+import { documentFileUrl } from '../../api/client';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -221,8 +212,6 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
-const exportingPdf = ref(false);
-const pdfExportError = ref('');
 
 onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
@@ -271,6 +260,7 @@ const fileUrl = computed(() => documentFileUrl(props.documentId));
 const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
 );
+const displayArticleCount = computed(() => articleCount.value || meta.value.section_count || 0);
 const articleUnitLabel = computed(() => {
   const hasClause = sections.value.some((s) => s.badge.startsWith('ข้อ'));
   const hasArticle = sections.value.some((s) => s.badge.startsWith('มาตรา'));
@@ -340,24 +330,6 @@ function relationHref(rel: LawRelation): string | null {
   return rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : null;
 }
 
-function printPage(): void {
-  window.print();
-}
-
-async function downloadPdf(): Promise<void> {
-  if (exportingPdf.value) return;
-
-  exportingPdf.value = true;
-  pdfExportError.value = '';
-  try {
-    await downloadPdfExport(props.documentId);
-    await documentStore.fetch(props.documentId, true);
-  } catch (error) {
-    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
-  } finally {
-    exportingPdf.value = false;
-  }
-}
 
 const sectionEls = ref<Record<string, HTMLElement>>({});
 const activeId = ref('');
@@ -521,7 +493,10 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 .lawx-grid.is-original-pdf,
-.lawx-grid.is-original-pdf.is-toc-hidden,
+.lawx-grid.is-original-pdf.is-toc-hidden {
+  grid-template-columns: minmax(0, 960px) 280px;
+}
+
 .lawx-grid.is-original-pdf.is-info-hidden,
 .lawx-grid.is-original-pdf.is-toc-hidden.is-info-hidden {
   grid-template-columns: minmax(0, 960px);
@@ -718,7 +693,11 @@ onBeforeUnmount(() => observer?.disconnect());
   .lawx-grid,
   .lawx-grid.is-toc-hidden,
   .lawx-grid.is-info-hidden,
-  .lawx-grid.is-toc-hidden.is-info-hidden {
+  .lawx-grid.is-toc-hidden.is-info-hidden,
+  .lawx-grid.is-original-pdf,
+  .lawx-grid.is-original-pdf.is-toc-hidden,
+  .lawx-grid.is-original-pdf.is-info-hidden,
+  .lawx-grid.is-original-pdf.is-toc-hidden.is-info-hidden {
     grid-template-columns: minmax(0, 1fr);
   }
 

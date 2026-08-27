@@ -1,7 +1,8 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'ข้อมูลเอกสาร']"
-    title=""
+    title="ข้อมูลเอกสาร"
+    subtitle="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้"
   >
     <WorkflowFooterBar
       :step="isOld ? 2 : 4"
@@ -11,9 +12,7 @@
       @back="router.push(isOld ? `/documents/${props.documentId}/preview` : `/documents/${props.documentId}/rag`)"
       @next="saveAndNext"
     />
-    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="isOld ? 2 : 4" :variant="isOld ? 'historical' : 'default'" description="กรอกข้อมูลเอกสารและรายละเอียดการประกาศใช้" />
-
+    <div class="law-info-page mx-auto">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -291,7 +290,6 @@ import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
 import { normalizeChunkType } from '../../types/chunkType';
 import AppShell from '../../components/shared/AppShell.vue';
-import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
@@ -614,3 +612,10 @@ onMounted(() => {
 });
 onBeforeUnmount(() => documentStore.reset());
 </script>
+
+<style scoped>
+.law-info-page {
+  max-width: 860px;
+  padding-bottom: 60px;
+}
+</style>

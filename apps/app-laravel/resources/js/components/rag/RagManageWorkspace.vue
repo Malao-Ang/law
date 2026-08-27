@@ -22,7 +22,6 @@
     </div>
 
     <template v-else>
-      <WorkflowStepper :step="3" description="จัดการความสัมพันธ์และบล็อกก่อนเผยแพร่" />
       <div class="rag-content-area">
         <!-- Selection action bar -->
         <div
@@ -211,7 +210,6 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import type { DocumentBlock } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
-import WorkflowStepper from '../shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, suggestChunkType, type LawSection } from '../../composables/useLawSections';
 import BlockFlow from '../shared/BlockFlow.vue';

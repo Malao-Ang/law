@@ -1,7 +1,8 @@
 <template>
   <AppShell
     :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'กำหนดสิทธิ์การเข้าถึง']"
-    title=""
+    title="กำหนดสิทธิ์การเข้าถึง"
+    subtitle="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่"
   >
     <WorkflowFooterBar
       :step="isOld ? 4 : 6"
@@ -14,8 +15,6 @@
     />
 
     <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
-      <WorkflowStepper :step="isOld ? 4 : 6" :variant="isOld ? 'historical' : 'default'" description="กำหนดสิทธิ์การเข้าถึงเอกสารก่อนเผยแพร่" />
-
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -167,7 +166,6 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { writeStage } from '../../data/documentPipeline';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../../types/permission';
 import AppShell from '../../components/shared/AppShell.vue';
-import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AccessScopeCard from '../../components/permissions/AccessScopeCard.vue';
 import PermissionGroupCard from '../../components/permissions/PermissionGroupCard.vue';

@@ -51,7 +51,7 @@
             </v-chip>
           </div>
         </div>
-        <div class="law-info-row py-1">
+        <div v-if="articleCount > 0" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">จำนวนข้อ</span>
           <span class="law-info-row__value font-weight-semibold">{{ articleCount }} {{ articleUnitLabel ?? 'ข้อ' }}</span>
         </div>
@@ -82,6 +82,7 @@
         </template>
         <v-btn v-else flat variant="outlined" disabled prepend-icon="mdi-history" class="justify-start text-none">ดูประวัติการแก้ไข</v-btn>
         <v-btn flat variant="outlined" disabled prepend-icon="mdi-sitemap-outline" class="justify-start text-none">ความสัมพันธ์กฎหมาย</v-btn>
+
       </v-card-text>
     </v-card>
 

@@ -662,6 +662,10 @@ watch(
     syncingFromRoute = true;
     syncFromRoute();
     syncingFromRoute = false;
+    if (suggestTimer) {
+      clearTimeout(suggestTimer);
+      suggestTimer = null;
+    }
     if (suppressNextRouteSearch) {
       suppressNextRouteSearch = false;
       return;

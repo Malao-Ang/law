@@ -13,8 +13,6 @@
       @next="saveAndNext"
     />
     <div class="mx-auto relations-page" style="max-width:960px; padding-bottom:60px">
-      <WorkflowStepper :step="isOld ? 3 : 5" :variant="isOld ? 'historical' : 'default'" />
-
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -216,7 +214,6 @@ import {
   relationTypeLabel,
 } from '../../types/lawRelation';
 import AppShell from '../../components/shared/AppShell.vue';
-import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 

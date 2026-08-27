@@ -168,6 +168,13 @@
           </div>
         </section>
 
+        <iframe
+          v-if="isOldDoc"
+          :src="fileUrl"
+          title="เอกสารต้นฉบับ"
+          class="old-pdf-frame"
+        />
+
         <section
           v-for="section in sections"
           :id="`sec-${section.id}`"
@@ -382,11 +389,14 @@ import { buildSections, buildTocGroups } from '../../composables/useLawSections'
 import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { documentFileUrl } from '../../api/client';
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
 });
 const isEdit = computed(() => props.mode === 'edit');
+const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+const fileUrl = computed(() => documentFileUrl(props.documentId));
 const router = useRouter();
 const documentStore = useDocumentStore();
 
@@ -841,6 +851,14 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: #1e293b;
   word-break: break-word;
+}
+
+.old-pdf-frame {
+  width: 100%;
+  height: calc(100vh - 160px);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
 }
 
 @media (max-width: 1220px) {

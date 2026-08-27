@@ -14,11 +14,6 @@
       @next="router.push(`/documents/${documentId}/law-info`)"
     />
     <div class="old-preview">
-      <WorkflowStepper
-        :step="1"
-        variant="historical"
-        description="ตรวจสอบเอกสารต้นฉบับก่อนกรอกข้อมูลเอกสาร"
-      />
       <iframe
         :src="pdfUrl"
         class="preview-pdf"
@@ -74,7 +69,6 @@ import DOMPurify from 'dompurify';
 import { usePreviewStore } from '../../stores/previewStore';
 import { fetchStatus, documentFileUrl } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
-import WorkflowStepper from '../../components/shared/WorkflowStepper.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 
 const props = defineProps<{ documentId: string }>();
