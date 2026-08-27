@@ -24,7 +24,9 @@ class LookupApiTest extends TestCase
             $this->assertNotEmpty($data[$key], "Lookup list '{$key}' must not be empty");
         }
 
-        $this->assertContains('พ.ร.บ.', array_column($data['document_types'], 'value'));
+        $this->assertContains('กฎหมายภายนอก', array_column($data['document_types'], 'value'));
+        $this->assertContains('ประกาศที่ออกโดยมหาวิทยาลัย', array_column($data['document_types'], 'value'));
+        $this->assertContains('ประกาศที่ออกโดยสภามหาวิทยาลัย', array_column($data['document_types'], 'value'));
         $this->assertContains('มหาวิทยาลัยบูรพา', array_column($data['agencies'], 'value'));
         $this->assertContains('มีผลบังคับใช้', array_column($data['statuses'], 'value'));
         $this->assertContains('กฎหมายล่าสุด', array_column($data['change_statuses'], 'value'));
@@ -34,7 +36,7 @@ class LookupApiTest extends TestCase
     public function test_sample_seeder_law_types_exist_in_lookups(): void
     {
         $allowed = array_column(config('lookups.document_types'), 'value');
-        $seededTypes = ['พ.ร.บ.', 'ระเบียบ', 'ประกาศ'];
+        $seededTypes = ['กฎหมายภายนอก', 'ระเบียบ', 'ประกาศที่ออกโดยมหาวิทยาลัย'];
 
         foreach ($seededTypes as $type) {
             $this->assertContains($type, $allowed, "Seeder law_type '{$type}' is not a canonical document type");

@@ -47,7 +47,7 @@ class SeedSampleLawsCommand extends Command
             ],
             [
                 'title' => 'ประกาศกระทรวงสาธารณสุข พ.ศ. ๒๕๖๕',
-                'law_type' => 'ประกาศ',
+                'law_type' => 'ประกาศที่ออกโดยมหาวิทยาลัย',
                 'status' => 'มีผลบังคับใช้',
                 'change_status' => 'กฎหมายล่าสุด',
                 'agency' => 'กระทรวงสาธารณสุข',

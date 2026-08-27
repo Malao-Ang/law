@@ -135,6 +135,7 @@ class ReviewStore
             $parentDocumentId = null;
             $parentDocumentIds = [];
             $accessScope = 'public';
+            $lawType = '';
 
             $review = $this->blob->read('review', $documentId);
             if ($review !== null) {
@@ -146,6 +147,7 @@ class ReviewStore
                 $parentDocumentIds = LawMetaNormalizer::parentDocumentIds($meta);
                 $parentDocumentId = $parentDocumentIds[0] ?? null;
                 $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
+                $lawType = trim((string) ($meta['law_type'] ?? ''));
             }
 
             $documents[] = [
@@ -162,6 +164,7 @@ class ReviewStore
                 'error' => isset($status['error']) ? (string) $status['error'] : null,
                 'parent_document_id' => $parentDocumentId,
                 'parent_document_ids' => $parentDocumentIds,
+                'law_type' => $lawType,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,

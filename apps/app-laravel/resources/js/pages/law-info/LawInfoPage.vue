@@ -54,7 +54,7 @@
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.law_type"
-                :items="documentTypes"
+                :items="lawTypeItems"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('ประเภทเอกสาร')"
@@ -268,9 +268,10 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
-  [/ประกาศ/u, 'ประกาศ'],
-  [/คำสั่ง/u, 'ประกาศ'],
-  [/มติ/u, 'ประกาศ'],
+  [/สภามหาวิทยาลัย/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
+  [/ประกาศ/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
+  [/คำสั่ง/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
+  [/มติ/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
 ];
 
 const EMPTY: LawMeta = {
@@ -287,6 +288,23 @@ const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_law
 const noExpiry = ref(false);
 const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
+
+const lawTypeItems = computed(() => {
+  const items = [...documentTypes.value];
+  const current = form.value.law_type?.trim() ?? '';
+  if (current && !items.some((item) => item.value === current)) {
+    items.unshift({ title: current, value: current });
+  }
+  return items;
+});
+
+function normalizeSavedLawType(saved: string, selectedAgencies: string[]): string {
+  if (saved !== 'ประกาศ') return saved;
+  if (selectedAgencies.some((agency) => agency.includes('สภา'))) {
+    return 'ประกาศที่ออกโดยสภามหาวิทยาลัย';
+  }
+  return 'ประกาศที่ออกโดยมหาวิทยาลัย';
+}
 
 function requiredLabel(label: string): string {
   return `${label} *`;
@@ -369,7 +387,7 @@ watch(() => documentStore.review, (review) => {
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
-    law_type: savedLawType || inferLawType(documentTitle),
+    law_type: normalizeSavedLawType(savedLawType, agencies) || inferLawType(documentTitle),
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
     agency: agencies[0] ?? '',

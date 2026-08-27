@@ -468,6 +468,8 @@ const TYPE_META: Record<string, { color: string }> = {
   ข้อบังคับ: { color: 'doc-kho-bangkhab' },
   ระเบียบ: { color: 'doc-rabiap' },
   ประกาศ: { color: 'doc-prakat' },
+  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat' },
+  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat' },
 };
 
 // ── Derived table rows ─────────────────────────────────────
@@ -578,7 +580,7 @@ function formatDateTime(date: Date): string {
 
 // ── Table helpers ─────────────────────────────────────────
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? 'grey';
+  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
 }
 
 function workflowStageColor(stage: string): string {

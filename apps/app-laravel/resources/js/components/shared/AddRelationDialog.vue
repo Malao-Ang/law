@@ -57,22 +57,7 @@
 
         <v-divider class="mb-5" />
 
-        <div class="mb-4">
-          <div class="text-caption font-weight-bold text-medium-emphasis mb-1">ประเภท</div>
-          <div class="d-flex flex-wrap ga-3">
-            <v-btn
-              v-for="relType in RELATION_TYPES"
-              :key="relType"
-              size="small"
-              :color="form.type === relType ? RELATION_TYPE_COLORS[relType] : ''"
-              :variant="form.type === relType ? 'flat' : 'outlined'"
-              :prepend-icon="RELATION_TYPE_ICONS[relType]"
-              @click="form.type = relType"
-            >{{ RELATION_TYPE_LABELS[relType] }}</v-btn>
-          </div>
-        </div>
-
-        <div class="mb-4">
+        <div v-if="allowFreeText" class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">เป้าหมาย</div>
           <div class="d-flex ga-3">
             <v-btn
@@ -95,7 +80,9 @@
           v-model="pickerTarget"
           :exclude-document-id="excludeDocumentId"
           :parent-document-ids="parentDocumentIds"
-          :restrict-to-parent-children="scope === 'document'"
+          :catalog-mode="catalogMode"
+          :require-section="requireSection"
+          :whole-document-only="wholeDocumentOnly"
         />
 
         <template v-else>
@@ -107,7 +94,7 @@
           />
           <v-text-field
             v-model="form.target_section"
-            label="ข้อ (ไม่บังคับ)"
+            :label="requireSection ? 'ข้อ / มาตรา' : 'ข้อ (ไม่บังคับ)'"
             placeholder="ข้อ ๕"
             class="mb-3"
           />
@@ -140,10 +127,8 @@
 import { computed, ref, watch } from 'vue';
 import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from '../../types/document';
 import {
-  RELATION_TYPES,
   RELATION_TYPE_COLORS,
   RELATION_TYPE_ICONS,
-  RELATION_TYPE_LABELS,
   formatRelationTarget,
   relationTypeLabel,
 } from '../../types/lawRelation';
@@ -156,6 +141,9 @@ const props = defineProps<{
   defaultType?: RelationType;
   excludeDocumentId?: string | null;
   parentDocumentIds?: string[];
+  catalogMode?: 'all' | 'siblings' | 'parents';
+  requireSection?: boolean;
+  wholeDocumentOnly?: boolean;
   existingRelations?: LawRelation[];
   sectionLabels?: Record<string, string>;
 }>();
@@ -165,6 +153,7 @@ const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 const mode = ref<'picker' | 'text'>('picker');
 const pickerTarget = ref<LawRelationTarget | null>(null);
 const existingRelations = computed(() => props.existingRelations ?? []);
+const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
 
 const form = ref<LawRelation>({
   id: createClientId('relation'),
@@ -186,9 +175,12 @@ const dialogTitle = computed(() => {
 
 const canSave = computed(() => {
   if (mode.value === 'text') {
+    if (props.requireSection && !(form.value.target_section?.trim())) return false;
     return form.value.target_title.trim() !== '';
   }
-  return pickerTarget.value !== null && pickerTarget.value.title.trim() !== '';
+  if (!pickerTarget.value || pickerTarget.value.title.trim() === '') return false;
+  if (props.requireSection && !pickerTarget.value.section) return false;
+  return true;
 });
 
 function relationSourceLabel(relation: LawRelation): string {

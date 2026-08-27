@@ -403,7 +403,7 @@ class LawMetaTest extends TestCase
             'source_type' => 'docx',
             'language' => 'th',
             'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
-            'law_meta' => ['title' => 'พ.ร.บ. แม่'],
+            'law_meta' => ['title' => 'พ.ร.บ. แม่', 'law_type' => 'กฎหมายภายนอก'],
             'pages' => [],
         ]);
 
@@ -429,6 +429,7 @@ class LawMetaTest extends TestCase
 
         $this->assertNotNull($parent);
         $this->assertSame('พ.ร.บ. แม่', $parent['title']);
+        $this->assertSame('กฎหมายภายนอก', $parent['law_type']);
         $this->assertNull($parent['parent_document_id']);
         $this->assertSame([], $parent['parent_document_ids']);
 

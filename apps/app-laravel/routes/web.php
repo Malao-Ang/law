@@ -15,6 +15,8 @@ Route::view('/admin/laws', 'app');
 Route::view('/admin/upload', 'app');
 Route::view('/admin/ocr-queue', 'app');
 Route::view('/admin/relations', 'app');
+Route::view('/admin/show-relations', 'app');
+Route::view('/admin/show-relations/{documentId}', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/admin/reports', 'app');
 Route::view('/upload', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
@@ -29,3 +31,5 @@ Route::view('/documents/{documentId}/esign', 'app')->where('documentId', '[A-Za-
 Route::view('/documents/{documentId}/esign/preview', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/esign/status', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/law/{documentId}', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+
+Route::fallback(fn () => view('app'));

@@ -41,9 +41,9 @@
       <span class="text-body-2 text-medium-emphasis">กำลังโหลดรายการกฎหมาย...</span>
     </div>
 
-    <div v-else class="law-rel-picker__columns">
+    <div v-else class="law-rel-picker__columns" :class="{ 'is-single': wholeDocumentOnly }">
       <div class="law-rel-col">
-        <div class="law-rel-col__head">กฎหมายที่อ้างถึง</div>
+        <div class="law-rel-col__head">{{ col1Head }}</div>
         <v-text-field
           v-model="searchCol1"
           density="compact"
@@ -66,7 +66,7 @@
             @click="selectDocument(doc)"
           >
             <span class="law-rel-col__label">{{ doc.title }}</span>
-            <v-icon icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
+            <v-icon v-if="!wholeDocumentOnly" icon="mdi-chevron-right" size="18" class="law-rel-col__chev" />
           </button>
           <div v-if="filteredCol1.length === 0" class="law-rel-col__empty">
             {{ col1EmptyMessage }}
@@ -74,8 +74,8 @@
         </div>
       </div>
 
-      <div class="law-rel-col">
-        <div class="law-rel-col__head">ข้อ</div>
+      <div v-if="!wholeDocumentOnly" class="law-rel-col">
+        <div class="law-rel-col__head">ข้อ / มาตรา</div>
         <v-text-field
           v-model="searchCol3"
           density="compact"
@@ -94,6 +94,7 @@
             </div>
             <template v-else>
               <button
+                v-if="!requireSection"
                 type="button"
                 class="law-rel-col__item"
                 :class="{ 'is-active': selectedSection === null && sectionTouched }"
@@ -138,6 +139,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
+  documentsByIds,
   documentsUnderParents,
   filterByQuery,
   pickableDocuments,
@@ -149,7 +151,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 const props = defineProps<{
   excludeDocumentId?: string | null;
   parentDocumentIds?: string[] | null;
+  catalogMode?: 'all' | 'siblings' | 'parents';
   restrictToParentChildren?: boolean;
+  requireSection?: boolean;
+  wholeDocumentOnly?: boolean;
   modelValue?: LawRelationTarget | null;
 }>();
 
@@ -175,20 +180,37 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const catalogQuery = computed(() => globalSearch.value.trim() || searchCol1.value.trim());
 
+const catalogMode = computed(() => {
+  if (props.catalogMode) return props.catalogMode;
+  return props.restrictToParentChildren ? 'siblings' : 'all';
+});
+
+const col1Head = computed(() => {
+  if (catalogMode.value === 'siblings') return 'กฎหมายชั้นเดียวกัน';
+  if (catalogMode.value === 'parents') return 'กฎหมายแม่';
+  return 'กฎหมายที่อ้างถึง';
+});
+
 const col1EmptyMessage = computed(() => {
-  if (props.restrictToParentChildren && !(props.parentDocumentIds?.length)) {
+  if (catalogMode.value !== 'all' && !(props.parentDocumentIds?.length)) {
     return 'เลือกกฎหมายแม่ก่อน จึงจะเลือกเอกสารที่เกี่ยวข้องได้';
   }
   if (!documentsLoaded.value) return 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย';
-  if (props.restrictToParentChildren) return 'ไม่พบเอกสารภายใต้กฎหมายแม่ที่เลือก';
+  if (catalogMode.value === 'siblings') return 'ไม่พบกฎหมายชั้นเดียวกันภายใต้กฎหมายแม่ที่เลือก';
+  if (catalogMode.value === 'parents') return 'ไม่พบกฎหมายแม่ที่เลือก';
   return 'ไม่พบรายการ';
 });
 
 const filteredCol1 = computed(() => {
   if (!documentsLoaded.value) return [];
-  const docs = props.restrictToParentChildren
-    ? documentsUnderParents(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId)
-    : pickableDocuments(documents.value, props.excludeDocumentId);
+  let docs: DocumentListItem[] = [];
+  if (catalogMode.value === 'siblings') {
+    docs = documentsUnderParents(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId);
+  } else if (catalogMode.value === 'parents') {
+    docs = documentsByIds(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId);
+  } else {
+    docs = pickableDocuments(documents.value, props.excludeDocumentId);
+  }
   return filterByQuery(docs, catalogQuery.value) as DocumentListItem[];
 });
 
@@ -309,6 +331,10 @@ function selectDocument(doc: DocumentListItem): void {
   sectionTouched.value = false;
   searchCol3.value = '';
   sections.value = [];
+  if (props.wholeDocumentOnly) {
+    selectWholeDocument();
+    return;
+  }
   void loadSections(doc.document_id);
   emitSelection();
 }
@@ -413,6 +439,10 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   min-height: 320px;
+}
+
+.law-rel-picker__columns.is-single {
+  grid-template-columns: 1fr;
 }
 
 .law-rel-col {

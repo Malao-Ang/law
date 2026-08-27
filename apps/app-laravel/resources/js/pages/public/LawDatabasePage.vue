@@ -511,7 +511,7 @@ const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
   'kotmai-phaainok': ['kotmai-phaainok', 'kotmai-krung', 'phrb', 'พ.ร.บ.', 'พระราชบัญญัติ', 'กฎหมายภายนอก'],
   'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
   rabiap: ['rabiap', 'ระเบียบ'],
-  prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ'],
+  prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ', 'ประกาศที่ออกโดยมหาวิทยาลัย', 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
 };
 
 const CHILD_CHIP_LABELS: Record<string, string> = {
@@ -971,7 +971,9 @@ function lookupDataToFacets(data: LookupData): LawSearchFacets {
 }
 
 function canonicalLawTypeValue(value: string): string {
-  return LAW_TYPE_CANONICAL_VALUES[value] ?? value;
+  if (LAW_TYPE_CANONICAL_VALUES[value]) return LAW_TYPE_CANONICAL_VALUES[value];
+  if (value.includes('ประกาศ')) return 'prakat';
+  return value;
 }
 
 function expandLawTypeFilterValues(values: string[]): string[] {
@@ -1025,6 +1027,7 @@ const LAW_TYPE_TO_DOC_TYPE: Record<string, DocType> = {
 };
 
 function toDocType(lawType: string | null | undefined): DocType {
+  if ((lawType ?? '').includes('ประกาศ')) return 'prakat';
   return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(lawType ?? '')] ?? 'other';
 }
 

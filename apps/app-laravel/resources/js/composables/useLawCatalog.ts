@@ -58,6 +58,21 @@ export function childDocuments(
   });
 }
 
+export function documentsByIds(
+  documents: DocumentListItem[],
+  documentIds: string[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  const ids = new Set(documentIds.map((id) => id.trim()).filter(Boolean));
+  if (ids.size === 0) return [];
+
+  return documents.filter((doc) => {
+    if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
+    if (!isPickableDocument(doc)) return false;
+    return ids.has(doc.document_id);
+  });
+}
+
 export function documentsUnderParents(
   documents: DocumentListItem[],
   parentDocumentIds: string[],
@@ -86,4 +101,59 @@ export function filterByQuery(items: Array<{ title: string }>, query: string): A
   const needle = query.trim().toLowerCase();
   if (!needle) return items;
   return items.filter((item) => item.title.toLowerCase().includes(needle));
+}
+
+export type ParentLawFamily = 'act' | 'regulation' | 'ordinance' | 'announcement';
+
+export function isUniversityAnnouncementType(lawType: string | null | undefined): boolean {
+  const type = (lawType ?? '').trim();
+  if (type === 'ประกาศที่ออกโดยมหาวิทยาลัย') return true;
+  return type.includes('ประกาศ') && type.includes('มหาวิทยาลัย') && !type.includes('สภา');
+}
+
+export function isCouncilAnnouncementType(lawType: string | null | undefined): boolean {
+  const type = (lawType ?? '').trim();
+  if (type === 'ประกาศที่ออกโดยสภามหาวิทยาลัย') return true;
+  return type.includes('ประกาศ') && type.includes('สภา');
+}
+
+export function matchesParentLawFamily(lawType: string | null | undefined, family: ParentLawFamily): boolean {
+  const type = (lawType ?? '').trim();
+  if (!type) return false;
+  if (family === 'regulation') return type.includes('ระเบียบ');
+  if (family === 'ordinance') return type.includes('ข้อบังคับ');
+  if (family === 'announcement') return type.includes('ประกาศ');
+  return type.includes('พระราชบัญญัติ')
+    || type.includes('พ.ร.บ')
+    || type.includes('กฎหมายภายนอก')
+    || type === 'phrb'
+    || type === 'kotmai-phaainok';
+}
+
+export function allowedParentFamiliesForChild(childLawType: string | null | undefined): ParentLawFamily[] | null {
+  if (isCouncilAnnouncementType(childLawType)) {
+    return ['act', 'regulation', 'ordinance', 'announcement'];
+  }
+  if (isUniversityAnnouncementType(childLawType)) {
+    return ['regulation', 'ordinance'];
+  }
+  return null;
+}
+
+export function parentDocumentsForChildType(
+  documents: DocumentListItem[],
+  childLawType: string | null | undefined,
+  excludeDocumentId?: string | null,
+  keepDocumentIds: string[] = [],
+): DocumentListItem[] {
+  const families = allowedParentFamiliesForChild(childLawType);
+  const keep = new Set(keepDocumentIds.map((id) => id.trim()).filter(Boolean));
+
+  return documents.filter((doc) => {
+    if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
+    if (!isPickableDocument(doc)) return false;
+    if (keep.has(doc.document_id)) return true;
+    if (!families) return true;
+    return families.some((family) => matchesParentLawFamily(doc.law_type, family));
+  });
 }

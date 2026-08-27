@@ -229,6 +229,8 @@ const TYPE_META: Record<string, { color: string; icon: string }> = {
   ข้อบังคับ: { color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
   ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
   ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
+  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
+  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
 
 const FEATURED_TYPES = ['กฎหมายภายนอก', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
@@ -236,12 +238,17 @@ const FEATURED_TYPES = ['กฎหมายภายนอก', 'ข้อบั
 const statCards = computed(() => {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   return FEATURED_TYPES.map((typeName) => {
-    const bucket = summary.value.by_type.find((b) => b.key === typeName);
+    const matchesType = (value: string) => (
+      typeName === 'ประกาศ' ? value.includes('ประกาศ') : value === typeName
+    );
+    const count = summary.value.by_type
+      .filter((b) => matchesType(b.key))
+      .reduce((sum, b) => sum + b.count, 0);
     const recent = summary.value.documents.filter(
-      (d) => d.type === typeName && d.date && new Date(d.date).getTime() > thirtyDaysAgo,
+      (d) => matchesType(d.type) && d.date && new Date(d.date).getTime() > thirtyDaysAgo,
     ).length;
     const meta = TYPE_META[typeName] ?? { color: 'grey', icon: 'mdi-file-outline' };
-    return { type: typeName, count: bucket?.count ?? 0, recent, ...meta };
+    return { type: typeName, count, recent, ...meta };
   });
 });
 
@@ -369,7 +376,7 @@ const rangeStart = computed(() => (filteredLaws.value.length === 0 ? 0 : (page.v
 const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, filteredLaws.value.length));
 
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? 'grey';
+  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
 }
 
 function metaStatusColor(status: string): string {
