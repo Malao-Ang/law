@@ -14,16 +14,7 @@
         @click="router.push(`/documents/${documentId}/esign/preview`)"
       >ดูตัวอย่าง</v-btn>
       <v-btn
-        v-if="isEdit"
         color="admin-primary"
-        size="small"
-        prepend-icon="mdi-pencil-outline"
-        class="text-none"
-        @click="router.push(`/documents/${documentId}/review`)"
-      >แก้ไขเอกสาร</v-btn>
-      <v-btn
-        :color="isEdit ? undefined : 'admin-primary'"
-        :variant="isEdit ? 'outlined' : 'elevated'"
         size="small"
         prepend-icon="mdi-file-document-edit-outline"
         class="text-none"
