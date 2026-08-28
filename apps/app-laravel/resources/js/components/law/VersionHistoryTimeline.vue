@@ -25,66 +25,55 @@
       </div>
       <div v-if="v.change_status" class="text-caption mt-1">{{ v.change_status }}</div>
     </button>
-
-    <v-dialog :model-value="pending !== null" max-width="460" @update:model-value="cancel">
-      <v-card v-if="pending" rounded="xl">
-        <div class="d-flex align-center ga-2 px-5 pt-4 pb-2">
-          <v-avatar color="admin-primary" size="36" rounded="lg">
-            <v-icon icon="mdi-history" color="white" size="18" />
-          </v-avatar>
-          <div class="text-subtitle-1 font-weight-bold">ไปยังเอกสารเวอร์ชันนี้?</div>
-        </div>
-        <v-card-text class="px-5 pt-2">
-          <div class="text-body-2">
-            <strong>{{ pending.version_label }}</strong> — {{ pending.title || pending.document_id }}
-          </div>
-          <div class="text-caption text-medium-emphasis mt-1">
-            ระบบจะเปิดหน้าเอกสารของเวอร์ชันที่เลือก
-          </div>
-        </v-card-text>
-        <v-card-actions class="px-5 pb-5">
-          <v-spacer />
-          <v-btn variant="outlined" class="text-none" @click="cancel">ยกเลิก</v-btn>
-          <v-btn color="admin-primary" class="text-none" @click="confirmNavigate">ไปยังเวอร์ชันนี้</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import Swal from 'sweetalert2';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ versions: VersionChainItem[]; viewedDocumentId: string }>();
 const router = useRouter();
+const route = useRoute();
 
 // versions arrive oldest -> newest; show newest first (matches the mockup v3/v2/v1).
 const ordered = computed(() => [...props.versions].reverse());
-
-const pending = ref<VersionChainItem | null>(null);
 
 function formatLawDate(value: string): string {
   return formatThaiDate(value) || value || '';
 }
 
-function open(v: VersionChainItem): void {
+function targetPath(documentId: string): string {
+  const encodedId = encodeURIComponent(documentId);
+  if (route.path.startsWith('/law/')) return `/law/${encodedId}`;
+  if (route.path.includes('/edit')) return `/documents/${encodedId}/edit`;
+  return `/law/${encodedId}`;
+}
+
+function dialogText(v: VersionChainItem): string {
+  return v.title || v.version_label || v.document_id;
+}
+
+async function open(v: VersionChainItem): Promise<void> {
   if (v.document_id === props.viewedDocumentId) return;
-  pending.value = v;
-}
 
-function confirmNavigate(): void {
-  const target = pending.value;
-  pending.value = null;
-  if (target) {
-    router.push(`/law/${encodeURIComponent(target.document_id)}`);
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'คุณต้องการจะออกจากหน้านี้ใช่หรือไม่',
+    text: dialogText(v),
+    showCancelButton: true,
+    confirmButtonText: 'ออกจากหน้านี้',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#1e3a8a',
+    cancelButtonColor: '#64748b',
+  });
+
+  if (confirmed.isConfirmed) {
+    await router.push(targetPath(v.document_id));
   }
-}
-
-function cancel(): void {
-  pending.value = null;
 }
 </script>
 

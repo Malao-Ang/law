@@ -209,31 +209,6 @@
               :block="child"
             />
           </div>
-
-          <div v-if="!section.isChapter" class="esign-card__actions">
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-pencil-outline"
-              class="text-none"
-              @click="router.push(`/documents/${documentId}/review`)"
-            >แก้ไขมาตรา</v-btn>
-            <v-btn variant="text" size="small" prepend-icon="mdi-history" class="text-none" disabled>ประวัติ</v-btn>
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-link-variant"
-              class="text-none"
-              @click="router.push(`/documents/${documentId}/relations`)"
-            >ความสัมพันธ์</v-btn>
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-content-copy"
-              class="text-none"
-              @click="copySection(section.id)"
-            >คัดลอก</v-btn>
-          </div>
         </section>
       </main>
 
@@ -553,21 +528,6 @@ function setupObserver(): void {
   Object.values(sectionEls.value).forEach((el) => observer?.observe(el));
 }
 
-async function copySection(sectionId: string): Promise<void> {
-  const section = sections.value.find((s) => s.id === sectionId);
-  if (!section) return;
-  const parts = [
-    section.badge,
-    section.headBodyText,
-    ...section.children.map((b) => b.approved_text || b.normalized_text || b.raw_text || ''),
-  ].filter(Boolean);
-  try {
-    await navigator.clipboard.writeText(parts.join('\n'));
-  } catch {
-    // ignore clipboard errors in restricted contexts
-  }
-}
-
 async function confirmSign(): Promise<void> {
   confirming.value = true;
   try {
@@ -586,6 +546,13 @@ onMounted(() => {
   if (!isEdit.value) {
     writeStage(props.documentId, 'wait_esign');
   }
+});
+
+// Same-route param changes (/documents/A/edit -> /documents/B/edit) reuse this component,
+// so onMounted never re-fires; refetch content + versions when the id changes.
+watch(() => props.documentId, (id) => {
+  void documentStore.fetch(id);
+  void versionStore.fetch(id);
 });
 
 watch(sections, async (value) => {
@@ -806,15 +773,6 @@ onBeforeUnmount(() => {
 
 .esign-card__body {
   min-width: 0;
-}
-
-.esign-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed #e2e8f0;
 }
 
 .esign-side {

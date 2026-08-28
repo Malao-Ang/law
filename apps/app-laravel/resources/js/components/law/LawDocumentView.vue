@@ -46,24 +46,7 @@
       </v-alert>
 
       <template v-else-if="documentStore.review">
-      <v-alert
-        v-if="notCurrentVersion"
-        type="warning"
-        variant="tonal"
-        density="compact"
-        class="ma-4"
-        prepend-icon="mdi-history"
-      >
-        <div class="d-flex align-center justify-space-between ga-3 flex-wrap">
-          <div>
-            <strong>คุณกำลังดูเอกสารเวอร์ชันเก่า</strong>
-            <div class="text-caption">เอกสารฉบับนี้ถูกแทนที่แล้ว แนะนำให้เปิดเวอร์ชันปัจจุบัน</div>
-          </div>
-          <v-btn size="small" color="warning" variant="flat" @click="openCurrentVersion">เปิด Version ล่าสุด</v-btn>
-        </div>
-      </v-alert>
-
-<div
+      <div
         class="lawx-grid"
         :class="{
           'is-toc-hidden': !tocOpen,
@@ -192,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useVersionStore } from '../../stores/versionStore';
@@ -213,13 +196,12 @@ const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
 
-onMounted(() => {
-  if (documentStore.documentId !== props.documentId || !documentStore.review) {
-    documentStore.fetch(props.documentId);
-  }
-});
-
+// Fetch in the watcher (immediate) — same-route param changes (/law/A -> /law/B) reuse this
+// component, so onMounted never re-fires; the watcher keeps content + versions in sync.
 watch(() => props.documentId, (id) => {
+  if (documentStore.documentId !== id || !documentStore.review) {
+    void documentStore.fetch(id);
+  }
   void versionStore.fetch(id);
 }, { immediate: true });
 
@@ -280,12 +262,6 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const notCurrentVersion = computed(() =>
   versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
 );
-
-function openCurrentVersion(): void {
-  if (versionStore.currentDocumentId) {
-    router.push(`/law/${encodeURIComponent(versionStore.currentDocumentId)}`);
-  }
-}
 
 const tocOpen = ref(true);
 const infoOpen = ref(true);
