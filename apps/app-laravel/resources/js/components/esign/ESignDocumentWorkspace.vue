@@ -597,7 +597,6 @@ watch(sections, async (value) => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   documentStore.reset();
-  versionStore.reset();
 });
 </script>
 
