@@ -38,7 +38,8 @@ export type SelectableOption = {
 export type LookupData = {
   document_types: (SelectableOption & { source?: string })[];
   statuses: SelectableOption[];
-  change_statuses: SelectableOption[];
+  change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];
+  change_status_details: (SelectableOption & { source?: string })[];
   agencies: SelectableOption[];
   law_groups: SelectableOption[];
   law_sources: SelectableOption[];

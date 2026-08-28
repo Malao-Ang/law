@@ -193,7 +193,8 @@ export interface LawMeta {
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
-  change_status?: string | null;   // canonical Thai label from config/lookups.change_statuses
+  change_status?: string | null;   // parent value from config/lookups.change_status_types
+  change_details?: string[];       // sub-selections from config/lookups.change_status_details
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
   signer_group?: string | null;

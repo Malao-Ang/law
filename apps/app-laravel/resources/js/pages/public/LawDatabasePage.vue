@@ -966,7 +966,7 @@ function lookupDataToFacets(data: LookupData): LawSearchFacets {
   return {
     law_type: lookupBuckets(data.document_types),
     status: lookupBuckets(data.statuses),
-    change_status: lookupBuckets(data.change_statuses),
+    change_status: lookupBuckets(data.change_status_types),
     agency: lookupBuckets(data.agencies),
     law_group: lookupBuckets(data.law_groups),
     signer_group: [],

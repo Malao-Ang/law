@@ -229,16 +229,21 @@ const relationDialog = ref<{
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
+const changeDetails = computed(() => documentStore.review?.law_meta?.change_details ?? []);
+const hasSectionCancelDetail = computed(() =>
+  changeDetails.value.includes('ยกเลิกข้อ') || changeDetails.value.includes('ยกเลิกมาตรา'),
+);
 const isWholeDocumentChange = computed(() =>
   changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ยกเลิกทั้งฉบับ',
 );
 const isSectionChange = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายมาตรา' || changeStatus.value === 'ยกเลิกรายมาตรา',
+  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา' || changeStatus.value === 'ยกเลิกรายมาตรา',
 );
 const showDocumentRelations = computed(() => !isSectionChange.value);
 const showSectionRelations = computed(() => !isWholeDocumentChange.value);
 const suggestedRelationType = computed<RelationType | undefined>(() => {
-  if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
+  if (hasSectionCancelDetail.value) return 'repeals';
+  if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
   if (changeStatus.value === 'ยกเลิกทั้งฉบับ' || changeStatus.value === 'ยกเลิกรายมาตรา') return 'repeals';
   return undefined;
 });

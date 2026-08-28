@@ -3,7 +3,8 @@ import { getLookups, type LookupData, type SelectableOption } from '../api/clien
 
 const documentTypes = ref<(SelectableOption & { source?: string })[]>([]);
 const statuses = ref<SelectableOption[]>([]);
-const changeStatuses = ref<SelectableOption[]>([]);
+const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
+const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
 const lawGroups = ref<SelectableOption[]>([]);
 const lawSources = ref<SelectableOption[]>([]);
@@ -17,7 +18,8 @@ async function load(): Promise<void> {
     inFlight = getLookups().then((data: LookupData) => {
       documentTypes.value = data.document_types;
       statuses.value = data.statuses;
-      changeStatuses.value = data.change_statuses;
+      changeStatusTypes.value = data.change_status_types;
+      changeStatusDetails.value = data.change_status_details;
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
       lawSources.value = data.law_sources;
@@ -31,5 +33,5 @@ async function load(): Promise<void> {
 }
 
 export function useLookups() {
-  return { documentTypes, statuses, changeStatuses, agencies, lawGroups, lawSources, load };
+  return { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load };
 }

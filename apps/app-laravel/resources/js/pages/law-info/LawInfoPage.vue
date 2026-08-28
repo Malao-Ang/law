@@ -116,7 +116,7 @@
             <v-col cols="12" sm="6">
               <v-select
                 v-model="form.change_status"
-                :items="changeStatuses"
+                :items="changeStatusTypeItems"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('สถานะการเปลี่ยนแปลง')"
@@ -124,6 +124,23 @@
                 variant="outlined"
                 clearable
                 :rules="requiredTextRules('สถานะการเปลี่ยนแปลง')"
+                required
+              />
+            </v-col>
+            <v-col v-if="changeStatusHasDetails" cols="12" sm="6">
+              <v-select
+                v-model="form.change_details"
+                :items="changeStatusDetailItems"
+                item-title="title"
+                item-value="value"
+                :label="requiredLabel('รายละเอียดการเปลี่ยนแปลง')"
+                placeholder="- เลือกรายละเอียด -"
+                variant="outlined"
+                multiple
+                chips
+                closable-chips
+                clearable
+                :rules="requiredArrayRules('รายละเอียดการเปลี่ยนแปลง')"
                 required
               />
             </v-col>
@@ -297,10 +314,10 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, statuses, changeStatuses, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
-  [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
+  [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พระราชบัญญัติ'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
   [/สภามหาวิทยาลัย/u, 'ประกาศ'],
@@ -321,7 +338,7 @@ const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
 
 const EMPTY: LawMeta = {
   status: '', source: '', law_type: '', law_group: '', law_groups: [],
-  change_status: null,
+  change_status: null, change_details: [],
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [], keywords: [],
@@ -369,6 +386,43 @@ function requiredArrayRules(label: string): Array<(v: unknown) => boolean | stri
 const issuerRules = [
   (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
 ];
+
+// internal ('ข้อ') vs external ('มาตรา') is derived from the selected law_type's
+// source tag, falling back to the explicit source field for old docs.
+const lawSourceKind = computed<'internal' | 'external'>(() => {
+  const byType = documentTypes.value.find((t) => t.value === form.value.law_type)?.source;
+  const src = byType || form.value.source;
+  return src === 'external' ? 'external' : 'internal';
+});
+
+function matchesSource(optionSource: string | undefined): boolean {
+  return optionSource === 'both' || optionSource === undefined || optionSource === lawSourceKind.value;
+}
+
+const changeStatusTypeItems = computed(() => {
+  const items = changeStatusTypes.value.filter((t) => matchesSource(t.source));
+  const current = form.value.change_status?.trim() ?? '';
+  if (current && !items.some((item) => item.value === current)) {
+    return [{ title: current, value: current }, ...items];
+  }
+  return items;
+});
+
+const selectedChangeType = computed(() =>
+  changeStatusTypes.value.find((t) => t.value === form.value.change_status),
+);
+
+const changeStatusHasDetails = computed(() => selectedChangeType.value?.has_details === true);
+
+const changeStatusDetailItems = computed(() => {
+  const items = changeStatusDetails.value.filter((d) => matchesSource(d.source));
+  const current = form.value.change_details ?? [];
+  const missing = current
+    .map((value) => value.trim())
+    .filter((value) => value !== '' && !items.some((item) => item.value === value));
+  if (missing.length === 0) return items;
+  return [...missing.map((value) => ({ title: value, value })), ...items];
+});
 
 const documentTypeDisabled = computed(() => isOld.value && !hasText(form.value.source));
 const documentTypePlaceholder = computed(() =>
@@ -474,6 +528,7 @@ watch(() => documentStore.review, (review) => {
     agency: agencies[0] ?? '',
     agencies,
     repealed_laws: [...(meta?.repealed_laws ?? [])],
+    change_details: [...(meta?.change_details ?? [])],
     keywords: normalizeKeywords(meta?.keywords),
     title: documentTitle,
     imported_by: meta?.imported_by?.trim() || CURRENT_ADMIN_LABEL,
@@ -578,6 +633,7 @@ function buildLawMetaPayload(): LawMeta {
     imported_by: form.value.imported_by.trim() || CURRENT_ADMIN_LABEL,
     section_count: articleCount.value,
     issuer: form.value.law_type === 'ประกาศ' ? (form.value.issuer ?? null) : null,
+    change_details: changeStatusHasDetails.value ? [...(form.value.change_details ?? [])] : [],
   };
 }
 
@@ -626,6 +682,10 @@ watch(noExpiry, () => {
 
 watch(() => form.value.law_type, (lawType) => {
   if (lawType !== 'ประกาศ') form.value.issuer = null;
+});
+
+watch(() => form.value.change_status, () => {
+  if (!changeStatusHasDetails.value) form.value.change_details = [];
 });
 
 watch(() => form.value.source, () => {
