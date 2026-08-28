@@ -9,7 +9,7 @@
       :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
       :next-loading="documentStore.saving"
-      @back="router.push(isOld ? `/documents/${props.documentId}/preview` : `/documents/${props.documentId}/rag`)"
+      @back="router.back()"
       @next="saveAndNext"
     />
     <div class="law-info-page mx-auto">

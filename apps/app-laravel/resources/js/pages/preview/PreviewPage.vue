@@ -10,7 +10,7 @@
       variant="historical"
       back-label="กลับรายการ"
       next-label="กรอกข้อมูล"
-      @back="router.push('/admin/upload')"
+      @back="router.back()"
       @next="router.push(`/documents/${documentId}/law-info`)"
     />
     <div class="old-preview">

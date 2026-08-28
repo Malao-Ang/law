@@ -14,7 +14,7 @@
       :extra-loading="documentStore.saving && esignLeaving"
       :next-disabled="documentStore.saving"
       :extra-disabled="documentStore.saving"
-      @back="router.push(`/documents/${props.documentId}/law-info`)"
+      @back="router.back()"
       @next="saveAndNext"
       @extra="saveAndEsign"
     />

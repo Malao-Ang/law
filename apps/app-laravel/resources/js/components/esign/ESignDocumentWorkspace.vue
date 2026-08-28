@@ -29,7 +29,7 @@
           size="small"
           prepend-icon="mdi-arrow-left"
           class="text-none px-1"
-          @click="router.push('/admin/laws')"
+          @click="router.back()"
         >ย้อนกลับ</v-btn>
       </div>
 

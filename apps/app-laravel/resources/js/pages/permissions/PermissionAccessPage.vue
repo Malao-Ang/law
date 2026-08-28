@@ -10,7 +10,7 @@
       :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
       :next-disabled="nextDisabled"
-      @back="router.push(`/documents/${props.documentId}/relations`)"
+      @back="router.back()"
       @next="saveAndPublish"
     />
 
