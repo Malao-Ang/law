@@ -11,8 +11,6 @@ return [
         ['title' => 'พระราชบัญญัติ', 'value' => 'พระราชบัญญัติ', 'source' => 'external'],
         ['title' => 'กฎกระทรวง', 'value' => 'กฎกระทรวง', 'source' => 'external'],
         ['title' => 'ประกาศกระทรวง', 'value' => 'ประกาศกระทรวง', 'source' => 'external'],
-        // legacy value kept so pre-existing documents still validate
-        ['title' => 'กฎหมายภายนอก', 'value' => 'กฎหมายภายนอก', 'source' => 'external'],
     ],
 
     'law_sources' => [
@@ -27,13 +25,19 @@ return [
         ['title' => 'ร่าง', 'value' => 'ร่าง'],
     ],
 
-    // สถานะการเปลี่ยนแปลง
-    'change_statuses' => [
-        ['title' => 'กฎหมายล่าสุด', 'value' => 'กฎหมายล่าสุด'],
-        ['title' => 'ปรับปรุงรายมาตรา', 'value' => 'ปรับปรุงรายมาตรา'],
-        ['title' => 'ปรับปรุงทั้งฉบับ', 'value' => 'ปรับปรุงทั้งฉบับ'],
-        ['title' => 'ยกเลิกรายมาตรา', 'value' => 'ยกเลิกรายมาตรา'],
-        ['title' => 'ยกเลิกทั้งฉบับ', 'value' => 'ยกเลิกทั้งฉบับ'],
+    // สถานะการเปลี่ยนแปลง — parent options (source: internal ใช้ "ข้อ", external ใช้ "มาตรา", both = ทั้งสอง)
+    'change_status_types' => [
+        ['title' => 'กฎหมายใหม่', 'value' => 'กฎหมายใหม่', 'source' => 'both'],
+        ['title' => 'ปรับปรุงทั้งฉบับ', 'value' => 'ปรับปรุงทั้งฉบับ', 'source' => 'both'],
+        ['title' => 'ปรับปรุงรายข้อ', 'value' => 'ปรับปรุงรายข้อ', 'source' => 'internal', 'has_details' => true],
+        ['title' => 'ปรับปรุงรายมาตรา', 'value' => 'ปรับปรุงรายมาตรา', 'source' => 'external', 'has_details' => true],
+    ],
+    // สถานะการเปลี่ยนแปลง — ตัวเลือกย่อย (เลือกได้หลายรายการ) เมื่อ parent = ปรับปรุงราย...
+    'change_status_details' => [
+        ['title' => 'ยกเลิกข้อ', 'value' => 'ยกเลิกข้อ', 'source' => 'internal'],
+        ['title' => 'ยกเลิกมาตรา', 'value' => 'ยกเลิกมาตรา', 'source' => 'external'],
+        ['title' => 'เพิ่มข้อความ', 'value' => 'เพิ่มข้อความ', 'source' => 'both'],
+        ['title' => 'แก้ไขข้อความ', 'value' => 'แก้ไขข้อความ', 'source' => 'both'],
     ],
 
     'law_groups' => [
