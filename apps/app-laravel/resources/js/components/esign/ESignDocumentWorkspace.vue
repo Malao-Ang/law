@@ -209,31 +209,6 @@
               :block="child"
             />
           </div>
-
-          <div v-if="!section.isChapter" class="esign-card__actions">
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-pencil-outline"
-              class="text-none"
-              @click="router.push(`/documents/${documentId}/review`)"
-            >แก้ไขมาตรา</v-btn>
-            <v-btn variant="text" size="small" prepend-icon="mdi-history" class="text-none" disabled>ประวัติ</v-btn>
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-link-variant"
-              class="text-none"
-              @click="router.push(`/documents/${documentId}/relations`)"
-            >ความสัมพันธ์</v-btn>
-            <v-btn
-              variant="text"
-              size="small"
-              prepend-icon="mdi-content-copy"
-              class="text-none"
-              @click="copySection(section.id)"
-            >คัดลอก</v-btn>
-          </div>
         </section>
       </main>
 
@@ -323,20 +298,15 @@
         </div>
 
         <div v-show="sideTab === 'timeline'" class="pa-2">
-          <v-timeline density="compact" side="end" truncate-line="both">
-            <v-timeline-item dot-color="success" size="x-small">
-              <div class="text-body-2 font-weight-medium">กำหนดสิทธิ์แล้ว</div>
-              <div class="text-caption text-medium-emphasis">พร้อมส่งลงนามอิเล็กทรอนิกส์</div>
-            </v-timeline-item>
-            <v-timeline-item dot-color="warning" size="x-small">
-              <div class="text-body-2 font-weight-medium">รอลงนาม</div>
-              <div class="text-caption text-medium-emphasis">สถานะปัจจุบัน</div>
-            </v-timeline-item>
-            <v-timeline-item dot-color="grey" size="x-small">
-              <div class="text-body-2 font-weight-medium text-medium-emphasis">เผยแพร่สาธารณะ</div>
-              <div class="text-caption text-medium-emphasis">หลังยืนยันลงนาม</div>
-            </v-timeline-item>
-          </v-timeline>
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-3">ประวัติเวอร์ชัน</div>
+          <VersionHistoryTimeline
+            v-if="versionStore.versions.length >= 2"
+            :versions="versionStore.versions"
+            :viewed-document-id="documentId"
+          />
+          <div v-else class="text-body-2 text-medium-emphasis pa-2">
+            ยังไม่มีประวัติเวอร์ชัน
+          </div>
         </div>
 
         <div v-show="sideTab === 'actions'" class="d-flex flex-column ga-2">
@@ -390,6 +360,8 @@ import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { documentFileUrl } from '../../api/client';
+import { useVersionStore } from '../../stores/versionStore';
+import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
@@ -399,6 +371,7 @@ const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type ==
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const router = useRouter();
 const documentStore = useDocumentStore();
+const versionStore = useVersionStore();
 
 const tocQuery = ref('');
 const sideTab = ref('info');
@@ -555,21 +528,6 @@ function setupObserver(): void {
   Object.values(sectionEls.value).forEach((el) => observer?.observe(el));
 }
 
-async function copySection(sectionId: string): Promise<void> {
-  const section = sections.value.find((s) => s.id === sectionId);
-  if (!section) return;
-  const parts = [
-    section.badge,
-    section.headBodyText,
-    ...section.children.map((b) => b.approved_text || b.normalized_text || b.raw_text || ''),
-  ].filter(Boolean);
-  try {
-    await navigator.clipboard.writeText(parts.join('\n'));
-  } catch {
-    // ignore clipboard errors in restricted contexts
-  }
-}
-
 async function confirmSign(): Promise<void> {
   confirming.value = true;
   try {
@@ -584,9 +542,17 @@ onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
     void documentStore.fetch(props.documentId);
   }
+  void versionStore.fetch(props.documentId);
   if (!isEdit.value) {
     writeStage(props.documentId, 'wait_esign');
   }
+});
+
+// Same-route param changes (/documents/A/edit -> /documents/B/edit) reuse this component,
+// so onMounted never re-fires; refetch content + versions when the id changes.
+watch(() => props.documentId, (id) => {
+  void documentStore.fetch(id);
+  void versionStore.fetch(id);
 });
 
 watch(sections, async (value) => {
@@ -807,15 +773,6 @@ onBeforeUnmount(() => {
 
 .esign-card__body {
   min-width: 0;
-}
-
-.esign-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed #e2e8f0;
 }
 
 .esign-side {

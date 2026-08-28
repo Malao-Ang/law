@@ -30,12 +30,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import Swal from 'sweetalert2';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ versions: VersionChainItem[]; viewedDocumentId: string }>();
 const router = useRouter();
+const route = useRoute();
 
 // versions arrive oldest -> newest; show newest first (matches the mockup v3/v2/v1).
 const ordered = computed(() => [...props.versions].reverse());
@@ -44,9 +46,33 @@ function formatLawDate(value: string): string {
   return formatThaiDate(value) || value || '';
 }
 
-function open(v: VersionChainItem): void {
-  if (v.document_id !== props.viewedDocumentId) {
-    router.push(`/law/${encodeURIComponent(v.document_id)}`);
+function targetPath(documentId: string): string {
+  const encodedId = encodeURIComponent(documentId);
+  if (route.path.startsWith('/law/')) return `/law/${encodedId}`;
+  if (route.path.includes('/edit')) return `/documents/${encodedId}/edit`;
+  return `/law/${encodedId}`;
+}
+
+function dialogText(v: VersionChainItem): string {
+  return v.title || v.version_label || v.document_id;
+}
+
+async function open(v: VersionChainItem): Promise<void> {
+  if (v.document_id === props.viewedDocumentId) return;
+
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'คุณต้องการจะออกจากหน้านี้ใช่หรือไม่',
+    text: dialogText(v),
+    showCancelButton: true,
+    confirmButtonText: 'ออกจากหน้านี้',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#1e3a8a',
+    cancelButtonColor: '#64748b',
+  });
+
+  if (confirmed.isConfirmed) {
+    await router.push(targetPath(v.document_id));
   }
 }
 </script>

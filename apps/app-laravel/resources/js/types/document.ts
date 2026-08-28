@@ -254,7 +254,6 @@ export interface DocumentListItem {
   workflow_updated_at?: string | null;
   document_type?: DocumentType;
   source?: DocumentSource;
-  law_type?: string;
 }
 
 export interface LawCatalogSection {

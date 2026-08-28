@@ -303,16 +303,21 @@ const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'กฎหมายภายนอก'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
-  [/สภามหาวิทยาลัย/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
-  [/ประกาศ/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
-  [/คำสั่ง/u, 'ประกาศที่ออกโดยมหาวิทยาลัย'],
-  [/มติ/u, 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
+  [/สภามหาวิทยาลัย/u, 'ประกาศ'],
+  [/ประกาศ/u, 'ประกาศ'],
+  [/คำสั่ง/u, 'ประกาศ'],
+  [/มติ/u, 'ประกาศ'],
 ];
 
 const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
   { title: 'ออกโดยมหาวิทยาลัย', value: 'มหาวิทยาลัย' },
   { title: 'ออกโดยสภามหาวิทยาลัย', value: 'สภามหาวิทยาลัย' },
 ];
+
+const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
+  ประกาศที่ออกโดยมหาวิทยาลัย: 'มหาวิทยาลัย',
+  ประกาศที่ออกโดยสภามหาวิทยาลัย: 'สภามหาวิทยาลัย',
+};
 
 const EMPTY: LawMeta = {
   status: '', source: '', law_type: '', law_group: '', law_groups: [],
@@ -329,21 +334,16 @@ const noExpiry = ref(false);
 const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
 
-const lawTypeItems = computed(() => {
-  const items = [...documentTypes.value];
-  const current = form.value.law_type?.trim() ?? '';
-  if (current && !items.some((item) => item.value === current)) {
-    items.unshift({ title: current, value: current });
-  }
-  return items;
-});
+function normalizeSavedLawType(saved: string): string {
+  return ANNOUNCEMENT_ISSUER_LAW_TYPES[saved] ? 'ประกาศ' : saved;
+}
 
-function normalizeSavedLawType(saved: string, selectedAgencies: string[]): string {
-  if (saved !== 'ประกาศ') return saved;
-  if (selectedAgencies.some((agency) => agency.includes('สภา'))) {
-    return 'ประกาศที่ออกโดยสภามหาวิทยาลัย';
+function inferAnnouncementIssuer(text: string, selectedAgencies: string[]): string | null {
+  if (selectedAgencies.some((agency) => agency.includes('สภา')) || /สภามหาวิทยาลัย|มติ/u.test(text)) {
+    return 'สภามหาวิทยาลัย';
   }
-  return 'ประกาศที่ออกโดยมหาวิทยาลัย';
+  if (/ประกาศ|คำสั่ง/u.test(text)) return 'มหาวิทยาลัย';
+  return null;
 }
 
 function requiredLabel(label: string): string {
@@ -376,11 +376,20 @@ const documentTypePlaceholder = computed(() =>
 );
 
 // Old docs restrict law_type to the chosen source; new docs keep the full list.
-const filteredDocumentTypes = computed(() =>
-  isOld.value
-    ? documentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
-    : documentTypes.value,
+const selectableDocumentTypes = computed(() =>
+  documentTypes.value.filter((t) => !ANNOUNCEMENT_ISSUER_LAW_TYPES[t.value]),
 );
+
+const filteredDocumentTypes = computed(() => {
+  const items = isOld.value
+    ? selectableDocumentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
+    : selectableDocumentTypes.value;
+  const current = form.value.law_type?.trim() ?? '';
+  if (current && !items.some((item) => item.value === current)) {
+    return [{ title: current, value: current }, ...items];
+  }
+  return items;
+});
 
 const sourceRules = [
   (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
@@ -455,10 +464,11 @@ watch(() => documentStore.review, (review) => {
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
   const savedLawType = meta?.law_type?.trim() ?? '';
   const oldDocument = meta?.document_type === 'old';
+  const normalizedLawType = normalizeSavedLawType(savedLawType) || (oldDocument ? '' : inferLawType(documentTitle));
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
-    law_type: normalizeSavedLawType(savedLawType, agencies) || (oldDocument ? '' : inferLawType(documentTitle)),
+    law_type: normalizedLawType,
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
     agency: agencies[0] ?? '',
@@ -472,6 +482,9 @@ watch(() => documentStore.review, (review) => {
     parent_document_ids: meta?.parent_document_ids?.length
       ? [...meta.parent_document_ids]
       : (meta?.parent_document_id ? [meta.parent_document_id] : []),
+    issuer: normalizedLawType === 'ประกาศ'
+      ? (meta?.issuer || ANNOUNCEMENT_ISSUER_LAW_TYPES[savedLawType] || inferAnnouncementIssuer(documentTitle, agencies))
+      : null,
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });

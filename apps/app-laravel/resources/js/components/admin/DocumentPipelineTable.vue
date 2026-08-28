@@ -265,8 +265,8 @@ function setStage(documentId: string, stage: StageKey): void {
 }
 
 function runAction(row: Row): void {
-  if (isOldPreview(row)) {
-    router.push(`/documents/${row.documentId}/preview`);
+  if (isOldInfoStage(row)) {
+    router.push(`/documents/${row.documentId}/edit`);
     return;
   }
   const action = STAGE_MAP[row.stage].action;
@@ -277,12 +277,12 @@ function runAction(row: Row): void {
   }
 }
 
-function isOldPreview(row: Row): boolean {
+function isOldInfoStage(row: Row): boolean {
   return row.documentType === 'old' && row.stage === 'info';
 }
 
 function rowActionLabel(row: Row): string {
-  if (isOldPreview(row)) return 'ดูตัวอย่าง';
+  if (isOldInfoStage(row)) return 'แก้ไข';
   return actionLabel(row.stage);
 }
 

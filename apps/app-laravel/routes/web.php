@@ -21,6 +21,7 @@ Route::view('/admin/show-relations/{documentId}', 'app')->where('documentId', '[
 Route::view('/admin/reports', 'app');
 Route::view('/upload', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
+Route::view('/documents/{documentId}/edit', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/compose', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/preview', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/rag', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
