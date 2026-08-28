@@ -4,6 +4,8 @@
 
 ระบบหลักเป็น Laravel monolith ที่รวม API และ Vue frontend ไว้ใน `apps/app-laravel` และมี service แยกสำหรับ OCR/PDF render.
 
+> 📑 **LawMeta field reference:** ประเภท/สถานะเอกสารมีหลายฟิลด์ที่ทับซ้อนกัน (`law_type`/`source`/`document_type`, คู่เดี่ยว↔อาเรย์, และ 4 แกนสถานะ) — ดูแหล่งความจริงและกฎการใช้งานที่ [`docs/law-metadata-reference.md`](docs/law-metadata-reference.md) ก่อนเพิ่ม logic ที่อ่าน/เขียนฟิลด์เหล่านี้.
+
 ## Tool Stack
 
 ### Runtime

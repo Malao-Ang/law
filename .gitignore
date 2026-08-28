@@ -42,6 +42,7 @@ temp/
 docs/*
 !docs/
 !docs/*overview*.html
+!docs/law-metadata-reference.md
 prompts/
 CLAUDE.md
 docling-arch.md
