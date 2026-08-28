@@ -323,20 +323,15 @@
         </div>
 
         <div v-show="sideTab === 'timeline'" class="pa-2">
-          <v-timeline density="compact" side="end" truncate-line="both">
-            <v-timeline-item dot-color="success" size="x-small">
-              <div class="text-body-2 font-weight-medium">กำหนดสิทธิ์แล้ว</div>
-              <div class="text-caption text-medium-emphasis">พร้อมส่งลงนามอิเล็กทรอนิกส์</div>
-            </v-timeline-item>
-            <v-timeline-item dot-color="warning" size="x-small">
-              <div class="text-body-2 font-weight-medium">รอลงนาม</div>
-              <div class="text-caption text-medium-emphasis">สถานะปัจจุบัน</div>
-            </v-timeline-item>
-            <v-timeline-item dot-color="grey" size="x-small">
-              <div class="text-body-2 font-weight-medium text-medium-emphasis">เผยแพร่สาธารณะ</div>
-              <div class="text-caption text-medium-emphasis">หลังยืนยันลงนาม</div>
-            </v-timeline-item>
-          </v-timeline>
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-3">ประวัติเวอร์ชัน</div>
+          <VersionHistoryTimeline
+            v-if="versionStore.versions.length >= 2"
+            :versions="versionStore.versions"
+            :viewed-document-id="documentId"
+          />
+          <div v-else class="text-body-2 text-medium-emphasis pa-2">
+            ยังไม่มีประวัติเวอร์ชัน
+          </div>
         </div>
 
         <div v-show="sideTab === 'actions'" class="d-flex flex-column ga-2">
@@ -390,6 +385,8 @@ import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { documentFileUrl } from '../../api/client';
+import { useVersionStore } from '../../stores/versionStore';
+import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
@@ -399,6 +396,7 @@ const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type ==
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const router = useRouter();
 const documentStore = useDocumentStore();
+const versionStore = useVersionStore();
 
 const tocQuery = ref('');
 const sideTab = ref('info');
@@ -584,6 +582,7 @@ onMounted(() => {
   if (documentStore.documentId !== props.documentId || !documentStore.review) {
     void documentStore.fetch(props.documentId);
   }
+  void versionStore.fetch(props.documentId);
   if (!isEdit.value) {
     writeStage(props.documentId, 'wait_esign');
   }
@@ -598,6 +597,7 @@ watch(sections, async (value) => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   documentStore.reset();
+  versionStore.reset();
 });
 </script>
 
