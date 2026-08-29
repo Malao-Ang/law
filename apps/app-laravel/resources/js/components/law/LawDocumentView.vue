@@ -175,7 +175,36 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
+        <section v-if="docRelations.length" class="lawx-parentcard">
+          <div class="lawx-parentcard__head">
+            <span class="mdi mdi-bank" />
+            กฎหมายแม่ / เกี่ยวข้องทั้งฉบับ
+          </div>
+          <div
+            v-for="group in groupedDocRelations"
+            :key="group.type"
+            class="lawx-relgroup"
+          >
+            <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+            <a
+              v-for="rel in group.items"
+              :key="rel.id"
+              class="lawx-relrow"
+              :class="`is-${group.type}`"
+              :href="relationHref(rel) ?? undefined"
+              :target="safeUrl(rel.url) ? '_blank' : undefined"
+              rel="noopener"
+            >
+              <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+              <span class="lawx-relrow__main">
+                <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+              </span>
+              <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+            </a>
+          </div>
+        </section>
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
       </template>
@@ -289,8 +318,7 @@ const RELATION_GROUP_LABELS: Record<RelationType, string> = {
 
 const RELATION_GROUP_ORDER: RelationType[] = ['repeals', 'supersedes', 'amends', 'issued_under', 'related'];
 
-function groupedSectionRelations(sectionId: string): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
-  const rels = sectionRelations(sectionId);
+function groupRelations(rels: LawRelation[]): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
   return RELATION_GROUP_ORDER
     .map((type) => ({
       type,
@@ -299,6 +327,13 @@ function groupedSectionRelations(sectionId: string): Array<{ type: RelationType;
     }))
     .filter((group) => group.items.length > 0);
 }
+
+function groupedSectionRelations(sectionId: string) {
+  return groupRelations(sectionRelations(sectionId));
+}
+
+const docRelations = computed<LawRelation[]>(() => documentRelations(relations.value));
+const groupedDocRelations = computed(() => groupRelations(docRelations.value));
 
 function badgeOf(sectionId: string): string {
   return sections.value.find((section) => section.id === sectionId)?.badge ?? '';
@@ -585,6 +620,26 @@ onBeforeUnmount(() => observer?.disconnect());
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
   font-size: 16px !important;
 }
+
+.lawx-parentcard {
+  background: rgb(var(--v-theme-detail-surface));
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-top: 4px solid #7c3aed;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 18px 42px rgba(148, 163, 184, 0.14);
+}
+.lawx-parentcard__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1b14;
+  margin-bottom: 10px;
+}
+.lawx-parentcard__head .mdi { color: #7c3aed; }
 
 .lawx-relcard {
   margin-top: 14px;
