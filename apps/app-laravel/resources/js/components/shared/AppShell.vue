@@ -87,7 +87,7 @@
 
     <div v-if="title" class="app-shell__page-title">
       <div class="min-width-0">
-        <h1 class="text-h5 font-weight-black mb-0">{{ title }}</h1>
+        <h1 class="text-h6 font-weight-black mb-0">{{ title }}</h1>
         <p v-if="subtitle" class="text-body-2 text-medium-emphasis mb-0">{{ subtitle }}</p>
       </div>
       <div v-if="$slots['title-actions']" class="flex-shrink-0">
@@ -270,12 +270,11 @@ function isActive(item: NavItem): boolean {
 
 .app-shell__page-title {
   align-items: center;
-  background: #fff;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: transparent;
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 24px 0;
 }
 
 .app-shell__content {
