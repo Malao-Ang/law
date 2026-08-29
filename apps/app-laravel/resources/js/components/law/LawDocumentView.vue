@@ -96,8 +96,8 @@
           'is-original-pdf': usesOriginalPdfLayout,
         }"
       >
-        <v-card tag="section" class="lawx-headcard" elevation="0">
-          <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
+        <v-card tag="section" class="lawx-headcard" elevation="0" :style="{ borderTopColor: badgeColor }">
+          <DocBadge :type="badgeType" :label="badgeLabel" class="lawx-headcard__badge" />
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
@@ -226,6 +226,8 @@ import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
 import { documentFileUrl } from '../../api/client';
+import DocBadge from '../shared/DocBadge.vue';
+import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -290,6 +292,13 @@ const articleCount = computed(() =>
 const displayArticleCount = computed(() => articleCount.value || meta.value.section_count || 0);
 const isExternal = computed(() => sourceOf(meta.value.law_type, documentTypes.value, meta.value.source) === 'external');
 const unitWord = computed(() => (isExternal.value ? 'มาตรา' : 'ข้อ'));
+const badgeType = computed(() => lawBadgeType(meta.value.law_type, isExternal.value));
+const badgeColor = computed(() => LAW_BADGE_COLORS[badgeType.value]);
+const badgeLabel = computed(() =>
+  isExternal.value && meta.value.law_type
+    ? `${meta.value.law_type} · กฎหมายภายนอก`
+    : (meta.value.law_type || 'เอกสาร'),
+);
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
@@ -586,7 +595,7 @@ onBeforeUnmount(() => observer?.disconnect());
   box-shadow: 0 10px 40px rgba(75, 70, 61, 0.08);
 }
 
-.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+.lawx-headcard__badge { margin-bottom: 12px; }
 .lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
 .lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
