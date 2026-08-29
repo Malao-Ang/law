@@ -204,6 +204,32 @@ class LawSearchController extends Controller
     }
 
     /**
+     * Concatenate a document's searchable metadata into one haystack string.
+     *
+     * @param  array<string,mixed>  $row
+     */
+    private function metadataHaystack(array $row): string
+    {
+        $parts = [
+            (string) ($row['title'] ?? ''),
+            (string) ($row['law_type'] ?? ''),
+            (string) ($row['gazette_reference'] ?? ''),
+            (string) ($row['issuer'] ?? ''),
+        ];
+        foreach ((array) ($row['keywords'] ?? []) as $keyword) {
+            $parts[] = (string) $keyword;
+        }
+        foreach ((array) ($row['agencies'] ?? []) as $agency) {
+            $parts[] = (string) $agency;
+        }
+        foreach ((array) ($row['law_groups'] ?? []) as $group) {
+            $parts[] = (string) $group;
+        }
+
+        return trim(implode(' ', array_filter($parts, static fn (string $p): bool => trim($p) !== '')));
+    }
+
+    /**
      * @param  array<string,mixed>  $row
      * @return array{matched:bool,mode:string,confidence:float}
      */
@@ -216,6 +242,11 @@ class LawSearchController extends Controller
         $title = (string) ($row['title'] ?? '');
         if ($title !== '' && $query->matchesText($title)) {
             return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.82 : 0.84];
+        }
+
+        $metaHaystack = $this->metadataHaystack($row);
+        if ($metaHaystack !== '' && $query->matchesText($metaHaystack)) {
+            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.78 : 0.8];
         }
 
         $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';

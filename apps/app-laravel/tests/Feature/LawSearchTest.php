@@ -220,4 +220,34 @@ class LawSearchTest extends TestCase
             ->assertJsonPath('results.0.match_mode', 'file_fuzzy')
             ->assertJsonPath('meta.mode', 'file_fuzzy');
     }
+
+    public function test_metadata_only_document_is_found_by_keyword(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->andReturn(['total' => 0, 'results' => [], 'facets' => []]));
+
+        $store = app(\App\Services\ReviewStore::class);
+        $store->setStatus('OLD1', ['status' => 'ingested', 'document_type' => 'old']);
+        $store->writeReviewDocument('OLD1', [
+            'document_id' => 'OLD1',
+            'law_meta' => [
+                'title' => 'ระเบียบเก่า',
+                'access_scope' => 'public',
+                'published_date' => '2565-01-01',
+                'keywords' => ['ภาษีป้าย'],
+                'gazette_reference' => 'เล่ม 140 ตอนที่ 5',
+            ],
+            'pages' => [],
+        ]);
+        cache()->forget('law-meta-list');
+
+        $this->postJson('/api/laws/search', ['q' => 'ภาษีป้าย'])
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('results.0.law_id', 'OLD1');
+
+        $this->postJson('/api/laws/search', ['q' => 'ตอนที่ 5'])
+            ->assertOk()
+            ->assertJsonPath('total', 1);
+    }
 }
