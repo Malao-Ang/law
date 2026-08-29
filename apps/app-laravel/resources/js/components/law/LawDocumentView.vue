@@ -190,7 +190,8 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useVersionStore } from '../../stores/versionStore';
-import { buildSections, buildTocGroups, relationsForSection, documentRelations } from '../../composables/useLawSections';
+import { buildSections, buildTocGroups, relationsForSection, documentRelations, sourceOf } from '../../composables/useLawSections';
+import { useLookups } from '../../composables/useLookups';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
@@ -206,6 +207,7 @@ const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
+const { documentTypes, load: loadLookups } = useLookups();
 
 // Fetch in the watcher (immediate) — same-route param changes (/law/A -> /law/B) reuse this
 // component, so onMounted never re-fires; the watcher keeps content + versions in sync.
@@ -214,6 +216,7 @@ watch(() => props.documentId, (id) => {
     void documentStore.fetch(id);
   }
   void versionStore.fetch(id);
+  void loadLookups();
 }, { immediate: true });
 
 const sections = computed(() => buildSections(documentStore.review));
