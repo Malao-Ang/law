@@ -67,7 +67,7 @@
       >
       <template v-if="!usesOriginalPdfLayout">
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
-        <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญข้อ</p>
+        <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญ{{ unitWord }}</p>
         <div class="lawx-toc__scroll">
           <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
             <v-btn variant="text" block class="justify-space-between font-weight-bold text-body-2 mt-2 px-2"
@@ -175,7 +175,7 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="articleUnitLabel" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
       </template>
@@ -256,14 +256,8 @@ const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
 );
 const displayArticleCount = computed(() => articleCount.value || meta.value.section_count || 0);
-const articleUnitLabel = computed(() => {
-  const hasClause = sections.value.some((s) => s.badge.startsWith('ข้อ'));
-  const hasArticle = sections.value.some((s) => s.badge.startsWith('มาตรา'));
-  if (hasClause && hasArticle) return 'ข้อ';
-  if (hasClause) return 'ข้อ';
-  if (hasArticle) return 'ข้อ';
-  return 'ข้อ';
-});
+const isExternal = computed(() => sourceOf(meta.value.law_type, documentTypes.value, meta.value.source) === 'external');
+const unitWord = computed(() => (isExternal.value ? 'มาตรา' : 'ข้อ'));
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';

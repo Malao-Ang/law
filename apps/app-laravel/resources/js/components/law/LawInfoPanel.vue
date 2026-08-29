@@ -51,8 +51,8 @@
             </v-chip>
           </div>
         </div>
-        <div v-if="articleCount > 0" class="law-info-row py-1">
-          <span class="law-info-row__label text-medium-emphasis">จำนวนข้อ</span>
+        <div v-if="showCount" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">จำนวน{{ articleUnitLabel ?? 'ข้อ' }}</span>
           <span class="law-info-row__value font-weight-semibold">{{ articleCount }} {{ articleUnitLabel ?? 'ข้อ' }}</span>
         </div>
 
@@ -120,7 +120,7 @@ import {
 import { formatThaiDate } from '../../utils/thaiDate';
 import VersionHistoryTimeline from './VersionHistoryTimeline.vue';
 
-defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; relations?: LawRelation[]; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
+defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; relations?: LawRelation[]; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
