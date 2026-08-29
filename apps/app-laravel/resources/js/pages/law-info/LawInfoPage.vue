@@ -129,18 +129,15 @@
             </v-col>
             <v-col v-if="changeStatusHasDetails" cols="12" sm="6">
               <v-select
-                v-model="form.change_details"
+                v-model="changeDetailSingle"
                 :items="changeStatusDetailItems"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('รายละเอียดการเปลี่ยนแปลง')"
                 placeholder="- เลือกรายละเอียด -"
                 variant="outlined"
-                multiple
-                chips
-                closable-chips
                 clearable
-                :rules="requiredArrayRules('รายละเอียดการเปลี่ยนแปลง')"
+                :rules="requiredTextRules('รายละเอียดการเปลี่ยนแปลง')"
                 required
               />
             </v-col>
@@ -415,6 +412,12 @@ const selectedChangeType = computed(() =>
 );
 
 const changeStatusHasDetails = computed(() => selectedChangeType.value?.has_details === true);
+
+// รายละเอียดการเปลี่ยนแปลงเลือกได้ค่าเดียว — เก็บเป็น array 0/1 ตัวใน change_details (backend คงเดิม)
+const changeDetailSingle = computed<string | null>({
+  get: () => form.value.change_details?.[0] ?? null,
+  set: (value) => { form.value.change_details = value ? [value] : []; },
+});
 
 const changeStatusDetailItems = computed(() => {
   const items = changeStatusDetails.value.filter((d) => matchesSource(d.source));
