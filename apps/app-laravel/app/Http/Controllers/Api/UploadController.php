@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDocumentRequest;
 use App\Jobs\ExtractDocumentJob;
-use App\Jobs\IndexHistoricalDocumentJob;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 
@@ -43,11 +42,6 @@ class UploadController extends Controller
                 'correction_status' => 'not_required',
                 'review_path' => $this->reviewStore->displayPath($this->reviewStore->reviewRelativePath($documentId)),
             ]);
-
-            IndexHistoricalDocumentJob::dispatch(
-                documentId: $documentId,
-                relativeFilePath: $storedFile['relative_path'],
-            );
 
             return response()->json(['document_id' => $documentId, 'status' => 'done'], 202);
         }
