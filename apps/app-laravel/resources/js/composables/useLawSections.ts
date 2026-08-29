@@ -183,3 +183,17 @@ export function relationsForSection(relations: LawRelation[] | undefined, sectio
 export function documentRelations(relations: LawRelation[] | undefined): LawRelation[] {
   return (relations ?? []).filter((r) => r.scope === 'document');
 }
+
+/**
+ * Derive law source ('internal' | 'external') from law_type via the lookups list.
+ * ตาม docs/law-metadata-reference.md — derive จาก law_type; ใช้ stored source เป็น fallback
+ * (สำหรับเอกสารเก่าที่เก็บค่าตรงๆ) เท่านั้น. internal เป็น default.
+ */
+export function sourceOf(
+  lawType: string | null | undefined,
+  documentTypes: { value: string; source?: string }[],
+  fallback?: string | null,
+): 'internal' | 'external' {
+  const hit = documentTypes.find((t) => t.value === lawType)?.source;
+  return (hit ?? fallback) === 'external' ? 'external' : 'internal';
+}
