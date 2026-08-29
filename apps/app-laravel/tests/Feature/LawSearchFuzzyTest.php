@@ -14,7 +14,7 @@ class LawSearchFuzzyTest extends TestCase
             'document_id' => $id, 'source_file' => $id.'.docx', 'source_type' => 'docx',
             'language' => 'th',
             'summary' => ['page_count' => 1, 'block_count' => 0, 'review_required_count' => 0],
-            'law_meta' => ['title' => $title, 'access_scope' => 'public', 'law_type' => 'ระเบียบ'],
+            'law_meta' => ['title' => $title, 'access_scope' => 'public', 'law_type' => 'ระเบียบ', 'published_date' => '2565-01-01'],
             'pages' => [['page_no' => 1, 'blocks' => []]],
         ]);
     }

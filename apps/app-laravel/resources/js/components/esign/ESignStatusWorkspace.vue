@@ -619,12 +619,17 @@ function markSigned(): void {
   persist();
 }
 
-function publish(): void {
+async function publish(): Promise<void> {
   publishing.value = true;
   try {
+    const saved = await documentStore.saveLawMeta({
+      status: 'มีผลบังคับใช้',
+      published_date: new Date().toISOString().slice(0, 10),
+    });
+    if (!saved) return;
     writeStage(props.documentId, 'public');
     publishOpen.value = false;
-    void router.push(`/law/${props.documentId}`);
+    await router.push(`/law/${props.documentId}`);
   } finally {
     publishing.value = false;
   }

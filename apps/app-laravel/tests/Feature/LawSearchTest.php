@@ -68,6 +68,19 @@ class LawSearchTest extends TestCase
 
         $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->once()->andReturn($fake));
 
+        $store = app(ReviewStore::class);
+        $store->setStatus('L1', ['status' => 'ingested']);
+        $store->writeReviewDocument('L1', [
+            'document_id' => 'L1',
+            'law_meta' => [
+                'title' => 'พ.ร.บ.',
+                'access_scope' => 'public',
+                'published_date' => '2565-01-01',
+            ],
+            'pages' => [],
+        ]);
+        cache()->forget('law-meta-list');
+
         $this->postJson('/api/laws/search', ['q' => 'ภาษี', 'filters' => ['law_type' => ['phrb']]])
             ->assertOk()
             ->assertJsonPath('total', 1)
@@ -124,6 +137,7 @@ class LawSearchTest extends TestCase
                 'law_type' => 'ระเบียบ',
                 'status' => 'มีผลบังคับใช้',
                 'access_scope' => 'public',
+                'published_date' => '2565-01-01',
             ],
         ]);
 
@@ -159,7 +173,7 @@ class LawSearchTest extends TestCase
         $store->setStatus($documentId, ['status' => 'ingested']);
         $store->writeReviewDocument($documentId, [
             'document_id' => $documentId,
-            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public'],
+            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public', 'published_date' => '2565-01-01'],
             'pages' => [[
                 'page_no' => 1,
                 'blocks' => [
@@ -193,6 +207,7 @@ class LawSearchTest extends TestCase
                 'law_type' => 'ประกาศ',
                 'status' => 'มีผลบังคับใช้',
                 'access_scope' => 'public',
+                'published_date' => '2565-01-01',
             ],
         ]);
 

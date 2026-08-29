@@ -268,8 +268,12 @@ async function saveAndPublish(): Promise<void> {
 
   if (isOld.value) {
     // Old docs are already-final PDFs: no RAG export, no eSign ceremony.
-    // Still advance the workflow step so the pipeline table derives the
-    // 'public' stage (deriveStageForDocument maps completed_step 6 -> public).
+    // Publishing marks them effective and records the publication date.
+    const stamped = await documentStore.saveLawMeta({
+      status: 'มีผลบังคับใช้',
+      published_date: new Date().toISOString().slice(0, 10),
+    });
+    if (!stamped) return;
     const progressed = await documentStore.completeWorkflowStep(6);
     if (!progressed) return;
     writeStage(props.documentId, 'public');

@@ -22,6 +22,15 @@ class LawSearchController extends Controller
         // reflects the current publish state without depending on ES being up-to-date.
         $fileBased = $this->fileBasedSearch($params, $store);
 
+        // Published allowlist (ingested + has published_date) drops any
+        // unpublished docs the ES index may still contain.
+        $publishedIds = [];
+        foreach ($store->listLawMeta() as $metaRow) {
+            if (($metaRow['status'] ?? '') === 'ingested' && ($metaRow['published_date'] ?? '') !== '') {
+                $publishedIds[(string) $metaRow['document_id']] = true;
+            }
+        }
+
         try {
             $esResult = $service->search($params);
             if (($esResult['total'] ?? 0) > 0) {
@@ -32,14 +41,17 @@ class LawSearchController extends Controller
                     fn (array $r): bool => ! isset($esLawIds[$r['law_id']]),
                 ));
                 $fileRowsById = array_column($fileBased['results'], null, 'law_id');
-                $esRows = array_map(
-                    fn (array $row): array => $this->overlayCurrentAccessState($row, $fileRowsById[(string) ($row['law_id'] ?? '')] ?? null),
-                    $esResult['results'] ?? [],
-                );
+                $esRows = array_values(array_filter(
+                    array_map(
+                        fn (array $row): array => $this->overlayCurrentAccessState($row, $fileRowsById[(string) ($row['law_id'] ?? '')] ?? null),
+                        $esResult['results'] ?? [],
+                    ),
+                    fn (array $row): bool => isset($publishedIds[(string) ($row['law_id'] ?? '')]),
+                ));
                 $results = array_merge($esRows, $supplement);
 
                 return response()->json($this->withSearchSuggestions([
-                    'total' => ($esResult['total'] ?? 0) + count($supplement),
+                    'total' => count($esRows) + count($supplement),
                     'results' => $results,
                     'facets' => $esResult['facets'] ?? $fileBased['facets'],
                     'fuzzy' => false,
@@ -101,6 +113,9 @@ class LawSearchController extends Controller
             if (($row['status'] ?? '') !== 'ingested') {
                 continue;
             }
+            if (($row['published_date'] ?? '') === '') {
+                continue;
+            }
 
             $match = $this->fileSearchMatch($row, $query, $store);
             if (! $query->isEmpty()) {
@@ -152,7 +167,7 @@ class LawSearchController extends Controller
                 'status' => $r['meta_status'],
                 'change_status' => $r['change_status'],
                 'summary' => null,
-                'published_date' => $r['promulgation_date'] ?? null,
+                'published_date' => $r['published_date'] ?? null,
                 'agency' => $r['agencies'][0] ?? null,
                 'law_group' => $r['law_groups'][0] ?? null,
                 'signer_group' => $r['signer_group'],
@@ -566,6 +581,9 @@ class LawSearchController extends Controller
 
         foreach ($store->listLawMeta() as $row) {
             if (LawMetaNormalizer::effectiveVisibility($row) === 'restricted') {
+                continue;
+            }
+            if (($row['published_date'] ?? '') === '') {
                 continue;
             }
 

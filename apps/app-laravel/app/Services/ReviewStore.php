@@ -235,6 +235,7 @@ class ReviewStore
                     'agencies' => $agencies,
                     'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
                     'effective_date' => trim((string) ($meta['effective_date'] ?? '')),
+                    'published_date' => trim((string) ($meta['published_date'] ?? '')),
                     'issuer' => trim((string) ($meta['issuer'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
                     'relations_count' => is_array($review['relations'] ?? null)

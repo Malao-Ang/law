@@ -16,7 +16,7 @@ class LawFacetsStatsTest extends TestCase
             'source_type' => 'docx',
             'language' => 'th',
             'summary' => ['page_count' => 1, 'block_count' => 0, 'review_required_count' => 0],
-            'law_meta' => array_merge(['title' => $id, 'access_scope' => 'public'], $meta),
+            'law_meta' => array_merge(['title' => $id, 'access_scope' => 'public', 'published_date' => '2565-01-01'], $meta),
             'pages' => [['page_no' => 1, 'blocks' => []]],
         ]);
     }

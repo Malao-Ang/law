@@ -45,7 +45,18 @@
         {{ documentStore.error }}
       </v-alert>
 
-      <template v-else-if="documentStore.review">
+      <v-alert
+        v-else-if="documentStore.review && !isPublished"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="ma-4"
+        prepend-icon="mdi-eye-off-outline"
+      >
+        เอกสารนี้ยังไม่เผยแพร่
+      </v-alert>
+
+      <template v-else-if="documentStore.review && isPublished">
       <div
         class="lawx-grid"
         :class="{
@@ -235,6 +246,7 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
+const isPublished = computed(() => !!documentStore.review?.law_meta?.published_date);
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith('pdf') ?? false);
 const usesOriginalPdfLayout = computed(() => isOld.value || isPdfSource.value);

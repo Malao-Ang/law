@@ -18,7 +18,7 @@
         size="small"
         prepend-icon="mdi-file-document-edit-outline"
         class="text-none"
-        @click="router.push(`/documents/${documentId}/law-info`)"
+        @click="router.push(`/documents/${documentId}/law-info?mode=edit`)"
       >แก้ไขข้อมูล</v-btn>
     </template>
 
@@ -271,8 +271,22 @@
               <strong>{{ formatThaiDate(meta.effective_date) || '—' }}</strong>
             </div>
             <div class="esign-kv">
-              <span>วันที่เผยแพร่</span>
-              <strong class="text-warning">รอลงนาม</strong>
+              <span>การเผยแพร่</span>
+              <v-switch
+                v-if="isEdit"
+                :model-value="isPublished"
+                :loading="publishToggleSaving"
+                :disabled="publishToggleSaving"
+                color="success"
+                density="compact"
+                hide-details
+                inset
+                :label="isPublished ? 'เผยแพร่' : 'ไม่เผยแพร่'"
+                @update:model-value="togglePublished"
+              />
+              <strong v-else :class="isPublished ? 'text-success' : 'text-warning'">
+                {{ isPublished ? formatThaiDate(meta.published_date) || 'เผยแพร่' : 'รอลงนาม' }}
+              </strong>
             </div>
             <div class="esign-kv">
               <span>จำนวน{{ articleUnitLabel }}</span>
@@ -320,7 +334,7 @@
             variant="outlined"
             prepend-icon="mdi-pencil-outline"
             class="justify-start text-none"
-            @click="router.push(`/documents/${documentId}/law-info`)"
+            @click="router.push(`/documents/${documentId}/law-info?mode=edit`)"
           >แก้ไขข้อมูลเอกสาร</v-btn>
           <v-btn
             variant="outlined"
@@ -409,6 +423,20 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
+const isPublished = computed(() => !!meta.value.published_date);
+const publishToggleSaving = ref(false);
+
+async function togglePublished(next: boolean | null): Promise<void> {
+  publishToggleSaving.value = true;
+  try {
+    await documentStore.saveLawMeta({
+      published_date: next ? new Date().toISOString().slice(0, 10) : '',
+    });
+  } finally {
+    publishToggleSaving.value = false;
+  }
+}
+
 const sections = computed(() => buildSections(documentStore.review));
 const tocGroups = computed(() => buildTocGroups(sections.value));
 

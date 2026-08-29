@@ -98,7 +98,7 @@
                 />
               </v-radio-group>
             </v-col>
-            <v-col cols="12" sm="6">
+            <v-col v-if="isEditMode" cols="12" sm="6">
               <v-autocomplete
                 v-model="form.status"
                 :items="statuses"
@@ -300,7 +300,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import type { SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -313,6 +313,8 @@ import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const route = useRoute();
+const isEditMode = computed(() => route.query.mode === 'edit');
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
@@ -337,7 +339,7 @@ const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
 };
 
 const EMPTY: LawMeta = {
-  status: '', source: '', law_type: '', law_group: '', law_groups: [],
+  status: 'ร่าง', source: '', law_type: '', law_group: '', law_groups: [],
   change_status: null, change_details: [],
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
