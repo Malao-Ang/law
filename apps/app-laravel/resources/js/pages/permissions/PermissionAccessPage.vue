@@ -14,7 +14,7 @@
       @next="saveAndPublish"
     />
 
-    <div class="mx-auto" style="max-width:860px; padding-bottom:60px">
+    <div class="mx-auto" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>

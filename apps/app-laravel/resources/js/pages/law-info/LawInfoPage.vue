@@ -711,7 +711,7 @@ onBeforeUnmount(() => documentStore.reset());
 
 <style scoped>
 .law-info-page {
-  max-width: 860px;
+  max-width: 1400px;
   padding-bottom: 60px;
 }
 </style>

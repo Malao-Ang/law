@@ -365,6 +365,6 @@ function goToDatabase(): void {
 
 <style scoped>
 .result-page {
-  max-width: 720px;
+  max-width: 1400px;
 }
 </style>
