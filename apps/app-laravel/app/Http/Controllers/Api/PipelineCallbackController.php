@@ -66,13 +66,6 @@ class PipelineCallbackController
             return response()->json(['error' => 'Invalid callback payload: missing output'], 422);
         }
 
-        $existingStatus = $reviewStore->getStatus($documentId) ?? [];
-        if (($existingStatus['document_type'] ?? null) === 'old') {
-            $this->indexHistorical($reviewStore, $documentId, $output);
-
-            return response()->json(['status' => 'indexed']);
-        }
-
         $reviewStore->writeReviewDocument($documentId, $output);
         $extraction = is_array($output['extraction'] ?? null) ? $output['extraction'] : [];
 
@@ -90,52 +83,5 @@ class PipelineCallbackController
         ]);
 
         return response()->json(['status' => 'received']);
-    }
-
-    /** Build fulltext export chunks from OCR output and index; leave review blob intact. */
-    private function indexHistorical(ReviewStore $reviewStore, string $documentId, array $output): void
-    {
-        $text = $this->flattenText($output);
-        $reviewStore->writeExport($documentId, [
-            'document_id' => $documentId,
-            'chunks' => [[
-                'chunk_id' => $documentId.'_full',
-                'page_no' => 1,
-                'block_ids' => [],
-                'section_path' => null,
-                'text' => $text,
-            ]],
-        ]);
-
-        try {
-            app(\App\Services\Search\LawIndexer::class)->index($documentId);
-            $reviewStore->setStatus($documentId, ['search_status' => 'indexed']);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Historical indexing failed (non-fatal)', [
-                'document_id' => $documentId,
-                'error' => $e->getMessage(),
-            ]);
-            $reviewStore->setStatus($documentId, ['search_status' => 'failed']);
-        }
-    }
-
-    private function flattenText(array $output): string
-    {
-        $parts = [];
-        foreach ($output['pages'] ?? [] as $page) {
-            foreach ($page['blocks'] ?? [] as $block) {
-                $t = trim((string) (
-                    $block['approved_text']
-                    ?? $block['normalized_text']
-                    ?? $block['raw_text']
-                    ?? ''
-                ));
-                if ($t !== '') {
-                    $parts[] = $t;
-                }
-            }
-        }
-
-        return implode("\n", $parts);
     }
 }
