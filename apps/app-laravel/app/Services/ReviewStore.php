@@ -236,6 +236,10 @@ class ReviewStore
                     'promulgation_date' => trim((string) ($meta['promulgation_date'] ?? '')),
                     'effective_date' => trim((string) ($meta['effective_date'] ?? '')),
                     'published_date' => trim((string) ($meta['published_date'] ?? '')),
+                    'gazette_reference' => trim((string) ($meta['gazette_reference'] ?? '')),
+                    'keywords' => is_array($meta['keywords'] ?? null)
+                        ? array_values(array_filter($meta['keywords'], 'is_string'))
+                        : [],
                     'issuer' => trim((string) ($meta['issuer'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
                     'relations_count' => is_array($review['relations'] ?? null)
