@@ -1,6 +1,6 @@
 # ประเภทกฎหมาย & สถานะทั้งหมด — คู่มือสำหรับผู้เขียน/ผู้พัฒนา
 
-เอกสารนี้列รวม **ค่าที่เลือกได้จริงทั้งหมด** ของฟิลด์ประเภท/สถานะบน `LawMeta` พร้อมตัวอย่าง
+เอกสารนี้รวม **ค่าที่เลือกได้จริงทั้งหมด** ของฟิลด์ประเภท/สถานะบน `LawMeta` พร้อมตัวอย่าง
 เพื่อให้ผู้เขียนเนื้อหาและ dev เข้าใจตรงกัน
 
 - **แหล่งความจริงของค่า (options):** `apps/app-laravel/config/lookups.php`
@@ -185,6 +185,17 @@
 | `ingesting` | กำลัง ingest เข้า index |
 | `ingested` | ingest เสร็จ |
 
+**อัปโหลดสำเร็จ/ล้มเหลว** — ดูจาก `status`: สำเร็จ → `done` (เข้าตรวจทานต่อได้), ล้มเหลว → `failed` (มีข้อความใน `error`)
+
+ฟิลด์ประกอบ (`DocumentStatus`):
+
+| ฟิลด์ | ความหมาย |
+|---|---|
+| `error` | ข้อความ error เมื่อ `failed` |
+| `fast_fallback_reason` | เหตุที่ fast path (PHP) ตกไปใช้ standard pipeline |
+| `timings` | เวลาที่ใช้แต่ละขั้น (ms) |
+| `correction_status` | `not_required` / `pending` / `in_progress` / `done` / `failed` — สถานะ spellcheck/แก้คำ |
+
 ---
 
 ## 12. ความสัมพันธ์กฎหมาย — `LawRelation`
@@ -208,16 +219,26 @@
 
 ---
 
-## 13. ขั้นตอน workflow นำเข้าเอกสาร (`WORKFLOW_STEPS`)
+## 13. ขั้นตอนการทำงาน (workflow) นำเข้าเอกสาร — end-to-end
 
-1. อัปโหลด
-2. ตรวจทาน
-3. จัดลำดับเนื้อหา
-4. ข้อมูล
-5. เอกสารที่เกี่ยวข้อง
-6. กำหนดสิทธิ์
+ลำดับ 6 ขั้น (`WORKFLOW_STEPS`) ติดตามด้วย `workflow_completed_step` / `workflow_current_step` / `workflow_updated_at`
+เอกสารนำเข้าเก่าแบบ `old` ใช้ flow สั้นกว่า (เลขขั้นในวงเล็บ)
 
-(เอกสารนำเข้าเก่าแบบ `old` ใช้ flow สั้นกว่า)
+| ขั้น (new/old) | ชื่อ | หน้า / route | ทำอะไร |
+|---|---|---|---|
+| 1 | อัปโหลด | `/admin/upload` (AdminUploadPage) | อัปโหลดไฟล์ → extract → **สำเร็จ `done` / ล้มเหลว `failed`** (ดู §11) |
+| 2 | ตรวจทาน = **แก้ไขเอกสาร** | `/documents/:id/review` (ReviewPage) | แก้เนื้อหาทั้งเอกสารใน editor |
+| 3 | จัดลำดับเนื้อหา | `/documents/:id/rag` (RagManageWorkspace) | เลือก/รวม/ลบ/จัดลำดับบล็อกก่อนทำ RAG |
+| 4 (old 2) | ข้อมูล | `/documents/:id/law-info` (LawInfoPage) | กรอก metadata (law_type / สถานะ / หน่วยงาน …) — `completeWorkflowStep(4)` |
+| 5 (old 3) | เอกสารที่เกี่ยวข้อง = **ความสัมพันธ์เอกสาร** | `/documents/:id/relations` (LawRelationsPage) | เพิ่มความสัมพันธ์ระดับเอกสาร/ระดับข้อ (ดู §12) — `completeWorkflowStep(5)` |
+| 6 (old 4) | กำหนดสิทธิ์ | `/documents/:id/permissions` (PermissionAccessPage) | ตั้ง `access_scope` + กลุ่มสิทธิ์ — `completeWorkflowStep(6)` |
+| — | ลงนาม (E-Sign) | `/documents/:id/esign` (+ `/esign/preview`, `/esign/status`) | ส่งลงนามอิเล็กทรอนิกส์ |
+| — | เผยแพร่ | (หลัง e-sign) | set `status='มีผลบังคับใช้'` + `published_date` (ดู §7–8) |
+
+**map ศัพท์ที่มักถาม → อยู่ตรงไหน**
+- **แก้ไขเอกสาร** = ขั้น 2 ตรวจทาน → `/documents/:id/review`
+- **ความสัมพันธ์เอกสาร** = ขั้น 5 → `/documents/:id/relations` (ประเภท/ขอบเขต ดู §12)
+- **upload สำเร็จ/ล้มเหลว** = `DocumentStatus.status` = `done` / `failed` (ดู §11)
 
 ---
 
