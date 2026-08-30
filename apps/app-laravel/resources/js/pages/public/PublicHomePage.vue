@@ -272,7 +272,7 @@ function docsByType(docs: DocumentVersion[], type: DocumentType): DocumentVersio
 }
 
 function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion {
-  const docType = inferDocType(law.law_type ?? law.title ?? '');
+  const docType = docTypeFromSource(law);
   const publicationScope: PublicationScope = law.restricted ? 'private' : 'public';
   const group = law.law_group || 'กลุ่มกฎหมาย';
   const org = law.agency || 'หน่วยงานที่เกี่ยวข้อง';
@@ -290,7 +290,22 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     ownerAgencyId: org,
     publishedDate,
     status: 'published',
+    issuer: law.issuer ?? '',
   });
+}
+
+function docTypeFromSource(law: LawSearchResult): DocumentType {
+  if (law.source === 'external') return 'kotmai-phaainok';
+  if (law.source === 'internal') return internalDocType(law.law_type ?? law.title ?? '');
+  // source missing (older result) — fall back to the legacy heuristic
+  return inferDocType(law.law_type ?? law.title ?? '');
+}
+
+function internalDocType(source: string): DocumentType {
+  const value = source.replace(/\s+/g, '');
+  if (value.includes('ข้อบังคับ')) return 'kho-bangkhab';
+  if (value.includes('ประกาศ')) return 'prakat';
+  return 'rabiap';
 }
 
 function inferDocType(source: string): DocumentType {
@@ -313,6 +328,7 @@ function buildDocumentVersion(input: {
   ownerAgencyId: string;
   publishedDate: string | Date;
   status?: DocumentVersion['status'];
+  issuer?: string;
 }): DocumentVersion {
   const publishedDate = typeof input.publishedDate === 'string' ? new Date(input.publishedDate) : input.publishedDate;
 
@@ -330,6 +346,7 @@ function buildDocumentVersion(input: {
       summary: input.summary,
       publishedDate,
       ownerAgencyId: input.ownerAgencyId,
+      issuer: input.issuer ?? '',
       keywords: [],
     },
     createdAt: publishedDate,

@@ -59,6 +59,8 @@ export interface LawSearchResult {
   confidence?: number;
   match_mode?: string;
   snippets: string[];
+  source?: 'internal' | 'external';
+  issuer?: string | null;
 }
 
 export interface FacetBucket {
