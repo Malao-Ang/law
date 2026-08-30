@@ -40,6 +40,8 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
@@ -71,6 +73,8 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
@@ -102,6 +106,8 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
@@ -133,6 +139,8 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
@@ -164,6 +172,8 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :issuer="doc.metadata.issuer"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -292,6 +302,8 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     publishedDate,
     status: 'published',
     issuer: law.issuer ?? '',
+    changeStatus: law.change_status ?? '',
+    useStatus: law.status ?? '',
   });
 }
 
@@ -330,6 +342,8 @@ function buildDocumentVersion(input: {
   publishedDate: string | Date;
   status?: DocumentVersion['status'];
   issuer?: string;
+  changeStatus?: string;
+  useStatus?: string;
 }): DocumentVersion {
   const publishedDate = typeof input.publishedDate === 'string' ? new Date(input.publishedDate) : input.publishedDate;
 
@@ -348,6 +362,8 @@ function buildDocumentVersion(input: {
       publishedDate,
       ownerAgencyId: input.ownerAgencyId,
       issuer: input.issuer ?? '',
+      changeStatus: input.changeStatus ?? '',
+      useStatus: input.useStatus ?? '',
       keywords: [],
     },
     createdAt: publishedDate,
