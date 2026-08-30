@@ -33,10 +33,19 @@
       ออกโดย{{ issuer }}
     </div>
 
-    <!-- Agency strip (LawInfoStrip style) -->
-    <div v-if="department" class="elaw-agency-strip">
-      <div class="elaw-agency-strip__label">หน่วยงานที่รับผิดชอบ</div>
-      <div class="elaw-agency-strip__value">{{ department }}</div>
+    <!-- Status-driven content box -->
+    <div v-if="changeState.variant === 'new'">
+      <div v-if="department" class="elaw-agency-strip">
+        <div class="elaw-agency-strip__label">หน่วยงานที่รับผิดชอบ</div>
+        <div class="elaw-agency-strip__value">{{ department }}</div>
+      </div>
+    </div>
+    <div v-else class="elaw-change-box" :class="`elaw-change-box--${changeState.variant}`">
+      <v-icon
+        :icon="changeState.variant === 'revise' ? 'mdi-file-document-edit-outline' : (changeState.variant === 'partial' ? 'mdi-alert-outline' : 'mdi-cancel')"
+        size="16"
+      />
+      <span>{{ changeState.label }}</span>
     </div>
 
     <div class="elaw-card__divider" />
@@ -76,6 +85,7 @@
 import { computed } from 'vue';
 import DocBadge from './DocBadge.vue';
 import { changeStatusToBadge, docTypeToBadge, type ChangeStatus, type DocType } from './lawBadge';
+import { cardChangeState } from '../../utils/cardChangeState';
 
 type Visibility = 'public' | 'private' | 'organization';
 
@@ -84,6 +94,8 @@ const props = defineProps<{
   docType: DocType;
   description?: string;
   issuer?: string;
+  changeStatusText?: string;
+  useStatus?: string;
   department?: string;
   lawGroup?: string;
   date?: string;
@@ -101,6 +113,8 @@ const typeLabels: Record<DocType, string> = {
   'kotmai-phaainok': 'กฎหมายภายนอก',
   other: 'อื่น ๆ',
 };
+
+const changeState = computed(() => cardChangeState(props.changeStatusText, props.useStatus));
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
 const typeBadge = computed(() => docTypeToBadge(props.docType));
@@ -221,6 +235,22 @@ const visibilityIcon = computed(() =>
   color: #475569;
   margin-bottom: 10px;
 }
+
+.elaw-change-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 0 12px 12px 0;
+  border-left-width: 4px;
+  border-left-style: solid;
+  padding: 10px 15px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.elaw-change-box--revise    { background: #f5f3ff; border-left-color: #7c3aed; color: #6d28d9; }
+.elaw-change-box--partial   { background: #fffbeb; border-left-color: #f59e0b; color: #b45309; }
+.elaw-change-box--cancelled { background: #fef2f2; border-left-color: #ef4444; color: #b91c1c; }
 
 /* Agency strip (matches LawInfoStrip agency tone) */
 .elaw-agency-strip {
