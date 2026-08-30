@@ -354,6 +354,11 @@
                       <v-icon size="9" icon="mdi-circle" />
                       {{ statusLabel(law.status) }}
                     </span>
+                    <span
+                      v-if="cardChangeState(law.change_status, law.status).variant !== 'new'"
+                      class="law-change-tag"
+                      :class="`law-change-tag--${cardChangeState(law.change_status, law.status).variant}`"
+                    >{{ cardChangeState(law.change_status, law.status).label }}</span>
                   </div>
                   <h3
                     class="law-list-card__title"
@@ -362,14 +367,6 @@
                   <p class="law-list-card__desc" :class="{ 'law-list-card__desc--empty': !law.summary }">
                     {{ law.summary || 'ไม่มีสรุปข้อมูล' }}
                   </p>
-                  <div
-                    v-if="cardChangeState(law.change_status, law.status).variant !== 'new'"
-                    class="law-change-box"
-                    :class="`law-change-box--${cardChangeState(law.change_status, law.status).variant}`"
-                  >
-                    <v-icon size="13" :icon="cardChangeState(law.change_status, law.status).variant === 'revise' ? 'mdi-file-document-edit-outline' : (cardChangeState(law.change_status, law.status).variant === 'partial' ? 'mdi-alert-outline' : 'mdi-cancel')" />
-                    {{ cardChangeState(law.change_status, law.status).label }}
-                  </div>
                   <div class="law-list-card__meta">
                     <span v-if="law.published_date">
                       <v-icon size="13" icon="mdi-calendar-blank-outline" />
@@ -1414,19 +1411,18 @@ onBeforeUnmount(() => {
 }
 
 /* ── List result cards ── */
-.law-change-box {
+.law-change-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 6px 10px;
-  margin: 4px 0 8px;
+  border-radius: 9999px;
+  padding: 2px 10px;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
-.law-change-box--revise    { background: #f5f3ff; color: #6d28d9; }
-.law-change-box--partial   { background: #fffbeb; color: #b45309; }
-.law-change-box--cancelled { background: #fef2f2; color: #b91c1c; }
+.law-change-tag--revise    { background: #f5f3ff; color: #6d28d9; }
+.law-change-tag--partial   { background: #fffbeb; color: #b45309; }
+.law-change-tag--cancelled { background: #fef2f2; color: #b91c1c; }
 
 .law-results-list {
   display: grid;

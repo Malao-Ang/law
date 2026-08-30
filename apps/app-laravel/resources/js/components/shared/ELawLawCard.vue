@@ -9,10 +9,15 @@
   >
     <!-- Tags row -->
     <div class="elaw-card__tags">
-      <div class="d-flex align-center ga-1">
+      <div class="d-flex align-center ga-1 flex-wrap">
         <DocBadge v-if="typeBadge" :type="typeBadge" />
         <span v-else class="elaw-tag elaw-tag--fallback">{{ typeLabel }}</span>
         <DocBadge v-if="statusBadge" :type="statusBadge" />
+        <span
+          v-if="changeState.variant !== 'new'"
+          class="elaw-change-tag"
+          :class="`elaw-change-tag--${changeState.variant}`"
+        >{{ changeState.label }}</span>
       </div>
       <!-- Visibility pill -->
       <div v-if="visibility" class="elaw-visibility" :class="`elaw-visibility--${visibility}`">
@@ -33,19 +38,10 @@
       ออกโดย{{ issuer }}
     </div>
 
-    <!-- Status-driven content box -->
-    <div v-if="changeState.variant === 'new'">
-      <div v-if="department" class="elaw-agency-strip">
-        <div class="elaw-agency-strip__label">หน่วยงานที่รับผิดชอบ</div>
-        <div class="elaw-agency-strip__value">{{ department }}</div>
-      </div>
-    </div>
-    <div v-else class="elaw-change-box" :class="`elaw-change-box--${changeState.variant}`">
-      <v-icon
-        :icon="changeState.variant === 'revise' ? 'mdi-file-document-edit-outline' : (changeState.variant === 'partial' ? 'mdi-alert-outline' : 'mdi-cancel')"
-        size="16"
-      />
-      <span>{{ changeState.label }}</span>
+    <!-- Agency strip (LawInfoStrip style) -->
+    <div v-if="department" class="elaw-agency-strip">
+      <div class="elaw-agency-strip__label">หน่วยงานที่รับผิดชอบ</div>
+      <div class="elaw-agency-strip__value">{{ department }}</div>
     </div>
 
     <div class="elaw-card__divider" />
@@ -225,21 +221,18 @@ const visibilityIcon = computed(() =>
   margin-bottom: 10px;
 }
 
-.elaw-change-box {
-  display: flex;
+.elaw-change-tag {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 0 12px 12px 0;
-  border-left-width: 4px;
-  border-left-style: solid;
-  padding: 10px 15px;
-  margin-bottom: 16px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  white-space: nowrap;
 }
-.elaw-change-box--revise    { background: #f5f3ff; border-left-color: #7c3aed; color: #6d28d9; }
-.elaw-change-box--partial   { background: #fffbeb; border-left-color: #f59e0b; color: #b45309; }
-.elaw-change-box--cancelled { background: #fef2f2; border-left-color: #ef4444; color: #b91c1c; }
+.elaw-change-tag--revise    { background: #f5f3ff; color: #6d28d9; }
+.elaw-change-tag--partial   { background: #fffbeb; color: #b45309; }
+.elaw-change-tag--cancelled { background: #fef2f2; color: #b91c1c; }
 
 /* Agency strip (matches LawInfoStrip agency tone) */
 .elaw-agency-strip {
