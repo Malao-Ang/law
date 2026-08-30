@@ -78,9 +78,14 @@ class LawSearchController extends Controller
     private function overlayCurrentAccessState(array $row, ?array $fileRow): array
     {
         if ($fileRow === null) {
+            $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
+            $row['issuer'] = (string) ($row['issuer'] ?? '');
+
             return $row;
         }
 
+        $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
+        $row['issuer'] = (string) ($fileRow['issuer'] ?? ($row['issuer'] ?? ''));
         $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
         $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
         if ($row['restricted']) {
@@ -164,6 +169,8 @@ class LawSearchController extends Controller
                 'title' => $r['title'],
                 'title_highlighted' => $this->highlightTitle((string) ($r['title'] ?? ''), $query),
                 'law_type' => $r['law_type'],
+                'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
+                'issuer' => (string) ($r['issuer'] ?? ''),
                 'status' => $r['meta_status'],
                 'change_status' => $r['change_status'],
                 'summary' => null,
@@ -674,6 +681,22 @@ class LawSearchController extends Controller
         ];
 
         return response()->json($facets);
+    }
+
+    /** internal/external for a law_type, from config document_types (legacy กฎหมายภายนอก = external). */
+    private function sourceForLawType(string $lawType): string
+    {
+        $lawType = trim($lawType);
+        if ($lawType === 'กฎหมายภายนอก') {
+            return 'external';
+        }
+        foreach ((array) config('lookups.document_types', []) as $type) {
+            if ((string) ($type['value'] ?? '') === $lawType) {
+                return ($type['source'] ?? '') === 'external' ? 'external' : 'internal';
+            }
+        }
+
+        return 'internal';
     }
 
     private function canonicalType(string $lawType): string

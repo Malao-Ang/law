@@ -250,4 +250,36 @@ class LawSearchTest extends TestCase
             ->assertOk()
             ->assertJsonPath('total', 1);
     }
+
+    public function test_results_expose_source_and_issuer(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->andReturn(['total' => 0, 'results' => [], 'facets' => []]));
+
+        $store = app(\App\Services\ReviewStore::class);
+
+        $store->setStatus('EXT1', ['status' => 'ingested']);
+        $store->writeReviewDocument('EXT1', [
+            'document_id' => 'EXT1',
+            'law_meta' => ['title' => 'ประกาศกระทรวงการคลัง', 'access_scope' => 'public',
+                'published_date' => '2565-01-01', 'law_type' => 'ประกาศกระทรวง'],
+            'pages' => [],
+        ]);
+
+        $store->setStatus('PRK1', ['status' => 'ingested']);
+        $store->writeReviewDocument('PRK1', [
+            'document_id' => 'PRK1',
+            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public',
+                'published_date' => '2565-01-01', 'law_type' => 'ประกาศ', 'issuer' => 'มหาวิทยาลัย'],
+            'pages' => [],
+        ]);
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', ['q' => ''])->assertOk();
+        $bySource = collect($response->json('results'))->keyBy('law_id');
+
+        $this->assertSame('external', $bySource['EXT1']['source']);
+        $this->assertSame('internal', $bySource['PRK1']['source']);
+        $this->assertSame('มหาวิทยาลัย', $bySource['PRK1']['issuer']);
+    }
 }
