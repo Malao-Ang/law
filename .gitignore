@@ -43,6 +43,7 @@ docs/*
 !docs/
 !docs/*overview*.html
 !docs/law-metadata-reference.md
+!docs/law-types-and-statuses.md
 prompts/
 CLAUDE.md
 docling-arch.md
