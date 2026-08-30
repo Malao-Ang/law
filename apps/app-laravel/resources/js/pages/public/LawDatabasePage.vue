@@ -354,6 +354,11 @@
                       <v-icon size="9" icon="mdi-circle" />
                       {{ statusLabel(law.status) }}
                     </span>
+                    <span
+                      v-if="cardChangeState(law.change_status, law.status).variant !== 'new'"
+                      class="law-change-tag"
+                      :class="`law-change-tag--${cardChangeState(law.change_status, law.status).variant}`"
+                    >{{ cardChangeState(law.change_status, law.status).label }}</span>
                   </div>
                   <h3
                     class="law-list-card__title"
@@ -447,6 +452,7 @@ import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { canDisplayLawResult } from '../../utils/lawAccess';
+import { cardChangeState } from '../../utils/cardChangeState';
 
 const PER_PAGE = 20;
 
@@ -1405,6 +1411,19 @@ onBeforeUnmount(() => {
 }
 
 /* ── List result cards ── */
+.law-change-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.law-change-tag--revise    { background: #f5f3ff; color: #6d28d9; }
+.law-change-tag--partial   { background: #fffbeb; color: #b45309; }
+.law-change-tag--cancelled { background: #fef2f2; color: #b91c1c; }
+
 .law-results-list {
   display: grid;
   gap: 12px;

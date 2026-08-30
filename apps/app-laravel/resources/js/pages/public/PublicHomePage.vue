@@ -40,38 +40,10 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
-                :date="formatThaiDate(doc.metadata.publishedDate)"
-                :visibility="doc.metadata.publicationScope"
-                @click="openLaw(doc)"
-              />
-            </v-col>
-          </v-row>
-        </section>
-
-        <!-- Section: กฎหมายภายนอก -->
-        <section v-if="externalDocs.length" class="elaw-home-section">
-          <div class="elaw-section-header">
-            <div class="elaw-section-header__left">
-              <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar elaw-section-heading__bar--external" />
-                <h2 class="elaw-section-heading__text">กฎหมายภายนอก</h2>
-              </div>
-            </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase('kotmai-phaainok')">ดูทั้งหมด →</a>
-          </div>
-          <v-row class="mt-2">
-            <v-col
-              v-for="doc in externalDocs.slice(0, 3)"
-              :key="doc._id"
-              cols="12"
-              md="4"
-            >
-              <ELawLawCard
-                :title="doc.metadata.title"
-                :doc-type="toDocType(doc.metadata.documentType)"
-                :description="doc.metadata.summary"
-                :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
                 @click="openLaw(doc)"
@@ -102,7 +74,10 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
                 @click="openLaw(doc)"
@@ -133,7 +108,10 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
                 @click="openLaw(doc)"
@@ -164,8 +142,11 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
                 :issuer="doc.metadata.issuer"
                 :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
                 @click="openLaw(doc)"
@@ -242,7 +223,6 @@ function openLaw(doc: DocumentVersion): void {
 }
 
 const latestDocs = ref<DocumentVersion[]>([]);
-const externalDocs = ref<DocumentVersion[]>([]);
 const rabiapDocs = ref<DocumentVersion[]>([]);
 const khoBangkhabDocs = ref<DocumentVersion[]>([]);
 const prakatDocs = ref<DocumentVersion[]>([]);
@@ -255,13 +235,11 @@ onMounted(async () => {
       .map(mapSearchResultToDocumentVersion);
 
     latestDocs.value = databaseDocs.slice(0, 4);
-    externalDocs.value = docsByType(databaseDocs, 'kotmai-phaainok');
     rabiapDocs.value = docsByType(databaseDocs, 'rabiap');
     khoBangkhabDocs.value = docsByType(databaseDocs, 'kho-bangkhab');
     prakatDocs.value = docsByType(databaseDocs, 'prakat');
   } catch {
     latestDocs.value = [];
-    externalDocs.value = [];
     rabiapDocs.value = [];
     khoBangkhabDocs.value = [];
     prakatDocs.value = [];
@@ -292,6 +270,8 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     publishedDate,
     status: 'published',
     issuer: law.issuer ?? '',
+    changeStatus: law.change_status ?? '',
+    useStatus: law.status ?? '',
   });
 }
 
@@ -330,6 +310,8 @@ function buildDocumentVersion(input: {
   publishedDate: string | Date;
   status?: DocumentVersion['status'];
   issuer?: string;
+  changeStatus?: string;
+  useStatus?: string;
 }): DocumentVersion {
   const publishedDate = typeof input.publishedDate === 'string' ? new Date(input.publishedDate) : input.publishedDate;
 
@@ -348,6 +330,8 @@ function buildDocumentVersion(input: {
       publishedDate,
       ownerAgencyId: input.ownerAgencyId,
       issuer: input.issuer ?? '',
+      changeStatus: input.changeStatus ?? '',
+      useStatus: input.useStatus ?? '',
       keywords: [],
     },
     createdAt: publishedDate,

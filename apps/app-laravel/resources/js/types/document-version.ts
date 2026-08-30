@@ -27,6 +27,8 @@ export interface DocumentVersion {
     issueYear?: number;
     ownerAgencyId?: ObjectId;
     issuer?: string;
+    changeStatus?: string;
+    useStatus?: string;
     keywords: string[];
   };
   changeSummary?: string;

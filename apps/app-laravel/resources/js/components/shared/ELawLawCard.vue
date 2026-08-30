@@ -9,10 +9,15 @@
   >
     <!-- Tags row -->
     <div class="elaw-card__tags">
-      <div class="d-flex align-center ga-1">
+      <div class="d-flex align-center ga-1 flex-wrap">
         <DocBadge v-if="typeBadge" :type="typeBadge" />
         <span v-else class="elaw-tag elaw-tag--fallback">{{ typeLabel }}</span>
         <DocBadge v-if="statusBadge" :type="statusBadge" />
+        <span
+          v-if="changeState.variant !== 'new'"
+          class="elaw-change-tag"
+          :class="`elaw-change-tag--${changeState.variant}`"
+        >{{ changeState.label }}</span>
       </div>
       <!-- Visibility pill -->
       <div v-if="visibility" class="elaw-visibility" :class="`elaw-visibility--${visibility}`">
@@ -47,17 +52,6 @@
       <span>{{ lawGroup }}</span>
     </div>
 
-    <div v-if="visibility === 'private'" class="elaw-card__private-panel">
-      <div>
-        <div class="elaw-card__private-label">สิทธิ์การเข้าถึง</div>
-        <div class="elaw-card__private-title">
-          <v-icon icon="mdi-lock-outline" size="16" />
-          Private
-        </div>
-        <div class="elaw-card__private-note">เฉพาะผู้ได้รับสิทธิ์</div>
-      </div>
-    </div>
-
     <!-- Footer: date + link -->
     <div class="elaw-card__footer">
       <div v-if="date" class="elaw-card__date">
@@ -76,6 +70,7 @@
 import { computed } from 'vue';
 import DocBadge from './DocBadge.vue';
 import { changeStatusToBadge, docTypeToBadge, type ChangeStatus, type DocType } from './lawBadge';
+import { cardChangeState } from '../../utils/cardChangeState';
 
 type Visibility = 'public' | 'private' | 'organization';
 
@@ -84,6 +79,8 @@ const props = defineProps<{
   docType: DocType;
   description?: string;
   issuer?: string;
+  changeStatusText?: string;
+  useStatus?: string;
   department?: string;
   lawGroup?: string;
   date?: string;
@@ -101,6 +98,8 @@ const typeLabels: Record<DocType, string> = {
   'kotmai-phaainok': 'กฎหมายภายนอก',
   other: 'อื่น ๆ',
 };
+
+const changeState = computed(() => cardChangeState(props.changeStatusText, props.useStatus));
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
 const typeBadge = computed(() => docTypeToBadge(props.docType));
@@ -222,6 +221,19 @@ const visibilityIcon = computed(() =>
   margin-bottom: 10px;
 }
 
+.elaw-change-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+.elaw-change-tag--revise    { background: #f5f3ff; color: #6d28d9; }
+.elaw-change-tag--partial   { background: #fffbeb; color: #b45309; }
+.elaw-change-tag--cancelled { background: #fef2f2; color: #b91c1c; }
+
 /* Agency strip (matches LawInfoStrip agency tone) */
 .elaw-agency-strip {
   background: #ecfdf5;
@@ -272,35 +284,6 @@ const visibilityIcon = computed(() =>
   white-space: nowrap;
 }
 
-.elaw-card__private-panel {
-  border-top: 1px solid #e9dfcf;
-  margin: 0 0 14px;
-  padding-top: 14px;
-}
-
-.elaw-card__private-label {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.elaw-card__private-title {
-  align-items: center;
-  color: #0f172a;
-  display: inline-flex;
-  font-size: 15px;
-  font-weight: 800;
-  gap: 5px;
-  margin-top: 2px;
-}
-
-.elaw-card__private-note {
-  color: #b45309;
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
 /* Footer */
 .elaw-card__footer {
   display: flex;
@@ -332,10 +315,4 @@ const visibilityIcon = computed(() =>
   white-space: nowrap;
 }
 
-.elaw-card:has(.elaw-card__private-panel) .elaw-card__read-btn {
-  background: #b7790b;
-  border-radius: 8px;
-  color: #fff;
-  padding: 9px 13px;
-}
 </style>
