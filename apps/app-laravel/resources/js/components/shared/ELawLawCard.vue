@@ -56,17 +56,6 @@
       <span>{{ lawGroup }}</span>
     </div>
 
-    <div v-if="visibility === 'private'" class="elaw-card__private-panel">
-      <div>
-        <div class="elaw-card__private-label">สิทธิ์การเข้าถึง</div>
-        <div class="elaw-card__private-title">
-          <v-icon icon="mdi-lock-outline" size="16" />
-          Private
-        </div>
-        <div class="elaw-card__private-note">เฉพาะผู้ได้รับสิทธิ์</div>
-      </div>
-    </div>
-
     <!-- Footer: date + link -->
     <div class="elaw-card__footer">
       <div v-if="date" class="elaw-card__date">
@@ -302,35 +291,6 @@ const visibilityIcon = computed(() =>
   white-space: nowrap;
 }
 
-.elaw-card__private-panel {
-  border-top: 1px solid #e9dfcf;
-  margin: 0 0 14px;
-  padding-top: 14px;
-}
-
-.elaw-card__private-label {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.elaw-card__private-title {
-  align-items: center;
-  color: #0f172a;
-  display: inline-flex;
-  font-size: 15px;
-  font-weight: 800;
-  gap: 5px;
-  margin-top: 2px;
-}
-
-.elaw-card__private-note {
-  color: #b45309;
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
 /* Footer */
 .elaw-card__footer {
   display: flex;
@@ -362,10 +322,4 @@ const visibilityIcon = computed(() =>
   white-space: nowrap;
 }
 
-.elaw-card:has(.elaw-card__private-panel) .elaw-card__read-btn {
-  background: #b7790b;
-  border-radius: 8px;
-  color: #fff;
-  padding: 9px 13px;
-}
 </style>
