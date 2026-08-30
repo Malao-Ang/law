@@ -362,6 +362,14 @@
                   <p class="law-list-card__desc" :class="{ 'law-list-card__desc--empty': !law.summary }">
                     {{ law.summary || 'ไม่มีสรุปข้อมูล' }}
                   </p>
+                  <div
+                    v-if="cardChangeState(law.change_status, law.status).variant !== 'new'"
+                    class="law-change-box"
+                    :class="`law-change-box--${cardChangeState(law.change_status, law.status).variant}`"
+                  >
+                    <v-icon size="13" :icon="cardChangeState(law.change_status, law.status).variant === 'revise' ? 'mdi-file-document-edit-outline' : (cardChangeState(law.change_status, law.status).variant === 'partial' ? 'mdi-alert-outline' : 'mdi-cancel')" />
+                    {{ cardChangeState(law.change_status, law.status).label }}
+                  </div>
                   <div class="law-list-card__meta">
                     <span v-if="law.published_date">
                       <v-icon size="13" icon="mdi-calendar-blank-outline" />
@@ -447,6 +455,7 @@ import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { canDisplayLawResult } from '../../utils/lawAccess';
+import { cardChangeState } from '../../utils/cardChangeState';
 
 const PER_PAGE = 20;
 
@@ -1405,6 +1414,20 @@ onBeforeUnmount(() => {
 }
 
 /* ── List result cards ── */
+.law-change-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.law-change-box--revise    { background: #f5f3ff; color: #6d28d9; }
+.law-change-box--partial   { background: #fffbeb; color: #b45309; }
+.law-change-box--cancelled { background: #fef2f2; color: #b91c1c; }
+
 .law-results-list {
   display: grid;
   gap: 12px;
