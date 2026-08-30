@@ -26,6 +26,7 @@ export interface DocumentVersion {
     repealedDate?: Date;
     issueYear?: number;
     ownerAgencyId?: ObjectId;
+    issuer?: string;
     keywords: string[];
   };
   changeSummary?: string;
