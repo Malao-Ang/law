@@ -164,6 +164,7 @@
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :description="doc.metadata.summary"
+                :issuer="doc.metadata.issuer"
                 :department="doc.metadata.ownerAgencyId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
