@@ -432,6 +432,7 @@ class LawMetaTest extends TestCase
         $this->assertSame('กฎหมายภายนอก', $parent['law_type']);
         $this->assertNull($parent['parent_document_id']);
         $this->assertSame([], $parent['parent_document_ids']);
+        $this->assertArrayHasKey('change_status', $parent);
 
         $this->assertNotNull($child);
         $this->assertSame('กฎกระทรวงลูก', $child['title']);

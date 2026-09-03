@@ -136,6 +136,7 @@ class ReviewStore
             $parentDocumentIds = [];
             $accessScope = 'public';
             $lawType = '';
+            $changeStatus = '';
 
             $meta = [];
             $review = $this->blob->read('review', $documentId);
@@ -149,6 +150,7 @@ class ReviewStore
                 $parentDocumentId = $parentDocumentIds[0] ?? null;
                 $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
                 $lawType = trim((string) ($meta['law_type'] ?? ''));
+                $changeStatus = trim((string) ($meta['change_status'] ?? ''));
             }
 
             $documents[] = [
@@ -165,10 +167,10 @@ class ReviewStore
                 'error' => isset($status['error']) ? (string) $status['error'] : null,
                 'document_type' => $meta['document_type'] ?? 'new',
                 'source' => $meta['source'] ?? '',
-                'law_type' => trim((string) ($meta['law_type'] ?? '')),
+                'law_type' => $lawType,
+                'change_status' => $changeStatus === '' ? null : $changeStatus,
                 'parent_document_id' => $parentDocumentId,
                 'parent_document_ids' => $parentDocumentIds,
-                'law_type' => $lawType,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,

@@ -141,6 +141,7 @@ import { buildSections } from '../../composables/useLawSections';
 import {
   documentsByIds,
   documentsSiblingsAndParents,
+  documentsWithoutParent,
   filterByQuery,
   pickableDocuments,
 } from '../../composables/useLawCatalog';
@@ -186,14 +187,21 @@ const catalogMode = computed(() => {
 });
 
 const col1Head = computed(() => {
-  if (catalogMode.value === 'siblings') return 'กฎหมายแม่และชั้นเดียวกัน';
+  const hasParent = (props.parentDocumentIds?.length ?? 0) > 0;
+  if (catalogMode.value === 'siblings') {
+    return hasParent ? 'กฎหมายแม่และชั้นเดียวกัน' : 'กฎหมายที่เป็นราก (ไม่มีกฎหมายแม่)';
+  }
   if (catalogMode.value === 'parents') return 'กฎหมายแม่';
-  return 'กฎหมายที่อ้างถึง';
+  return hasParent ? 'กฎหมายที่อ้างถึง' : 'กฎหมายที่เป็นราก (ไม่มีกฎหมายแม่)';
 });
 
 const col1EmptyMessage = computed(() => {
   if (!documentsLoaded.value) return 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย';
-  if (catalogMode.value === 'siblings') return 'ไม่พบกฎหมายแม่หรือกฎหมายชั้นเดียวกันภายใต้กฎหมายแม่ที่เลือก';
+  if (catalogMode.value === 'siblings') {
+    return (props.parentDocumentIds?.length ?? 0) > 0
+      ? 'ไม่พบกฎหมายแม่หรือกฎหมายชั้นเดียวกันภายใต้กฎหมายแม่ที่เลือก'
+      : 'ไม่พบเอกสารชั้นเดียวกันที่ยังไม่มีกฎหมายแม่';
+  }
   if (catalogMode.value === 'parents') {
     return props.parentDocumentIds?.length ? 'ไม่พบกฎหมายแม่ที่เลือก' : 'เลือกกฎหมายแม่ก่อน';
   }
@@ -207,11 +215,14 @@ const filteredCol1 = computed(() => {
     const parentIds = props.parentDocumentIds ?? [];
     docs = parentIds.length
       ? documentsSiblingsAndParents(documents.value, parentIds, props.excludeDocumentId)
-      : pickableDocuments(documents.value, props.excludeDocumentId);
+      : documentsWithoutParent(documents.value, props.excludeDocumentId);
   } else if (catalogMode.value === 'parents') {
     docs = documentsByIds(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId);
   } else {
-    docs = pickableDocuments(documents.value, props.excludeDocumentId);
+    const parentIds = props.parentDocumentIds ?? [];
+    docs = parentIds.length
+      ? pickableDocuments(documents.value, props.excludeDocumentId)
+      : documentsWithoutParent(documents.value, props.excludeDocumentId);
   }
   return filterByQuery(docs, catalogQuery.value) as DocumentListItem[];
 });

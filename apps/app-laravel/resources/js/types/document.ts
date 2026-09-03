@@ -251,6 +251,7 @@ export interface DocumentListItem {
   parent_document_id?: string | null;
   parent_document_ids?: string[];
   law_type?: string | null;
+  change_status?: string | null;
   access_scope?: 'public' | 'private';
   workflow_completed_step?: number | null;
   workflow_current_step?: number | null;
