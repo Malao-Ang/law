@@ -41,7 +41,7 @@
         @click.stop="expanded = !expanded"
       >
         <v-icon :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="16" />
-        {{ expanded ? 'ย่อขั้นเดียวกัน' : `ขั้นเดียวกัน ${peers.length}` }}
+        {{ expanded ? 'ย่อประวัติการปรับปรุง' : 'แก้ไขการปรับปรุง' }}
       </button>
     </div>
     <div v-if="canTogglePeers && expanded" class="h-peers">

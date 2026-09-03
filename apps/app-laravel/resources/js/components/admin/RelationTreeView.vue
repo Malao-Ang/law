@@ -39,7 +39,7 @@
         @click.stop="expanded = !expanded"
       >
         <v-icon :icon="expanded ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="18" />
-        <span>{{ expanded ? 'ย่อ' : `ขั้นเดียวกัน ${peers.length}` }}</span>
+        <span>{{ expanded ? 'ย่อ' : 'แก้ไขการปรับปรุง' }}</span>
       </button>
 
       <SameLevelInlineChain
