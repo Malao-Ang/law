@@ -106,10 +106,57 @@
           </div>
         </v-card>
 
+        <v-card class="lawx-card lawx-download-card" elevation="0">
+          <div class="lawx-download-card__title">
+            <span class="mdi mdi-download-circle-outline" />
+            ดาวน์โหลดเอกสาร
+          </div>
+          <div class="lawx-download-card__actions">
+            <v-btn
+              :href="downloadUrl"
+              variant="tonal"
+              size="small"
+              prepend-icon="mdi-file-document-outline"
+            >
+              ดาวน์โหลดเอกสารต้นฉบับ
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              size="small"
+              prepend-icon="mdi-file-pdf-box"
+              :loading="pdfExportLoading"
+              @click="handlePdfExport"
+            >
+              ดาวน์โหลด PDF
+            </v-btn>
+          </div>
+
+          <template v-if="downloadableRelations.length">
+            <div class="lawx-download-card__subtitle">
+              <span class="mdi mdi-link-variant" />
+              เอกสารที่เชื่อมโยง
+            </div>
+            <div class="lawx-download-card__relations">
+              <div v-for="rel in downloadableRelations" :key="rel.id" class="lawx-download-card__relrow">
+                <span class="lawx-download-card__reltitle">{{ rel.target_title || rel.target_document_id }}</span>
+                <v-btn
+                  :href="relatedDocumentFileUrl(props.documentId, rel.target_document_id!)"
+                  variant="text"
+                  size="x-small"
+                  prepend-icon="mdi-download"
+                  class="text-none"
+                >
+                  ดาวน์โหลด
+                </v-btn>
+              </div>
+            </div>
+          </template>
+        </v-card>
+
         <template v-if="usesOriginalPdfLayout">
           <v-card tag="section" class="lawx-card" elevation="0">
             <div class="d-flex justify-end mb-2">
-              <v-btn :href="fileUrl" target="_blank" prepend-icon="mdi-download" variant="tonal" size="small">
+              <v-btn :href="downloadUrl" prepend-icon="mdi-download" variant="tonal" size="small">
                 ดาวน์โหลด PDF
               </v-btn>
             </div>
@@ -225,7 +272,7 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { documentFileUrl } from '../../api/client';
+import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, relatedDocumentFileUrl } from '../../api/client';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
@@ -285,6 +332,8 @@ const isOld = computed(() => documentStore.review?.law_meta?.document_type === '
 const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith('pdf') ?? false);
 const usesOriginalPdfLayout = computed(() => isOld.value || isPdfSource.value);
 const fileUrl = computed(() => documentFileUrl(props.documentId));
+const downloadUrl = computed(() => documentFileDownloadUrl(props.documentId));
+const pdfExportLoading = ref(false);
 
 const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
@@ -305,6 +354,20 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
+const downloadableRelations = computed(() =>
+  relations.value.filter((rel) => rel.target_document_id),
+);
+
+async function handlePdfExport(): Promise<void> {
+  pdfExportLoading.value = true;
+  try {
+    await downloadPdfExport(props.documentId);
+  } catch (e) {
+    console.error('PDF export failed', e);
+  } finally {
+    pdfExportLoading.value = false;
+  }
+}
 
 const notCurrentVersion = computed(() =>
   versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
@@ -628,6 +691,58 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-card__content :deep(td) {
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
   font-size: 16px !important;
+}
+
+.lawx-download-card {
+  padding: 16px 24px;
+}
+
+.lawx-download-card__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lawx-download-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lawx-download-card__subtitle {
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.lawx-download-card__relations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lawx-download-card__relrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.lawx-download-card__reltitle {
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .lawx-parentcard {

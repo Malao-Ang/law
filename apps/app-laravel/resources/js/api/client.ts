@@ -105,6 +105,14 @@ export function documentFileUrl(documentId: string): string {
   return `/api/documents/${documentId}/file`;
 }
 
+export function documentFileDownloadUrl(documentId: string): string {
+  return `/api/documents/${encodeURIComponent(documentId)}/file?download=1`;
+}
+
+export function relatedDocumentFileUrl(documentId: string, targetDocumentId: string): string {
+  return `/api/documents/${encodeURIComponent(documentId)}/related/${encodeURIComponent(targetDocumentId)}/file?download=1`;
+}
+
 export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {
   return jsonRequest<{ documents: DocumentListItem[] }>('/api/documents');
 }
