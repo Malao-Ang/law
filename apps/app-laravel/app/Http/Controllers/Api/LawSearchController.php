@@ -54,7 +54,7 @@ class LawSearchController extends Controller
                     'total' => count($esRows) + count($supplement),
                     'results' => $results,
                     'facets' => $esResult['facets'] ?? $fileBased['facets'],
-                    'fuzzy' => false,
+                    'fuzzy' => ($esResult['meta']['mode'] ?? 'exact') !== 'exact',
                     'meta' => [
                         'engine' => $supplement === [] ? 'elastic' : 'mixed',
                         'mode' => (string) ($esResult['meta']['mode'] ?? 'exact'),
