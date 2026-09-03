@@ -96,8 +96,8 @@
           'is-original-pdf': usesOriginalPdfLayout,
         }"
       >
-        <v-card tag="section" class="lawx-headcard" elevation="0">
-          <span class="lawx-headcard__badge">{{ meta.law_type || 'เอกสาร' }}</span>
+        <v-card tag="section" class="lawx-headcard" elevation="0" :style="{ borderTopColor: badgeColor }">
+          <DocBadge :type="badgeType" :label="badgeLabel" class="lawx-headcard__badge" />
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
@@ -175,7 +175,36 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :relations="documentRelations(relations)" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
+        <section v-if="docRelations.length" class="lawx-parentcard">
+          <div class="lawx-parentcard__head">
+            <span class="mdi mdi-bank" />
+            กฎหมายแม่ / เกี่ยวข้องทั้งฉบับ
+          </div>
+          <div
+            v-for="group in groupedDocRelations"
+            :key="group.type"
+            class="lawx-relgroup"
+          >
+            <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+            <a
+              v-for="rel in group.items"
+              :key="rel.id"
+              class="lawx-relrow"
+              :class="`is-${group.type}`"
+              :href="relationHref(rel) ?? undefined"
+              :target="safeUrl(rel.url) ? '_blank' : undefined"
+              rel="noopener"
+            >
+              <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+              <span class="lawx-relrow__main">
+                <span class="lawx-relrow__title">{{ rel.target_title }}</span>
+                <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+              </span>
+              <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+            </a>
+          </div>
+        </section>
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
       </template>
@@ -197,6 +226,8 @@ import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
 import { documentFileUrl } from '../../api/client';
+import DocBadge from '../shared/DocBadge.vue';
+import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -261,6 +292,13 @@ const articleCount = computed(() =>
 const displayArticleCount = computed(() => articleCount.value || meta.value.section_count || 0);
 const isExternal = computed(() => sourceOf(meta.value.law_type, documentTypes.value, meta.value.source) === 'external');
 const unitWord = computed(() => (isExternal.value ? 'มาตรา' : 'ข้อ'));
+const badgeType = computed(() => lawBadgeType(meta.value.law_type, isExternal.value));
+const badgeColor = computed(() => LAW_BADGE_COLORS[badgeType.value]);
+const badgeLabel = computed(() =>
+  isExternal.value && meta.value.law_type
+    ? `${meta.value.law_type} · กฎหมายภายนอก`
+    : (meta.value.law_type || 'เอกสาร'),
+);
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
@@ -289,8 +327,7 @@ const RELATION_GROUP_LABELS: Record<RelationType, string> = {
 
 const RELATION_GROUP_ORDER: RelationType[] = ['repeals', 'supersedes', 'amends', 'issued_under', 'related'];
 
-function groupedSectionRelations(sectionId: string): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
-  const rels = sectionRelations(sectionId);
+function groupRelations(rels: LawRelation[]): Array<{ type: RelationType; label: string; items: LawRelation[] }> {
   return RELATION_GROUP_ORDER
     .map((type) => ({
       type,
@@ -299,6 +336,13 @@ function groupedSectionRelations(sectionId: string): Array<{ type: RelationType;
     }))
     .filter((group) => group.items.length > 0);
 }
+
+function groupedSectionRelations(sectionId: string) {
+  return groupRelations(sectionRelations(sectionId));
+}
+
+const docRelations = computed<LawRelation[]>(() => documentRelations(relations.value));
+const groupedDocRelations = computed(() => groupRelations(docRelations.value));
 
 function badgeOf(sectionId: string): string {
   return sections.value.find((section) => section.id === sectionId)?.badge ?? '';
@@ -551,7 +595,7 @@ onBeforeUnmount(() => observer?.disconnect());
   box-shadow: 0 10px 40px rgba(75, 70, 61, 0.08);
 }
 
-.lawx-headcard__badge { display: inline-block; background: #fef9ec; color: #7b580d; border: 1px solid #d2c5b3; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; font-weight: 700; padding: 4px 14px; border-radius: 999px; margin-bottom: 12px; }
+.lawx-headcard__badge { margin-bottom: 12px; }
 .lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
 .lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
@@ -585,6 +629,26 @@ onBeforeUnmount(() => observer?.disconnect());
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif !important;
   font-size: 16px !important;
 }
+
+.lawx-parentcard {
+  background: rgb(var(--v-theme-detail-surface));
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-top: 4px solid #7c3aed;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 18px 42px rgba(148, 163, 184, 0.14);
+}
+.lawx-parentcard__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1b14;
+  margin-bottom: 10px;
+}
+.lawx-parentcard__head .mdi { color: #7c3aed; }
 
 .lawx-relcard {
   margin-top: 14px;

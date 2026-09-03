@@ -86,52 +86,19 @@
       </v-card-text>
     </v-card>
 
-    <v-card v-if="(relations ?? []).length" tag="section" flat border rounded="lg">
-      <v-card-title class="d-flex align-center ga-2 text-body-2 font-weight-bold text-elaw-navy">
-        <v-icon icon="mdi-link-variant" size="small" />
-        กฎหมายที่เกี่ยวข้อง
-      </v-card-title>
-      <v-card-text>
-        <div
-          v-for="rel in relations"
-          :key="rel.id"
-          class="d-flex align-center ga-2 text-caption my-2"
-          :class="relationRowClass(rel.type)"
-        >
-          <v-icon
-            :icon="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'"
-            size="small"
-          />
-          <span class="font-weight-medium">{{ relationTypeLabel(rel.type) }}</span>
-          <span>{{ rel.target_title }}<span v-if="rel.target_section"> · {{ rel.target_section }}</span></span>
-        </div>
-      </v-card-text>
-    </v-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { LawMeta, LawRelation, RelationType } from '../../types/document';
+import type { LawMeta } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
-import {
-  RELATION_TYPE_ICONS,
-  relationTypeLabel,
-} from '../../types/lawRelation';
 import { formatThaiDate } from '../../utils/thaiDate';
 import VersionHistoryTimeline from './VersionHistoryTimeline.vue';
 
-defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; relations?: LawRelation[]; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
+defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
-}
-
-function relationRowClass(type: RelationType): string {
-  if (type === 'repeals') return 'text-error';
-  if (type === 'supersedes') return 'text-orange-darken-2';
-  if (type === 'amends') return 'text-teal';
-  if (type === 'issued_under') return 'text-deep-purple';
-  return 'text-medium-emphasis';
 }
 </script>
 
