@@ -12,11 +12,22 @@
         @click="$emit('select', item.row.id)"
       >
         <div class="slc__meta">
-          <span class="slc__kind">{{ item.kindLabel }}</span>
-          <span class="slc__status" :class="`is-${item.kind}`">{{ item.statusLabel }}</span>
+          <v-chip
+            v-if="item.kindLabel"
+            size="x-small"
+            variant="tonal"
+            color="grey"
+            class="font-weight-bold"
+          >{{ item.kindLabel }}</v-chip>
+          <v-chip
+            v-if="item.versionLabel"
+            size="x-small"
+            color="admin-primary"
+            variant="tonal"
+          >{{ item.versionLabel }}</v-chip>
         </div>
-        <div v-if="item.versionLabel" class="slc__version">{{ item.versionLabel }}</div>
         <div class="slc__title">{{ item.row.title }}</div>
+        <div class="slc__status" :class="`is-${item.kind}`">สถานะ: {{ item.statusLabel }}</div>
       </button>
       <span v-if="index < items.length - 1" class="slc__arrow" aria-hidden="true">
         <span class="slc__rel">{{ peerEdgeLabel(items[index + 1].row) }}</span>
@@ -59,9 +70,9 @@ const items = computed(() => {
       row,
       kind,
       size: versionNodeSize(row.changeStatus),
-      kindLabel: editionKindLabel(row.changeStatus),
+      kindLabel: editionKindLabel(row.typeShort || row.lawType),
       versionLabel: sameLevelVersionLabel(chain, row.id),
-      statusLabel: kind === 'revoked' ? 'ยกเลิก' : kind === 'active' ? 'บังคับใช้' : (row.metaStatus || '—'),
+      statusLabel: row.metaStatus || (kind === 'revoked' ? 'ยกเลิก' : kind === 'active' ? 'มีผลบังคับใช้' : '—'),
     };
   });
 });
@@ -77,62 +88,49 @@ const items = computed(() => {
 }
 
 .slc__card {
-  width: 220px;
-  padding: 10px 12px;
-  border: 1px solid #94a3b8;
+  width: 240px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .slc__card.is-small {
-  width: 180px;
-  padding: 8px 10px;
+  width: 220px;
   border-style: dashed;
 }
 
 .slc__card.is-current {
   border-color: #1e3a8a;
-  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.14);
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.08);
 }
 
 .slc__meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
-.slc__kind {
-  font-size: 11px;
+.slc__title {
+  font-size: 13px;
   font-weight: 700;
-  color: #64748b;
-}
-
-.slc__version {
-  margin-bottom: 4px;
-  color: #1e3a8a;
-  font-size: 11px;
-  font-weight: 800;
+  line-height: 1.45;
+  color: #1e293b;
 }
 
 .slc__status {
-  font-size: 11px;
-  font-weight: 700;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .slc__status.is-revoked { color: #dc2626; }
 .slc__status.is-active { color: #16a34a; }
 .slc__status.is-other { color: #64748b; }
-
-.slc__title {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: #1e293b;
-}
 
 .slc__arrow {
   display: inline-flex;

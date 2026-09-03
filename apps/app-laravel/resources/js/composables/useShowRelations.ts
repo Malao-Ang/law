@@ -459,11 +459,9 @@ export function sameLevelVersionLabel(chain: ShowRelRow[], documentId: string): 
   return number > 0 ? `เวอร์ชัน ${number}` : '';
 }
 
-export function editionKindLabel(changeStatus: string): string {
-  if (isSectionEditionChange(changeStatus)) return 'ปรับปรุงรายข้อ';
-  if (changeStatus.trim() === 'ปรับปรุงทั้งฉบับ' || changeStatus.trim() === 'ยกเลิกทั้งฉบับ') return 'ปรับปรุงทั้งฉบับ';
-  if (changeStatus.trim() === 'กฎหมายใหม่') return 'กฎหมายใหม่';
-  return 'ทั้งฉบับ';
+export function editionKindLabel(lawTypeShort = ''): string {
+  const typeLabel = lawTypeShort.trim();
+  return typeLabel || 'เอกสาร';
 }
 
 export function buildRelationTree(
