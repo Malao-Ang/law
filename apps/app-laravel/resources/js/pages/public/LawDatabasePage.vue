@@ -451,7 +451,6 @@ import { useAuthStore } from '../../stores/authStore';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
-import { canDisplayLawResult } from '../../utils/lawAccess';
 import { cardChangeState } from '../../utils/cardChangeState';
 
 const PER_PAGE = 20;
@@ -639,7 +638,7 @@ const years = computed(() => {
 });
 
 const sortedResults = computed(() => {
-  const items = searchStore.results.filter((law) => canDisplayLawResult(law, auth.isAuthenticated));
+  const items = [...searchStore.results];
 
   switch (sortBy.value) {
     case 'thai-asc':
