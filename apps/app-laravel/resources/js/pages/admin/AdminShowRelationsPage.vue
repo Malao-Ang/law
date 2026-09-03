@@ -284,7 +284,12 @@
         </div>
         <template v-else>
           <div v-if="viewMode === 'tree'" class="rel-tree-wrap">
-            <RelationTreeView v-if="pagedRootNode" :node="pagedRootNode" />
+            <RelationTreeView
+              v-if="pagedRootNode"
+              :node="pagedRootNode"
+              :current-id="selectedId"
+              @select="openDetail"
+            />
             <div v-else class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
             </div>
@@ -293,7 +298,7 @@
             <div v-if="!pagedRootNode && !filteredRootNode" class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
             </div>
-            <HierarchyList v-else-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" />
+            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" />
           </div>
         </template>
 
@@ -345,14 +350,14 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchReportSummary, fetchReview } from '../../api/client';
-import type { LawMeta, RelationType, ReportSummary } from '../../types/document';
-import { documentRelations } from '../../composables/useLawSections';
+import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 import RelationTreeView from '../../components/admin/RelationTreeView.vue';
 import HierarchyList from '../../components/admin/HierarchyList.vue';
 import {
   RELATION_FILTERS,
   buildRelationTree,
+  collectDescendantIds,
   displayLawDate,
   flattenTree,
   loadRecentIds,
@@ -366,6 +371,7 @@ import {
   type ShowRelRow,
   isActiveStatus,
   isCancelledStatus,
+  isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
 
 const PAGE_SIZE = 20;
@@ -385,7 +391,7 @@ const summary = ref<ReportSummary>({
   documents: [],
 });
 const rootMeta = ref<LawMeta | null>(null);
-const rootRelations = ref(documentRelations([]));
+const rootRelations = ref<Record<string, LawRelation[]>>({});
 const pickerOpen = ref(false);
 const pickerId = ref<string | null>(null);
 const viewMode = ref<'tree' | 'hierarchy'>('tree');
@@ -484,7 +490,12 @@ const allowedTypes = computed(() => (typeFilters.value.length ? typeFilters.valu
 
 const rootNode = computed(() => {
   if (!selectedId.value) return null;
-  return buildRelationTree(selectedId.value, rows.value, rootRelations.value, allowedTypes.value);
+  return buildRelationTree(
+    selectedId.value,
+    rows.value,
+    rootRelations.value,
+    allowedTypes.value,
+  );
 });
 
 function filterTree(node: RelTreeNode | null): RelTreeNode | null {
@@ -494,7 +505,7 @@ function filterTree(node: RelTreeNode | null): RelTreeNode | null {
     .map((child) => filterTree(child))
     .filter((child): child is RelTreeNode => Boolean(child));
 
-  const selfMatch = node.level === 0 || (
+  const selfMatch = node.level === 0 || isKeptInRelationGraph(node.row) || (
     (!treeType.value || node.row.lawType === treeType.value)
     && (!treeStatus.value || node.row.workflowStage === treeStatus.value || node.row.metaStatus === treeStatus.value)
     && (!q || node.row.title.toLowerCase().includes(q) || node.row.org.toLowerCase().includes(q) || node.row.group.toLowerCase().includes(q))
@@ -572,11 +583,23 @@ async function loadDetail(id: string): Promise<void> {
   try {
     const review = await fetchReview(id);
     rootMeta.value = review.law_meta ?? null;
-    rootRelations.value = documentRelations(review.relations);
+    const bag: Record<string, LawRelation[]> = { [id]: review.relations ?? [] };
+    const extraIds = collectDescendantIds(id, rows.value);
+    const extras = await Promise.all(
+      extraIds.map((documentId) =>
+        fetchReview(documentId)
+          .then((item) => [documentId, item.relations ?? []] as const)
+          .catch(() => [documentId, []] as const),
+      ),
+    );
+    for (const [documentId, rels] of extras) {
+      bag[documentId] = rels;
+    }
+    rootRelations.value = bag;
     rememberRecentId(id);
   } catch {
     rootMeta.value = null;
-    rootRelations.value = [];
+    rootRelations.value = {};
   } finally {
     detailLoading.value = false;
   }
@@ -601,7 +624,7 @@ watch(selectedId, async (id) => {
   if (id) await loadDetail(id);
   else {
     rootMeta.value = null;
-    rootRelations.value = [];
+    rootRelations.value = {};
   }
 });
 

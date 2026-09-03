@@ -8,8 +8,15 @@ use Tests\TestCase;
 
 class DocumentVersionsTest extends TestCase
 {
-    private function writeDoc(ReviewStore $store, string $id, ?string $parentId, string $promulgation, string $status, string $changeStatus): void
-    {
+    private function writeDoc(
+        ReviewStore $store,
+        string $id,
+        ?string $parentId,
+        string $promulgation,
+        string $status,
+        string $changeStatus,
+        string $lawType = '',
+    ): void {
         $store->setStatus($id, ['status' => 'done', 'source_file' => "{$id}.pdf"]);
         $store->writeReviewDocument($id, [
             'document_id' => $id,
@@ -19,6 +26,7 @@ class DocumentVersionsTest extends TestCase
             'summary' => ['page_count' => 1, 'block_count' => 0, 'review_required_count' => 0],
             'law_meta' => [
                 'title' => "Doc {$id}",
+                'law_type' => $lawType,
                 'status' => $status,
                 'change_status' => $changeStatus,
                 'promulgation_date' => $promulgation,
@@ -48,6 +56,24 @@ class DocumentVersionsTest extends TestCase
         $this->assertSame(['v1.0', 'v2.0', 'v3.0'], array_column($res['versions'], 'version_label'));
         $this->assertSame([false, false, true], array_column($res['versions'], 'is_current'));
         $this->assertSame('มีผลบังคับใช้', $res['versions'][2]['status']);
+    }
+
+    public function test_same_level_chain_excludes_different_law_type_children(): void
+    {
+        $store = app(ReviewStore::class);
+        $suffix = uniqid();
+        $v1 = "ver_{$suffix}_a";
+        $v2 = "ver_{$suffix}_b";
+        $child = "ver_{$suffix}_ann";
+        $this->writeDoc($store, $v1, null, '2566-06-01', 'ยกเลิกการใช้งาน', 'กฎหมายใหม่', 'ระเบียบ');
+        $this->writeDoc($store, $v2, $v1, '2567-02-12', 'มีผลบังคับใช้', 'ปรับปรุงทั้งฉบับ', 'ระเบียบ');
+        $this->writeDoc($store, $child, $v2, '2567-08-01', 'มีผลบังคับใช้', 'กฎหมายใหม่', 'ประกาศ');
+        Cache::forget('law-meta-list');
+
+        $res = $this->getJson("/api/documents/{$v1}/versions")->assertOk()->json();
+
+        $this->assertSame([$v1, $v2], array_column($res['versions'], 'document_id'));
+        $this->assertSame($v2, $res['current_document_id']);
     }
 
     public function test_lone_document_returns_single_current_version(): void

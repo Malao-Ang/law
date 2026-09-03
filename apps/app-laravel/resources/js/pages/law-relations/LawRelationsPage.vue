@@ -92,6 +92,15 @@
                 {{ relationTypeLabel(rel.type) }}
               </v-chip>
               <span class="relations-list__target">{{ formatRelationTarget(rel) }}</span>
+              <v-chip
+                v-if="changeDetailMeta(rel.change_detail)"
+                size="x-small"
+                :color="changeDetailMeta(rel.change_detail)?.color"
+                variant="tonal"
+                :prepend-icon="changeDetailMeta(rel.change_detail)?.icon"
+              >
+                {{ changeDetailMeta(rel.change_detail)?.title }}
+              </v-chip>
               <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
               <v-spacer />
               <v-btn
@@ -147,6 +156,15 @@
                     {{ relationTypeLabel(rel.type) }}
                   </v-chip>
                   <span class="relations-list__target">{{ formatRelationTarget(rel) }}</span>
+                  <v-chip
+                    v-if="changeDetailMeta(rel.change_detail)"
+                    size="x-small"
+                    :color="changeDetailMeta(rel.change_detail)?.color"
+                    variant="tonal"
+                    :prepend-icon="changeDetailMeta(rel.change_detail)?.icon"
+                  >
+                    {{ changeDetailMeta(rel.change_detail)?.title }}
+                  </v-chip>
                   <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
                   <v-spacer />
                   <v-btn
@@ -180,6 +198,7 @@
       :whole-document-only="isWholeDocumentChange"
       :existing-relations="relations"
       :section-labels="sectionLabels"
+      :change-status="changeStatus"
       @close="closeRelationDialog"
       @save="onRelationSave"
     />
@@ -200,6 +219,9 @@ import {
   RELATION_TYPE_ICONS,
   formatRelationTarget,
   relationTypeLabel,
+  uniqueRelationChangeDetails,
+  changeDetailMeta,
+  normalizeChangeDetail,
 } from '../../types/lawRelation';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
@@ -231,16 +253,16 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
 const changeDetails = computed(() => documentStore.review?.law_meta?.change_details ?? []);
 const hasSectionCancelDetail = computed(() =>
-  changeDetails.value.includes('ยกเลิกข้อ') || changeDetails.value.includes('ยกเลิกมาตรา'),
+  changeDetails.value.some((detail) => normalizeChangeDetail(detail) === 'ยกเลิกข้อ'),
 );
 const isWholeDocumentChange = computed(() =>
   changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ยกเลิกทั้งฉบับ',
 );
 const isSectionChange = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา' || changeStatus.value === 'ยกเลิกรายมาตรา',
+  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
 );
 const showDocumentRelations = computed(() => !isSectionChange.value);
-const showSectionRelations = computed(() => !isWholeDocumentChange.value);
+const showSectionRelations = computed(() => isSectionChange.value);
 const suggestedRelationType = computed<RelationType | undefined>(() => {
   if (hasSectionCancelDetail.value) return 'repeals';
   if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
@@ -248,19 +270,28 @@ const suggestedRelationType = computed<RelationType | undefined>(() => {
   return undefined;
 });
 const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
-  if (isWholeDocumentChange.value) return 'siblings';
-  if (isSectionChange.value) return 'parents';
+  if (!parentIds.value.length) return 'siblings';
+  if (isWholeDocumentChange.value || isSectionChange.value) return 'siblings';
   return relationDialog.value.scope === 'document' ? 'siblings' : 'all';
 });
 const documentRelationsHint = computed(() => {
-  if (isWholeDocumentChange.value) {
-    return 'เลือกกฎหมายชั้นเดียวกัน (พี่น้องภายใต้กฎหมายแม่เดียวกัน) ทั้งฉบับ ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย';
+  if (changeStatus.value === 'กฎหมายใหม่') {
+    return 'กฎหมายใหม่ระบุได้แค่ลำดับชั้นเอกสาร (กฎหมายแม่) ไม่ผูกฉบับขั้นเดียวกัน';
   }
-  return 'บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง เลือกได้เฉพาะเอกสารที่ออกภายใต้กฎหมายแม่ด้านบน';
+  if (isWholeDocumentChange.value) {
+    return parentIds.value.length
+      ? 'เลือกกฎหมายแม่หรือกฎหมายขั้นเดียวกันที่จะถูกแทนที่ทั้งฉบับ เมื่อบันทึก ฉบับตั้งต้นและฉบับแก้รายข้อในสายนั้นจะถูกยกเลิก และเอกสารนี้เป็นฉบับบังคับใช้ล่าสุด'
+      : 'ยังไม่ได้เลือกกฎหมายแม่ จึงเลือกได้เฉพาะเอกสารที่ไม่มีกฎหมายแม่ เพื่อผูกกับฉบับขั้นเดียวกัน';
+  }
+  return parentIds.value.length
+    ? 'บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง เลือกได้จากกฎหมายแม่และเอกสารที่ออกภายใต้แม่เดียวกัน'
+    : 'ยังไม่ได้เลือกกฎหมายแม่ จึงค้นหาเอกสารได้ทั้งหมด เพื่อผูกความสัมพันธ์กับฉบับที่เกี่ยวข้อง';
 });
 const sectionRelationsHint = computed(() => {
   if (isSectionChange.value) {
-    return 'เลือกข้อหรือมาตราย่อยของกฎหมายแม่ (กฎหมายเป้าหมาย) ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย ไม่เลือกทั้งฉบับ';
+    return parentIds.value.length
+      ? 'เลือกข้อของกฎหมายแม่หรือกฎหมายขั้นเดียวกันที่กำลังแก้ ฉบับเดิมยังบังคับใช้คู่กัน จนกว่าจะมีเอกสารปรับปรุงทั้งฉบับออกมาแทนที่ทั้งสาย'
+      : 'ยังไม่ได้เลือกกฎหมายแม่ จึงเลือกได้เฉพาะเอกสารที่ไม่มีกฎหมายแม่ แล้วเลือกข้อของฉบับเดิมที่กำลังแก้';
   }
   return 'บอกว่าข้อไหนในเอกสารนี้เกี่ยวข้องกับกฎหมายอื่น เช่น แก้ไขหรือยกเลิกข้อของกฎหมายฉบับอื่น กดเพิ่มที่ข้อที่ต้องการ';
 });
@@ -288,6 +319,9 @@ const parentItems = computed(() =>
 
 const parentPickerHint = computed(() => {
   const lawType = documentStore.review?.law_meta?.law_type;
+  if (changeStatus.value === 'กฎหมายใหม่') {
+    return 'กฎหมายใหม่เลือกได้เฉพาะกฎหมายแม่ (root) ไม่ระบุฉบับขั้นเดียวกัน';
+  }
   if (isUniversityAnnouncementType(lawType)) {
     return 'ประกาศที่ออกโดยมหาวิทยาลัย เลือกกฎหมายแม่ได้เฉพาะระเบียบและข้อบังคับ';
   }
@@ -319,14 +353,21 @@ function closeRelationDialog(): void {
   relationDialog.value.open = false;
 }
 
+function persistRelations(next: LawRelation[]): Promise<boolean> {
+  return documentStore.saveRelations(
+    next,
+    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next) } : undefined,
+  );
+}
+
 async function removeRelation(id: string): Promise<void> {
-  const ok = await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
+  const ok = await persistRelations(relations.value.filter((r) => r.id !== id));
   if (ok) snackbar.success('ลบความสัมพันธ์แล้ว');
 }
 
 async function onRelationSave(relation: LawRelation): Promise<void> {
   closeRelationDialog();
-  const ok = await documentStore.saveRelations([...relations.value, relation]);
+  const ok = await persistRelations([...relations.value, relation]);
   if (ok) snackbar.success('เพิ่มความสัมพันธ์แล้ว');
 }
 

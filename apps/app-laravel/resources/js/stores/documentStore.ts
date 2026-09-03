@@ -76,13 +76,17 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
-  async function saveRelations(relations: LawRelation[]): Promise<boolean> {
+  async function saveRelations(relations: LawRelation[], lawMeta?: Partial<LawMeta>): Promise<boolean> {
     saving.value = true;
     saveError.value = '';
     try {
-      const res = await saveDocumentReview(documentId.value, { relations });
-      if (review.value && res.relations) {
-        review.value.relations = res.relations;
+      const res = await saveDocumentReview(documentId.value, {
+        relations,
+        ...(lawMeta ? { law_meta: lawMeta } : {}),
+      });
+      if (review.value) {
+        if (res.relations) review.value.relations = res.relations;
+        if (res.law_meta) review.value.law_meta = res.law_meta;
         setReview(documentId.value, review.value);
       }
       return true;

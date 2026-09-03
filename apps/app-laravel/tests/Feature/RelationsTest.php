@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\ReviewStore;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class RelationsTest extends TestCase
@@ -83,6 +84,7 @@ class RelationsTest extends TestCase
                     'target_block_id' => 'p1-b0042',
                     'note' => null,
                     'url' => null,
+                    'change_detail' => 'แก้ไขข้อความ',
                 ],
                 [
                     'id' => 'r-supersedes',
@@ -103,9 +105,68 @@ class RelationsTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('relations.0.type', 'amends');
         $response->assertJsonPath('relations.0.target_block_id', 'p1-b0042');
+        $response->assertJsonPath('relations.0.change_detail', 'แก้ไขข้อความ');
         $response->assertJsonPath('relations.1.type', 'supersedes');
         $response->assertJsonPath('relations.1.target_block_id', 'p2-b0001');
         $response->assertJsonPath('relations.2.type', 'issued_under');
         $response->assertJsonCount(3, 'relations');
+    }
+
+    public function test_whole_edition_replacement_revokes_same_level_chain(): void
+    {
+        $store = app(ReviewStore::class);
+        $suffix = uniqid();
+        $v1 = "doc_chain_{$suffix}_1";
+        $v2 = "doc_chain_{$suffix}_2";
+        $v4 = "doc_chain_{$suffix}_4";
+
+        foreach ([$v1 => 'กฎหมายใหม่', $v2 => 'ปรับปรุงรายข้อ'] as $id => $change) {
+            $store->setStatus($id, ['status' => 'done', 'source_file' => "{$id}.pdf"]);
+            $store->writeReviewDocument($id, [
+                'document_id' => $id,
+                'source_file' => "{$id}.pdf",
+                'source_type' => 'pdf',
+                'language' => 'th',
+                'summary' => ['page_count' => 1, 'block_count' => 0, 'review_required_count' => 0],
+                'law_meta' => [
+                    'title' => 'ระเบียบว่าด้วยเอกสาร พ.ศ. '.($id === $v1 ? '๒๕๖๖' : '๒๕๖๗'),
+                    'law_type' => 'ระเบียบ',
+                    'status' => 'มีผลบังคับใช้',
+                    'change_status' => $change,
+                ],
+                'pages' => [['page_no' => 1, 'blocks' => []]],
+            ]);
+        }
+
+        $store->setStatus($v4, ['status' => 'done', 'source_file' => "{$v4}.pdf"]);
+        $store->writeReviewDocument($v4, [
+            'document_id' => $v4,
+            'source_file' => "{$v4}.pdf",
+            'source_type' => 'pdf',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 0, 'review_required_count' => 0],
+            'law_meta' => [
+                'title' => 'ระเบียบว่าด้วยเอกสาร พ.ศ. ๒๕๖๘',
+                'law_type' => 'ระเบียบ',
+                'status' => 'ร่าง',
+                'change_status' => 'ปรับปรุงทั้งฉบับ',
+            ],
+            'pages' => [['page_no' => 1, 'blocks' => []]],
+        ]);
+        Cache::forget('law-meta-list');
+
+        $this->putJson("/api/documents/{$v4}/document-review", [
+            'relations' => [[
+                'id' => 'r-whole',
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_document_id' => $v2,
+                'target_title' => 'ระเบียบว่าด้วยเอกสาร พ.ศ. ๒๕๖๗',
+            ]],
+        ])->assertOk();
+
+        $this->assertSame('ยกเลิกการใช้งาน', $store->getReviewDocument($v1)['law_meta']['status']);
+        $this->assertSame('ยกเลิกการใช้งาน', $store->getReviewDocument($v2)['law_meta']['status']);
+        $this->assertSame('มีผลบังคับใช้', $store->getReviewDocument($v4)['law_meta']['status']);
     }
 }

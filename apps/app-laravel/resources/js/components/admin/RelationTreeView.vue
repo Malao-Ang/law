@@ -1,26 +1,54 @@
 <template>
   <div class="rel-tree">
-    <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
-      <div v-if="node.level > 0" class="rel-tree__edge">{{ relationTypeLabel(node.edgeType) }}</div>
-      <div class="rel-tree__card" :class="{ 'is-current': node.level === 0 }">
-        <div class="d-flex align-center ga-2 mb-2">
-          <v-chip
-            v-if="node.row.lawType"
-            size="x-small"
-            variant="tonal"
-            color="grey"
-            class="font-weight-bold"
-          >{{ node.row.typeShort }}</v-chip>
-          <v-spacer />
-          <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="flat">
-            เอกสารปัจจุบัน
-          </v-chip>
-        </div>
-        <div class="rel-tree__title">{{ node.row.title }}</div>
-        <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
-          สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
+    <div v-if="node.level > 0" class="rel-tree__edge">{{ relationTypeLabel(node.edgeType) }}</div>
+
+    <div class="rel-tree__same-row">
+      <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
+        <div class="rel-tree__card" :class="{ 'is-current': isCurrent }">
+          <div class="d-flex align-center ga-2 mb-2">
+            <v-chip
+              v-if="node.row.lawType"
+              size="x-small"
+              variant="tonal"
+              color="grey"
+              class="font-weight-bold"
+            >{{ node.row.typeShort }}</v-chip>
+            <v-chip
+              v-if="versionLabel"
+              size="x-small"
+              color="admin-primary"
+              variant="tonal"
+            >{{ versionLabel }}</v-chip>
+            <v-spacer />
+            <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="flat">
+              เอกสารปัจจุบัน
+            </v-chip>
+          </div>
+          <div class="rel-tree__title">{{ node.row.title }}</div>
+          <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
+            สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
+          </div>
         </div>
       </div>
+
+      <button
+        v-if="canTogglePeers"
+        type="button"
+        class="rel-tree__toggle"
+        :aria-expanded="expanded"
+        @click.stop="expanded = !expanded"
+      >
+        <v-icon :icon="expanded ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="18" />
+        <span>{{ expanded ? 'ย่อ' : 'แก้ไขการปรับปรุง' }}</span>
+      </button>
+
+      <SameLevelInlineChain
+        v-if="canTogglePeers && expanded"
+        :versions="peers"
+        :chain="node.sameLevelVersions"
+        :current-id="currentId ?? node.row.id"
+        @select="$emit('select', $event)"
+      />
     </div>
 
     <div v-if="node.children.length" class="rel-tree__children">
@@ -32,6 +60,8 @@
           v-for="child in node.children"
           :key="child.row.id"
           :node="child"
+          :current-id="currentId"
+          @select="$emit('select', $event)"
         />
       </div>
     </div>
@@ -39,11 +69,37 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
-import { type RelTreeNode } from '../../composables/useShowRelations';
+import { sameLevelVersionLabel, type RelTreeNode } from '../../composables/useShowRelations';
+import SameLevelInlineChain from './SameLevelInlineChain.vue';
 
 defineOptions({ name: 'RelationTreeView' });
-defineProps<{ node: RelTreeNode }>();
+const props = defineProps<{
+  node: RelTreeNode;
+  currentId?: string;
+}>();
+defineEmits<{ select: [id: string] }>();
+
+const expanded = ref(true);
+
+const isCurrent = computed(() =>
+  props.node.level === 0 || props.node.row.id === props.currentId,
+);
+
+const isLeaf = computed(() => props.node.children.length === 0);
+
+const versionChain = computed(() => props.node.sameLevelVersions ?? []);
+
+const peers = computed(() =>
+  versionChain.value.filter((row) => row.id !== props.node.row.id),
+);
+
+const versionLabel = computed(() =>
+  sameLevelVersionLabel(versionChain.value, props.node.row.id),
+);
+
+const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
 
 function statusClass(status: string): string {
   if (status.includes('ยกเลิก')) return 'text-error';
@@ -62,12 +118,22 @@ function statusClass(status: string): string {
   min-width: 240px;
 }
 
+.rel-tree__same-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: max-content;
+  max-width: 100%;
+}
+
 .rel-tree__node {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
-  max-width: 320px;
+  width: 280px;
+  flex-shrink: 0;
 }
 
 .rel-tree__edge {
@@ -107,6 +173,21 @@ function statusClass(status: string): string {
   font-weight: 700;
   line-height: 1.45;
   color: #1e293b;
+}
+
+.rel-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .rel-tree__children {

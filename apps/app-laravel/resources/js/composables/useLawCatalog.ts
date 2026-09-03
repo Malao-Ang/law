@@ -36,6 +36,27 @@ export function rootDocuments(
   });
 }
 
+const SAME_LEVEL_EDITION_STATUSES = new Set([
+  'ปรับปรุงทั้งฉบับ',
+  'ยกเลิกทั้งฉบับ',
+  'ปรับปรุงรายข้อ',
+  'ปรับปรุงรายมาตรา',
+  'ยกเลิกรายมาตรา',
+]);
+
+export function documentsWithoutParent(
+  documents: DocumentListItem[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  return documents.filter((doc) => {
+    if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
+    if (!isPickableDocument(doc)) return false;
+    if (parentIdsOf(doc).length > 0) return false;
+    const changeStatus = doc.change_status?.trim() ?? '';
+    return !SAME_LEVEL_EDITION_STATUSES.has(changeStatus);
+  });
+}
+
 export function pickableDocuments(
   documents: DocumentListItem[],
   excludeDocumentId?: string | null,
@@ -86,6 +107,24 @@ export function documentsUnderParents(
     if (!isPickableDocument(doc)) return false;
     return parentIdsOf(doc).some((id) => parents.has(id));
   });
+}
+
+export function documentsSiblingsAndParents(
+  documents: DocumentListItem[],
+  parentDocumentIds: string[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  const seen = new Set<string>();
+  const merged: DocumentListItem[] = [];
+  for (const doc of [
+    ...documentsByIds(documents, parentDocumentIds, excludeDocumentId),
+    ...documentsUnderParents(documents, parentDocumentIds, excludeDocumentId),
+  ]) {
+    if (seen.has(doc.document_id)) continue;
+    seen.add(doc.document_id);
+    merged.push(doc);
+  }
+  return merged;
 }
 
 export function documentHasChildren(

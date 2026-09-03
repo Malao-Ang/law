@@ -45,6 +45,16 @@
               <div class="existing-relations__target">
                 {{ formatRelationTarget(relation) }}
               </div>
+              <div v-if="changeDetailMeta(relation.change_detail)" class="d-flex">
+                <v-chip
+                  size="x-small"
+                  :color="changeDetailMeta(relation.change_detail)?.color"
+                  variant="tonal"
+                  :prepend-icon="changeDetailMeta(relation.change_detail)?.icon"
+                >
+                  {{ changeDetailMeta(relation.change_detail)?.title }}
+                </v-chip>
+              </div>
               <div v-if="relation.note" class="text-caption text-medium-emphasis">
                 {{ relation.note }}
               </div>
@@ -56,6 +66,22 @@
         </section>
 
         <v-divider class="mb-5" />
+
+        <div v-if="showChangeDetails" class="mb-4">
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-2">รายละเอียดการเปลี่ยนแปลง *</div>
+          <v-chip-group v-model="changeDetail" mandatory>
+            <v-chip
+              v-for="item in SECTION_CHANGE_DETAILS"
+              :key="item.value"
+              :value="item.value"
+              :color="item.color"
+              :prepend-icon="item.icon"
+              filter
+            >
+              {{ item.title }}
+            </v-chip>
+          </v-chip-group>
+        </div>
 
         <div v-if="allowFreeText" class="mb-4">
           <div class="text-caption font-weight-bold text-medium-emphasis mb-1">เป้าหมาย</div>
@@ -129,7 +155,11 @@ import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from
 import {
   RELATION_TYPE_COLORS,
   RELATION_TYPE_ICONS,
+  SECTION_CHANGE_DETAILS,
+  changeDetailMeta,
   formatRelationTarget,
+  normalizeChangeDetail,
+  relationTypeFromChangeDetail,
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
@@ -146,14 +176,20 @@ const props = defineProps<{
   wholeDocumentOnly?: boolean;
   existingRelations?: LawRelation[];
   sectionLabels?: Record<string, string>;
+  changeStatus?: string | null;
 }>();
 
 const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 
 const mode = ref<'picker' | 'text'>('picker');
 const pickerTarget = ref<LawRelationTarget | null>(null);
+const changeDetail = ref<string | null>(null);
 const existingRelations = computed(() => props.existingRelations ?? []);
 const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
+const showChangeDetails = computed(() =>
+  props.scope === 'section'
+  && (props.changeStatus === 'ปรับปรุงรายข้อ' || props.changeStatus === 'ปรับปรุงรายมาตรา'),
+);
 
 const form = ref<LawRelation>({
   id: createClientId('relation'),
@@ -166,6 +202,7 @@ const form = ref<LawRelation>({
   target_block_id: null,
   note: null,
   url: null,
+  change_detail: null,
 });
 
 const dialogTitle = computed(() => {
@@ -174,6 +211,7 @@ const dialogTitle = computed(() => {
 });
 
 const canSave = computed(() => {
+  if (showChangeDetails.value && !(changeDetail.value?.trim())) return false;
   if (mode.value === 'text') {
     if (props.requireSection && !(form.value.target_section?.trim())) return false;
     return form.value.target_title.trim() !== '';
@@ -181,6 +219,11 @@ const canSave = computed(() => {
   if (!pickerTarget.value || pickerTarget.value.title.trim() === '') return false;
   if (props.requireSection && !pickerTarget.value.section) return false;
   return true;
+});
+
+watch(changeDetail, (detail) => {
+  const nextType = relationTypeFromChangeDetail(detail);
+  if (nextType) form.value.type = nextType;
 });
 
 function relationSourceLabel(relation: LawRelation): string {
@@ -225,6 +268,7 @@ function save(): void {
     target_document_id: form.value.target_document_id || null,
     url: form.value.url?.trim() || null,
     note: form.value.note?.trim() || null,
+    change_detail: showChangeDetails.value ? normalizeChangeDetail(changeDetail.value) : null,
   });
 }
 </script>

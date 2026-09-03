@@ -136,6 +136,7 @@ class ReviewStore
             $parentDocumentIds = [];
             $accessScope = 'public';
             $lawType = '';
+            $changeStatus = '';
 
             $meta = [];
             $review = $this->blob->read('review', $documentId);
@@ -149,6 +150,7 @@ class ReviewStore
                 $parentDocumentId = $parentDocumentIds[0] ?? null;
                 $accessScope = ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public';
                 $lawType = trim((string) ($meta['law_type'] ?? ''));
+                $changeStatus = trim((string) ($meta['change_status'] ?? ''));
             }
 
             $documents[] = [
@@ -165,10 +167,10 @@ class ReviewStore
                 'error' => isset($status['error']) ? (string) $status['error'] : null,
                 'document_type' => $meta['document_type'] ?? 'new',
                 'source' => $meta['source'] ?? '',
-                'law_type' => trim((string) ($meta['law_type'] ?? '')),
+                'law_type' => $lawType,
+                'change_status' => $changeStatus === '' ? null : $changeStatus,
                 'parent_document_id' => $parentDocumentId,
                 'parent_document_ids' => $parentDocumentIds,
-                'law_type' => $lawType,
                 'access_scope' => $accessScope,
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,
@@ -280,27 +282,34 @@ class ReviewStore
             throw new RuntimeException("Document {$documentId} not found.");
         }
 
+        $lawType = (string) ($byId[$documentId]['law_type'] ?? '');
+        $sameType = static function (array $row) use ($lawType): bool {
+            return (string) ($row['law_type'] ?? '') === $lawType;
+        };
+
         $childrenByParent = [];
         foreach ($rows as $row) {
+            if (! $sameType($row)) {
+                continue;
+            }
             $parentId = (string) ($row['parent_document_id'] ?? '');
-            if ($parentId !== '' && isset($byId[$parentId])) {
+            if ($parentId !== '' && isset($byId[$parentId]) && $sameType($byId[$parentId])) {
                 $childrenByParent[$parentId][] = $row['document_id'];
             }
         }
 
-        // Walk up parent links to the root of this document's chain.
+        // Walk up parent links of the same law type (same-level versions, not issued-under parents).
         $rootId = $documentId;
         $guard = 0;
         while ($guard++ < 200) {
             $parentId = (string) ($byId[$rootId]['parent_document_id'] ?? '');
-            if ($parentId === '' || ! isset($byId[$parentId])) {
+            if ($parentId === '' || ! isset($byId[$parentId]) || ! $sameType($byId[$parentId])) {
                 break;
             }
             $rootId = $parentId;
         }
 
-        // BFS every descendant of the root to gather the connected component.
-        // ponytail: linear chains are expected; BFS + date sort still yields a sane order if a parent ever branches.
+        // BFS same-type descendants. Linear chains are expected; date sort still yields a sane order if a parent ever branches.
         $component = [];
         $seen = [$rootId => true];
         $queue = [$rootId];
@@ -608,7 +617,176 @@ class ReviewStore
             ];
         });
 
-        return $returnPayload;
+        $revoked = $this->applySameLevelReplacement($documentId);
+        $fresh = $this->blob->read('review', $documentId);
+        if (is_array($fresh) && is_array($returnPayload)) {
+            $returnPayload['law_meta'] = $fresh['law_meta'] ?? $returnPayload['law_meta'];
+            $returnPayload['relations'] = $fresh['relations'] ?? $returnPayload['relations'];
+        }
+
+        $payload = $returnPayload ?? [
+            'document_review' => [],
+            'compose_state' => [],
+            'law_meta' => [],
+            'relations' => [],
+        ];
+        $payload['revoked_document_ids'] = $revoked;
+
+        return $payload;
+    }
+
+    /**
+     * When this document is a whole-edition replacement of a same-level law,
+     * revoke every earlier node in that chain (original + section patches).
+     *
+     * @return list<string>
+     */
+    public function applySameLevelReplacement(string $documentId): array
+    {
+        $document = $this->blob->read('review', $documentId);
+        if ($document === null) {
+            return [];
+        }
+
+        $changeStatus = trim((string) (($document['law_meta']['change_status'] ?? '') ?: ''));
+        if (! in_array($changeStatus, ['ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ'], true)) {
+            return [];
+        }
+
+        $targets = [];
+        foreach (is_array($document['relations'] ?? null) ? $document['relations'] : [] as $rel) {
+            if (! is_array($rel) || ($rel['scope'] ?? 'document') !== 'document') {
+                continue;
+            }
+            $type = (string) ($rel['type'] ?? '');
+            if (! in_array($type, ['amends', 'supersedes', 'repeals'], true)) {
+                continue;
+            }
+            $targetId = trim((string) ($rel['target_document_id'] ?? ''));
+            if ($targetId !== '' && $targetId !== $documentId) {
+                $targets[] = $targetId;
+            }
+        }
+        $targets = array_values(array_unique($targets));
+        if ($targets === []) {
+            return [];
+        }
+
+        $component = $this->sameLevelComponentIds($documentId, $targets);
+        $revoked = [];
+        foreach ($component as $id) {
+            if ($id === $documentId) {
+                continue;
+            }
+            $this->patchLawMeta($id, ['status' => 'ยกเลิกการใช้งาน']);
+            $revoked[] = $id;
+        }
+
+        $this->patchLawMeta($documentId, ['status' => 'มีผลบังคับใช้']);
+
+        return $revoked;
+    }
+
+    /**
+     * @param  list<string>  $seedIds
+     * @return list<string>
+     */
+    private function sameLevelComponentIds(string $documentId, array $seedIds): array
+    {
+        $rows = $this->listLawMeta();
+        $byId = [];
+        foreach ($rows as $row) {
+            $byId[(string) $row['document_id']] = $row;
+        }
+
+        $parent = [];
+        $find = function (string $id) use (&$parent, &$find): string {
+            $parent[$id] ??= $id;
+            if ($parent[$id] !== $id) {
+                $parent[$id] = $find($parent[$id]);
+            }
+
+            return $parent[$id];
+        };
+        $union = function (string $a, string $b) use ($find, &$parent): void {
+            $pa = $find($a);
+            $pb = $find($b);
+            if ($pa !== $pb) {
+                $parent[$pa] = $pb;
+            }
+        };
+
+        $ids = array_keys($byId);
+        $count = count($ids);
+        for ($i = 0; $i < $count; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                $a = $byId[$ids[$i]];
+                $b = $byId[$ids[$j]];
+                if ($this->shouldUnionSameLevelRows($a, $b)) {
+                    $union($ids[$i], $ids[$j]);
+                }
+            }
+        }
+
+        $seeds = array_values(array_unique([...$seedIds, $documentId]));
+        $roots = [];
+        foreach ($seeds as $seed) {
+            if (isset($byId[$seed])) {
+                $roots[$find($seed)] = true;
+            }
+        }
+
+        $out = [];
+        foreach ($ids as $id) {
+            if (isset($roots[$find($id)])) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $a
+     * @param  array<string, mixed>  $b
+     */
+    private function shouldUnionSameLevelRows(array $a, array $b): bool
+    {
+        $typeA = (string) ($a['law_type'] ?? '');
+        $typeB = (string) ($b['law_type'] ?? '');
+        if ($typeA !== $typeB) {
+            return false;
+        }
+
+        $keyA = $this->regulationFamilyKey((string) ($a['title'] ?? ''));
+        $keyB = $this->regulationFamilyKey((string) ($b['title'] ?? ''));
+        $parentsA = LawMetaNormalizer::parentDocumentIds($a);
+        $parentsB = LawMetaNormalizer::parentDocumentIds($b);
+        $idA = (string) ($a['document_id'] ?? '');
+        $idB = (string) ($b['document_id'] ?? '');
+        if (in_array($idB, $parentsA, true) || in_array($idA, $parentsB, true)) {
+            return false;
+        }
+
+        if ($keyA === '' || $keyA !== $keyB) {
+            return false;
+        }
+
+        $changeA = trim((string) ($a['change_status'] ?? ''));
+        $changeB = trim((string) ($b['change_status'] ?? ''));
+        $amendmentChanges = [
+            'ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ',
+            'ปรับปรุงรายข้อ', 'ปรับปรุงรายมาตรา', 'ยกเลิกรายมาตรา',
+        ];
+
+        return in_array($changeA, $amendmentChanges, true) || in_array($changeB, $amendmentChanges, true);
+    }
+
+    private function regulationFamilyKey(string $title): string
+    {
+        $stripped = preg_replace('/\s*พ\.ศ\.\s*[๐-๙0-9]+/u', '', $title) ?? $title;
+
+        return trim(preg_replace('/\s+/u', ' ', $stripped) ?? $stripped);
     }
 
     /**
@@ -1499,6 +1677,7 @@ class ReviewStore
                 'target_block_id' => trim((string) ($entry['target_block_id'] ?? '')) ?: null,
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
+                'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
             ];
         }
 

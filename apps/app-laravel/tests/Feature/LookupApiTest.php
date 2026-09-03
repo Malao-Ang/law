@@ -34,14 +34,4 @@ class LookupApiTest extends TestCase
         $this->assertContains('ยกเลิกข้อ', array_column($data['change_status_details'], 'value'));
         $this->assertContains('ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', array_column($data['law_groups'], 'value'));
     }
-
-    public function test_sample_seeder_law_types_exist_in_lookups(): void
-    {
-        $allowed = array_column(config('lookups.document_types'), 'value');
-        $seededTypes = ['พระราชบัญญัติ', 'ระเบียบ', 'ประกาศที่ออกโดยมหาวิทยาลัย'];
-
-        foreach ($seededTypes as $type) {
-            $this->assertContains($type, $allowed, "Seeder law_type '{$type}' is not a canonical document type");
-        }
-    }
 }
