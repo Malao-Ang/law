@@ -167,6 +167,7 @@ class ReportController extends Controller
             'agency' => ($r['agencies'][0] ?? '') ?: 'ไม่ระบุ',
             'status' => $r['status'],
             'meta_status' => trim((string) ($r['meta_status'] ?? '')),
+            'change_status' => trim((string) ($r['change_status'] ?? '')),
             'date' => $r['updated_at'],
             'section_count' => isset($r['section_count']) ? (int) $r['section_count'] : null,
             'page_count' => (int) ($r['page_count'] ?? 0),

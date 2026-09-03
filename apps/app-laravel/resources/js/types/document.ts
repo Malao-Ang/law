@@ -400,6 +400,7 @@ export interface ReportDocument {
   agency: string;
   status: string;
   meta_status: string;
+  change_status?: string;
   date: string | null;
   section_count: number | null;
   page_count: number;

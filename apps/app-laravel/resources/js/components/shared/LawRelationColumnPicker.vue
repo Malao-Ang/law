@@ -140,7 +140,7 @@ import { fetchReview, listDocuments } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
   documentsByIds,
-  documentsUnderParents,
+  documentsSiblingsAndParents,
   filterByQuery,
   pickableDocuments,
 } from '../../composables/useLawCatalog';
@@ -186,18 +186,17 @@ const catalogMode = computed(() => {
 });
 
 const col1Head = computed(() => {
-  if (catalogMode.value === 'siblings') return 'กฎหมายชั้นเดียวกัน';
+  if (catalogMode.value === 'siblings') return 'กฎหมายแม่และชั้นเดียวกัน';
   if (catalogMode.value === 'parents') return 'กฎหมายแม่';
   return 'กฎหมายที่อ้างถึง';
 });
 
 const col1EmptyMessage = computed(() => {
-  if (catalogMode.value !== 'all' && !(props.parentDocumentIds?.length)) {
-    return 'เลือกกฎหมายแม่ก่อน จึงจะเลือกเอกสารที่เกี่ยวข้องได้';
-  }
   if (!documentsLoaded.value) return 'พิมพ์คำค้นหาเพื่อโหลดรายการกฎหมาย';
-  if (catalogMode.value === 'siblings') return 'ไม่พบกฎหมายชั้นเดียวกันภายใต้กฎหมายแม่ที่เลือก';
-  if (catalogMode.value === 'parents') return 'ไม่พบกฎหมายแม่ที่เลือก';
+  if (catalogMode.value === 'siblings') return 'ไม่พบกฎหมายแม่หรือกฎหมายชั้นเดียวกันภายใต้กฎหมายแม่ที่เลือก';
+  if (catalogMode.value === 'parents') {
+    return props.parentDocumentIds?.length ? 'ไม่พบกฎหมายแม่ที่เลือก' : 'เลือกกฎหมายแม่ก่อน';
+  }
   return 'ไม่พบรายการ';
 });
 
@@ -205,7 +204,10 @@ const filteredCol1 = computed(() => {
   if (!documentsLoaded.value) return [];
   let docs: DocumentListItem[] = [];
   if (catalogMode.value === 'siblings') {
-    docs = documentsUnderParents(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId);
+    const parentIds = props.parentDocumentIds ?? [];
+    docs = parentIds.length
+      ? documentsSiblingsAndParents(documents.value, parentIds, props.excludeDocumentId)
+      : pickableDocuments(documents.value, props.excludeDocumentId);
   } else if (catalogMode.value === 'parents') {
     docs = documentsByIds(documents.value, props.parentDocumentIds ?? [], props.excludeDocumentId);
   } else {

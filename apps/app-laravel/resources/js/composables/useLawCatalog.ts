@@ -88,6 +88,24 @@ export function documentsUnderParents(
   });
 }
 
+export function documentsSiblingsAndParents(
+  documents: DocumentListItem[],
+  parentDocumentIds: string[],
+  excludeDocumentId?: string | null,
+): DocumentListItem[] {
+  const seen = new Set<string>();
+  const merged: DocumentListItem[] = [];
+  for (const doc of [
+    ...documentsByIds(documents, parentDocumentIds, excludeDocumentId),
+    ...documentsUnderParents(documents, parentDocumentIds, excludeDocumentId),
+  ]) {
+    if (seen.has(doc.document_id)) continue;
+    seen.add(doc.document_id);
+    merged.push(doc);
+  }
+  return merged;
+}
+
 export function documentHasChildren(
   documents: DocumentListItem[],
   documentId: string,

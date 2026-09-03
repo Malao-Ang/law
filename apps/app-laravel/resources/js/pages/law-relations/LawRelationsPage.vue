@@ -248,19 +248,28 @@ const suggestedRelationType = computed<RelationType | undefined>(() => {
   return undefined;
 });
 const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
-  if (isWholeDocumentChange.value) return 'siblings';
-  if (isSectionChange.value) return 'parents';
+  if (!parentIds.value.length) return 'all';
+  if (isWholeDocumentChange.value || isSectionChange.value) return 'siblings';
   return relationDialog.value.scope === 'document' ? 'siblings' : 'all';
 });
 const documentRelationsHint = computed(() => {
-  if (isWholeDocumentChange.value) {
-    return 'เลือกกฎหมายชั้นเดียวกัน (พี่น้องภายใต้กฎหมายแม่เดียวกัน) ทั้งฉบับ ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย';
+  if (changeStatus.value === 'กฎหมายใหม่') {
+    return 'กฎหมายใหม่ระบุได้แค่ลำดับชั้นเอกสาร (กฎหมายแม่) ไม่ผูกฉบับขั้นเดียวกัน';
   }
-  return 'บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง เลือกได้เฉพาะเอกสารที่ออกภายใต้กฎหมายแม่ด้านบน';
+  if (isWholeDocumentChange.value) {
+    return parentIds.value.length
+      ? 'เลือกกฎหมายแม่หรือกฎหมายขั้นเดียวกันที่จะถูกแทนที่ทั้งฉบับ เมื่อบันทึก ฉบับตั้งต้นและฉบับแก้รายข้อในสายนั้นจะถูกยกเลิก และเอกสารนี้เป็นฉบับบังคับใช้ล่าสุด'
+      : 'ยังไม่ได้เลือกกฎหมายแม่ จึงค้นหาเอกสารได้ทั้งหมด เลือกฉบับเดิมขั้นเดียวกันที่จะถูกแทนที่ทั้งฉบับ';
+  }
+  return parentIds.value.length
+    ? 'บอกว่าเอกสารทั้งฉบับเกี่ยวข้องกับกฎหมายอื่นอย่างไร เช่น แทนที่ ออกตามอำนาจ หรือเกี่ยวข้อง เลือกได้จากกฎหมายแม่และเอกสารที่ออกภายใต้แม่เดียวกัน'
+    : 'ยังไม่ได้เลือกกฎหมายแม่ จึงค้นหาเอกสารได้ทั้งหมด เพื่อผูกความสัมพันธ์กับฉบับที่เกี่ยวข้อง';
 });
 const sectionRelationsHint = computed(() => {
   if (isSectionChange.value) {
-    return 'เลือกข้อหรือมาตราย่อยของกฎหมายแม่ (กฎหมายเป้าหมาย) ตามสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย ไม่เลือกทั้งฉบับ';
+    return parentIds.value.length
+      ? 'เลือกข้อของกฎหมายแม่หรือกฎหมายขั้นเดียวกันที่กำลังแก้ ฉบับเดิมยังบังคับใช้คู่กัน จนกว่าจะมีเอกสารปรับปรุงทั้งฉบับออกมาแทนที่ทั้งสาย'
+      : 'ยังไม่ได้เลือกกฎหมายแม่ จึงค้นหาเอกสารได้ทั้งหมด แล้วเลือกข้อของฉบับเดิมที่กำลังแก้';
   }
   return 'บอกว่าข้อไหนในเอกสารนี้เกี่ยวข้องกับกฎหมายอื่น เช่น แก้ไขหรือยกเลิกข้อของกฎหมายฉบับอื่น กดเพิ่มที่ข้อที่ต้องการ';
 });
@@ -288,6 +297,9 @@ const parentItems = computed(() =>
 
 const parentPickerHint = computed(() => {
   const lawType = documentStore.review?.law_meta?.law_type;
+  if (changeStatus.value === 'กฎหมายใหม่') {
+    return 'กฎหมายใหม่เลือกได้เฉพาะกฎหมายแม่ (root) ไม่ระบุฉบับขั้นเดียวกัน';
+  }
   if (isUniversityAnnouncementType(lawType)) {
     return 'ประกาศที่ออกโดยมหาวิทยาลัย เลือกกฎหมายแม่ได้เฉพาะระเบียบและข้อบังคับ';
   }

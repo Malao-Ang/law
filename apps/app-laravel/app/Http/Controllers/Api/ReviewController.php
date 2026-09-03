@@ -168,12 +168,17 @@ class ReviewController extends Controller
             return response()->json(['message' => $exception->getMessage()], 404);
         }
 
-        if ($shouldReindex) {
+        $reindexIds = array_values(array_unique([
+            ...($shouldReindex ? [$documentId] : []),
+            ...array_map('strval', $payload['revoked_document_ids'] ?? []),
+            ...((($payload['revoked_document_ids'] ?? []) !== []) ? [$documentId] : []),
+        ]));
+        foreach ($reindexIds as $reindexId) {
             try {
-                $this->lawIndexer->index($documentId);
+                $this->lawIndexer->index($reindexId);
             } catch (Throwable $exception) {
                 Log::warning('Law indexing failed after review metadata update (non-fatal)', [
-                    'document_id' => $documentId,
+                    'document_id' => $reindexId,
                     'error' => $exception->getMessage(),
                 ]);
             }

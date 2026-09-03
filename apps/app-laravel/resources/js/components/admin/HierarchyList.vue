@@ -24,6 +24,22 @@
       >
         {{ statusLabel }}
       </v-chip>
+      <button
+        v-if="canTogglePeers"
+        type="button"
+        class="h-toggle"
+        :aria-expanded="expanded"
+        @click.stop="expanded = !expanded"
+      >
+        <v-icon :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="16" />
+        {{ expanded ? 'ย่อขั้นเดียวกัน' : `ขั้นเดียวกัน ${peers.length}` }}
+      </button>
+    </div>
+    <div v-if="canTogglePeers && expanded" class="h-peers">
+      <SameLevelInlineChain
+        :versions="peers"
+        :current-id="node.row.id"
+      />
     </div>
     <ul v-if="node.children.length" class="h-list">
       <li v-for="child in node.children" :key="child.row.id" class="h-item">
@@ -34,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
 import {
   metaStatusColor,
@@ -43,10 +59,18 @@ import {
   workflowStageColor,
   type RelTreeNode,
 } from '../../composables/useShowRelations';
+import SameLevelInlineChain from './SameLevelInlineChain.vue';
 
 defineOptions({ name: 'HierarchyList' });
 
 const props = defineProps<{ node: RelTreeNode }>();
+
+const expanded = ref(true);
+const isLeaf = computed(() => props.node.children.length === 0);
+const peers = computed(() =>
+  (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
+);
+const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
 
 const rowIcon = computed(() =>
   props.node.level === 0 ? 'mdi-office-building' : typeIcon(props.node.row.lawType),
@@ -98,6 +122,26 @@ const statusChipColor = computed(() =>
 
 .h-chip {
   flex-shrink: 0;
+}
+
+.h-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.h-peers {
+  display: flex;
+  overflow-x: auto;
+  padding: 8px 0 4px 28px;
 }
 
 .h-list {
