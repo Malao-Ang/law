@@ -88,7 +88,12 @@ class DocumentFileController extends Controller
         string $documentId,
         string $targetDocumentId,
     ): Response|\Illuminate\Http\RedirectResponse {
-        $doc = $this->reviewStore->getReviewDocument($documentId);
+        try {
+            $doc = $this->reviewStore->getReviewDocument($documentId);
+        } catch (\Throwable) {
+            abort(404, 'Document not found.');
+        }
+
         $relations = $doc['relations'] ?? [];
         $linked = collect($relations)->firstWhere('target_document_id', $targetDocumentId);
         if (! $linked) {
