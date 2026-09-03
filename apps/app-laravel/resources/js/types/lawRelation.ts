@@ -51,3 +51,46 @@ export function formatRelationTarget(rel: LawRelation): string {
 export function formatRelationChip(rel: LawRelation): string {
   return `${relationTypeLabel(rel.type)} · ${formatRelationTarget(rel)}`;
 }
+
+export const SECTION_CHANGE_DETAILS = [
+  { value: 'ยกเลิกข้อ', title: 'ยกเลิกข้อ', color: 'error', icon: 'mdi-cancel' },
+  { value: 'เพิ่มข้อความ', title: 'เพิ่มข้อความ', color: 'success', icon: 'mdi-plus' },
+  { value: 'แก้ไขข้อความ', title: 'แก้ไขข้อความ', color: 'teal', icon: 'mdi-pencil' },
+] as const;
+
+export type SectionChangeDetail = (typeof SECTION_CHANGE_DETAILS)[number]['value'];
+
+const LEGACY_CHANGE_DETAILS: Record<string, SectionChangeDetail> = {
+  ยกเลิก: 'ยกเลิกข้อ',
+  ยกเลิกมาตรา: 'ยกเลิกข้อ',
+  เพิ่ม: 'เพิ่มข้อความ',
+  แก้ไข: 'แก้ไขข้อความ',
+};
+
+export function normalizeChangeDetail(detail: string | null | undefined): SectionChangeDetail | null {
+  const value = detail?.trim() ?? '';
+  if (value === '') return null;
+  if (value === 'ยกเลิกข้อ' || value === 'เพิ่มข้อความ' || value === 'แก้ไขข้อความ') return value;
+  return LEGACY_CHANGE_DETAILS[value] ?? null;
+}
+
+export function relationTypeFromChangeDetail(detail: string | null | undefined): RelationType | undefined {
+  const normalized = normalizeChangeDetail(detail);
+  if (normalized === 'ยกเลิกข้อ') return 'repeals';
+  if (normalized === 'เพิ่มข้อความ' || normalized === 'แก้ไขข้อความ') return 'amends';
+  return undefined;
+}
+
+export function changeDetailMeta(detail: string | null | undefined) {
+  const normalized = normalizeChangeDetail(detail);
+  return SECTION_CHANGE_DETAILS.find((item) => item.value === normalized) ?? null;
+}
+
+export function uniqueRelationChangeDetails(relations: LawRelation[]): string[] {
+  const details: string[] = [];
+  for (const relation of relations) {
+    const value = normalizeChangeDetail(relation.change_detail);
+    if (value && !details.includes(value)) details.push(value);
+  }
+  return details;
+}

@@ -92,6 +92,15 @@
                 {{ relationTypeLabel(rel.type) }}
               </v-chip>
               <span class="relations-list__target">{{ formatRelationTarget(rel) }}</span>
+              <v-chip
+                v-if="changeDetailMeta(rel.change_detail)"
+                size="x-small"
+                :color="changeDetailMeta(rel.change_detail)?.color"
+                variant="tonal"
+                :prepend-icon="changeDetailMeta(rel.change_detail)?.icon"
+              >
+                {{ changeDetailMeta(rel.change_detail)?.title }}
+              </v-chip>
               <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
               <v-spacer />
               <v-btn
@@ -147,6 +156,15 @@
                     {{ relationTypeLabel(rel.type) }}
                   </v-chip>
                   <span class="relations-list__target">{{ formatRelationTarget(rel) }}</span>
+                  <v-chip
+                    v-if="changeDetailMeta(rel.change_detail)"
+                    size="x-small"
+                    :color="changeDetailMeta(rel.change_detail)?.color"
+                    variant="tonal"
+                    :prepend-icon="changeDetailMeta(rel.change_detail)?.icon"
+                  >
+                    {{ changeDetailMeta(rel.change_detail)?.title }}
+                  </v-chip>
                   <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
                   <v-spacer />
                   <v-btn
@@ -180,6 +198,7 @@
       :whole-document-only="isWholeDocumentChange"
       :existing-relations="relations"
       :section-labels="sectionLabels"
+      :change-status="changeStatus"
       @close="closeRelationDialog"
       @save="onRelationSave"
     />
@@ -200,6 +219,9 @@ import {
   RELATION_TYPE_ICONS,
   formatRelationTarget,
   relationTypeLabel,
+  uniqueRelationChangeDetails,
+  changeDetailMeta,
+  normalizeChangeDetail,
 } from '../../types/lawRelation';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
@@ -231,16 +253,16 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
 const changeDetails = computed(() => documentStore.review?.law_meta?.change_details ?? []);
 const hasSectionCancelDetail = computed(() =>
-  changeDetails.value.includes('ยกเลิกข้อ') || changeDetails.value.includes('ยกเลิกมาตรา'),
+  changeDetails.value.some((detail) => normalizeChangeDetail(detail) === 'ยกเลิกข้อ'),
 );
 const isWholeDocumentChange = computed(() =>
   changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ยกเลิกทั้งฉบับ',
 );
 const isSectionChange = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา' || changeStatus.value === 'ยกเลิกรายมาตรา',
+  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
 );
 const showDocumentRelations = computed(() => !isSectionChange.value);
-const showSectionRelations = computed(() => !isWholeDocumentChange.value);
+const showSectionRelations = computed(() => isSectionChange.value);
 const suggestedRelationType = computed<RelationType | undefined>(() => {
   if (hasSectionCancelDetail.value) return 'repeals';
   if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
@@ -331,14 +353,21 @@ function closeRelationDialog(): void {
   relationDialog.value.open = false;
 }
 
+function persistRelations(next: LawRelation[]): Promise<boolean> {
+  return documentStore.saveRelations(
+    next,
+    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next) } : undefined,
+  );
+}
+
 async function removeRelation(id: string): Promise<void> {
-  const ok = await documentStore.saveRelations(relations.value.filter((r) => r.id !== id));
+  const ok = await persistRelations(relations.value.filter((r) => r.id !== id));
   if (ok) snackbar.success('ลบความสัมพันธ์แล้ว');
 }
 
 async function onRelationSave(relation: LawRelation): Promise<void> {
   closeRelationDialog();
-  const ok = await documentStore.saveRelations([...relations.value, relation]);
+  const ok = await persistRelations([...relations.value, relation]);
   if (ok) snackbar.success('เพิ่มความสัมพันธ์แล้ว');
 }
 

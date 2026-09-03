@@ -235,6 +235,8 @@ export interface LawRelation {
   target_block_id: string | null;
   note: string | null;
   url: string | null;
+  /** รายละเอียดการเปลี่ยนแปลงต่อข้อ เช่น ยกเลิกข้อ / เพิ่มข้อความ / แก้ไขข้อความ */
+  change_detail?: string | null;
 }
 
 export interface DocumentListItem {

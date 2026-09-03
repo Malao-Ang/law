@@ -1675,6 +1675,7 @@ class ReviewStore
                 'target_block_id' => trim((string) ($entry['target_block_id'] ?? '')) ?: null,
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
+                'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
             ];
         }
 

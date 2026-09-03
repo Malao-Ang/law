@@ -126,20 +126,9 @@
                 :rules="requiredTextRules('สถานะการเปลี่ยนแปลง')"
                 required
               />
-            </v-col>
-            <v-col v-if="changeStatusHasDetails" cols="12" sm="6">
-              <v-select
-                v-model="changeDetailSingle"
-                :items="changeStatusDetailItems"
-                item-title="title"
-                item-value="value"
-                :label="requiredLabel('รายละเอียดการเปลี่ยนแปลง')"
-                placeholder="- เลือกรายละเอียด -"
-                variant="outlined"
-                clearable
-                :rules="requiredTextRules('รายละเอียดการเปลี่ยนแปลง')"
-                required
-              />
+              <p v-if="changeStatusHasDetails" class="text-caption text-medium-emphasis mt-n1 mb-3">
+                รายละเอียดการเปลี่ยนแปลงเลือกตอนเพิ่มความสัมพันธ์รายข้อในขั้นตอนถัดไป
+              </p>
             </v-col>
             <v-col cols="12">
               <v-autocomplete
@@ -313,7 +302,7 @@ const documentStore = useDocumentStore();
 const route = useRoute();
 const isEditMode = computed(() => route.query.mode === 'edit');
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { documentTypes, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พระราชบัญญัติ'],
@@ -412,22 +401,6 @@ const selectedChangeType = computed(() =>
 );
 
 const changeStatusHasDetails = computed(() => selectedChangeType.value?.has_details === true);
-
-// รายละเอียดการเปลี่ยนแปลงเลือกได้ค่าเดียว — เก็บเป็น array 0/1 ตัวใน change_details (backend คงเดิม)
-const changeDetailSingle = computed<string | null>({
-  get: () => form.value.change_details?.[0] ?? null,
-  set: (value) => { form.value.change_details = value ? [value] : []; },
-});
-
-const changeStatusDetailItems = computed(() => {
-  const items = changeStatusDetails.value.filter((d) => matchesSource(d.source));
-  const current = form.value.change_details ?? [];
-  const missing = current
-    .map((value) => value.trim())
-    .filter((value) => value !== '' && !items.some((item) => item.value === value));
-  if (missing.length === 0) return items;
-  return [...missing.map((value) => ({ title: value, value })), ...items];
-});
 
 const documentTypeDisabled = computed(() => isOld.value && !hasText(form.value.source));
 const documentTypePlaceholder = computed(() =>

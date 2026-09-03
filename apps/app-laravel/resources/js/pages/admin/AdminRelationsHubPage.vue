@@ -267,6 +267,7 @@
             <div v-else class="text-body-2 text-medium-emphasis mb-4">ยังไม่มีความสัมพันธ์ระดับเอกสาร</div>
 
             <!-- Section-level relations -->
+            <template v-if="showSectionRelations">
             <div class="rh-section-title mb-3">
               <v-icon icon="mdi-vector-link" color="admin-primary" size="16" />
               ความสัมพันธ์ระดับข้อ
@@ -287,6 +288,15 @@
                       {{ relationTypeLabel(rel.type) }}
                     </v-chip>
                     <span class="text-body-2 text-truncate flex-1">{{ formatRelationTarget(rel) }}</span>
+                    <v-chip
+                      v-if="changeDetailMeta(rel.change_detail)"
+                      size="x-small"
+                      :color="changeDetailMeta(rel.change_detail)?.color"
+                      variant="tonal"
+                      :prepend-icon="changeDetailMeta(rel.change_detail)?.icon"
+                    >
+                      {{ changeDetailMeta(rel.change_detail)?.title }}
+                    </v-chip>
                     <v-btn icon variant="text" size="x-small" color="error" :disabled="documentStore.saving" @click="removeRelation(rel)">
                       <v-icon icon="mdi-delete-outline" size="15" />
                     </v-btn>
@@ -295,6 +305,7 @@
                 <div v-else class="text-caption text-medium-emphasis">ยังไม่มีความสัมพันธ์</div>
               </div>
             </div>
+          </template>
           </template>
         </v-card-text>
 
@@ -355,6 +366,7 @@
       :parent-document-ids="quickEditParentIds"
       :existing-relations="relations"
       :section-labels="sectionLabels"
+      :change-status="documentStore.review?.law_meta?.change_status"
       @close="closeRelationDialog"
       @save="onRelationAdd"
     />
@@ -373,10 +385,13 @@ import {
   RELATION_TYPE_ICONS,
   formatRelationTarget,
   relationTypeLabel,
+  uniqueRelationChangeDetails,
+  changeDetailMeta,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
+import { isSectionEditionChange } from '../../composables/useShowRelations';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -541,6 +556,10 @@ watch([search, filterStatus, sortOrder], () => { page.value = 1; });
 
 // ── Relations computed (from staged pendingRelations) ──────
 const relations = computed<LawRelation[]>(() => pendingRelations.value);
+const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
+const showSectionRelations = computed(() =>
+  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
+);
 const sections = computed(() => buildSections(documentStore.review));
 const sectionLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(sections.value.map((s) => [s.id, s.badge])),
@@ -643,7 +662,13 @@ function openConfirmSave(): void {
 
 async function confirmSave(): Promise<void> {
   confirmSaveOpen.value = false;
-  const ok = await documentStore.saveRelations(pendingRelations.value);
+  const changeStatus = documentStore.review?.law_meta?.change_status ?? '';
+  const ok = await documentStore.saveRelations(
+    pendingRelations.value,
+    isSectionEditionChange(changeStatus)
+      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value) }
+      : undefined,
+  );
   if (ok) {
     snackbar.success('บันทึกความสัมพันธ์แล้ว');
     quickEditOpen.value = false;
