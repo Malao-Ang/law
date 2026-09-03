@@ -54,7 +54,8 @@ class LawSearchController extends Controller
                     'total' => count($esRows) + count($supplement),
                     'results' => $results,
                     'facets' => $esResult['facets'] ?? $fileBased['facets'],
-                    'fuzzy' => false,
+                    'fuzzy' => ($esResult['meta']['mode'] ?? 'exact') === 'fuzzy'
+                        || ($fileBased['fuzzy'] ?? false),
                     'meta' => [
                         'engine' => $supplement === [] ? 'elastic' : 'mixed',
                         'mode' => (string) ($esResult['meta']['mode'] ?? 'exact'),
@@ -86,6 +87,9 @@ class LawSearchController extends Controller
 
         $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
         $row['issuer'] = (string) ($fileRow['issuer'] ?? ($row['issuer'] ?? ''));
+        if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
+            $row['title_highlighted'] = $fileRow['title_highlighted'];
+        }
         $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
         $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
         if ($row['restricted']) {

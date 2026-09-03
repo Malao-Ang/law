@@ -11,6 +11,9 @@
  */
 return [
 
+    /** Toggle MinIO for document file serving (false = local dev) */
+    'minio_enabled' => env('BUU_MINIO_ENABLED', false),
+
     'domain' => env('BUU_KONG_DOMAIN', 'https://kong-dev.buu.ac.th'),
 
     'client_id' => env('BUU_CLIENT_ID', ''),

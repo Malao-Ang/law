@@ -32,6 +32,22 @@ class LawSearchFuzzyTest extends TestCase
         $this->assertTrue($res->json('fuzzy'), 'response should flag fuzzy results');
     }
 
+    public function test_search_results_include_title_highlighted(): void
+    {
+        $s = app(ReviewStore::class);
+        $id = 'hl_result_'.uniqid();
+        $this->seedLaw($s, $id, 'ระเบียบว่าด้วยการเบิกจ่ายค่าเดินทาง');
+
+        $res = $this->postJson('/api/laws/search', ['q' => 'เบิกจ่าย']);
+        $res->assertOk();
+
+        $hit = collect($res->json('results'))->firstWhere('law_id', $id);
+        $this->assertNotNull($hit);
+        $this->assertNotNull($hit['title_highlighted'], 'search results must include title_highlighted');
+        $this->assertStringContainsString('<mark>', $hit['title_highlighted']);
+        $this->assertStringContainsString('เบิกจ่าย', $hit['title_highlighted']);
+    }
+
     public function test_exact_query_highlights_the_matched_term_in_title(): void
     {
         $s = app(ReviewStore::class);

@@ -292,9 +292,25 @@ class LawSearchService
 
             $restricted = $this->isRestrictedSource($source);
 
+            $titleHighlighted = null;
+            $titleHighlightFragments = $hit['highlight']['title'] ?? [];
+            if ($titleHighlightFragments !== []) {
+                $titleHighlighted = $titleHighlightFragments[0];
+            }
+            if ($titleHighlighted === null) {
+                foreach ($hit['inner_hits']['snippets']['hits']['hits'] ?? [] as $innerHit) {
+                    $innerTitleFragments = $innerHit['highlight']['title'] ?? [];
+                    if ($innerTitleFragments !== []) {
+                        $titleHighlighted = $innerTitleFragments[0];
+                        break;
+                    }
+                }
+            }
+
             $results[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
+                'title_highlighted' => $titleHighlighted,
                 'law_type' => $source['law_type'] ?? null,
                 'status' => $source['status'] ?? null,
                 'change_status' => $source['change_status'] ?? null,
