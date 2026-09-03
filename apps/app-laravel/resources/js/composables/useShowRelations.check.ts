@@ -7,6 +7,8 @@ import {
   currentFamilyTitle,
   regulationFamilyKey,
   sameLevelTreeSkipIds,
+  sameLevelVersionLabel,
+  sameLevelVersionNumber,
   shouldNestAsSectionPatch,
   shouldUnionSameLevel,
   shouldUnionSameLevelFamily,
@@ -99,6 +101,12 @@ assert(currentFamilyTitle(chainFromV2[0]).includes('๒๕๖๙'), 'current tit
 const mixedFromV2 = collectMixedSameLevelChains([v1, v2, v3, v4, announcement], [], 'v2');
 assert(mixedFromV2.length === 1, 'mixed family is one chain');
 assert(mixedFromV2[0].map((item) => item.id).join(',') === 'v1,v2,v3,v4', 'mixed chain includes whole editions and section patches');
+assert(sameLevelVersionNumber(mixedFromV2[0], 'v1') === 1, 'original is version 1');
+assert(sameLevelVersionNumber(mixedFromV2[0], 'v2') === 2, 'first section patch is version 2');
+assert(sameLevelVersionNumber(mixedFromV2[0], 'v3') === 3, 'next section patch is version 3');
+assert(sameLevelVersionNumber(mixedFromV2[0], 'v4') === 4, 'later whole edition is version 4');
+assert(sameLevelVersionLabel(mixedFromV2[0], 'v2') === 'เวอร์ชัน 2', 'version label is Thai');
+assert(sameLevelVersionNumber([v1], 'v1') === 0, 'single document has no version number');
 
 const mixedSkip = sameLevelTreeSkipIds('v4', mixedFromV2);
 assert(mixedSkip.has('v1') && mixedSkip.has('v2') && mixedSkip.has('v3') && !mixedSkip.has('v4'), 'tree keeps latest whole edition and puts others on the horizontal chain');
@@ -192,7 +200,7 @@ const treeBAC = buildRelationTree('B', [lawB, lawA, lawC], {
 assert(treeBAC?.children.some((c) => c.row.id === 'A') === true, 'A stays under B');
 assert(treeBAC?.children.some((c) => c.row.id === 'C') !== true, 'C is not a sibling of A under B');
 const aNode = treeBAC?.children.find((c) => c.row.id === 'A');
-assert(aNode?.sameLevelVersions.some((item) => item.id === 'C') === true, 'C appears on A as a same-level version');
+assert(aNode?.edgeType === 'issued_under', 'A under B is issued-under even if a section patch amends A');
 
 const firstLaw = row({
   id: 'first',
@@ -240,6 +248,7 @@ assert((treeFirst?.sameLevelVersions.length ?? 0) === 0, 'parent is not in the c
 assert(treeFirst?.children.some((c) => c.row.id === 'second') === true, 'second law is a child of the first');
 assert(treeFirst?.children.some((c) => c.row.id === 'tor') !== true, 'TOR is not a sibling of the second law under the parent');
 const secondNode = treeFirst?.children.find((c) => c.row.id === 'second');
+assert(secondNode?.edgeType === 'issued_under', 'second law is issued-under the first, not an amendment of it');
 assert(secondNode?.sameLevelVersions.some((item) => item.id === 'tor') === true, 'TOR sits on the second law row');
 const v4Node = tree2!.children.find((c) => c.row.id === 'v4');
 assert(!v4Node?.children.some((c) => c.row.id === 'v2'), 'section patch is not a vertical tree child');

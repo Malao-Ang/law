@@ -443,6 +443,17 @@ export function currentFamilyTitle(chain: ShowRelRow[]): string {
   return (active ?? chain[chain.length - 1])?.title ?? '';
 }
 
+export function sameLevelVersionNumber(chain: ShowRelRow[], documentId: string): number {
+  if (chain.length < 2) return 0;
+  const index = chain.findIndex((row) => row.id === documentId);
+  return index >= 0 ? index + 1 : 0;
+}
+
+export function sameLevelVersionLabel(chain: ShowRelRow[], documentId: string): string {
+  const number = sameLevelVersionNumber(chain, documentId);
+  return number > 0 ? `เวอร์ชัน ${number}` : '';
+}
+
 export function editionKindLabel(changeStatus: string): string {
   if (isSectionEditionChange(changeStatus)) return 'ปรับปรุงรายข้อ';
   if (changeStatus.trim() === 'ปรับปรุงทั้งฉบับ' || changeStatus.trim() === 'ยกเลิกทั้งฉบับ') return 'ปรับปรุงทั้งฉบับ';
@@ -494,6 +505,7 @@ export function buildRelationTree(
   const relationByTarget = new Map<string, RelationType>();
   for (const list of relMap.values()) {
     for (const rel of relationsLinkingDocuments(list)) {
+      if (SAME_LEVEL_RELATION_TYPES.has(rel.type)) continue;
       const targetId = rel.target_document_id?.trim();
       if (targetId) relationByTarget.set(targetId, rel.type);
     }
@@ -533,8 +545,10 @@ export function buildRelationTree(
     if (level < MAX_DEPTH) {
       const ordered = [...childRows].sort((a, b) => a.title.localeCompare(b.title, 'th'));
       for (const child of ordered) {
-        const childEdge = relationByTarget.get(child.id)
-          ?? (child.parentIds.includes(id) ? 'issued_under' : 'related');
+        const extraType = extraBySource.get(id)?.find((item) => item.id === child.id)?.type;
+        const childEdge = child.parentIds.includes(id)
+          ? 'issued_under'
+          : (extraType ?? relationByTarget.get(child.id) ?? 'related');
         const node = walk(child.id, level + 1, childEdge, nextSeen);
         if (node) children.push(node);
       }

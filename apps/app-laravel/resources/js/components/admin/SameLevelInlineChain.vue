@@ -15,17 +15,24 @@
           <span class="slc__kind">{{ item.kindLabel }}</span>
           <span class="slc__status" :class="`is-${item.kind}`">{{ item.statusLabel }}</span>
         </div>
+        <div v-if="item.versionLabel" class="slc__version">{{ item.versionLabel }}</div>
         <div class="slc__title">{{ item.row.title }}</div>
       </button>
-      <span v-if="index < items.length - 1" class="slc__arrow" aria-hidden="true">→</span>
+      <span v-if="index < items.length - 1" class="slc__arrow" aria-hidden="true">
+        <span class="slc__rel">{{ peerEdgeLabel(items[index + 1].row) }}</span>
+        →
+      </span>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { relationTypeLabel } from '../../types/lawRelation';
 import {
   editionKindLabel,
+  isWholeEditionChange,
+  sameLevelVersionLabel,
   versionNodeSize,
   versionStatusKind,
   type ShowRelRow,
@@ -33,23 +40,31 @@ import {
 
 const props = defineProps<{
   versions: ShowRelRow[];
+  chain?: ShowRelRow[];
   currentId?: string;
 }>();
 
 defineEmits<{ select: [id: string] }>();
 
-const items = computed(() =>
-  props.versions.map((row) => {
+function peerEdgeLabel(row: ShowRelRow): string {
+  if (isWholeEditionChange(row.changeStatus)) return relationTypeLabel('supersedes');
+  return relationTypeLabel('amends');
+}
+
+const items = computed(() => {
+  const chain = props.chain?.length ? props.chain : props.versions;
+  return props.versions.map((row) => {
     const kind = versionStatusKind(row.metaStatus);
     return {
       row,
       kind,
       size: versionNodeSize(row.changeStatus),
       kindLabel: editionKindLabel(row.changeStatus),
+      versionLabel: sameLevelVersionLabel(chain, row.id),
       statusLabel: kind === 'revoked' ? 'ยกเลิก' : kind === 'active' ? 'บังคับใช้' : (row.metaStatus || '—'),
     };
-  }),
-);
+  });
+});
 </script>
 
 <style scoped>
@@ -96,6 +111,13 @@ const items = computed(() =>
   color: #64748b;
 }
 
+.slc__version {
+  margin-bottom: 4px;
+  color: #1e3a8a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .slc__status {
   font-size: 11px;
   font-weight: 700;
@@ -113,8 +135,19 @@ const items = computed(() =>
 }
 
 .slc__arrow {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   color: #94a3b8;
   font-size: 16px;
   font-weight: 700;
+}
+
+.slc__rel {
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 </style>

@@ -13,6 +13,12 @@
               color="grey"
               class="font-weight-bold"
             >{{ node.row.typeShort }}</v-chip>
+            <v-chip
+              v-if="versionLabel"
+              size="x-small"
+              color="admin-primary"
+              variant="tonal"
+            >{{ versionLabel }}</v-chip>
             <v-spacer />
             <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="flat">
               เอกสารปัจจุบัน
@@ -39,6 +45,7 @@
       <SameLevelInlineChain
         v-if="canTogglePeers && expanded"
         :versions="peers"
+        :chain="node.sameLevelVersions"
         :current-id="currentId ?? node.row.id"
         @select="$emit('select', $event)"
       />
@@ -64,7 +71,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
-import type { RelTreeNode } from '../../composables/useShowRelations';
+import { sameLevelVersionLabel, type RelTreeNode } from '../../composables/useShowRelations';
 import SameLevelInlineChain from './SameLevelInlineChain.vue';
 
 defineOptions({ name: 'RelationTreeView' });
@@ -82,8 +89,14 @@ const isCurrent = computed(() =>
 
 const isLeaf = computed(() => props.node.children.length === 0);
 
+const versionChain = computed(() => props.node.sameLevelVersions ?? []);
+
 const peers = computed(() =>
-  (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
+  versionChain.value.filter((row) => row.id !== props.node.row.id),
+);
+
+const versionLabel = computed(() =>
+  sameLevelVersionLabel(versionChain.value, props.node.row.id),
 );
 
 const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);

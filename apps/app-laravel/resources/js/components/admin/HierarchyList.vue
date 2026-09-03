@@ -24,6 +24,15 @@
       >
         {{ statusLabel }}
       </v-chip>
+      <v-chip
+        v-if="versionLabel"
+        size="x-small"
+        color="admin-primary"
+        variant="tonal"
+        class="h-chip"
+      >
+        {{ versionLabel }}
+      </v-chip>
       <button
         v-if="canTogglePeers"
         type="button"
@@ -38,6 +47,7 @@
     <div v-if="canTogglePeers && expanded" class="h-peers">
       <SameLevelInlineChain
         :versions="peers"
+        :chain="node.sameLevelVersions"
         :current-id="node.row.id"
       />
     </div>
@@ -54,6 +64,7 @@ import { computed, ref } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
 import {
   metaStatusColor,
+  sameLevelVersionLabel,
   typeColor,
   typeIcon,
   workflowStageColor,
@@ -71,6 +82,9 @@ const peers = computed(() =>
   (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
 );
 const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
+const versionLabel = computed(() =>
+  sameLevelVersionLabel(props.node.sameLevelVersions ?? [], props.node.row.id),
+);
 
 const rowIcon = computed(() =>
   props.node.level === 0 ? 'mdi-office-building' : typeIcon(props.node.row.lawType),
