@@ -165,17 +165,17 @@ class LawSearchQuery
             $token = $quoted ? $match[1] : ($match[2] ?? '');
             $upper = mb_strtoupper($token);
 
-            if (! $quoted && in_array($upper, ['AND', 'และ'], true)) {
+            if (! $quoted && in_array($upper, ['AND', 'และ', '&'], true)) {
                 $this->hasBooleanSyntax = true;
                 $operator = 'AND';
                 continue;
             }
-            if (! $quoted && in_array($upper, ['OR', 'หรือ'], true)) {
+            if (! $quoted && in_array($upper, ['OR', 'หรือ', '|'], true)) {
                 $this->hasBooleanSyntax = true;
                 $operator = 'OR';
                 continue;
             }
-            if (! $quoted && in_array($upper, ['NOT', 'ไม่'], true)) {
+            if (! $quoted && in_array($upper, ['NOT', 'ไม่', '~'], true)) {
                 $this->hasBooleanSyntax = true;
                 $negateNext = true;
                 continue;
