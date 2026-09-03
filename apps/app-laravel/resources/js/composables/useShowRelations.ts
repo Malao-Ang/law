@@ -19,6 +19,7 @@ export const TYPE_META: Record<string, { color: string; short: string }> = {
 export const RELATION_FILTERS: Array<{ value: RelationType; label: string }> = [
   { value: 'issued_under', label: 'ออกตามอำนาจ' },
   { value: 'amends', label: 'แก้ไขเพิ่มเติม' },
+  { value: 'repeals', label: 'ยกเลิก' },
   { value: 'related', label: 'เกี่ยวข้อง' },
 ];
 
@@ -70,7 +71,7 @@ export function workflowStageLabel(doc: {
   meta_status: string;
   workflow_completed_step: number | null;
 }): string {
-  if (doc.meta_status === 'ยกเลิก') return 'ยกเลิก';
+  if (isCancelledStatus(doc.meta_status) || isCancelledStatus(doc.status)) return 'ยกเลิก';
   const step = doc.workflow_completed_step ?? 0;
   if (doc.status === 'exported' || doc.status === 'ingested') return 'เผยแพร่';
   if (step >= 6) return 'พร้อมเผยแพร่';
@@ -109,6 +110,10 @@ export function isActiveStatus(status: string): boolean {
 
 export function isCancelledStatus(status: string): boolean {
   return status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน' || status.includes('ยกเลิก');
+}
+
+export function isKeptInRelationGraph(row: Pick<ShowRelRow, 'metaStatus' | 'workflowStage'>): boolean {
+  return isCancelledStatus(row.metaStatus) || isCancelledStatus(row.workflowStage);
 }
 
 export function displayLawDate(value: string | null | undefined): string {
@@ -555,7 +560,11 @@ export function buildRelationTree(
     }
 
     if (level > 0 && allowed && children.length === 0 && !allowed.has(edgeType)) {
-      return null;
+      const keepCancelled = isKeptInRelationGraph(row);
+      const keepVersionChain = (chainById.get(id)?.length ?? 0) >= 2;
+      if (!keepCancelled && !keepVersionChain) {
+        return null;
+      }
     }
 
     return {

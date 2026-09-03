@@ -250,6 +250,43 @@ assert(treeFirst?.children.some((c) => c.row.id === 'tor') !== true, 'TOR is not
 const secondNode = treeFirst?.children.find((c) => c.row.id === 'second');
 assert(secondNode?.edgeType === 'issued_under', 'second law is issued-under the first, not an amendment of it');
 assert(secondNode?.sameLevelVersions.some((item) => item.id === 'tor') === true, 'TOR sits on the second law row');
+
+const revokedStep = row({
+  id: 'step2',
+  title: 'ขั้น 2',
+  lawType: 'ประกาศ',
+  typeShort: 'ประกาศ',
+  changeStatus: 'กฎหมายใหม่',
+  metaStatus: 'ยกเลิกการใช้งาน',
+  parentIds: ['first'],
+});
+const cancelPatch = row({
+  id: 'cancel-patch',
+  title: 'ปรับปรุงรายข้อ ยกเลิกข้อ',
+  lawType: 'ประกาศ',
+  typeShort: 'ประกาศ',
+  changeStatus: 'ปรับปรุงรายข้อ',
+  metaStatus: 'ร่าง',
+  parentIds: ['first'],
+});
+const treeCancel = buildRelationTree('first', [firstLaw, revokedStep, cancelPatch], {
+  'cancel-patch': [{
+    id: 'cancel-repeals-step2',
+    scope: 'section',
+    block_id: 'c-blk',
+    type: 'repeals',
+    target_document_id: 'step2',
+    target_title: 'ขั้น 2',
+    target_section: 'ข้อ 1',
+    target_block_id: null,
+    note: null,
+    url: null,
+  }],
+}, ['issued_under', 'amends', 'related']);
+const step2Node = treeCancel?.children.find((c) => c.row.id === 'step2');
+assert(step2Node != null, 'revoked step 2 stays in the tree');
+assert(step2Node?.sameLevelVersions.some((item) => item.id === 'cancel-patch') === true, 'ยกเลิกข้อ patch stays on the graph as a version');
+assert(treeCancel?.children.some((c) => c.row.id === 'cancel-patch') !== true, 'ยกเลิกข้อ patch is not a vertical sibling');
 const v4Node = tree2!.children.find((c) => c.row.id === 'v4');
 assert(!v4Node?.children.some((c) => c.row.id === 'v2'), 'section patch is not a vertical tree child');
 assert(v4Node?.sameLevelVersions.map((item) => item.id).join(',') === 'v1,v2,v4', 'leaf stores same-level versions');

@@ -371,6 +371,7 @@ import {
   type ShowRelRow,
   isActiveStatus,
   isCancelledStatus,
+  isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
 
 const PAGE_SIZE = 20;
@@ -504,7 +505,7 @@ function filterTree(node: RelTreeNode | null): RelTreeNode | null {
     .map((child) => filterTree(child))
     .filter((child): child is RelTreeNode => Boolean(child));
 
-  const selfMatch = node.level === 0 || (
+  const selfMatch = node.level === 0 || isKeptInRelationGraph(node.row) || (
     (!treeType.value || node.row.lawType === treeType.value)
     && (!treeStatus.value || node.row.workflowStage === treeStatus.value || node.row.metaStatus === treeStatus.value)
     && (!q || node.row.title.toLowerCase().includes(q) || node.row.org.toLowerCase().includes(q) || node.row.group.toLowerCase().includes(q))
