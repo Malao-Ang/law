@@ -334,18 +334,26 @@ class ReviewStore
 
         $versions = [];
         foreach ($component as $index => $row) {
+            $vStatus = $this->getStatus($row['document_id']) ?? [];
+            $sourceType = (string) ($vStatus['source_type'] ?? '');
+            $sourcePath = (string) ($vStatus['source_path'] ?? '');
+            $hasFile = $sourcePath !== '' && is_file($this->absolutePath($sourcePath));
+
             $versions[] = [
-                'document_id' => $row['document_id'],
+                'document_id'      => $row['document_id'],
                 // ponytail: positional label, not a stable id — if a middle version is later
                 // inserted, labels shift. Add a persisted label to law_meta if stability is needed.
-                'version_label' => 'v'.($index + 1).'.0',
-                'is_current' => $row['document_id'] === $currentId,
-                'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
-                'change_status' => (string) ($row['change_status'] ?? ''),
-                'issuer' => (string) ($row['issuer'] ?? ''),
-                'agency' => $row['agencies'][0] ?? '',
-                'promulgation_date' => (string) ($row['promulgation_date'] ?? ''),
-                'title' => (string) ($row['title'] ?? ''),
+                'version_label'    => 'v'.($index + 1).'.0',
+                'is_current'       => $row['document_id'] === $currentId,
+                'status'           => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
+                'change_status'    => (string) ($row['change_status'] ?? ''),
+                'issuer'           => (string) ($row['issuer'] ?? ''),
+                'agency'           => $row['agencies'][0] ?? '',
+                'promulgation_date'=> (string) ($row['promulgation_date'] ?? ''),
+                'title'            => (string) ($row['title'] ?? ''),
+                'source_type'      => $sourceType,
+                'has_file'         => $hasFile,
+                'source_file'      => (string) ($vStatus['source_file'] ?? ''),
             ];
         }
 
