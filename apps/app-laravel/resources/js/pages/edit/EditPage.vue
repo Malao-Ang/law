@@ -1,9 +1,9 @@
 <template>
-  <ESignDocumentWorkspace :document-id="documentId" mode="edit" />
+  <EditHubWorkspace :document-id="documentId" />
 </template>
 
 <script setup lang="ts">
-import ESignDocumentWorkspace from '../../components/esign/ESignDocumentWorkspace.vue';
+import EditHubWorkspace from '../../components/edit/EditHubWorkspace.vue';
 
 defineProps<{ documentId: string }>();
 </script>
