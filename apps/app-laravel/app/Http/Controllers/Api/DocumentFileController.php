@@ -68,9 +68,10 @@ class DocumentFileController extends Controller
 
         // 2. MinIO fallback
         if (config('buu.minio_enabled')) {
+            $minioKey = (string) ($status['minio_source_filename'] ?? $relative);
             try {
                 $links = $this->minioService->getPublicLinks(
-                    ['file' => $relative],
+                    ['file' => $minioKey],
                     ['file' => basename((string) ($status['source_file'] ?? $relative))],
                 );
                 $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
