@@ -88,6 +88,7 @@
         <span v-if="item.lawType">{{ item.lawType }}</span>
         <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
         <span v-else>—</span>
+        <v-chip v-if="item.documentType === 'old'" size="x-small" color="grey" variant="tonal" class="ml-2">เอกสารเก่า</v-chip>
       </template>
 
       <template #item.stage="{ item }">
@@ -127,6 +128,22 @@
             :disabled="deletingId !== null && deletingId !== item.documentId"
             @click="confirmDelete(item)"
           />
+
+          <v-menu>
+            <template #activator="{ props: menuProps }">
+              <v-btn icon="mdi-dots-vertical" size="small" variant="text" color="grey" v-bind="menuProps" />
+            </template>
+            <v-list density="compact">
+              <v-list-item :disabled="item.stage === 'public' || item.stage === 'failed'" @click="advance(item)">
+                <template #prepend><v-icon icon="mdi-arrow-right" size="18" /></template>
+                <v-list-item-title>ขั้นถัดไป</v-list-item-title>
+              </v-list-item>
+              <v-list-item :disabled="!canRollback(item.stage)" @click="rollback(item)">
+                <template #prepend><v-icon icon="mdi-arrow-left" size="18" /></template>
+                <v-list-item-title>ย้อนกลับ</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
         </div>
       </template>
 

@@ -54,10 +54,6 @@ class BuuMinioService
 
         $fields = [
             [
-                'name' => 'qrVerify',
-                'contents' => $qrVerify ? 'true' : 'false',
-            ],
-            [
                 'name' => 'path',
                 'contents' => $folderPath,
             ],
@@ -75,6 +71,13 @@ class BuuMinioService
                 'filename' => $uploadName,
             ],
         ];
+
+        if ($qrVerify) {
+            $fields[] = [
+                'name' => 'qrVerify',
+                'contents' => 'true',
+            ];
+        }
 
         if ($fileName !== null && $fileName !== '') {
             $fields[] = [

@@ -259,6 +259,15 @@ function isActive(item: NavItem): boolean {
 
 .app-shell__breadcrumbs {
   min-width: 0;
+  overflow: hidden;
+}
+
+.app-shell__breadcrumbs :deep(.v-breadcrumbs-item:last-child) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 360px;
 }
 
 .app-shell__topbar-right {
