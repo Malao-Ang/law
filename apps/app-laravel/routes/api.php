@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\EsignCallbackController;
+use App\Http\Controllers\Api\EsignController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\DocumentFileController;
@@ -58,6 +59,8 @@ Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, '
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
+Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send']);
+Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel']);
 Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);

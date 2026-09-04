@@ -124,6 +124,9 @@
                   {{ roleLabel(signer.roleType) }}
                   <span v-if="signer.position"> • {{ signer.position }}</span>
                 </div>
+                <div v-if="signer.citizenId" class="text-caption text-medium-emphasis text-truncate">
+                  บัตร {{ signer.citizenId }}
+                </div>
                 <div v-if="signer.note" class="text-caption text-warning text-truncate">{{ signer.note }}</div>
               </div>
               <v-btn
@@ -232,7 +235,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { downloadPdfExport, reviewPdfPreviewUrl } from '../../api/client';
+import { downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -397,15 +400,26 @@ async function sendToESign(): Promise<void> {
   sending.value = true;
   try {
     persistSigners();
+    const primaryCitizenId = signers.value[0]?.citizenId;
+    const result = await sendDocumentESign(props.documentId, {
+      // Sandbox mock: owner = first signer until real owner mapping exists
+      owner_citizen_id: primaryCitizenId,
+      signers: signers.value.map((signer) => ({
+        citizen_id: signer.citizenId,
+        name: signer.name,
+        note: signer.note,
+      })),
+    });
     const now = new Date().toISOString();
     const current = loadSession(props.documentId);
     const next = pushActivity({
       ...current,
       status: 'waiting',
       submittedAt: now,
+      trackingId: result.minio_filename || current.trackingId,
     }, {
       title: 'ส่งเอกสารเข้าสู่ระบบ e-Sign',
-      detail: `Tracking ${current.trackingId}`,
+      detail: `MinIO ${result.minio_filename}`,
       actor: documentStore.review?.law_meta?.imported_by || undefined,
       at: now,
     });
@@ -413,6 +427,8 @@ async function sendToESign(): Promise<void> {
     writeStage(props.documentId, 'wait_esign');
     confirmSendOpen.value = false;
     await router.push(`/documents/${props.documentId}/esign/status`);
+  } catch (error) {
+    errorFlash.value = error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ';
   } finally {
     sending.value = false;
   }
