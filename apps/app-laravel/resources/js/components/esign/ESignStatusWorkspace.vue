@@ -18,7 +18,14 @@
         >ส่งไปยังระบบ E-Sign</v-btn>
       </template>
       <template v-else-if="session.status === 'waiting'">
-        <v-btn color="error" size="small" variant="flat" class="text-none" @click="cancelSubmit">
+        <v-btn
+          color="error"
+          size="small"
+          variant="flat"
+          class="text-none"
+          :loading="cancelling"
+          @click="cancelSubmit"
+        >
           ยกเลิกการส่งลงนาม
         </v-btn>
       </template>
@@ -56,7 +63,18 @@
     </div>
     <v-alert v-else-if="documentStore.error" type="error" variant="tonal">{{ documentStore.error }}</v-alert>
 
-    <div v-else class="status-layout">
+    <template v-else>
+    <v-alert
+      v-if="errorFlash"
+      type="error"
+      variant="tonal"
+      density="compact"
+      class="mb-3"
+      closable
+      @click:close="errorFlash = ''"
+    >{{ errorFlash }}</v-alert>
+
+    <div class="status-layout">
       <div class="status-main">
         <section class="status-card status-hero">
           <div class="d-flex flex-wrap align-center ga-2 mb-2">
@@ -305,6 +323,7 @@
         </v-card>
       </aside>
     </div>
+    </template>
     </div>
 
     <SignerRightsDialog v-model="signerDialog" @confirm="onSignerConfirmed" />
@@ -338,7 +357,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { downloadPdfExport, reviewPdfPreviewUrl } from '../../api/client';
+import { cancelDocumentESign, downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -374,9 +393,11 @@ const confirmSendOpen = ref(false);
 const docPreviewOpen = ref(false);
 const publishOpen = ref(false);
 const sending = ref(false);
+const cancelling = ref(false);
 const publishing = ref(false);
 const downloadingPdf = ref(false);
 const pdfPreviewKey = ref(0);
+const errorFlash = ref('');
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -570,39 +591,63 @@ function saveDraft(): void {
   persist();
 }
 
-function submitToESign(): void {
+async function submitToESign(): Promise<void> {
   if (signers.value.length === 0) return;
+  errorFlash.value = '';
   sending.value = true;
   try {
+    persist();
+    const primaryCitizenId = signers.value[0]?.citizenId;
+    const result = await sendDocumentESign(props.documentId, {
+      // Sandbox mock: owner = first signer until real owner mapping exists
+      owner_citizen_id: primaryCitizenId,
+      signers: signers.value.map((signer) => ({
+        citizen_id: signer.citizenId,
+        name: signer.name,
+        note: signer.note,
+      })),
+    });
     const now = new Date().toISOString();
     session.value = pushActivity({
       ...session.value,
       status: 'waiting',
       submittedAt: now,
+      trackingId: result.minio_filename || session.value.trackingId,
     }, {
       title: 'ส่งเอกสารเข้าสู่ระบบ e-Sign',
-      detail: `Tracking ${session.value.trackingId}`,
+      detail: `MinIO ${result.minio_filename}`,
       actor: meta.value.imported_by || undefined,
       at: now,
     });
     writeStage(props.documentId, 'wait_esign');
     persist();
     confirmSendOpen.value = false;
+  } catch (error) {
+    errorFlash.value = error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ';
   } finally {
     sending.value = false;
   }
 }
 
-function cancelSubmit(): void {
-  session.value = pushActivity({
-    ...session.value,
-    status: 'draft',
-    submittedAt: null,
-  }, {
-    title: 'ยกเลิกการส่งลงนาม',
-    actor: meta.value.imported_by || undefined,
-  });
-  persist();
+async function cancelSubmit(): Promise<void> {
+  errorFlash.value = '';
+  cancelling.value = true;
+  try {
+    await cancelDocumentESign(props.documentId);
+    session.value = pushActivity({
+      ...session.value,
+      status: 'draft',
+      submittedAt: null,
+    }, {
+      title: 'ยกเลิกการส่งลงนาม',
+      actor: meta.value.imported_by || undefined,
+    });
+    persist();
+  } catch (error) {
+    errorFlash.value = error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ';
+  } finally {
+    cancelling.value = false;
+  }
 }
 
 function markSigned(): void {

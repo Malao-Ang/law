@@ -8,6 +8,8 @@ export interface ESignPerson {
   position: string;
   department: string;
   employeeId: string;
+  /** Thai citizen ID (13 digits) for BUU e-sign sandbox */
+  citizenId?: string;
 }
 
 export interface ESignSigner {
@@ -17,6 +19,8 @@ export interface ESignSigner {
   position: string;
   department?: string;
   employeeId?: string;
+  /** Thai citizen ID (13 digits) required when calling Kong e-sign */
+  citizenId?: string;
   note?: string;
 }
 

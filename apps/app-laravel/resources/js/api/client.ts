@@ -314,6 +314,57 @@ export async function downloadWordExport(documentId: string): Promise<void> {
   );
 }
 
+export type ESignSendSignerPayload = {
+  citizen_id?: string;
+  psn_citizenid?: string;
+  docs_comment?: string;
+  note?: string;
+  name?: string;
+};
+
+export type ESignSendResponse = {
+  status: 'submitted';
+  document_id: string;
+  minio_filename: string;
+  bucket: string;
+  return_url: string;
+  doc_name: string;
+  owner_citizen_id: string;
+  esign: Record<string, unknown>;
+};
+
+export type ESignCancelResponse = {
+  status: 'cancelled';
+  document_id: string;
+  minio_filename: string;
+  esign: Record<string, unknown>;
+};
+
+export function sendDocumentESign(
+  documentId: string,
+  payload: {
+    signers: ESignSendSignerPayload[];
+    owner_citizen_id?: string;
+    comment?: string;
+    return_type?: 'L' | 'A';
+  },
+): Promise<ESignSendResponse> {
+  return jsonRequest<ESignSendResponse>(`/api/documents/${encodeURIComponent(documentId)}/esign/send`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelDocumentESign(
+  documentId: string,
+  payload: { psn_id?: string } = {},
+): Promise<ESignCancelResponse> {
+  return jsonRequest<ESignCancelResponse>(`/api/documents/${encodeURIComponent(documentId)}/esign/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchLawFacets(): Promise<LawSearchFacets> {
   return jsonRequest<LawSearchFacets>('/api/laws/facets');
 }
