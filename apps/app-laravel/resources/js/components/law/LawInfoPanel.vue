@@ -94,6 +94,16 @@
             class="ml-2"
           >{{ versions.length }}</v-chip>
         </v-btn>
+        <v-btn
+          flat
+          variant="outlined"
+          prepend-icon="mdi-sitemap"
+          class="justify-start text-none"
+          :disabled="!viewedDocumentId"
+          :to="viewedDocumentId ? `/law/relations/${encodeURIComponent(viewedDocumentId)}` : undefined"
+        >
+          ดูโครงสร้างความสัมพันธ์ (Hierarchy)
+        </v-btn>
       </v-card-text>
     </v-card>
 

@@ -16,11 +16,11 @@
             <v-chip
               v-if="versionLabel"
               size="x-small"
-              color="admin-primary"
+              :color="themeColor"
               variant="tonal"
             >{{ versionLabel }}</v-chip>
             <v-spacer />
-            <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="flat">
+            <v-chip v-if="node.level === 0" size="x-small" :color="themeColor" variant="flat">
               เอกสารปัจจุบัน
             </v-chip>
           </div>
@@ -47,6 +47,7 @@
         :versions="peers"
         :chain="node.sameLevelVersions"
         :current-id="currentId ?? node.row.id"
+        :theme-color="themeColor"
         @select="$emit('select', $event)"
       />
     </div>
@@ -61,6 +62,7 @@
           :key="child.row.id"
           :node="child"
           :current-id="currentId"
+          :theme-color="themeColor"
           @select="$emit('select', $event)"
         />
       </div>
@@ -78,10 +80,12 @@ defineOptions({ name: 'RelationTreeView' });
 const props = defineProps<{
   node: RelTreeNode;
   currentId?: string;
+  themeColor?: string;
 }>();
 defineEmits<{ select: [id: string] }>();
 
 const expanded = ref(true);
+const themeColor = computed(() => props.themeColor ?? 'admin-primary');
 
 const isCurrent = computed(() =>
   props.node.level === 0 || props.node.row.id === props.currentId,

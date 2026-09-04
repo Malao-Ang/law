@@ -1,18 +1,27 @@
 <template>
-  <AppShell
-    :breadcrumbs="breadcrumbs"
-    :title="selectedId ? '' : 'แสดงความสัมพันธ์'"
-    :subtitle="selectedId ? undefined : 'ค้นหาและเลือกกฎหมายเพื่อดูโครงสร้างความสัมพันธ์และกฎหมายลำดับรอง'"
-    show-bell
-  >
-    <template v-if="selectedRow" #actions>
-      <v-btn variant="text" prepend-icon="mdi-arrow-left" class="text-none" @click="goList">
-        ย้อนกลับ
-      </v-btn>
-    </template>
+  <div class="psr">
+    <ELawNavbar @go-admin="router.push('/admin')" />
 
+    <div class="psr-topbar">
+      <v-container style="max-width:1200px" class="py-0">
+        <div class="d-flex align-center ga-2 py-3">
+          <v-btn
+            variant="text"
+            size="small"
+            prepend-icon="mdi-arrow-left"
+            class="text-none"
+            @click="selectedRow ? goList() : router.push('/database')"
+          >
+            ย้อนกลับ
+          </v-btn>
+          <span class="text-body-2 text-medium-emphasis">ดูโครงสร้างความสัมพันธ์</span>
+        </div>
+      </v-container>
+    </div>
+
+    <v-container style="max-width:1200px" class="py-6">
     <div v-if="loading" class="d-flex align-center justify-center pa-12">
-      <v-progress-circular indeterminate color="admin-primary" />
+      <v-progress-circular indeterminate color="primary" />
     </div>
 
     <template v-else-if="!selectedId">
@@ -74,7 +83,7 @@
               <th>ประเภท</th>
               <th>สถานะ</th>
               <th>แก้ไขล่าสุด</th>
-              <th>จัดการ</th>
+              <th>ดูข้อมูล</th>
             </tr>
           </thead>
           <tbody>
@@ -131,7 +140,7 @@
               <td>
                 <v-btn
                   variant="text"
-                  color="admin-primary"
+                  color="primary"
                   size="small"
                   class="text-none"
                   append-icon="mdi-arrow-right"
@@ -219,12 +228,12 @@
             :key="filter.value"
             size="small"
             :variant="typeFilters.includes(filter.value) ? 'flat' : 'outlined'"
-            :color="typeFilters.includes(filter.value) ? 'admin-primary' : 'default'"
+            :color="typeFilters.includes(filter.value) ? 'primary' : 'default'"
             class="rel-filter-chip"
             @click="toggleTypeFilter(filter.value)"
           >{{ filter.label }}</v-chip>
           <v-spacer />
-          <v-btn-toggle v-model="viewMode" mandatory density="compact" color="admin-primary" rounded="lg" divided>
+          <v-btn-toggle v-model="viewMode" mandatory density="compact" color="primary" rounded="lg" divided>
             <v-btn value="hierarchy" class="text-none px-3" size="small" prepend-icon="mdi-graph-outline">Hierarchy</v-btn>
             <v-btn value="tree" class="text-none px-3" size="small" prepend-icon="mdi-file-tree-outline">Tree</v-btn>
           </v-btn-toggle>
@@ -280,7 +289,7 @@
         </div>
 
         <div v-if="detailLoading" class="d-flex justify-center pa-8">
-          <v-progress-circular indeterminate color="admin-primary" />
+          <v-progress-circular indeterminate color="primary" />
         </div>
         <template v-else>
           <div v-if="viewMode === 'tree'" class="rel-tree-wrap">
@@ -288,6 +297,7 @@
               v-if="pagedRootNode"
               :node="pagedRootNode"
               :current-id="selectedId"
+              theme-color="primary"
               @select="openDetail"
             />
             <div v-else class="text-body-2 text-medium-emphasis text-center pa-8">
@@ -298,7 +308,7 @@
             <div v-if="!pagedRootNode && !filteredRootNode" class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
             </div>
-            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" />
+            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" theme-color="primary" />
           </div>
         </template>
 
@@ -339,11 +349,14 @@
         <v-card-actions>
           <v-spacer />
           <v-btn class="text-none" @click="pickerOpen = false">ยกเลิก</v-btn>
-          <v-btn color="admin-primary" class="text-none" :disabled="!pickerId" @click="confirmPick">ดูความสัมพันธ์</v-btn>
+          <v-btn color="primary" class="text-none" :disabled="!pickerId" @click="confirmPick">ดูความสัมพันธ์</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </AppShell>
+    </v-container>
+
+    <ELawFooter />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -351,7 +364,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchReportSummary, fetchReview } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
-import AppShell from '../../components/shared/AppShell.vue';
+import ELawNavbar from '../../components/shared/ELawNavbar.vue';
+import ELawFooter from '../../components/shared/ELawFooter.vue';
 import RelationTreeView from '../../components/shared/RelationTreeView.vue';
 import HierarchyList from '../../components/shared/HierarchyList.vue';
 import {
@@ -414,11 +428,6 @@ const selectedId = computed(() => props.documentId || (typeof route.params.docum
 const rows = computed(() => mapShowRelRows(summary.value.documents));
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null);
 
-const breadcrumbs = computed(() => {
-  const base = ['เมนูหลัก', 'แสดงความสัมพันธ์'];
-  if (selectedRow.value) return [...base, selectedRow.value.title];
-  return base;
-});
 
 const statusOptions = [
   { label: 'ทุกสถานะ', value: null },
@@ -565,11 +574,11 @@ function toggleTypeFilter(type: RelationType): void {
 
 function openDetail(id: string): void {
   rememberRecentId(id);
-  router.push(`/admin/show-relations/${id}`);
+  router.push(`/law/relations/${encodeURIComponent(id)}`);
 }
 
 function goList(): void {
-  router.push('/admin/show-relations');
+  router.push('/law/relations');
 }
 
 function confirmPick(): void {
@@ -633,6 +642,16 @@ watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () =>
 </script>
 
 <style scoped>
+.psr {
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.psr-topbar {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .rel-root__title {
   color: #0f172a;
   font-size: 1.5rem;
