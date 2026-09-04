@@ -156,7 +156,7 @@
         <template v-if="usesOriginalPdfLayout">
           <v-card tag="section" class="lawx-card" elevation="0">
             <div class="d-flex justify-end mb-2">
-              <v-btn :href="fileUrl" target="_blank" prepend-icon="mdi-download" variant="tonal" size="small">
+              <v-btn :href="downloadUrl" prepend-icon="mdi-download" variant="tonal" size="small">
                 ดาวน์โหลด PDF
               </v-btn>
             </div>
@@ -272,7 +272,7 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { documentFileUrl, documentFileDownloadUrl, relatedDocumentFileUrl, downloadPdfExport } from '../../api/client';
+import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, relatedDocumentFileUrl } from '../../api/client';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
@@ -335,21 +335,6 @@ const fileUrl = computed(() => documentFileUrl(props.documentId));
 const downloadUrl = computed(() => documentFileDownloadUrl(props.documentId));
 const pdfExportLoading = ref(false);
 
-async function handlePdfExport(): Promise<void> {
-  pdfExportLoading.value = true;
-  try {
-    await downloadPdfExport(props.documentId);
-  } catch (e) {
-    console.error('PDF export failed', e);
-  } finally {
-    pdfExportLoading.value = false;
-  }
-}
-
-const downloadableRelations = computed(() =>
-  relations.value.filter((r) => !!r.target_document_id),
-);
-
 const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
 );
@@ -369,6 +354,20 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
+const downloadableRelations = computed(() =>
+  relations.value.filter((rel) => rel.target_document_id),
+);
+
+async function handlePdfExport(): Promise<void> {
+  pdfExportLoading.value = true;
+  try {
+    await downloadPdfExport(props.documentId);
+  } catch (e) {
+    console.error('PDF export failed', e);
+  } finally {
+    pdfExportLoading.value = false;
+  }
+}
 
 const notCurrentVersion = computed(() =>
   versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
@@ -694,6 +693,58 @@ onBeforeUnmount(() => observer?.disconnect());
   font-size: 16px !important;
 }
 
+.lawx-download-card {
+  padding: 16px 24px;
+}
+
+.lawx-download-card__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lawx-download-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lawx-download-card__subtitle {
+  font-weight: 500;
+  font-size: 0.85rem;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.lawx-download-card__relations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lawx-download-card__relrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.lawx-download-card__reltitle {
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
 .lawx-parentcard {
   background: rgb(var(--v-theme-detail-surface));
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -868,50 +919,5 @@ onBeforeUnmount(() => observer?.disconnect());
 @media print {
   :deep(.v-app-bar), .lawx-subbar, .lawx-toc, .lawx-info { display: none !important; }
   .lawx-grid { grid-template-columns: 1fr; padding: 0; }
-}
-.lawx-download-card {
-  padding: 16px 24px;
-}
-.lawx-download-card__title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.lawx-download-card__actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.lawx-download-card__subtitle {
-  font-weight: 500;
-  font-size: 0.85rem;
-  margin-top: 16px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: rgba(var(--v-theme-on-surface), 0.7);
-}
-.lawx-download-card__relations {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.lawx-download-card__relrow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-.lawx-download-card__reltitle {
-  font-size: 0.85rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
 }
 </style>

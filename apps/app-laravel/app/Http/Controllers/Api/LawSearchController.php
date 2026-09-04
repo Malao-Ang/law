@@ -49,13 +49,14 @@ class LawSearchController extends Controller
                     fn (array $row): bool => isset($publishedIds[(string) ($row['law_id'] ?? '')]),
                 ));
                 $results = array_merge($esRows, $supplement);
+                $usedFuzzy = (string) ($esResult['meta']['mode'] ?? 'exact') === 'fuzzy'
+                    || $this->containsFuzzyResult($results);
 
                 return response()->json($this->withSearchSuggestions([
-                    'total' => count($esRows) + count($supplement),
+                    'total' => max((int) ($fileBased['total'] ?? 0), count($results)),
                     'results' => $results,
                     'facets' => $esResult['facets'] ?? $fileBased['facets'],
-                    'fuzzy' => ($esResult['meta']['mode'] ?? 'exact') === 'fuzzy'
-                        || ($fileBased['fuzzy'] ?? false),
+                    'fuzzy' => $usedFuzzy,
                     'meta' => [
                         'engine' => $supplement === [] ? 'elastic' : 'mixed',
                         'mode' => (string) ($esResult['meta']['mode'] ?? 'exact'),
@@ -370,6 +371,20 @@ class LawSearchController extends Controller
         }
 
         return count($modes) === 1 ? $modes[0] : 'mixed';
+    }
+
+    /**
+     * @param  array<int, array<string,mixed>>  $results
+     */
+    private function containsFuzzyResult(array $results): bool
+    {
+        foreach ($results as $result) {
+            if (str_contains((string) ($result['match_mode'] ?? ''), 'fuzzy')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function textSimilarity(string $query, string $candidate): float

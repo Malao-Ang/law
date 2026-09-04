@@ -74,11 +74,11 @@ class DocumentFileController extends Controller
                     ['file' => basename((string) ($status['source_file'] ?? $relative))],
                 );
                 $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
-                if ($url) {
+                if (is_string($url) && $url !== '') {
                     return redirect($url);
                 }
             } catch (\Throwable) {
-                // fall through to 404
+                // Fall through to the same 404 as missing local files.
             }
         }
 

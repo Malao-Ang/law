@@ -25,6 +25,7 @@ const ESignPage = () => import('../pages/esign/ESignPage.vue');
 const ESignPreviewPage = () => import('../pages/esign/ESignPreviewPage.vue');
 const ESignStatusPage = () => import('../pages/esign/ESignStatusPage.vue');
 const LawPage = () => import('../pages/law/LawPage.vue');
+const LawVersionsPage = () => import('../pages/law/LawVersionsPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
@@ -51,6 +52,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/documents/:documentId/result', name: 'result', component: ResultPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/preview', name: 'preview', component: PreviewPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
+  { path: '/law/:documentId/versions', name: 'law-versions', component: LawVersionsPage, props: true, meta: { bareLayout: true } },
 ];
 
 export const router = createRouter({
