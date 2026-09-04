@@ -22,7 +22,7 @@
           <v-chip
             v-if="item.versionLabel"
             size="x-small"
-            color="admin-primary"
+            :color="themeColor"
             variant="tonal"
           >{{ item.versionLabel }}</v-chip>
         </div>
@@ -53,9 +53,11 @@ const props = defineProps<{
   versions: ShowRelRow[];
   chain?: ShowRelRow[];
   currentId?: string;
+  themeColor?: string;
 }>();
 
 defineEmits<{ select: [id: string] }>();
+const themeColor = computed(() => props.themeColor ?? 'admin-primary');
 
 function peerEdgeLabel(row: ShowRelRow): string {
   if (isWholeEditionChange(row.changeStatus)) return relationTypeLabel('supersedes');

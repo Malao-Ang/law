@@ -25,6 +25,15 @@
         <div class="lvp-title mb-6">
           <h1 class="text-h6 font-weight-bold">{{ meta.title || documentStore.review?.source_file }}</h1>
           <div v-if="meta.law_type" class="text-caption text-medium-emphasis mt-1">{{ meta.law_type }}</div>
+          <v-btn
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-sitemap"
+            class="text-none mt-3"
+            :to="`/law/relations/${encodeURIComponent(props.documentId)}`"
+          >
+            ดูโครงสร้างความสัมพันธ์ (Hierarchy)
+          </v-btn>
         </div>
 
         <div class="lvp-grid">

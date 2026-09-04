@@ -468,7 +468,7 @@ export function buildRelationTree(
   rootId: string,
   rows: ShowRelRow[],
   relations: RelationBag | undefined,
-  allowedTypes: RelationType[] | null,
+  allowedTypes: RelationType[] | null = null,
   skipChildIds: Set<string> | null = null,
 ): RelTreeNode | null {
   const byId = new Map(rows.map((row) => [row.id, row]));

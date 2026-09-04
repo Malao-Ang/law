@@ -2,9 +2,9 @@
   <div class="h-node" :class="{ 'is-root': node.level === 0 }">
     <div v-if="node.level > 0" class="h-edge">{{ relationTypeLabel(node.edgeType) }}</div>
     <div class="h-row">
-      <v-icon :icon="rowIcon" size="20" class="h-icon" :color="node.level === 0 ? 'admin-primary' : undefined" />
+      <v-icon :icon="rowIcon" size="20" class="h-icon" :color="node.level === 0 ? themeColor : undefined" />
       <span class="h-title">{{ node.row.title }}</span>
-      <v-chip v-if="node.level === 0" size="x-small" color="admin-primary" variant="tonal" class="h-chip">
+      <v-chip v-if="node.level === 0" size="x-small" :color="themeColor" variant="tonal" class="h-chip">
         Root
       </v-chip>
       <v-chip
@@ -27,7 +27,7 @@
       <v-chip
         v-if="versionLabel"
         size="x-small"
-        color="admin-primary"
+        :color="themeColor"
         variant="tonal"
         class="h-chip"
       >
@@ -49,11 +49,12 @@
         :versions="peers"
         :chain="node.sameLevelVersions"
         :current-id="node.row.id"
+        :theme-color="themeColor"
       />
     </div>
     <ul v-if="node.children.length" class="h-list">
       <li v-for="child in node.children" :key="child.row.id" class="h-item">
-        <HierarchyList :node="child" />
+        <HierarchyList :node="child" :theme-color="themeColor" />
       </li>
     </ul>
   </div>
@@ -74,9 +75,10 @@ import SameLevelInlineChain from './SameLevelInlineChain.vue';
 
 defineOptions({ name: 'HierarchyList' });
 
-const props = defineProps<{ node: RelTreeNode }>();
+const props = defineProps<{ node: RelTreeNode; themeColor?: string }>();
 
 const expanded = ref(true);
+const themeColor = computed(() => props.themeColor ?? 'admin-primary');
 const isLeaf = computed(() => props.node.children.length === 0);
 const peers = computed(() =>
   (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
