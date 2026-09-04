@@ -24,9 +24,13 @@ class LawSearchService
         $body = $this->buildExactBody($q, $filters, $page, $perPage);
         $raw = $this->client->search($body);
 
-        if ($q !== '' && mb_strlen($q) >= self::FUZZY_MIN_QUERY_LENGTH && ($raw['hits']['hits'] ?? []) === []) {
-            $mode = 'fuzzy';
-            $raw = $this->client->search($this->buildFuzzyBody($q, $filters, $page, $perPage));
+        if ($q !== '' && mb_strlen($q) >= self::FUZZY_MIN_QUERY_LENGTH) {
+            if (($raw['hits']['hits'] ?? []) === []) {
+                $mode = 'fuzzy';
+                $raw = $this->client->search($this->buildFuzzyBody($q, $filters, $page, $perPage));
+            } else {
+                $mode = $this->modeFromExactHits($raw, LawSearchQuery::parse($q)->rawVariants());
+            }
         }
 
         return $this->parse($raw, $mode);
@@ -58,6 +62,17 @@ class LawSearchService
                                     'value' => $q,
                                     'boost' => 8,
                                 ],
+                            ],
+                        ],
+                        [
+                            'multi_match' => [
+                                'query' => $q,
+                                'type' => 'best_fields',
+                                'fields' => ['title^2', 'keywords_text^2', 'text'],
+                                'fuzziness' => 'AUTO',
+                                'prefix_length' => 2,
+                                'max_expansions' => 10,
+                                'boost' => 0.3,
                             ],
                         ],
                     ],
@@ -104,6 +119,70 @@ class LawSearchService
         ];
 
         return $this->buildBodyFromMust($must, $filters, $page, $perPage);
+    }
+
+    /**
+     * @param  array<string,mixed>  $raw
+     * @param  array<int,string>  $variants
+     */
+    private function modeFromExactHits(array $raw, array $variants): string
+    {
+        $hits = $raw['hits']['hits'] ?? [];
+        if ($hits === [] || $variants === []) {
+            return 'exact';
+        }
+
+        $exact = 0;
+        foreach ($hits as $hit) {
+            if ($this->hitContainsQueryVariant($hit, $variants)) {
+                $exact++;
+            }
+        }
+
+        return $exact === 0 ? 'fuzzy' : 'exact';
+    }
+
+    /**
+     * @param  array<string,mixed>  $hit
+     * @param  array<int,string>  $variants
+     */
+    private function hitContainsQueryVariant(array $hit, array $variants): bool
+    {
+        $haystacks = [];
+        $source = is_array($hit['_source'] ?? null) ? $hit['_source'] : [];
+        foreach (['title', 'keywords_text', 'section_path', 'summary', 'text'] as $field) {
+            if (isset($source[$field])) {
+                $haystacks[] = (string) $source[$field];
+            }
+        }
+        foreach ((array) ($source['keywords'] ?? []) as $keyword) {
+            $haystacks[] = (string) $keyword;
+        }
+
+        foreach (['text', 'title', 'keywords_text'] as $field) {
+            foreach ($hit['highlight'][$field] ?? [] as $fragment) {
+                $haystacks[] = strip_tags((string) $fragment);
+            }
+            foreach ($hit['inner_hits']['snippets']['hits']['hits'] ?? [] as $innerHit) {
+                foreach ($innerHit['highlight'][$field] ?? [] as $fragment) {
+                    $haystacks[] = strip_tags((string) $fragment);
+                }
+            }
+        }
+
+        foreach ($variants as $variant) {
+            $variant = trim($variant);
+            if ($variant === '') {
+                continue;
+            }
+            foreach ($haystacks as $haystack) {
+                if (mb_stripos($haystack, $variant) !== false) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

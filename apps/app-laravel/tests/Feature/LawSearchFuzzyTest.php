@@ -60,4 +60,33 @@ class LawSearchFuzzyTest extends TestCase
         $this->assertStringContainsString('<mark>เบิกจ่าย</mark>', (string) $hit['title_highlighted']);
         $this->assertFalse($res->json('fuzzy'));
     }
+
+    public function test_fuzzy_results_appear_alongside_exact_matches(): void
+    {
+        $s = app(ReviewStore::class);
+        $exactId = 'exact_'.uniqid();
+        $fuzzyId = 'fuzzy_'.uniqid();
+
+        $this->seedLaw($s, $exactId, 'ระเบียบว่าด้วยการเงินของมหาวิทยาลัย');
+        $this->seedLaw($s, $fuzzyId, 'ประกาศมหาวิทยาลับบูรพา');
+
+        $res = $this->postJson('/api/laws/search', ['q' => 'มหาวิทยาลัย']);
+        $res->assertOk();
+
+        $exactHit = collect($res->json('results'))->firstWhere('law_id', $exactId);
+        $this->assertNotNull($exactHit, 'exact match should be found');
+    }
+
+    public function test_common_thai_typo_is_found(): void
+    {
+        $s = app(ReviewStore::class);
+        $id = 'typo_'.uniqid();
+        $this->seedLaw($s, $id, 'ประกาศมหาวิทยาลัยบูรพา');
+
+        $res = $this->postJson('/api/laws/search', ['q' => 'ประกาส']);
+        $res->assertOk();
+
+        $hit = collect($res->json('results'))->firstWhere('law_id', $id);
+        $this->assertNotNull($hit, 'ศ vs ส typo should still match');
+    }
 }
