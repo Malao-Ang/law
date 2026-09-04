@@ -32,7 +32,7 @@
           <div class="text-caption font-weight-bold text-medium-emphasis mb-2">
             ขั้นตอนที่ 2: ตรวจสอบข้อมูลบุคคล
           </div>
-          <div class="signer-person-card">
+          <div class="signer-person-card mb-3">
             <v-avatar color="admin-primary" size="44">
               <span class="text-caption font-weight-bold">{{ initials(presetPerson.name) }}</span>
             </v-avatar>
@@ -47,6 +47,20 @@
               </div>
             </div>
           </div>
+
+          <div class="text-caption font-weight-bold text-medium-emphasis mb-2">
+            ขั้นตอนที่ 3: เลขบัตรประชาชน (สำหรับ e-Sign)
+          </div>
+          <v-text-field
+            v-model="citizenId"
+            label="เลขบัตรประชาชน 13 หลัก"
+            density="comfortable"
+            variant="outlined"
+            hide-details="auto"
+            maxlength="13"
+            inputmode="numeric"
+            autocomplete="off"
+          />
         </template>
       </v-card-text>
 
@@ -106,6 +120,7 @@ const TYPE_OPTIONS: Array<{
 ];
 
 const roleType = ref<ESignSignerRole | null>(null);
+const citizenId = ref('');
 
 const presetPerson = computed<ESignPerson | null>(() => {
   if (roleType.value === 'president') return PRESIDENT_PERSON;
@@ -113,7 +128,13 @@ const presetPerson = computed<ESignPerson | null>(() => {
   return null;
 });
 
-const canConfirm = computed(() => Boolean(presetPerson.value));
+const canConfirm = computed(() => {
+  if (!presetPerson.value) return false;
+  const id = citizenId.value.replace(/\D/g, '');
+  // Allow empty when BUU_ESIGN_DEFAULT_SIGNER_CITIZENID is set server-side;
+  // if filled, require 13 digits.
+  return id === '' || id.length === 13;
+});
 
 function initials(name: string): string {
   const cleaned = name.replace(/^(ศ\.ดร\.|รศ\.ดร\.|ผศ\.ดร\.|ดร\.|นาย|นาง|นางสาว)\s*/u, '').trim();
@@ -125,10 +146,12 @@ function initials(name: string): string {
 
 function selectType(type: ESignSignerRole): void {
   roleType.value = type;
+  citizenId.value = presetPerson.value?.citizenId ?? '';
 }
 
 function reset(): void {
   roleType.value = null;
+  citizenId.value = '';
 }
 
 function emitClose(value: boolean): void {
@@ -140,6 +163,7 @@ function confirm(): void {
   if (!canConfirm.value || !roleType.value || !presetPerson.value) return;
 
   const person = presetPerson.value;
+  const id = citizenId.value.replace(/\D/g, '');
   emit('confirm', {
     id: createClientId('signer'),
     roleType: roleType.value,
@@ -147,6 +171,7 @@ function confirm(): void {
     position: person.position,
     department: person.department,
     employeeId: person.employeeId,
+    citizenId: id || undefined,
   });
 
   emitClose(false);

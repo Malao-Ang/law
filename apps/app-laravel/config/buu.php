@@ -20,7 +20,7 @@ return [
     'authenticated_userid' => env('BUU_AUTHENTICATED_USERID', 'library-buu'),
 
     /** Default MinIO bucket for document uploads (must exist on the cluster) */
-    'default_bucket' => env('BUU_MINIO_BUCKET', 'law-space'),
+    'default_bucket' => env('BUU_MINIO_BUCKET', 'buu-contract'),
 
     /** System name sent to e-sign (doc_sysname) */
     'esign_sysname' => env('BUU_ESIGN_SYSNAME', 'law-space'),
@@ -30,6 +30,12 @@ return [
      * Final callback: {base}/api/esign/callback/{documentId}
      */
     'esign_callback_base_url' => rtrim((string) env('BUU_ESIGN_CALLBACK_BASE_URL', env('APP_URL', 'http://localhost')), '/'),
+
+    /** Document owner citizen ID when the UI does not send owner_citizen_id */
+    'esign_owner_citizenid' => env('BUU_ESIGN_OWNER_CITIZENID', ''),
+
+    /** Fallback signer citizen ID for sandbox when a signer has none */
+    'esign_default_signer_citizenid' => env('BUU_ESIGN_DEFAULT_SIGNER_CITIZENID', ''),
 
     'timeout' => (int) env('BUU_HTTP_TIMEOUT', 60),
 

@@ -6,6 +6,7 @@ export const PRESIDENT_PERSON: ESignPerson = {
   position: 'อธิการบดี',
   department: 'อธิการบดีมหาวิทยาลัย • สำนักงานอธิการบดี',
   employeeId: 'EMP-2021-004',
+  citizenId: '',
 };
 
 export const COUNCIL_CHAIR_PERSON: ESignPerson = {
@@ -14,6 +15,7 @@ export const COUNCIL_CHAIR_PERSON: ESignPerson = {
   position: 'นายกสภามหาวิทยาลัย',
   department: 'สภามหาวิทยาลัย • สำนักงานสภา',
   employeeId: 'EMP-2018-001',
+  citizenId: '',
 };
 
 export const DELEGATE_CANDIDATES: ESignPerson[] = [
