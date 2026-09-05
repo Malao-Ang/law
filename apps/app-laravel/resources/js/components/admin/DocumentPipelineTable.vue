@@ -209,14 +209,14 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
-  { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 72 },
-  { title: 'เอกสาร', key: 'title', sortable: false },
-  { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const },
-  { title: 'สถานะกฎหมาย', key: 'lawStatus', sortable: false, align: 'center' as const },
-  { title: 'สถานะเผยแพร่', key: 'publishedDate', sortable: false, align: 'center' as const },
-  { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const },
-  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const },
-  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const },
+  { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
+  { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
+  { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
+  { title: 'สถานะกฎหมาย', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
+  { title: 'สถานะเผยแพร่', key: 'publishedDate', sortable: false, align: 'center' as const, width: 120 },
+  { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const, width: 140 },
+  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
+  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 140 },
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
@@ -369,7 +369,7 @@ defineExpose({ load });
 
 .pipeline-title {
   display: inline-block;
-  max-width: min(560px, 44vw);
+  max-width: 240px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
