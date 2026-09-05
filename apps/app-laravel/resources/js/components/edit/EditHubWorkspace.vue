@@ -461,10 +461,13 @@ async function togglePublished(next: boolean | null): Promise<void> {
 
     // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
     if (!docStatus?.esign_confirmed_at) {
+      const isWaitingSign = !!docStatus?.esign_submitted_at;
       await Swal.fire({
         icon: 'warning',
-        title: 'ยังไม่ผ่านการลงนาม e-Sign',
-        html: 'เอกสารต้องผ่านการลงนามอิเล็กทรอนิกส์ให้สำเร็จก่อนเผยแพร่<br><small>กด "ส่งลงนาม e-Sign" ในเมนูด้านซ้าย</small>',
+        title: isWaitingSign ? 'อยู่ระหว่างรอลงนาม' : 'ยังไม่ผ่านการลงนาม e-Sign',
+        html: isWaitingSign
+          ? 'เอกสารถูกส่งลงนามแล้ว กรุณารอผู้ลงนามดำเนินการให้เสร็จก่อนเผยแพร่<br><small>หรือกดปุ่ม "จำลองลงนามเสร็จ" เพื่อทดสอบ</small>'
+          : 'เอกสารต้องผ่านการลงนามอิเล็กทรอนิกส์ให้สำเร็จก่อนเผยแพร่<br><small>กด "ส่งลงนาม e-Sign" ในเมนูด้านซ้าย</small>',
         confirmButtonText: 'รับทราบ',
         confirmButtonColor: '#1a3673',
       });
