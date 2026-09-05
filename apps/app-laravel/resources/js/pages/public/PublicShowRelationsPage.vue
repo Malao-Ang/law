@@ -734,20 +734,44 @@ watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () =>
 }
 
 .psr-topbar {
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
   align-items: center;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
   justify-content: center;
-  min-height: 40px;
+  min-height: 52px;
 }
 
 .psr-breadcrumbs {
+  flex: 1 1 0;
   font-size: 0.75rem !important;
+  min-width: 0;
+}
+
+.psr-breadcrumbs :deep(.v-breadcrumbs) {
+  min-width: 0;
 }
 
 .psr-breadcrumbs :deep(.v-breadcrumbs-item) {
+  color: #475569;
   font-size: 0.75rem;
+  max-width: 220px;
+  min-width: 0;
+}
+
+.psr-breadcrumbs :deep(.v-breadcrumbs-item:last-child) {
+  color: #0f172a;
+  display: inline-block;
+  flex: 0 1 auto;
+  font-weight: 700;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psr-breadcrumbs :deep(.v-breadcrumbs-divider) {
+  color: #94a3b8;
 }
 
 .psr-breadcrumb-title {
