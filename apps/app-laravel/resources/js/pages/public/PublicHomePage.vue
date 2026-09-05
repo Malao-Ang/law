@@ -347,6 +347,7 @@ function toDate(value?: string | null): Date | undefined {
 
 .elaw-hscroll {
   display: flex;
+  align-items: stretch;
   gap: 20px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -371,6 +372,8 @@ function toDate(value?: string | null): Date | undefined {
 .elaw-hscroll__card {
   flex: 0 0 320px;
   scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Section header: heading + tabs row */
