@@ -206,6 +206,9 @@ class LawSearchService
             $bool = [];
             if ($must !== []) {
                 $bool['must'] = $must;
+            } elseif ($mustNot !== []) {
+                // NOT-only group: must match everything except negated terms
+                $bool['must'] = [['match_all' => (object) []]];
             }
             if ($mustNot !== []) {
                 $bool['must_not'] = $mustNot;
