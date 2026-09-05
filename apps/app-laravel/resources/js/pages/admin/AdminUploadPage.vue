@@ -36,7 +36,7 @@
         ref="fileInputEl"
         type="file"
         :accept="uploadMode === 'old' ? '.pdf' : '.pdf,.doc,.docx'"
-        :multiple="uploadMode === 'new'"
+        :multiple="true"
         style="display:none"
         @change="onInputChange"
       />
