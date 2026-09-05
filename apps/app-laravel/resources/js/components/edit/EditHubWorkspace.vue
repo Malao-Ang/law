@@ -26,147 +26,146 @@
       </v-alert>
 
       <template v-else-if="documentStore.review">
-        <section class="edit-hub-hero">
-          <div class="d-flex flex-wrap ga-2 mb-3">
-            <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
-              {{ meta.law_type || 'เอกสาร' }}
-            </v-chip>
-            <v-chip
-              size="small"
-              :color="isPublished ? 'success' : 'warning'"
-              variant="flat"
-              class="font-weight-bold"
-            >
-              {{ isPublished ? 'เผยแพร่แล้ว' : 'รอลงนาม' }}
-            </v-chip>
-            <v-chip size="small" variant="tonal" class="font-weight-medium">
-              # {{ documentId }}
-            </v-chip>
-          </div>
+        <section class="edit-hub-header-grid">
+          <div class="edit-hub-hero">
+            <div class="d-flex flex-wrap ga-2 mb-3">
+              <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
+                {{ meta.law_type || 'เอกสาร' }}
+              </v-chip>
+              <v-chip
+                size="small"
+                :color="isPublished ? 'success' : 'warning'"
+                variant="flat"
+                class="font-weight-bold"
+              >
+                {{ isPublished ? 'เผยแพร่แล้ว' : 'รอลงนาม' }}
+              </v-chip>
+              <v-chip size="small" variant="tonal" class="font-weight-medium">
+                # {{ documentId }}
+              </v-chip>
+            </div>
 
-          <h1 class="edit-hub-hero__title">{{ docTitle }}</h1>
+            <h1 class="edit-hub-hero__title">{{ docTitle }}</h1>
 
-          <div class="edit-hub-meta-grid">
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-calendar-outline" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">วันที่ประกาศ</div>
-                <div class="edit-hub-meta-cell__value">{{ formatThaiDate(meta.promulgation_date) || '-' }}</div>
+            <div class="edit-hub-meta-grid">
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-calendar-outline" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">วันที่ประกาศ</div>
+                  <div class="edit-hub-meta-cell__value">{{ formatThaiDate(meta.promulgation_date) || '-' }}</div>
+                </div>
               </div>
-            </div>
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-calendar-check-outline" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">วันที่มีผล</div>
-                <div class="edit-hub-meta-cell__value">{{ formatThaiDate(meta.effective_date) || '-' }}</div>
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-calendar-check-outline" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">วันที่มีผล</div>
+                  <div class="edit-hub-meta-cell__value">{{ formatThaiDate(meta.effective_date) || '-' }}</div>
+                </div>
               </div>
-            </div>
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-book-open-page-variant-outline" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">ราชกิจจาฯ</div>
-                <div class="edit-hub-meta-cell__value">{{ meta.gazette_reference || '-' }}</div>
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-book-open-page-variant-outline" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">ราชกิจจาฯ</div>
+                  <div class="edit-hub-meta-cell__value">{{ meta.gazette_reference || '-' }}</div>
+                </div>
               </div>
-            </div>
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-office-building-outline" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">หน่วยงาน</div>
-                <div class="edit-hub-meta-cell__value">{{ agencyLabel }}</div>
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-office-building-outline" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">หน่วยงาน</div>
+                  <div class="edit-hub-meta-cell__value">{{ agencyLabel }}</div>
+                </div>
               </div>
-            </div>
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-folder-outline" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">กลุ่มกฎหมาย</div>
-                <div class="edit-hub-meta-cell__value">{{ lawGroupLabel }}</div>
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-folder-outline" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">กลุ่มกฎหมาย</div>
+                  <div class="edit-hub-meta-cell__value">{{ lawGroupLabel }}</div>
+                </div>
               </div>
-            </div>
-            <div class="edit-hub-meta-cell">
-              <v-icon icon="mdi-format-list-numbered" size="18" color="admin-primary" />
-              <div>
-                <div class="edit-hub-meta-cell__label">จำนวน{{ articleUnitLabel }}</div>
-                <div class="edit-hub-meta-cell__value">{{ articleCount }}</div>
+              <div class="edit-hub-meta-cell">
+                <v-icon icon="mdi-format-list-numbered" size="18" color="admin-primary" />
+                <div>
+                  <div class="edit-hub-meta-cell__label">จำนวน{{ articleUnitLabel }}</div>
+                  <div class="edit-hub-meta-cell__value">{{ articleCount }}</div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
+        <section class="edit-hub-pipeline" aria-label="ขั้นตอนการแก้ไข">
+          <v-btn
+            v-for="action in actions"
+            :key="action.key"
+            color="admin-primary"
+            variant="tonal"
+            rounded="lg"
+            class="edit-hub-pipeline__button text-none"
+            :prepend-icon="action.icon"
+            @click="router.push(action.to)"
+          >{{ action.title }}</v-btn>
+        </section>
+
         <div class="edit-hub-grid">
-          <main class="edit-hub-actions">
-            <v-card
-              v-for="action in actions"
-              :key="action.key"
-              flat
-              border
-              rounded="lg"
-              class="edit-hub-action-card"
-            >
-              <div class="edit-hub-action-card__icon">
-                <v-icon :icon="action.icon" size="24" />
+          <main class="edit-hub-doc">
+            <v-card flat border rounded="lg" class="edit-hub-doc-card">
+              <div class="edit-hub-doc-card__header">
+                <div>
+                  <h2 class="edit-hub-section-title mb-1">เนื้อหาเอกสาร</h2>
+                  <p class="text-caption text-medium-emphasis mb-0">อ่านตัวบทแบบ read-only</p>
+                </div>
+                <v-btn
+                  v-if="!isOldDoc"
+                  color="admin-primary"
+                  variant="tonal"
+                  size="small"
+                  class="text-none"
+                  @click="router.push(`/documents/${documentId}/review`)"
+                >แก้ไขเนื้อหา</v-btn>
               </div>
-              <div class="edit-hub-action-card__body">
-                <h2>{{ action.title }}</h2>
-                <p>{{ action.description }}</p>
-              </div>
-              <v-btn
-                color="admin-primary"
-                variant="tonal"
-                size="small"
-                class="text-none edit-hub-action-card__button"
-                append-icon="mdi-arrow-right"
-                @click="router.push(action.to)"
+
+              <iframe
+                v-if="isOldDoc"
+                :src="fileUrl"
+                title="เอกสารต้นฉบับ"
+                class="edit-hub-old-pdf-frame"
+              />
+
+              <section
+                v-for="section in sections"
+                v-else
+                :id="`sec-${section.id}`"
+                :key="section.id"
+                class="edit-hub-document-section"
               >
-                เปิด
-              </v-btn>
+                <div class="edit-hub-document-section__top">
+                  <span
+                    class="edit-hub-document-section__badge"
+                    :class="{ 'edit-hub-document-section__badge--chapter': section.isChapter }"
+                  >{{ section.badge }}</span>
+                  <v-chip
+                    v-if="!section.isChapter"
+                    size="x-small"
+                    color="success"
+                    variant="tonal"
+                  >มีผลบังคับ</v-chip>
+                </div>
+
+                <BlockFlow
+                  :block="section.headBlock"
+                  :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
+                />
+                <BlockFlow
+                  v-for="child in section.children"
+                  :key="child.block_id"
+                  :block="child"
+                />
+              </section>
             </v-card>
           </main>
 
           <aside class="edit-hub-info">
-            <v-card flat border rounded="lg" class="edit-hub-info-card">
-              <h2 class="edit-hub-section-title">ข้อมูลเอกสาร</h2>
-              <div class="edit-hub-kv">
-                <span>รหัสกฎหมาย</span>
-                <strong>{{ documentId }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>ประเภท</span>
-                <strong>{{ meta.law_type || '-' }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>กลุ่มกฎหมาย</span>
-                <strong>{{ lawGroupLabel }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>วันที่ประกาศ</span>
-                <strong>{{ formatThaiDate(meta.promulgation_date) || '-' }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>วันที่มีผล</span>
-                <strong>{{ formatThaiDate(meta.effective_date) || '-' }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>จำนวน{{ articleUnitLabel }}</span>
-                <strong>{{ articleCount }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>หน่วยงาน</span>
-                <strong>{{ agencyLabel }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>ผู้นำเข้า</span>
-                <strong>{{ meta.imported_by || '-' }}</strong>
-              </div>
-              <div class="edit-hub-kv">
-                <span>แก้ไขล่าสุด</span>
-                <strong>{{ updatedAtLabel || '-' }}</strong>
-              </div>
-              <div v-if="signatoryLabel" class="edit-hub-kv">
-                <span>ผู้ลงนาม</span>
-                <strong>{{ signatoryLabel }}</strong>
-              </div>
-            </v-card>
-
             <v-card flat border rounded="lg" class="edit-hub-info-card">
               <div class="d-flex align-center justify-space-between ga-3 mb-3">
                 <h2 class="edit-hub-section-title mb-0">ความสัมพันธ์กฎหมาย</h2>
@@ -221,56 +220,12 @@
           </aside>
         </div>
 
-        <v-expansion-panels class="edit-hub-document-panels">
-          <v-expansion-panel>
-            <v-expansion-panel-title>
-              <div>
-                <div class="font-weight-bold">แสดงเนื้อหาเอกสาร</div>
-                <div class="text-caption text-medium-emphasis">อ่านตัวบทแบบ read-only</div>
-              </div>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <iframe
-                v-if="isOldDoc"
-                :src="fileUrl"
-                title="เอกสารต้นฉบับ"
-                class="edit-hub-old-pdf-frame"
-              />
-              <section
-                v-for="section in sections"
-                v-else
-                :id="`sec-${section.id}`"
-                :key="section.id"
-                class="edit-hub-document-card"
-              >
-                <div class="edit-hub-document-card__top">
-                  <span
-                    class="edit-hub-document-card__badge"
-                    :class="{ 'edit-hub-document-card__badge--chapter': section.isChapter }"
-                  >{{ section.badge }}</span>
-                  <v-chip
-                    v-if="!section.isChapter"
-                    size="x-small"
-                    color="success"
-                    variant="tonal"
-                  >มีผลบังคับ</v-chip>
-                </div>
-
-                <div class="edit-hub-document-card__body">
-                  <BlockFlow
-                    :block="section.headBlock"
-                    :override-text="section.headBlock.meta?.reviewed_html ? null : (section.headBodyText || null)"
-                  />
-                  <BlockFlow
-                    v-for="child in section.children"
-                    :key="child.block_id"
-                    :block="child"
-                  />
-                </div>
-              </section>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
+        <PublishConfirmDialog
+          v-model="publishDialogOpen"
+          :publishing="publishDialogNext ?? !isPublished"
+          :loading="publishToggleSaving"
+          @confirm="confirmPublishChange"
+        />
       </template>
     </div>
   </AppShell>
@@ -281,11 +236,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
+import PublishConfirmDialog from '../shared/PublishConfirmDialog.vue';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useVersionStore } from '../../stores/versionStore';
 import { buildSections } from '../../composables/useLawSections';
-import { documentFileUrl } from '../../api/client';
+import { documentFileUrl, fetchStatus } from '../../api/client';
+import Swal from 'sweetalert2';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 
@@ -326,6 +283,8 @@ const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type ==
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
+const publishDialogOpen = ref(false);
+const publishDialogNext = ref<boolean | null>(null);
 const sections = computed(() => buildSections(documentStore.review));
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 
@@ -378,50 +337,72 @@ const relationTypeSummary = computed(() => {
   return Array.from(counts.entries()).map(([type, count]) => ({ type, count }));
 });
 
-const actions = computed(() => [
-  {
-    key: 'review',
-    icon: 'mdi-file-document-edit-outline',
-    title: 'แก้ไขเนื้อหา',
-    description: 'ตรวจทานและแก้ไขบล็อกตัวบทก่อนเผยแพร่',
-    to: `/documents/${props.documentId}/review`,
-  },
-  {
+const actions = computed(() => {
+  const list = [];
+
+  // เอกสารเก่าไม่มี review/rag (ไม่ผ่าน extraction)
+  if (!isOldDoc.value) {
+    list.push({
+      key: 'review',
+      icon: 'mdi-file-document-edit-outline',
+      title: 'แก้ไขเนื้อหา',
+      description: 'ตรวจทานและแก้ไขบล็อกตัวบทก่อนเผยแพร่',
+      to: `/documents/${props.documentId}/review`,
+    });
+  }
+
+  list.push({
     key: 'law-info',
     icon: 'mdi-card-text-outline',
     title: 'แก้ไขข้อมูลกฎหมาย',
     description: 'จัดการ metadata วันที่ กลุ่มกฎหมาย และข้อมูลประกาศ',
     to: `/documents/${props.documentId}/law-info?mode=edit`,
-  },
-  {
+  });
+
+  list.push({
     key: 'relations',
     icon: 'mdi-graph-outline',
     title: 'ความสัมพันธ์',
     description: 'เพิ่มหรือแก้ไขฉบับที่เกี่ยวข้องและผลทางกฎหมาย',
     to: `/documents/${props.documentId}/relations`,
-  },
-  {
+  });
+
+  if (!isOldDoc.value) {
+    list.push({
+      key: 'rag',
+      icon: 'mdi-sort-variant',
+      title: 'จัดลำดับ RAG',
+      description: 'จัดกลุ่ม เลือก และเรียงบล็อกก่อนบันทึกเข้าคลัง RAG',
+      to: `/documents/${props.documentId}/rag`,
+    });
+  }
+
+  list.push({
     key: 'permissions',
     icon: 'mdi-shield-lock-outline',
     title: 'กำหนดสิทธิ์',
     description: 'ตั้งค่าการเข้าถึงแบบ public หรือ private',
     to: `/documents/${props.documentId}/permissions`,
-  },
-  {
+  });
+
+  list.push({
     key: 'preview',
     icon: 'mdi-eye-outline',
     title: 'ดูตัวอย่าง',
     description: 'ตรวจรูปแบบเอกสารก่อนเข้าสู่ขั้นตอน e-Sign',
     to: `/documents/${props.documentId}/esign/preview`,
-  },
-  {
+  });
+
+  list.push({
     key: 'esign',
     icon: 'mdi-send-outline',
     title: 'ส่งลงนาม e-Sign',
     description: 'เปิดหน้าลงนามอิเล็กทรอนิกส์และติดตามสถานะ',
     to: `/documents/${props.documentId}/esign`,
-  },
-]);
+  });
+
+  return list;
+});
 
 function relationTypeLabel(type: RelationType): string {
   const labels: Record<RelationType, string> = {
@@ -435,6 +416,55 @@ function relationTypeLabel(type: RelationType): string {
 }
 
 async function togglePublished(next: boolean | null): Promise<void> {
+  if (!!next) {
+    const status = await fetchStatus(props.documentId);
+    if (status?.rag_skipped) {
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'ยังไม่ได้จัดลำดับ RAG',
+        html: 'เอกสารนี้เคยข้ามขั้นตอน RAG ไว้ ต้องกลับไปจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
+        showCancelButton: true,
+        confirmButtonText: 'ไปจัดลำดับ RAG',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a3673',
+        cancelButtonColor: '#64748b',
+      });
+      if (result.isConfirmed) {
+        router.push(`/documents/${props.documentId}/rag`);
+      }
+      return;
+    }
+  }
+  // Draft status check — after RAG check passes
+  if (!!next && (!meta.value.status || meta.value.status === 'ร่าง')) {
+    const result = await Swal.fire({
+      title: 'เอกสารยังเป็นร่าง',
+      html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>หากเผยแพร่ สถานะจะเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> โดยอัตโนมัติ',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
+      cancelButtonText: 'ยกเลิก',
+      denyButtonText: 'ไปแก้ไขสถานะเอง',
+      denyButtonColor: '#6b7280',
+      confirmButtonColor: '#1a3673',
+    });
+
+    if (result.isConfirmed) {
+      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+    } else if (result.isDenied) {
+      router.push(`/documents/${props.documentId}/law-info`);
+      return;
+    } else {
+      return;
+    }
+  }
+  publishDialogNext.value = !!next;
+  publishDialogOpen.value = true;
+}
+
+async function confirmPublishChange(): Promise<void> {
+  if (publishDialogNext.value === null) return;
+  const next = publishDialogNext.value;
   publishToggleSaving.value = true;
   try {
     await documentStore.saveLawMeta({
@@ -442,6 +472,8 @@ async function togglePublished(next: boolean | null): Promise<void> {
     });
   } finally {
     publishToggleSaving.value = false;
+    publishDialogOpen.value = false;
+    publishDialogNext.value = null;
   }
 }
 
@@ -487,6 +519,13 @@ onBeforeUnmount(() => {
   gap: 12px;
   justify-content: center;
   padding: 64px 16px;
+}
+
+.edit-hub-header-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
 }
 
 .edit-hub-hero,
@@ -536,42 +575,104 @@ onBeforeUnmount(() => {
   word-break: break-word;
 }
 
-.edit-hub-grid {
-  align-items: start;
-  display: grid;
-  gap: 20px;
-  grid-template-columns: 1fr 380px;
-}
-
-.edit-hub-actions {
-  display: grid;
-  gap: 12px;
-}
-
-.edit-hub-action-card {
-  align-items: flex-start;
-  display: grid;
-  gap: 14px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  padding: 20px;
-}
-
-.edit-hub-action-card__icon {
+.edit-hub-pipeline {
   align-items: center;
-  background: #eef4f8;
-  border-radius: 10px;
-  color: rgb(var(--v-theme-admin-primary));
+  background: #fff;
+  border: 1px solid #e3ded6;
+  border-radius: 14px;
   display: flex;
-  height: 44px;
-  justify-content: center;
-  width: 44px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
 }
 
-.edit-hub-action-card__body {
+.edit-hub-pipeline__button {
+  flex: 0 0 auto;
+}
+
+.edit-hub-grid {
+  align-items: stretch;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  height: calc(100vh - 340px);
+  min-height: 400px;
+  overflow: hidden;
+}
+
+.edit-hub-doc,
+.edit-hub-info {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.edit-hub-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0;
+  padding-right: 2px;
 }
 
-.edit-hub-action-card__body h2,
+.edit-hub-doc-card {
+  background: #fff;
+  border: 1px solid #e3ded6;
+  border-radius: 14px;
+  min-height: 100%;
+  padding: 16px 18px;
+}
+
+.edit-hub-doc-card__header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.edit-hub-document-section {
+  border-top: 1px solid #eee9e1;
+  padding: 16px 0;
+}
+
+.edit-hub-document-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.edit-hub-document-section__top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.edit-hub-document-section__badge {
+  background: #eaf7ef;
+  border-radius: 8px;
+  color: #047857;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.edit-hub-document-section__badge--chapter {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.edit-hub-old-pdf-frame {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
+  height: calc(100vh - 360px);
+  width: 100%;
+}
+
 .edit-hub-section-title {
   color: #1f2933;
   font-size: 15px;
@@ -580,39 +681,22 @@ onBeforeUnmount(() => {
   margin: 0 0 4px;
 }
 
-.edit-hub-action-card__body p {
-  color: #667085;
-  font-size: 13px;
-  line-height: 1.45;
-  margin: 0;
-}
-
-.edit-hub-action-card__button {
-  align-self: end;
-  justify-self: end;
-}
-
-.edit-hub-info {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: sticky;
-  top: 12px;
-}
-
 .edit-hub-info-card {
+  flex: 0 0 auto;
+  min-width: 0;
   padding: 16px;
+  width: 100%;
 }
 
 .edit-hub-kv,
 .edit-hub-relation-row {
-  align-items: flex-start;
+  align-items: stretch;
   border-bottom: 1px solid #f0eee9;
   display: flex;
+  flex-direction: column;
   font-size: 13px;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 8px 0;
+  gap: 4px;
+  padding: 10px 0;
 }
 
 .edit-hub-kv:last-child,
@@ -623,14 +707,15 @@ onBeforeUnmount(() => {
 .edit-hub-kv span,
 .edit-hub-relation-row span {
   color: #667085;
-  flex-shrink: 0;
 }
 
 .edit-hub-kv strong,
 .edit-hub-relation-row strong {
   color: #1f2933;
   font-weight: 700;
-  text-align: right;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
   word-break: break-word;
 }
 
@@ -646,72 +731,23 @@ onBeforeUnmount(() => {
   justify-content: space-between;
 }
 
-.edit-hub-document-panels {
-  flex-shrink: 0;
-}
-
-.edit-hub-document-panels :deep(.v-expansion-panel) {
-  border: 1px solid #e3ded6;
-  border-radius: 14px;
-}
-
-.edit-hub-document-panels :deep(.v-expansion-panel-text__wrapper) {
-  background: #fbfaf8;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.edit-hub-document-card {
-  background: #fff;
-  border: 1px solid #e7e2da;
-  border-radius: 12px;
-  padding: 16px 18px 8px;
-}
-
-.edit-hub-document-card__top {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.edit-hub-document-card__badge {
-  background: #eaf7ef;
-  border-radius: 8px;
-  color: #047857;
-  display: inline-block;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 4px 10px;
-}
-
-.edit-hub-document-card__badge--chapter {
-  background: #eef2ff;
-  color: #4338ca;
-}
-
-.edit-hub-document-card__body {
-  min-width: 0;
-}
-
-.edit-hub-old-pdf-frame {
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
-  height: calc(100vh - 220px);
-  width: 100%;
-}
-
 @media (max-width: 900px) {
+  .edit-hub-header-grid,
   .edit-hub-grid {
     grid-template-columns: 1fr;
+    overflow: visible;
+    height: auto;
+    min-height: 0;
   }
 
+  .edit-hub-doc,
   .edit-hub-info {
-    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .edit-hub-pipeline__button {
+    flex: 1 1 180px;
   }
 
   .edit-hub-meta-grid {
@@ -724,13 +760,9 @@ onBeforeUnmount(() => {
     padding: 18px;
   }
 
-  .edit-hub-meta-grid,
-  .edit-hub-action-card {
+  .edit-hub-meta-grid {
     grid-template-columns: 1fr;
   }
 
-  .edit-hub-action-card__button {
-    justify-self: stretch;
-  }
 }
 </style>

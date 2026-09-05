@@ -21,16 +21,6 @@
       />
       <div class="pipeline-filter-selects">
         <v-select
-          v-model="filterSource"
-          class="pipeline-filter-select"
-          :items="[{ title: 'ภายใน', value: 'internal' }, { title: 'ภายนอก', value: 'external' }]"
-          clearable
-          density="compact"
-          variant="outlined"
-          hide-details
-          label="แหล่งที่มา: ทั้งหมด"
-        />
-        <v-select
           v-model="filterType"
           class="pipeline-filter-select"
           :items="lawTypeOptions"
@@ -72,23 +62,34 @@
         <span class="text-body-2 font-weight-medium">{{ item.title }}</span>
       </template>
 
-      <template #item.source="{ item }">
-        <v-chip
-          v-if="item.source || item.documentType === 'old'"
-          size="small"
-          :color="item.source === 'internal' ? 'blue' : item.source === 'external' ? 'purple' : 'warning'"
-          variant="tonal"
-        >
-          {{ item.source === 'internal' ? 'ภายใน' : item.source === 'external' ? 'ภายนอก' : 'รอกรอกข้อมูล' }}
+      <template #item.lawType="{ item }">
+        <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
+          {{ item.lawType }}
         </v-chip>
-        <span v-else>—</span>
+        <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
+        <v-chip v-else size="small" color="grey" variant="tonal">รอประมวลผล</v-chip>
       </template>
 
-      <template #item.lawType="{ item }">
-        <span v-if="item.lawType">{{ item.lawType }}</span>
-        <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
-        <span v-else>—</span>
-        <v-chip v-if="item.documentType === 'old'" size="x-small" color="grey" variant="tonal" class="ml-2">เอกสารเก่า</v-chip>
+      <template #item.lawStatus="{ item }">
+        <v-chip
+          v-if="item.lawStatus"
+          size="small"
+          :color="item.lawStatus === 'มีผลบังคับใช้' ? 'success' : item.lawStatus === 'ยกเลิกการใช้งาน' ? 'error' : 'warning'"
+          variant="tonal"
+        >
+          {{ item.lawStatus }}
+        </v-chip>
+        <span v-else class="text-caption text-medium-emphasis">—</span>
+      </template>
+
+      <template #item.publishedDate="{ item }">
+        <v-chip
+          size="small"
+          :color="item.publishedDate ? 'success' : 'grey'"
+          variant="tonal"
+        >
+          {{ item.publishedDate ? 'เผยแพร่แล้ว' : 'ยังไม่เผยแพร่' }}
+        </v-chip>
       </template>
 
       <template #item.stage="{ item }">
@@ -129,21 +130,6 @@
             @click="confirmDelete(item)"
           />
 
-          <v-menu>
-            <template #activator="{ props: menuProps }">
-              <v-btn icon="mdi-dots-vertical" size="small" variant="text" color="grey" v-bind="menuProps" />
-            </template>
-            <v-list density="compact">
-              <v-list-item :disabled="item.stage === 'public' || item.stage === 'failed'" @click="advance(item)">
-                <template #prepend><v-icon icon="mdi-arrow-right" size="18" /></template>
-                <v-list-item-title>ขั้นถัดไป</v-list-item-title>
-              </v-list-item>
-              <v-list-item :disabled="!canRollback(item.stage)" @click="rollback(item)">
-                <template #prepend><v-icon icon="mdi-arrow-left" size="18" /></template>
-                <v-list-item-title>ย้อนกลับ</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
         </div>
       </template>
 
@@ -164,7 +150,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import { formatThaiDate } from '../../utils/thaiDate';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
-  deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, prevStage, readStages, writeStage,
+  deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
 
@@ -174,8 +160,9 @@ interface Row {
   title: string;
   updatedAt: string;
   stage: StageKey;
-  source: string;
   lawType: string;
+  lawStatus: string;
+  publishedDate: string;
   documentType: 'new' | 'old';
 }
 
@@ -188,7 +175,6 @@ const deletingId = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const filterText = ref<string | null>('');
-const filterSource = ref<string | null>(null);
 const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 
@@ -209,7 +195,6 @@ const filteredDocs = computed(() => {
   return docs.value.filter((d) => {
     const searchableTitle = (d.title || d.document_id || d.source_file || '').toLowerCase();
     return (!needle || searchableTitle.includes(needle)) &&
-    (!filterSource.value || d.source === filterSource.value) &&
     (!filterType.value || d.law_type === filterType.value) &&
     (!filterStatus.value || d.status === filterStatus.value);
   });
@@ -223,11 +208,12 @@ const lawTypeOptions = computed(() =>
 const headers = [
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 72 },
   { title: 'เอกสาร', key: 'title', sortable: false },
-  { title: 'แหล่งที่มา', key: 'source', sortable: false },
-  { title: 'ประเภท', key: 'lawType', sortable: false },
-  { title: 'สถานะ', key: 'stage', sortable: false },
-  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false },
-  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'end' as const },
+  { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const },
+  { title: 'สถานะกฎหมาย', key: 'lawStatus', sortable: false, align: 'center' as const },
+  { title: 'สถานะเผยแพร่', key: 'publishedDate', sortable: false, align: 'center' as const },
+  { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const },
+  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const },
+  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const },
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
@@ -257,8 +243,9 @@ const rows = computed<Row[]>(() =>
     title: doc.title || doc.document_id,
     updatedAt: formatDate(doc.updated_at),
     stage: effectiveStage(doc),
-    source: doc.source ?? '',
     lawType: doc.law_type ?? '',
+    lawStatus: doc.law_status ?? '',
+    publishedDate: doc.published_date ?? '',
     documentType: doc.document_type ?? 'new',
   })),
 );
@@ -272,10 +259,6 @@ function actionLabel(stage: StageKey): string {
   return a.type === 'none' ? '' : a.label;
 }
 
-function canRollback(stage: StageKey): boolean {
-  return prevStage(stage) !== stage;
-}
-
 function setStage(documentId: string, stage: StageKey): void {
   localStages.value = { ...localStages.value, [documentId]: stage };
   writeStage(documentId, stage);
@@ -283,7 +266,7 @@ function setStage(documentId: string, stage: StageKey): void {
 
 function runAction(row: Row): void {
   if (isOldInfoStage(row)) {
-    router.push(`/documents/${row.documentId}/edit`);
+    router.push(`/documents/${row.documentId}/law-info`);
     return;
   }
   const action = STAGE_MAP[row.stage].action;
@@ -301,14 +284,6 @@ function isOldInfoStage(row: Row): boolean {
 function rowActionLabel(row: Row): string {
   if (isOldInfoStage(row)) return 'แก้ไข';
   return actionLabel(row.stage);
-}
-
-function advance(row: Row): void {
-  setStage(row.documentId, nextStage(row.stage));
-}
-
-function rollback(row: Row): void {
-  setStage(row.documentId, prevStage(row.stage));
 }
 
 async function confirmDelete(row: Row): Promise<void> {
@@ -382,6 +357,11 @@ defineExpose({ load });
   color: rgba(var(--v-theme-secondary), 0.6) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
+  text-align: center !important;
+}
+
+.pipeline-table :deep(thead th:nth-child(2)) {
+  text-align: left !important;
 }
 
 .pipeline-filter-bar {
