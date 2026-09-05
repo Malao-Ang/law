@@ -46,8 +46,7 @@ class ExtractDocumentJob implements ShouldQueue
     }
 
     /**
-     * Gemini OCR requires the Python pipeline. Fast PDF text extraction must not
-     * run first when the selected PDF path is Gemini.
+     * Cloud OCR (Gemini / LandingAI) requires the Python pipeline.
      */
     private function shouldUseStandardPipeline(): bool
     {
@@ -66,7 +65,7 @@ class ExtractDocumentJob implements ShouldQueue
             return false;
         }
 
-        return $this->scanExtractionMode === 'gemini';
+        return in_array($this->scanExtractionMode, ['gemini', 'landingai'], true);
     }
 
     private function runFast(

@@ -11,7 +11,7 @@ const USER_GEMINI_UNAVAILABLE = 'ไม่สามารถอ่านเอ�
 export function formatGeminiUploadError(raw: string): string {
   const text = raw.trim();
   if (text) {
-    console.error('[gemini-ocr]', text);
+    console.error('[ocr]', text);
   }
   if (/HTTP 503|high demand|UNAVAILABLE/i.test(text)) {
     return USER_GEMINI_BUSY;

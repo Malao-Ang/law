@@ -240,6 +240,7 @@ function modeOptionsFor(file: File) {
   return isPdf(file)
     ? [
         { title: 'Gemini Vision (แนะนำสำหรับ PDF scan)', value: 'gemini' },
+        { title: 'LandingAI ADE', value: 'landingai' },
       ]
     : [
         { title: 'Fast PHP extraction (แนะนำ)', value: 'local' },
@@ -247,7 +248,9 @@ function modeOptionsFor(file: File) {
 }
 
 function hintFor(item: PendingItem): string {
-  if (isPdf(item.file) && item.scanMode === 'gemini') return 'ใช้ Gemini เท่านั้น — ถ้า OCR ล้มเหลวจะแจ้งทันที';
+  if (isPdf(item.file) && (item.scanMode === 'gemini' || item.scanMode === 'landingai')) {
+    return 'ใช้ cloud OCR ตามที่เลือก — ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
+  }
   return '';
 }
 
@@ -329,7 +332,7 @@ async function uploadAll(): Promise<void> {
         if (uploadMode.value === 'new' && isPdf(item.file)) {
           const status = await waitForDocumentStatus(documentId);
           if (status.status === 'failed') {
-            throw new Error(formatGeminiUploadError(status.error || 'Gemini OCR ไม่สำเร็จ'));
+            throw new Error(formatGeminiUploadError(status.error || 'ไม่สามารถอ่านเอกสารได้'));
           }
         }
         item.done = true;

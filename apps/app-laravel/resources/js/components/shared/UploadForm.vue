@@ -83,6 +83,7 @@ const modeOptions = computed(() =>
   isPdf.value
     ? [
         { title: 'Gemini Vision — Google AI (แนะนำสำหรับ PDF scan)', value: 'gemini' },
+        { title: 'LandingAI ADE', value: 'landingai' },
       ]
     : [
         { title: 'Fast PHP extraction (แนะนำ)', value: 'local' },
@@ -90,7 +91,9 @@ const modeOptions = computed(() =>
 );
 
 const modeHint = computed(() => {
-  if (isPdf.value && scanMode.value === 'gemini') return 'ใช้ Gemini เท่านั้น — ถ้า OCR ล้มเหลวจะแจ้งทันที';
+  if (isPdf.value && (scanMode.value === 'gemini' || scanMode.value === 'landingai')) {
+    return 'ใช้ cloud OCR ตามที่เลือก — ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
+  }
   return '';
 });
 

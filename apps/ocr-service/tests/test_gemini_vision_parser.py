@@ -152,6 +152,8 @@ def test_should_force_gemini_scan_for_pdf_text_and_mixed() -> None:
 
     assert _should_force_gemini_scan("pdf_text", "gemini") is True
     assert _should_force_gemini_scan("mixed", "gemini") is True
+    assert _should_force_gemini_scan("pdf_text", "landingai") is True
+    assert _should_force_gemini_scan("mixed", "landingai") is True
     assert _should_force_gemini_scan("pdf_scan", "gemini") is False
     assert _should_force_gemini_scan("pdf_text", "auto") is False
     assert _should_force_gemini_scan("pdf_text", "local") is False
