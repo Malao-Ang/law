@@ -58,9 +58,10 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import Swal from 'sweetalert2';
 import UploadForm from '../components/shared/UploadForm.vue';
 import HeaderComponent from '../components/shared/HeaderComponent.vue';
-import { useUploadStore } from '../stores/uploadStore';
+import { formatGeminiUploadError, useUploadStore } from '../stores/uploadStore';
 import type { DocumentStatus } from '../types/document';
 
 const router = useRouter();
@@ -128,6 +129,15 @@ async function pollStatus(): Promise<void> {
       pollTimer = setTimeout(pollStatus, 1500);
     } else if (['done', 'exported', 'ingested'].includes(result.status)) {
       router.push(`/documents/${documentId.value}/review`);
+    } else if (result.status === 'failed') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'นำเข้า PDF ไม่สำเร็จ',
+        text: formatGeminiUploadError(result.error || 'Gemini OCR ไม่สำเร็จ'),
+        confirmButtonText: 'ตกลง',
+        confirmButtonColor: '#b42318',
+        allowOutsideClick: true,
+      });
     }
   } else {
     errorRetryCount++;

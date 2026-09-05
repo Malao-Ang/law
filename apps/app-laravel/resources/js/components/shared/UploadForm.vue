@@ -90,7 +90,7 @@ const modeOptions = computed(() =>
 );
 
 const modeHint = computed(() => {
-  if (isPdf.value && scanMode.value === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY ใน .env';
+  if (isPdf.value && scanMode.value === 'gemini') return 'ใช้ Gemini เท่านั้น — ถ้า OCR ล้มเหลวจะแจ้งทันที';
   return '';
 });
 

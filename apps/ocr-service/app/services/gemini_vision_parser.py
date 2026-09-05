@@ -64,21 +64,13 @@ class GeminiVisionParser:
         failed_pages: list[int] = []
 
         for page_no in page_numbers:
-            image_path = self._render_page_image(file_path, document_id, page_no)
             try:
+                image_path = self._render_page_image(file_path, document_id, page_no)
                 blocks, duration_ms = self._ocr_page(image_path, page_no, model_name)
                 total_duration_ms += duration_ms
-            except Exception:
+            except Exception as exc:
                 failed_pages.append(page_no)
-                blocks = [
-                    self._fallback_block(
-                        page_no=page_no,
-                        index=1,
-                        text="",
-                        confidence=0.0,
-                        error="gemini_page_failed",
-                    )
-                ]
+                raise RuntimeError(f"Gemini OCR failed on page {page_no}: {exc}") from exc
 
             for order, block in enumerate(blocks, start=1):
                 block["reading_order"] = order
@@ -129,7 +121,12 @@ class GeminiVisionParser:
 
         with httpx.Client(timeout=settings.gemini_timeout_seconds) as client:
             response = client.post(url, params=params, json=payload)
-            response.raise_for_status()
+            status_code = response.status_code
+            if isinstance(status_code, int) and status_code >= 400:
+                detail = (response.text or "").strip()[:800]
+                raise RuntimeError(
+                    f"Gemini API HTTP {status_code} on page {page_no}: {detail}"
+                )
             body = response.json()
 
         logger.info(

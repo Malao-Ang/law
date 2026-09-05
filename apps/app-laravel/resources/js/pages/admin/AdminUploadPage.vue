@@ -93,6 +93,9 @@
                     <v-chip v-if="item.done" color="success" size="x-small" variant="tonal" rounded="pill">
                       <v-icon start icon="mdi-check" size="11" />อัปโหลดแล้ว
                     </v-chip>
+                    <v-chip v-else-if="item.error" color="error" size="x-small" variant="tonal" rounded="pill">
+                      ไม่สำเร็จ
+                    </v-chip>
                     <v-progress-circular
                       v-else-if="item.uploading"
                       indeterminate
@@ -127,15 +130,11 @@
                     rounded="lg"
                     style="flex:1;max-width:380px"
                   />
-                  <v-chip v-if="hintFor(item)" size="x-small" color="warning" variant="tonal" rounded="pill">
+                  <v-chip v-if="hintFor(item)" size="x-small" color="info" variant="tonal" rounded="pill">
                     <v-icon start icon="mdi-key-outline" size="10" />
                     {{ hintFor(item) }}
                   </v-chip>
                 </div>
-
-                <v-alert v-if="item.error" type="error" density="compact" rounded="lg" class="mt-2 mx-4 mb-3">
-                  {{ item.error }}
-                </v-alert>
               </div>
 
               <div v-if="!pendingItems.length" class="adm-empty">
@@ -190,7 +189,7 @@ import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
 import type { ScanExtractionMode } from '../../types/document';
-import { useUploadStore } from '../../stores/uploadStore';
+import { formatGeminiUploadError, useUploadStore, waitForDocumentStatus } from '../../stores/uploadStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 
 interface PendingItem {
@@ -248,7 +247,7 @@ function modeOptionsFor(file: File) {
 }
 
 function hintFor(item: PendingItem): string {
-  if (isPdf(item.file) && item.scanMode === 'gemini') return 'ต้องตั้งค่า GEMINI_API_KEY';
+  if (isPdf(item.file) && item.scanMode === 'gemini') return 'ใช้ Gemini เท่านั้น — ถ้า OCR ล้มเหลวจะแจ้งทันที';
   return '';
 }
 
@@ -326,11 +325,28 @@ async function uploadAll(): Promise<void> {
       item.uploading = true;
       item.error = '';
       try {
-        await uploadStore.upload(item.file, item.scanMode, engineFor(item), { documentType: uploadMode.value });
+        const documentId = await uploadStore.upload(item.file, item.scanMode, engineFor(item), { documentType: uploadMode.value });
+        if (uploadMode.value === 'new' && isPdf(item.file)) {
+          const status = await waitForDocumentStatus(documentId);
+          if (status.status === 'failed') {
+            throw new Error(formatGeminiUploadError(status.error || 'Gemini OCR ไม่สำเร็จ'));
+          }
+        }
         item.done = true;
       } catch (err) {
         item.error = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';
-        snackbar.error(`${item.file.name}: ${item.error}`);
+        item.uploading = false;
+        await Swal.fire({
+          icon: 'error',
+          title: isPdf(item.file) ? 'นำเข้า PDF ไม่สำเร็จ' : 'อัปโหลดไม่สำเร็จ',
+          text: `${item.file.name}\n\n${item.error}`,
+          confirmButtonText: 'ตกลง',
+          confirmButtonColor: '#b42318',
+          allowOutsideClick: true,
+          customClass: {
+            container: 'adm-upload-confirm-swal',
+          },
+        });
       } finally {
         item.uploading = false;
       }

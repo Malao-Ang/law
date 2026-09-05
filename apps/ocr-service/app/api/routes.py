@@ -213,7 +213,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 _post_callback(payload.callback_url, payload.document_id, {"status": "success", "output": output}, logger)
 
     except Exception as exc:
-        logger.error("extraction failed", extra={"error": str(exc)})
+        logger.error(f"extraction failed: {exc}")
 
         failure_payload = {
             "status": "failed",
@@ -408,10 +408,10 @@ def _run_cloud_scan_mode(
         )
         return pages, provider, landingai_meta, gemini_meta
     except Exception as exc:
-        logger.warning(
-            f"{provider} mode: API call failed, falling back to local OCR",
-            extra={"error": str(exc)},
-        )
+        if provider == "gemini":
+            logger.error(f"gemini mode: API call failed: {exc}")
+            raise
+        logger.warning(f"{provider} mode: API call failed, falling back to local OCR: {exc}")
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
         if page_indices is None:
             pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)

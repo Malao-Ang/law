@@ -3,6 +3,44 @@ import { ref } from 'vue';
 import { fetchStatus, uploadDocument } from '../api/client';
 import type { DocumentStatus, ScanExtractionMode } from '../types/document';
 
+const TERMINAL_STATUSES = new Set<DocumentStatus['status']>(['done', 'failed', 'exported', 'ingested']);
+
+const USER_GEMINI_BUSY = 'ระบบประมวลผลเอกสารหนาแน่นชั่วคราว กรุณารอสักครู่แล้วลองอีกครั้ง';
+const USER_GEMINI_UNAVAILABLE = 'ไม่สามารถอ่านเอกสารได้ในขณะนี้ กรุณาลองอีกครั้ง หรือติดต่อผู้ดูแลระบบ';
+
+export function formatGeminiUploadError(raw: string): string {
+  const text = raw.trim();
+  if (text) {
+    console.error('[gemini-ocr]', text);
+  }
+  if (/HTTP 503|high demand|UNAVAILABLE/i.test(text)) {
+    return USER_GEMINI_BUSY;
+  }
+  if (/HTTP 429|RESOURCE_EXHAUSTED|credits are depleted|quota/i.test(text)) {
+    return USER_GEMINI_UNAVAILABLE;
+  }
+  return USER_GEMINI_UNAVAILABLE;
+}
+
+export async function waitForDocumentStatus(
+  documentId: string,
+  options: { intervalMs?: number; timeoutMs?: number } = {},
+): Promise<DocumentStatus> {
+  const intervalMs = options.intervalMs ?? 1500;
+  const timeoutMs = options.timeoutMs ?? 30 * 60 * 1000;
+  const started = Date.now();
+
+  while (Date.now() - started < timeoutMs) {
+    const current = await fetchStatus(documentId);
+    if (TERMINAL_STATUSES.has(current.status)) {
+      return current;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error('หมดเวลารอการประมวลผล Gemini');
+}
+
 export interface UploadHistoryEntry {
   documentId: string;
   filename: string;
