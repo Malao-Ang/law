@@ -28,7 +28,7 @@
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
           @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>
         <div class="lawx-actions">
-          <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
+          <v-btn variant="outlined" size="small"
             :prepend-icon="tocOpen ? 'mdi-eye-off-outline' : 'mdi-table-of-contents'"
             @click="tocOpen = !tocOpen">{{ tocOpen ? 'ซ่อนสารบัญ' : 'เปิดสารบัญ' }}</v-btn>
           <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
@@ -76,29 +76,33 @@
           'is-original-pdf': usesOriginalPdfLayout,
         }"
       >
-      <template v-if="!usesOriginalPdfLayout">
       <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
         <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญ{{ unitWord }}</p>
         <div class="lawx-toc__scroll">
-          <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
-            <v-btn variant="text" block class="justify-space-between font-weight-bold text-body-2 mt-2 px-2"
-              style="color:#1d4ed8" @click="toggleGroup(group.label)">
-              <span>{{ group.label }}</span>
-              <v-icon :icon="collapsed.has(group.label) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
-            </v-btn>
-            <div v-show="!collapsed.has(group.label)" class="lawx-toc__items">
-              <button
-                v-for="sid in group.sectionIds"
-                :key="sid"
-                class="lawx-toc__item"
-                :class="{ 'is-active': activeId === sid }"
-                @click="scrollTo(sid)"
-              >{{ badgeOf(sid) }}</button>
+          <template v-if="tocGroups.length > 0">
+            <div v-for="group in tocGroups" :key="group.label" class="lawx-toc__group">
+              <v-btn variant="text" block class="justify-space-between font-weight-bold text-body-2 mt-2 px-2"
+                style="color:#1d4ed8" @click="toggleGroup(group.label)">
+                <span>{{ group.label }}</span>
+                <v-icon :icon="collapsed.has(group.label) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
+              </v-btn>
+              <div v-show="!collapsed.has(group.label)" class="lawx-toc__items">
+                <button
+                  v-for="sid in group.sectionIds"
+                  :key="sid"
+                  class="lawx-toc__item"
+                  :class="{ 'is-active': activeId === sid }"
+                  @click="scrollTo(sid)"
+                >{{ badgeOf(sid) }}</button>
+              </div>
             </div>
+          </template>
+          <div v-else class="lawx-toc__empty">
+            <span class="mdi mdi-file-pdf-box" style="font-size:2rem;opacity:0.4" />
+            <p class="text-body-2 text-medium-emphasis text-center px-4 mt-2">เอกสาร PDF ต้นฉบับ — ใช้สารบัญของ PDF viewer</p>
           </div>
         </div>
       </v-card>
-      </template>
 
       <main
         class="lawx-doc"
@@ -711,6 +715,7 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-toc__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-weight: 700; font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; color: #343028; }
 .lawx-toc__scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .lawx-toc__items { display: flex; flex-direction: column; padding: 5px 0 4px 8px; }
+.lawx-toc__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 8px; color: #94a3b8; }
 .lawx-toc__item { text-align: left; background: transparent; border: none; border-left: 2px solid transparent; padding: 7px 10px; font-size: 13px; color: #475569; border-radius: 0; cursor: pointer; font-family: inherit; }
 .lawx-toc__item:hover { color: #7b580d; }
 .lawx-toc__item.is-active { background: transparent; border-left-color: #b68d40; color: #7b580d; font-weight: 700; }
