@@ -26,7 +26,7 @@
       <v-btn
         v-if="!nextHidden"
         color="admin-primary"
-        append-icon="mdi-arrow-right"
+        prepend-icon="mdi-content-save-outline"
         :disabled="nextDisabled"
         :loading="nextLoading"
         @click="emit('next')"
@@ -65,7 +65,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   variant: 'default',
   backLabel: 'ย้อนกลับ',
-  nextLabel: 'ถัดไป',
+  nextLabel: 'บันทึก',
   extraLabel: '',
   extraIcon: 'mdi-draw-pen',
   backDisabled: false,

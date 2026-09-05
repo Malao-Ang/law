@@ -294,6 +294,7 @@ import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/documen
 import { normalizeChunkType } from '../../types/chunkType';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
+import { useSnackbarStore } from '../../stores/snackbarStore';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
@@ -301,6 +302,7 @@ const router = useRouter();
 const documentStore = useDocumentStore();
 const route = useRoute();
 const isEditMode = computed(() => route.query.mode === 'edit');
+const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const { documentTypes, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
@@ -641,6 +643,8 @@ async function saveAndNext(): Promise<void> {
   form.value = { ...form.value, ...payload };
   const progressed = await documentStore.completeWorkflowStep(4);
   if (!progressed) return;
+  snackbar.success('บันทึกข้อมูลกฎหมายแล้ว');
+  await new Promise(r => setTimeout(r, 800));
   router.push(`/documents/${props.documentId}/relations`);
 }
 

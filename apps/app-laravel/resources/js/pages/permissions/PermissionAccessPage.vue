@@ -167,6 +167,7 @@ import { writeStage } from '../../data/documentPipeline';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../../types/permission';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
+import { useSnackbarStore } from '../../stores/snackbarStore';
 import AccessScopeCard from '../../components/permissions/AccessScopeCard.vue';
 import PermissionGroupCard from '../../components/permissions/PermissionGroupCard.vue';
 import PermissionGroupDetailDialog from '../../components/permissions/PermissionGroupDetailDialog.vue';
@@ -187,6 +188,7 @@ const createDialog = ref(false);
 const detailDialog = ref(false);
 const detailGroup = ref<PermissionGroup | null>(null);
 
+const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 
 const selectedGroups = computed(() =>
@@ -277,6 +279,8 @@ async function saveAndPublish(): Promise<void> {
     const progressed = await documentStore.completeWorkflowStep(6);
     if (!progressed) return;
     writeStage(props.documentId, 'public');
+    snackbar.success('บันทึกสิทธิ์แล้ว');
+    await new Promise(r => setTimeout(r, 800));
     router.push(`/law/${props.documentId}`);
     return;
   }

@@ -383,6 +383,8 @@ async function persistStepFive(): Promise<boolean> {
 async function saveAndNext(): Promise<void> {
   esignLeaving.value = false;
   if (!await persistStepFive()) return;
+  snackbar.success('บันทึกความสัมพันธ์แล้ว');
+  await new Promise(r => setTimeout(r, 800));
   router.push(`/documents/${props.documentId}/permissions`);
 }
 
