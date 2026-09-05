@@ -663,6 +663,7 @@ let syncingFromRoute = false;
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let hideSuggestionsTimer: ReturnType<typeof setTimeout> | null = null;
 let routeUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let suppressNextRouteSearch = false;
 let mutatingSearchState = false;
 
@@ -681,7 +682,8 @@ watch(
       return;
     }
     searchStore.clearSuggestions();
-    void runSearch();
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => { void runSearch(); }, 300);
   },
   { immediate: true },
 );
@@ -1104,6 +1106,7 @@ onBeforeUnmount(() => {
   if (suggestTimer) clearTimeout(suggestTimer);
   if (hideSuggestionsTimer) clearTimeout(hideSuggestionsTimer);
   if (routeUpdateTimer) clearTimeout(routeUpdateTimer);
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   if (refreshTimer) clearInterval(refreshTimer);
   searchStore.clearSuggestions();
 });
