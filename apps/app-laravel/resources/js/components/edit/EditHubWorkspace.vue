@@ -34,11 +34,20 @@
               </v-chip>
               <v-chip
                 size="small"
-                :color="isPublished ? 'success' : (meta.status && meta.status !== 'ร่าง' ? 'info' : 'warning')"
+                :color="metaStatusColor(meta.status)"
                 variant="flat"
                 class="font-weight-bold"
               >
-                {{ isPublished ? 'เผยแพร่แล้ว' : (meta.status || 'ร่าง') }}
+                {{ meta.status || 'ร่าง' }}
+              </v-chip>
+              <v-chip
+                size="small"
+                :color="isPublished ? 'success' : 'grey'"
+                variant="tonal"
+                class="font-weight-medium"
+              >
+                <v-icon :icon="isPublished ? 'mdi-eye-outline' : 'mdi-eye-off-outline'" size="14" start />
+                {{ isPublished ? 'เผยแพร่แล้ว' : 'ยังไม่เผยแพร่' }}
               </v-chip>
               <v-chip size="small" variant="tonal" class="font-weight-medium">
                 # {{ documentId }}
@@ -407,6 +416,12 @@ const actions = computed(() => {
 
   return list;
 });
+
+function metaStatusColor(status: string): string {
+  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'success';
+  if (status === 'ยกเลิกการใช้งาน' || status === 'ยกเลิก') return 'error';
+  return 'warning'; // ร่าง or empty
+}
 
 function relationTypeLabel(type: RelationType): string {
   const labels: Record<RelationType, string> = {
