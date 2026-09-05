@@ -435,56 +435,91 @@ function relationTypeLabel(type: RelationType): string {
 }
 
 async function togglePublished(next: boolean | null): Promise<void> {
-  if (!!next && !isOldDoc.value) {
-    try {
-      const status = await fetchStatus(props.documentId);
-      if (status?.rag_skipped) {
-        const result = await Swal.fire({
-          icon: 'warning',
-          title: 'ยังไม่ได้จัดลำดับ RAG',
-          html: 'เอกสารนี้เคยข้ามขั้นตอน RAG ไว้ ต้องกลับไปจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
-          showCancelButton: true,
-          confirmButtonText: 'ไปจัดลำดับ RAG',
-          cancelButtonText: 'ยกเลิก',
-          confirmButtonColor: '#1a3673',
-          cancelButtonColor: '#64748b',
-        });
-        if (result.isConfirmed) {
-          router.push(`/documents/${props.documentId}/rag`);
-        }
+  // ปิดเผยแพร่ — ไม่ต้องตรวจอะไร เปิด confirm dialog ตรงๆ
+  if (!next) {
+    publishDialogNext.value = false;
+    publishDialogOpen.value = true;
+    return;
+  }
+
+  // ======= เอกสารภายใน: ตรวจ 4 gates =======
+  if (!isOldDoc.value) {
+    let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
+    try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
+
+    // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
+    if (!docStatus?.esign_confirmed_at) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'ยังไม่ผ่านการลงนาม e-Sign',
+        html: 'เอกสารต้องผ่านการลงนามอิเล็กทรอนิกส์ให้สำเร็จก่อนเผยแพร่<br><small>กด "ส่งลงนาม e-Sign" ในเมนูด้านซ้าย</small>',
+        confirmButtonText: 'รับทราบ',
+        confirmButtonColor: '#1a3673',
+      });
+      return;
+    }
+
+    // Gate 2: RAG ต้องทำหรือยืนยันข้าม
+    const ragDone = (docStatus?.status === 'exported' || docStatus?.status === 'ingested' || (docStatus?.workflow_completed_step ?? 0) >= 3);
+    if (!ragDone || docStatus?.rag_skipped) {
+      const r = await Swal.fire({
+        icon: 'warning',
+        title: 'ยังไม่ได้จัดลำดับ RAG',
+        html: 'ต้องจัดลำดับเนื้อหา RAG ให้เสร็จก่อนเผยแพร่',
+        showCancelButton: true,
+        confirmButtonText: 'ไปจัดลำดับ RAG',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a3673',
+        cancelButtonColor: '#64748b',
+      });
+      if (r.isConfirmed) router.push(`/documents/${props.documentId}/rag`);
+      return;
+    }
+
+    // Gate 3: ต้องกำหนดสิทธิ์ public/private
+    if (!meta.value.access_scope) {
+      const r = await Swal.fire({
+        icon: 'info',
+        title: 'ยังไม่ได้กำหนดสิทธิ์การเข้าถึง',
+        html: 'กรุณากำหนดว่าเอกสารนี้เป็น <strong>Public</strong> หรือ <strong>Private</strong> ก่อนเผยแพร่',
+        showCancelButton: true,
+        confirmButtonText: 'ไปกำหนดสิทธิ์',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a3673',
+        cancelButtonColor: '#64748b',
+      });
+      if (r.isConfirmed) router.push(`/documents/${props.documentId}/permissions`);
+      return;
+    }
+
+    // Gate 4: สถานะยังเป็น "ร่าง"
+    if (!meta.value.status || meta.value.status === 'ร่าง') {
+      const r = await Swal.fire({
+        icon: 'question',
+        title: 'เอกสารยังเป็นร่าง',
+        html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>ต้องการเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> ก่อนเผยแพร่หรือไม่?',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
+        denyButtonText: 'ไปแก้ไขสถานะเอง',
+        cancelButtonText: 'ยกเลิก',
+        denyButtonColor: '#6b7280',
+        confirmButtonColor: '#1a3673',
+      });
+      if (r.isConfirmed) {
+        await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+      } else if (r.isDenied) {
+        router.push(`/documents/${props.documentId}/law-info`);
+        return;
+      } else {
         return;
       }
-    } catch {
-      // ถ้า fetch status ล้มเหลว ข้ามการตรวจ RAG และดำเนินการต่อ
     }
   }
-  // Draft status check — after RAG check passes
-  if (!!next && (!meta.value.status || meta.value.status === 'ร่าง')) {
-    const result = await Swal.fire({
-      title: 'เอกสารยังเป็นร่าง',
-      html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>หากเผยแพร่ สถานะจะเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> โดยอัตโนมัติ',
-      showCancelButton: true,
-      showDenyButton: true,
-      confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
-      cancelButtonText: 'ยกเลิก',
-      denyButtonText: 'ไปแก้ไขสถานะเอง',
-      denyButtonColor: '#6b7280',
-      confirmButtonColor: '#1a3673',
-    });
 
-    if (result.isConfirmed) {
-      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
-    } else if (result.isDenied) {
-      router.push(`/documents/${props.documentId}/law-info`);
-      return;
-    } else {
-      return;
-    }
-  }
-  publishDialogNext.value = !!next;
+  publishDialogNext.value = true;
   publishDialogOpen.value = true;
 }
-
 async function confirmPublishChange(): Promise<void> {
   if (publishDialogNext.value === null) return;
   const next = publishDialogNext.value;
