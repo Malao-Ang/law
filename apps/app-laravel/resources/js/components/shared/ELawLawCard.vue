@@ -142,6 +142,7 @@ const visibilityIcon = computed(() =>
   flex-direction: column;
   gap: 0;
   transition: box-shadow 0.15s ease;
+  width: 100%;
   height: 100%;
 }
 
