@@ -5,16 +5,14 @@
     <div class="psr-topbar">
       <v-container style="max-width:1200px" class="py-0">
         <div class="d-flex align-center ga-2 py-3">
-          <v-btn
-            variant="text"
-            size="small"
-            prepend-icon="mdi-arrow-left"
-            class="text-none"
-            @click="selectedRow ? goList() : router.push('/database')"
-          >
-            ย้อนกลับ
-          </v-btn>
-          <span class="text-body-2 text-medium-emphasis">ดูโครงสร้างความสัมพันธ์</span>
+          <v-breadcrumbs density="compact" class="pa-0 text-caption">
+            <v-breadcrumbs-item to="/" class="text-medium-emphasis">หน้าแรก</v-breadcrumbs-item>
+            <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+            <v-breadcrumbs-item to="/database" class="text-medium-emphasis">สืบค้นกฎหมาย</v-breadcrumbs-item>
+            <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+            <v-breadcrumbs-item v-if="selectedRow" class="psr-breadcrumb-title">{{ selectedRow.title || 'เอกสาร' }}</v-breadcrumbs-item>
+            <v-breadcrumbs-item v-else>ความสัมพันธ์กฎหมาย</v-breadcrumbs-item>
+          </v-breadcrumbs>
         </div>
       </v-container>
     </div>
@@ -721,11 +719,19 @@ watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () =>
 .psr {
   background: #f8fafc;
   min-height: 100vh;
+  padding-top: 96px;
 }
 
 .psr-topbar {
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.psr-breadcrumb-title {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rel-root__title {
