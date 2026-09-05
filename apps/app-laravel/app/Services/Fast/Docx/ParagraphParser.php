@@ -94,6 +94,8 @@ final class ParagraphParser
         ];
 
         if (! $pPr instanceof DOMElement) {
+            $layout['line_spacing'] = 240;
+
             return $layout;
         }
 
@@ -130,6 +132,10 @@ final class ParagraphParser
                 'position' => $position,
                 'type' => $this->mapTabType(WordXml::wordAttr($tab, 'val')),
             ];
+        }
+
+        if (! is_numeric($layout['line_spacing'] ?? null) || (float) $layout['line_spacing'] <= 0) {
+            $layout['line_spacing'] = 240;
         }
 
         return $layout;

@@ -20,8 +20,9 @@ class DocumentExportService
     // Google "Sarabun" — a different font with different metrics than the review.
     private const EXPORT_FONT = 'TH Sarabun New';
 
-    // Matches the review editor's on-screen line-height (DocumentEditorShell 1.85).
-    private const DEFAULT_LINE_HEIGHT = 1.85;
+    private const DEFAULT_LINE_HEIGHT = 1.0;
+
+    private const CM_TO_PT = 28.3464567;
 
     private const EXPORT_FONT_STACK = "'TH Sarabun New', 'TH Sarabun PSK', 'Sarabun', 'Noto Sans Thai', sans-serif";
 
@@ -35,7 +36,7 @@ class DocumentExportService
     public function __construct(
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly LibreOfficeConverter $libreOffice,
-        private readonly ReviewStore $reviewStore,
+        private readonly ?ReviewStore $reviewStore = null,
     ) {}
 
     public function buildHtml(array $document): string
@@ -235,7 +236,7 @@ class DocumentExportService
 
         try {
             $style = [
-                'alignment' => $this->mapAlignment((string) ($block['meta']['layout']['alignment'] ?? 'center')) ?? Jc::CENTER,
+                'alignment' => $this->mapAlignment($this->imageAlignment($block, $imgMeta)) ?? Jc::CENTER,
             ];
             $widthPt = $this->imageWidthPt($imgMeta, $path);
             if ($widthPt !== null) {
@@ -243,6 +244,7 @@ class DocumentExportService
             }
 
             $section->addImage($path, $style);
+            $this->appendImageSpacing($section, $imgMeta);
         } catch (\Throwable) {
             if ($isTemp) {
                 @unlink($path);
@@ -280,7 +282,7 @@ class DocumentExportService
         }
 
         $srcPath = (string) ($imgMeta['src_path'] ?? $meta['image_path'] ?? '');
-        if ($srcPath !== '') {
+        if ($srcPath !== '' && $this->reviewStore !== null) {
             $absolute = $this->reviewStore->absolutePath($srcPath);
             if (is_file($absolute)) {
                 return [$absolute, false];
@@ -297,6 +299,13 @@ class DocumentExportService
     {
         // Clamp to the A4 text column (~6.25in) so wide images do not overflow the page.
         $maxWidthPt = 6.25 * 72;
+
+        foreach (['display_width_cm', 'docx_width_cm'] as $key) {
+            $widthCm = $imgMeta[$key] ?? null;
+            if (is_numeric($widthCm) && (float) $widthCm > 0) {
+                return min((float) $widthCm * self::CM_TO_PT, $maxWidthPt);
+            }
+        }
 
         $displayPx = (int) ($imgMeta['display_width_px'] ?? 0);
         if ($displayPx > 0) {
@@ -720,7 +729,7 @@ class DocumentExportService
 
         $value = (float) $m[1];
 
-        return $value > 0 ? $value : null;
+        return $value > 0 ? $this->clampLineHeight($value) : null;
     }
 
     /**
@@ -736,7 +745,7 @@ class DocumentExportService
             return null;
         }
 
-        return (float) $spacing / 240.0;
+        return $this->clampLineHeight((float) $spacing / 240.0);
     }
 
     /**
@@ -1001,6 +1010,41 @@ class DocumentExportService
         }
 
         return null;
+    }
+
+    private function clampLineHeight(float $lineHeight): float
+    {
+        return max(1.0, min($lineHeight, 2.0));
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     * @param  array<string, mixed>  $imgMeta
+     */
+    private function imageAlignment(array $block, array $imgMeta): string
+    {
+        if (($imgMeta['is_logo'] ?? false) === true) {
+            return 'center';
+        }
+
+        return (string) ($imgMeta['alignment'] ?? $block['meta']['layout']['alignment'] ?? 'center');
+    }
+
+    /**
+     * @param  array<string, mixed>  $imgMeta
+     */
+    private function appendImageSpacing(object $section, array $imgMeta): void
+    {
+        $spacing = $imgMeta['spacing_after_line_height'] ?? null;
+        if (! is_numeric($spacing) || (float) $spacing <= 0) {
+            return;
+        }
+
+        $run = $section->addTextRun([
+            'spaceAfter' => 0,
+            'lineHeight' => $this->clampLineHeight((float) $spacing),
+        ]);
+        $run->addText(' ', ['name' => self::EXPORT_FONT, 'size' => 16]);
     }
 
     private function mapAlignment(string $alignment): ?string

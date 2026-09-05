@@ -23,7 +23,7 @@
       </v-container>
     </div>
 
-    <v-main class="lawx-main">
+    <v-main class="lawx-main pt-8">
       <div class="lawx-subbar">
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
           @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>

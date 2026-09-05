@@ -161,4 +161,50 @@ class FastDocxExtractorTest extends TestCase
         @array_map('unlink', glob($imagesDir.'/*') ?: []);
         @rmdir($imagesDir);
     }
+
+    public function test_marks_only_first_image_before_text_as_logo(): void
+    {
+        $docx = sys_get_temp_dir().'/fast-logo-'.uniqid('', true).'.docx';
+        $imagesDir = sys_get_temp_dir().'/fast-logo-out-'.uniqid('', true);
+
+        $imageParagraph = static fn (string $relId): string => '<w:p><w:r><w:drawing>'
+            .'<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+            .'<wp:extent cx="720000" cy="360000"/>'
+            .'<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            .'<a:blip r:embed="'.$relId.'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>'
+            .'</a:graphic></wp:inline></w:drawing></w:r></w:p>';
+        $body = $imageParagraph('rId10')
+            .'<w:p><w:r><w:t>ข้อความหลังโลโก้</w:t></w:r></w:p>'
+            .$imageParagraph('rId11');
+        buildRawDocx($docx, $body);
+
+        $zip = new \ZipArchive;
+        $zip->open($docx);
+        $zip->addFromString('word/media/image1.png', "\x89PNG\r\n\x1a\nFAKE1");
+        $zip->addFromString('word/media/image2.png', "\x89PNG\r\n\x1a\nFAKE2");
+        $zip->addFromString(
+            'word/_rels/document.xml.rels',
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>'
+            .'<Relationship Id="rId11" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image2.png"/>'
+            .'</Relationships>',
+        );
+        $zip->close();
+
+        $blocks = (new FastDocxExtractor)->extract($docx, 'doc-logo', $imagesDir)['pages'][0]['blocks'];
+        $images = array_values(array_filter($blocks, static fn (array $block): bool => $block['type'] === 'image'));
+
+        $this->assertCount(2, $images);
+        $this->assertTrue($images[0]['meta']['image']['is_logo']);
+        $this->assertSame(2.99, $images[0]['meta']['image']['display_width_cm']);
+        $this->assertSame('center', $images[0]['meta']['image']['alignment']);
+        $this->assertSame(1.5, $images[0]['meta']['image']['spacing_after_line_height']);
+        $this->assertFalse((bool) ($images[1]['meta']['image']['is_logo'] ?? false));
+        $this->assertArrayNotHasKey('display_width_cm', $images[1]['meta']['image']);
+
+        @unlink($docx);
+        @array_map('unlink', glob($imagesDir.'/*') ?: []);
+        @rmdir($imagesDir);
+    }
 }

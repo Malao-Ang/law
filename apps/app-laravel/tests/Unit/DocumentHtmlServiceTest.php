@@ -79,6 +79,46 @@ class DocumentHtmlServiceTest extends TestCase
         $this->assertStringContainsString('width:320px', $html);
     }
 
+    public function test_image_block_html_uses_display_width_cm_and_logo_spacing(): void
+    {
+        $html = $this->makeService()->buildBlockHtml([
+            'block_id' => 'logo-1',
+            'type' => 'image',
+            'meta' => [
+                'image' => [
+                    'src_url' => '/api/logo.png',
+                    'is_logo' => true,
+                    'display_width_cm' => 2.99,
+                    'alignment' => 'center',
+                    'spacing_after_line_height' => 1.5,
+                ],
+            ],
+        ], 1);
+
+        $this->assertStringContainsString('text-align:center', $html);
+        $this->assertStringContainsString('margin-bottom:1.5em', $html);
+        $this->assertStringContainsString('width:2.99cm', $html);
+    }
+
+    public function test_image_block_html_uses_docx_width_cm_for_non_logo_images(): void
+    {
+        $html = $this->makeService()->buildBlockHtml([
+            'block_id' => 'img-2',
+            'type' => 'image',
+            'meta' => [
+                'image' => [
+                    'src_url' => '/api/image.png',
+                    'docx_width_cm' => 4.25,
+                    'alignment' => 'right',
+                ],
+            ],
+        ], 1);
+
+        $this->assertStringContainsString('text-align:right', $html);
+        $this->assertStringContainsString('width:4.25cm', $html);
+        $this->assertStringNotContainsString('margin-bottom:1.5em', $html);
+    }
+
     public function test_image_block_html_without_saved_width_uses_responsive_default(): void
     {
         $service = $this->makeService();
@@ -102,6 +142,15 @@ class DocumentHtmlServiceTest extends TestCase
         ]);
 
         $this->assertStringContainsString('padding-left:72pt', $style);
+    }
+
+    public function test_build_layout_style_attribute_clamps_line_height(): void
+    {
+        $service = $this->makeService();
+
+        $this->assertStringContainsString('line-height:1.00', $service->buildLayoutStyleAttribute(['line_spacing' => 120]));
+        $this->assertStringContainsString('line-height:1.50', $service->buildLayoutStyleAttribute(['line_spacing' => 360]));
+        $this->assertStringContainsString('line-height:2.00', $service->buildLayoutStyleAttribute(['line_spacing' => 720]));
     }
 
     public function test_applyFormatting_wraps_font_size_pt_in_span(): void

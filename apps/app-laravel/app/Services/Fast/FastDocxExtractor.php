@@ -15,6 +15,8 @@ class FastDocxExtractor
 {
     private const DEDUP_MIN_TEXT_LENGTH = 30;
 
+    private const LOGO_WIDTH_CM = 2.99;
+
     public function __construct(
         private readonly ?ParagraphParser $paragraphParser = null,
         private readonly ?TableParser $tableParser = null,
@@ -39,6 +41,8 @@ class FastDocxExtractor
 
         $blocks = [];
         $readingOrder = 1;
+        $hasSeenTextBlock = false;
+        $logoAssigned = false;
 
         if ($body instanceof DOMElement) {
             foreach ($body->childNodes as $child) {
@@ -50,6 +54,14 @@ class FastDocxExtractor
                 if ($child->localName === 'p') {
                     if ($imageExtractor !== null) {
                         foreach ($imageExtractor->fromParagraph($child) as $imageMeta) {
+                            if (! $hasSeenTextBlock && ! $logoAssigned) {
+                                $imageMeta['is_logo'] = true;
+                                $imageMeta['display_width_cm'] = self::LOGO_WIDTH_CM;
+                                $imageMeta['alignment'] = 'center';
+                                $imageMeta['spacing_after_line_height'] = 1.5;
+                                $logoAssigned = true;
+                            }
+
                             $imageBlock = $this->makeBlock('image', '', $readingOrder, [], []);
                             $imageBlock['meta']['image'] = $imageMeta;
                             $blocks[] = $imageBlock;
@@ -69,12 +81,16 @@ class FastDocxExtractor
                         if (is_array($paragraph['numbering'] ?? null)) {
                             $block['meta']['numbering'] = $paragraph['numbering'];
                         }
+                        $hasSeenTextBlock = true;
                     }
                 } elseif ($child->localName === 'tbl') {
                     $table = $tableParser->parse($child);
                     if ($table !== null) {
                         $block = $this->makeBlock('table', (string) $table['text'], $readingOrder, [], []);
                         $block['meta']['table'] = $table;
+                        if (trim((string) $table['text']) !== '') {
+                            $hasSeenTextBlock = true;
+                        }
                     }
                 }
 

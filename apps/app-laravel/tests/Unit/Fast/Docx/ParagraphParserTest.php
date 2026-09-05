@@ -81,14 +81,42 @@ class ParagraphParserTest extends TestCase
     public function test_extractFormatting_reads_font_size_from_w_sz(): void
     {
         [, , $paragraph] = $this->loadWordFragment(
-            '<w:r><w:rPr><w:sz w:val="28"/></w:rPr><w:t>ข้อความ</w:t></w:r>',
+            '<w:r><w:rPr><w:sz w:val="32"/></w:rPr><w:t>ข้อความ</w:t></w:r>',
         );
 
         $parser = new ParagraphParser;
         $parsed = $parser->parse($paragraph, 1, new NumberingResolver(null));
 
         $this->assertNotNull($parsed);
-        $this->assertSame(14.0, $parsed['formatting']['font_size_pt']);
+        $this->assertSame(16.0, $parsed['formatting']['font_size_pt']);
+    }
+
+    public function test_defaults_missing_line_spacing_to_single(): void
+    {
+        [, , $paragraph] = $this->loadWordFragment(
+            '<w:pPr />'
+            .'<w:r><w:t>ข้อความ</w:t></w:r>',
+        );
+
+        $parser = new ParagraphParser;
+        $parsed = $parser->parse($paragraph, 1, new NumberingResolver(null));
+
+        $this->assertNotNull($parsed);
+        $this->assertSame(240, $parsed['layout']['line_spacing']);
+    }
+
+    public function test_preserves_explicit_word_line_spacing(): void
+    {
+        [, , $paragraph] = $this->loadWordFragment(
+            '<w:pPr><w:spacing w:line="360" /></w:pPr>'
+            .'<w:r><w:t>ข้อความ</w:t></w:r>',
+        );
+
+        $parser = new ParagraphParser;
+        $parsed = $parser->parse($paragraph, 1, new NumberingResolver(null));
+
+        $this->assertNotNull($parsed);
+        $this->assertSame(360, $parsed['layout']['line_spacing']);
     }
 
     public function test_extractFormatting_ignores_non_numeric_w_sz_val(): void

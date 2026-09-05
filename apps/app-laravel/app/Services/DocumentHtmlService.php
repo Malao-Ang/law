@@ -90,20 +90,27 @@ class DocumentHtmlService
             $imgMeta = is_array($block['meta']['image'] ?? null) ? $block['meta']['image'] : null;
             $srcUrl = trim((string) ($imgMeta['src_url'] ?? $imgMeta['data_uri'] ?? $block['meta']['image_path'] ?? ''));
             $caption = trim((string) ($imgMeta['caption'] ?? ''));
-            $displayWidth = isset($imgMeta['display_width_px']) ? (int) $imgMeta['display_width_px'] : 0;
             if ($srcUrl !== '') {
-                $rawAlign = $block['meta']['layout']['alignment'] ?? null;
+                $rawAlign = $imgMeta['alignment'] ?? $block['meta']['layout']['alignment'] ?? null;
                 $alignment = in_array($rawAlign, ['left', 'center', 'right', 'justify'], true) ? $rawAlign : 'center';
-                $imgStyle = $displayWidth > 0
-                    ? sprintf('width:%dpx;height:auto;', $displayWidth)
-                    : 'max-width:100%;height:auto;';
+                if (($imgMeta['is_logo'] ?? false) === true) {
+                    $alignment = 'center';
+                }
+
+                $figureStyles = ['text-align:'.$alignment, 'margin:1rem 0'];
+                $spacingAfter = $imgMeta['spacing_after_line_height'] ?? null;
+                if (is_numeric($spacingAfter) && (float) $spacingAfter > 0) {
+                    $figureStyles[] = 'margin-bottom:'.number_format((float) $spacingAfter, 1, '.', '').'em';
+                }
+
+                $imgStyle = $this->imageStyleAttribute($imgMeta);
 
                 return sprintf(
-                    '<figure data-block-id="%s" class="doc-image" style="text-align:%s;margin:1rem 0;">'.
+                    '<figure data-block-id="%s" class="doc-image" style="%s;">'.
                     '<img src="%s" alt="%s" data-block-id="%s" data-page-no="%d" style="%s"/>'.
                     '%s</figure>',
                     e($blockId),
-                    e($alignment),
+                    e(implode(';', $figureStyles)),
                     e($srcUrl),
                     e($caption ?: 'embedded image'),
                     e($blockId),
@@ -549,7 +556,7 @@ class DocumentHtmlService
 
         // Line spacing (Word uses 240 = single line, 480 = double, etc.)
         if (is_numeric($lineSpacing) && $lineSpacing > 0) {
-            $lineHeight = (float) $lineSpacing / 240.0;
+            $lineHeight = max(1.0, min((float) $lineSpacing / 240.0, 2.0));
             $styles[] = 'line-height:'.number_format($lineHeight, 2);
         }
 
@@ -564,6 +571,27 @@ class DocumentHtmlService
         }
 
         return (int) round((float) $position);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $imgMeta
+     */
+    private function imageStyleAttribute(?array $imgMeta): string
+    {
+        $imgMeta ??= [];
+        foreach (['display_width_cm', 'docx_width_cm'] as $key) {
+            $width = $imgMeta[$key] ?? null;
+            if (is_numeric($width) && (float) $width > 0) {
+                return 'width:'.number_format((float) $width, 2, '.', '').'cm;height:auto;max-width:100%;';
+            }
+        }
+
+        $displayWidth = isset($imgMeta['display_width_px']) ? (int) $imgMeta['display_width_px'] : 0;
+        if ($displayWidth > 0) {
+            return sprintf('width:%dpx;height:auto;', $displayWidth);
+        }
+
+        return 'max-width:100%;height:auto;';
     }
 
     private function renderTextWithLayout(string $text, array $layout): string

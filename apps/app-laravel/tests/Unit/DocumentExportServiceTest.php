@@ -5,6 +5,8 @@ namespace Tests\Unit;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
+use App\Services\ReviewStore;
+use App\Services\Storage\MongoBlobStore;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ZipArchive;
@@ -34,7 +36,11 @@ class DocumentExportServiceTest extends TestCase
 
     private function makeService(?LibreOfficeConverter $converter = null): DocumentExportService
     {
-        return new DocumentExportService(new DocumentHtmlService(), $converter ?? new LibreOfficeConverter());
+        $html = new DocumentHtmlService();
+        $blob = $this->createStub(MongoBlobStore::class);
+        $store = new ReviewStore($html, $blob, sys_get_temp_dir().'/doc-export-'.uniqid('', true));
+
+        return new DocumentExportService($html, $converter ?? new LibreOfficeConverter(), $store);
     }
 
     /**
@@ -351,7 +357,7 @@ class DocumentExportServiceTest extends TestCase
         $this->assertStringContainsString('TH Sarabun New', $documentXml);
     }
 
-    public function test_docx_expands_rowspan_tables_for_page_safe_pdf_export(): void
+    public function test_docx_expands_rowspan_tables_for_page_safe_pdf_export_duplicate_fixture(): void
     {
         $document = [
             'pages' => [[
@@ -584,8 +590,34 @@ class DocumentExportServiceTest extends TestCase
 
         $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
 
-        $this->assertStringContainsString('w:line="444"', $xml);   // 1.85 × 240
+        $this->assertStringContainsString('w:line="240"', $xml);   // 1.0 × 240
         $this->assertStringContainsString('w:lineRule="auto"', $xml);
+    }
+
+    public function test_docx_line_spacing_clamps_low_values_and_preserves_one_point_five(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    [
+                        'block_id' => 'b1', 'type' => 'paragraph', 'reading_order' => 1,
+                        'approved_text' => 'ก', 'normalized_text' => 'ก',
+                        'meta' => ['reviewed_html' => '<p>ก</p>', 'layout' => ['line_spacing' => 120]],
+                    ],
+                    [
+                        'block_id' => 'b2', 'type' => 'paragraph', 'reading_order' => 2,
+                        'approved_text' => 'ข', 'normalized_text' => 'ข',
+                        'meta' => ['reviewed_html' => '<p>ข</p>', 'layout' => ['line_spacing' => 360]],
+                    ],
+                ],
+            ]],
+        ];
+
+        $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('w:line="240"', $xml);
+        $this->assertStringContainsString('w:line="360"', $xml);
     }
 
     public function test_user_line_height_from_draft_html_is_honored(): void
@@ -626,9 +658,9 @@ class DocumentExportServiceTest extends TestCase
 
         $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
 
-        // Four paragraphs (2 text + 2 blank), each carrying the 1.85 line box so
+        // Four paragraphs (2 text + 2 blank), each carrying the default line box so
         // LibreOffice cannot collapse the blanks.
-        $this->assertSame(4, substr_count($xml, 'w:line="444"'));
+        $this->assertSame(4, substr_count($xml, 'w:line="240"'));
         // Every paragraph — including the two blanks — carries a preserved-whitespace
         // text run so the blank lines hold their height. Assert the invariant, not
         // the exact filler character (it has churned between ZWSP and space).
@@ -656,6 +688,35 @@ class DocumentExportServiceTest extends TestCase
         $html = $method->invoke($this->makeService(), $block);
 
         $this->assertStringContainsString('font-size: 14pt', $html);
+    }
+
+    public function test_docx_uses_logo_display_width_cm_and_spacing(): void
+    {
+        $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'img1',
+                    'type' => 'image',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'image' => [
+                            'data_uri' => $png,
+                            'is_logo' => true,
+                            'display_width_cm' => 2.99,
+                            'spacing_after_line_height' => 1.5,
+                        ],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringContainsString('wp:extent cx="1076400"', $xml);
+        $this->assertStringContainsString('w:jc w:val="center"', $xml);
+        $this->assertStringContainsString('w:line="360"', $xml);
     }
 
     public function test_to_pdf_renders_docx_via_libreoffice(): void
