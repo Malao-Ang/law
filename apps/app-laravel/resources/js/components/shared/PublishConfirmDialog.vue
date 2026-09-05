@@ -114,65 +114,69 @@ const checklist = computed<ChecklistItem[]>(() => {
   const workflowCompletedStep = currentStatus?.workflow_completed_step ?? null;
   const ragStatus = currentStatus?.status ?? '';
 
-  const items: ChecklistItem[] = [
-    {
-      key: 'metadata',
-      label: 'METADATA ครบ (title + law_type + date)',
-      ok: !!(currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)),
-      status: currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)
-        ? 'ครบถ้วน'
-        : 'ยังขาดข้อมูลจำเป็น',
-      level: 'required',
-    },
-  ];
+  const items: ChecklistItem[] = [];
 
+  // === เอกสารภายใน: 5 gates ตามลำดับ ===
   if (!isOldDoc.value) {
-    const blockCount = documentStore.review?.summary.block_count ?? 0;
+    // 1. e-Sign ต้องลงนามสำเร็จ (required)
     items.push({
-      key: 'structure',
-      label: 'โครงสร้างเนื้อหา (block_count > 0)',
-      ok: blockCount > 0,
-      status: blockCount > 0 ? `${blockCount} บล็อก` : 'ยังไม่มีโครงสร้างเนื้อหา',
+      key: 'esign',
+      label: 'ผ่านการลงนาม e-Sign',
+      ok: !!currentStatus?.esign_confirmed_at,
+      status: currentStatus?.esign_confirmed_at ? 'ยืนยันแล้ว' : 'ยังไม่ผ่าน e-Sign',
       level: 'required',
     });
 
-    const ragOk = ragStatus === 'exported' || ragStatus === 'ingested' || (workflowCompletedStep ?? 0) >= 2;
+    // 2. RAG ต้องจัดลำดับ (required)
+    const ragOk = (ragStatus === 'exported' || ragStatus === 'ingested' || (workflowCompletedStep ?? 0) >= 3) && !currentStatus?.rag_skipped;
     items.push({
       key: 'rag',
       label: 'จัดลำดับ RAG',
       ok: ragOk,
-      status: ragOk ? 'พร้อมใช้งาน' : 'ข้ามขั้นตอน',
-      level: 'optional',
+      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน — ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับ'),
+      level: 'required',
     });
   }
 
+  // 3. กำหนดสิทธิ์ (required)
+  items.push({
+    key: 'access_scope',
+    label: 'กำหนดสิทธิ์การเข้าถึง',
+    ok: !!currentMeta?.access_scope,
+    status: currentMeta?.access_scope ? currentMeta.access_scope : 'ยังไม่ได้กำหนด',
+    level: 'required',
+  });
+
+  // 4. ความสัมพันธ์กฎหมาย (optional)
   const relationCount = documentStore.review?.relations?.length ?? 0;
-  items.push(
-    {
-      key: 'relations',
-      label: 'ความสัมพันธ์กฎหมาย',
-      ok: relationCount > 0,
-      status: relationCount > 0 ? `${relationCount} รายการ` : 'ยังไม่มี',
-      level: 'optional',
-    },
-    {
-      key: 'access_scope',
-      label: 'กำหนดสิทธิ์',
-      ok: !!currentMeta?.access_scope,
-      status: currentMeta?.access_scope ? currentMeta.access_scope : 'ยังไม่ได้กำหนด',
-      level: 'optional',
-    },
-  );
+  items.push({
+    key: 'relations',
+    label: 'ความสัมพันธ์กฎหมาย',
+    ok: relationCount > 0,
+    status: relationCount > 0 ? `${relationCount} รายการ` : 'ยังไม่มี',
+    level: 'optional',
+  });
 
-  if (!isOldDoc.value) {
-    items.push({
-      key: 'esign',
-      label: 'ผ่าน e-Sign',
-      ok: !!currentStatus?.esign_confirmed_at,
-      status: currentStatus?.esign_confirmed_at ? 'ยืนยันแล้ว' : 'ยังไม่ผ่าน e-Sign',
-      level: 'optional',
-    });
-  }
+  // 5. สถานะบังคับใช้ (required — ต้องไม่เป็น "ร่าง")
+  const statusOk = !!currentMeta?.status && currentMeta.status !== 'ร่าง';
+  items.push({
+    key: 'status',
+    label: 'สถานะการบังคับใช้',
+    ok: statusOk,
+    status: statusOk ? currentMeta!.status : 'ยังเป็นร่าง',
+    level: 'required',
+  });
+
+  // Metadata ครบ (required ทั้ง old + new)
+  items.push({
+    key: 'metadata',
+    label: 'ข้อมูลกฎหมายครบ (ชื่อ + ประเภท + วันที่)',
+    ok: !!(currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)),
+    status: currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)
+      ? 'ครบถ้วน'
+      : 'ยังขาดข้อมูลจำเป็น',
+    level: 'required',
+  });
 
   return items;
 });
