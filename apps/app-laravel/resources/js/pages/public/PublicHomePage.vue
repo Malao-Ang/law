@@ -23,7 +23,7 @@
             <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
               <v-icon icon="mdi-chevron-left" />
             </button>
-            <div class="elaw-carousel__track" ref="latestTrack">
+            <div class="elaw-carousel__track" ref="latestTrack" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
                 v-for="doc in latestDocs.slice(0, 10)"
                 :key="doc._id"
@@ -192,6 +192,11 @@ function scrollCarousel(event: Event, direction: number): void {
   if (!track) return;
   const cardWidth = 340;
   track.scrollBy({ left: direction * cardWidth * 3, behavior: 'smooth' });
+}
+
+function handleWheelScroll(event: WheelEvent): void {
+  const track = (event.currentTarget as HTMLElement);
+  track.scrollLeft += event.deltaY * 2;
 }
 
 const router = useRouter();
