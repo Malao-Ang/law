@@ -392,7 +392,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { documentFileDownloadUrl, downloadPdfExport, fetchReportSummary, fetchReview } from '../../api/client';
+import { documentFileDownloadUrl, downloadPdfExport, fetchReportSummary, fetchReview, relatedDocumentsZipUrl } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
 import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
@@ -628,6 +628,10 @@ function safePdfName(title: string): string {
   return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.pdf`;
 }
 
+function safeZipName(title: string): string {
+  return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.zip`;
+}
+
 async function downloadRowPdf(row: ShowRelRow): Promise<void> {
   const fileName = safePdfName(row.title || row.id);
   if (row.documentType === 'old') {
@@ -657,12 +661,12 @@ async function downloadAll(): Promise<void> {
   if (!selectedRow.value || downloadAllLoading.value) return;
   downloadAllLoading.value = true;
   try {
-    await downloadRowPdf(selectedRow.value);
-    const relatedRows = flattenTree(filteredRootNode.value).map((node) => node.row);
-    for (const row of relatedRows) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await downloadRowPdf(row);
-    }
+    const anchor = document.createElement('a');
+    anchor.href = relatedDocumentsZipUrl(selectedRow.value.id);
+    anchor.download = safeZipName(`${selectedRow.value.title || selectedRow.value.id}-เอกสารที่เกี่ยวข้อง`);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   } finally {
     downloadAllLoading.value = false;
   }

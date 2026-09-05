@@ -101,6 +101,15 @@ class ReviewStore
             return false;
         }
 
+        $activeChildren = $this->activeChildLaws($documentId);
+        if ($activeChildren !== []) {
+            throw new RuntimeException(
+                'ไม่สามารถลบกฎหมายแม่ได้ เนื่องจากมีกฎหมายลูกที่ยังมีผลบังคับใช้ '
+                .count($activeChildren)
+                .' ฉบับ',
+            );
+        }
+
         if (is_array($status) && isset($status['source_path'])) {
             $this->deletePath($this->absolutePath((string) $status['source_path']));
         }
@@ -266,6 +275,203 @@ class ReviewStore
 
             return $rows;
         });
+    }
+
+    /**
+     * @return list<array{document_id: string, title: string, meta_status: string, published_date: string, law_type: string}>
+     */
+    public function activeChildLaws(string $parentDocumentId): array
+    {
+        $children = [];
+
+        foreach ($this->listLawMeta() as $row) {
+            $documentId = (string) ($row['document_id'] ?? '');
+            if ($documentId === '' || $documentId === $parentDocumentId) {
+                continue;
+            }
+
+            if (! $this->isChildLawRow($row, $parentDocumentId)) {
+                continue;
+            }
+
+            $review = $this->blob->read('review', $documentId);
+            $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+            $rawMetaStatus = array_key_exists('status', $meta) ? (string) $meta['status'] : null;
+            $metaStatus = (string) ($row['meta_status'] ?? '');
+            $publishedDate = (string) ($row['published_date'] ?? '');
+            $workflowStatus = (string) ($row['status'] ?? '');
+            if (! $this->isActiveLawMetaStatus($rawMetaStatus ?? $metaStatus)) {
+                continue;
+            }
+            if ($publishedDate === '' && ! in_array(strtolower($workflowStatus), ['done', 'published', 'ingested'], true)) {
+                continue;
+            }
+
+            $children[] = [
+                'document_id' => $documentId,
+                'title' => (string) ($row['title'] ?? $documentId),
+                'meta_status' => $metaStatus,
+                'published_date' => $publishedDate,
+                'law_type' => (string) ($row['law_type'] ?? ''),
+            ];
+        }
+
+        return $children;
+    }
+
+    public function isActiveLawMetaStatus(?string $status): bool
+    {
+        $normalized = mb_strtolower(trim((string) $status), 'UTF-8');
+        if ($normalized === '') {
+            return true;
+        }
+
+        foreach (['ยกเลิก', 'สิ้นผล', 'หมดอายุ', 'repeal', 'cancel', 'expired'] as $inactive) {
+            if (str_contains($normalized, $inactive)) {
+                return false;
+            }
+        }
+
+        return in_array($normalized, ['มีผลบังคับใช้', 'ใช้งาน', 'active', 'published'], true)
+            || str_contains($normalized, 'เผยแพร่');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function relatedDocumentIdsForDownload(string $documentId): array
+    {
+        $rows = $this->listLawMeta();
+        $byId = [];
+        $childrenByParent = [];
+
+        foreach ($rows as $row) {
+            $id = (string) ($row['document_id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+
+            $byId[$id] = true;
+            foreach (LawMetaNormalizer::parentDocumentIds([
+                'parent_document_id' => $row['parent_document_id'] ?? null,
+                'parent_document_ids' => $row['parent_document_ids'] ?? [],
+            ]) as $parentId) {
+                $childrenByParent[$parentId][] = $id;
+            }
+        }
+
+        if (! isset($byId[$documentId]) && $this->blob->read('review', $documentId) === null) {
+            return [];
+        }
+
+        $ids = [];
+        $seen = [];
+        $queue = [$documentId];
+        $relationTypes = ['issued_under', 'amends', 'supersedes', 'repeals', 'references', 'related'];
+
+        while ($queue !== []) {
+            $currentId = array_shift($queue);
+            if (isset($seen[$currentId])) {
+                continue;
+            }
+            $seen[$currentId] = true;
+            $ids[] = $currentId;
+
+            foreach ($childrenByParent[$currentId] ?? [] as $childId) {
+                if (! isset($seen[$childId])) {
+                    $queue[] = $childId;
+                }
+            }
+
+            $review = $this->blob->read('review', $currentId);
+            foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $rel) {
+                if (! is_array($rel) || ($rel['scope'] ?? 'document') !== 'document') {
+                    continue;
+                }
+                $type = (string) ($rel['type'] ?? '');
+                if (! in_array($type, $relationTypes, true)) {
+                    continue;
+                }
+                $targetId = trim((string) ($rel['target_document_id'] ?? ''));
+                if ($targetId !== '' && ! isset($seen[$targetId])) {
+                    $queue[] = $targetId;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @return array{path: string, title: string, extension: string}|null
+     */
+    public function downloadableFileForDocument(string $documentId): ?array
+    {
+        $status = $this->blob->read('status', $documentId);
+        if (! is_array($status)) {
+            return null;
+        }
+
+        $relative = trim((string) ($status['source_path'] ?? ''));
+        if ($relative === '') {
+            return null;
+        }
+
+        $path = $this->absolutePath($relative);
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $title = '';
+        $review = $this->blob->read('review', $documentId);
+        if (is_array($review)) {
+            $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+            $title = trim((string) ($meta['title'] ?? ''));
+        }
+        if ($title === '') {
+            $title = pathinfo((string) ($status['source_file'] ?? $relative), PATHINFO_FILENAME) ?: $documentId;
+        }
+
+        return [
+            'path' => $path,
+            'title' => $title,
+            'extension' => strtolower(pathinfo($relative, PATHINFO_EXTENSION) ?: 'bin'),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function isChildLawRow(array $row, string $parentDocumentId): bool
+    {
+        $parentIds = LawMetaNormalizer::parentDocumentIds([
+            'parent_document_id' => $row['parent_document_id'] ?? null,
+            'parent_document_ids' => $row['parent_document_ids'] ?? [],
+        ]);
+        if (in_array($parentDocumentId, $parentIds, true)) {
+            return true;
+        }
+
+        $documentId = (string) ($row['document_id'] ?? '');
+        if ($documentId === '') {
+            return false;
+        }
+
+        $review = $this->blob->read('review', $documentId);
+        $relationTypes = ['issued_under', 'amends', 'supersedes', 'repeals', 'references'];
+        foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $rel) {
+            if (! is_array($rel) || ($rel['scope'] ?? 'document') !== 'document') {
+                continue;
+            }
+            if (! in_array((string) ($rel['type'] ?? ''), $relationTypes, true)) {
+                continue;
+            }
+            if (trim((string) ($rel['target_document_id'] ?? '')) === $parentDocumentId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

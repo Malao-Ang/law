@@ -113,6 +113,22 @@ export function relatedDocumentFileUrl(documentId: string, targetDocumentId: str
   return `/api/documents/${encodeURIComponent(documentId)}/related/${encodeURIComponent(targetDocumentId)}/file?download=1`;
 }
 
+export interface ActiveChildLaw {
+  document_id: string;
+  title: string;
+  meta_status?: string | null;
+  published_date?: string | null;
+  law_type?: string | null;
+}
+
+export function fetchActiveChildren(documentId: string): Promise<{ document_id: string; count: number; children: ActiveChildLaw[] }> {
+  return jsonRequest(`/api/documents/${encodeURIComponent(documentId)}/active-children`);
+}
+
+export function relatedDocumentsZipUrl(documentId: string): string {
+  return `/api/documents/${encodeURIComponent(documentId)}/related-download.zip`;
+}
+
 export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {
   return jsonRequest<{ documents: DocumentListItem[] }>('/api/documents');
 }

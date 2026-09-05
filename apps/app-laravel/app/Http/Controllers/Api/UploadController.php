@@ -8,6 +8,7 @@ use App\Jobs\ExtractDocumentJob;
 use App\Services\Buu\MinioUploadService;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
+use RuntimeException;
 
 class UploadController extends Controller
 {
@@ -102,10 +103,14 @@ class UploadController extends Controller
 
     public function destroy(string $documentId): JsonResponse
     {
-        if (! $this->reviewStore->deleteDocument($documentId)) {
-            return response()->json([
-                'message' => 'Document not found.',
-            ], 404);
+        try {
+            if (! $this->reviewStore->deleteDocument($documentId)) {
+                return response()->json([
+                    'message' => 'Document not found.',
+                ], 404);
+            }
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
         }
 
         return response()->json([

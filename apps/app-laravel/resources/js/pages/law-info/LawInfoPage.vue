@@ -287,7 +287,8 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
 import { useRoute, useRouter } from 'vue-router';
-import type { SelectableOption } from '../../api/client';
+import Swal from 'sweetalert2';
+import { fetchActiveChildren, type SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
@@ -628,6 +629,44 @@ function focusFirstError(errors: { id: string | number; errorMessages: string[] 
   requestAnimationFrame(() => el.focus());
 }
 
+function isRepealOrCancelStatus(value: unknown): boolean {
+  return typeof value === 'string' && value.includes('ยกเลิก');
+}
+
+function escapeHtml(value: string): string {
+  const div = document.createElement('div');
+  div.textContent = value;
+
+  return div.innerHTML;
+}
+
+async function confirmSaveWithActiveChildren(payload: LawMeta): Promise<boolean> {
+  if (!isRepealOrCancelStatus(payload.status) && !isRepealOrCancelStatus(payload.change_status)) {
+    return true;
+  }
+
+  const response = await fetchActiveChildren(props.documentId);
+  if (response.count === 0) {
+    return true;
+  }
+
+  const childTitles = response.children
+    .slice(0, 5)
+    .map((child) => `<li>${escapeHtml(child.title || child.document_id)}</li>`)
+    .join('');
+  const remaining = response.count > 5 ? `<p>และอีก ${response.count - 5} ฉบับ</p>` : '';
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: 'มีกฎหมายลูกที่ยังมีผลบังคับใช้',
+    html: `<p>พบกฎหมายลูกที่ยังมีผลบังคับใช้ ${response.count} ฉบับ</p><ul style="text-align:left">${childTitles}</ul>${remaining}`,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึกต่อ',
+    cancelButtonText: 'กลับไปตรวจสอบ',
+  });
+
+  return result.isConfirmed;
+}
+
 async function saveAndNext(): Promise<void> {
   const result = await formRef.value?.validate();
   if (!result?.valid) {
@@ -638,6 +677,7 @@ async function saveAndNext(): Promise<void> {
   }
   validationFailed.value = false;
   const payload = buildLawMetaPayload();
+  if (!await confirmSaveWithActiveChildren(payload)) return;
   const saved = await documentStore.saveLawMeta(payload);
   if (!saved) return;
   form.value = { ...form.value, ...payload };

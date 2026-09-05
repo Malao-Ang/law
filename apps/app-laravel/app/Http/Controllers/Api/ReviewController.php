@@ -55,6 +55,17 @@ class ReviewController extends Controller
         return response()->json($chain);
     }
 
+    public function activeChildren(string $documentId): JsonResponse
+    {
+        $children = $this->reviewStore->activeChildLaws($documentId);
+
+        return response()->json([
+            'document_id' => $documentId,
+            'count' => count($children),
+            'children' => $children,
+        ]);
+    }
+
     /**
      * Tag the response with a content ETag and force revalidation. The browser then
      * sends If-None-Match on reload / new tab; if the document is unchanged we return
