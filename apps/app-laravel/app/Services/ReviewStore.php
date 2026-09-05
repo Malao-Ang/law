@@ -168,6 +168,8 @@ class ReviewStore
                 'document_type' => $meta['document_type'] ?? 'new',
                 'source' => $meta['source'] ?? '',
                 'law_type' => $lawType,
+                'law_status' => (string) ($meta['status'] ?? ''),
+                'published_date' => (string) ($meta['published_date'] ?? ''),
                 'change_status' => $changeStatus === '' ? null : $changeStatus,
                 'parent_document_id' => $parentDocumentId,
                 'parent_document_ids' => $parentDocumentIds,
@@ -1745,7 +1747,7 @@ class ReviewStore
         $document['law_meta'] = array_merge([
             'document_type' => 'new',
             'source' => '',
-            'status' => '',
+            'status' => 'ร่าง',
             'law_type' => '',
             'law_group' => '',
             'change_status' => null,

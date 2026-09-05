@@ -8,6 +8,10 @@ class LawMetaNormalizer
     {
         $status = trim((string) $value);
 
+        if ($status === '') {
+            return 'ร่าง';
+        }
+
         return $status === 'ยกเลิก' ? 'ยกเลิกการใช้งาน' : $status;
     }
 
