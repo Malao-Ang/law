@@ -385,21 +385,24 @@ const actions = computed(() => {
     to: `/documents/${props.documentId}/permissions`,
   });
 
-  list.push({
-    key: 'preview',
-    icon: 'mdi-eye-outline',
-    title: 'ดูตัวอย่าง',
-    description: 'ตรวจรูปแบบเอกสารก่อนเข้าสู่ขั้นตอน e-Sign',
-    to: `/documents/${props.documentId}/esign/preview`,
-  });
+  // เอกสารเก่า (source=external) ไม่มี preview/esign
+  if (!isOldDoc.value) {
+    list.push({
+      key: 'preview',
+      icon: 'mdi-eye-outline',
+      title: 'ดูตัวอย่าง',
+      description: 'ตรวจรูปแบบเอกสารก่อนเข้าสู่ขั้นตอน e-Sign',
+      to: `/documents/${props.documentId}/esign/preview`,
+    });
 
-  list.push({
-    key: 'esign',
-    icon: 'mdi-send-outline',
-    title: 'ส่งลงนาม e-Sign',
-    description: 'เปิดหน้าลงนามอิเล็กทรอนิกส์และติดตามสถานะ',
-    to: `/documents/${props.documentId}/esign`,
-  });
+    list.push({
+      key: 'esign',
+      icon: 'mdi-send-outline',
+      title: 'ส่งลงนาม e-Sign',
+      description: 'เปิดหน้าลงนามอิเล็กทรอนิกส์และติดตามสถานะ',
+      to: `/documents/${props.documentId}/esign`,
+    });
+  }
 
   return list;
 });

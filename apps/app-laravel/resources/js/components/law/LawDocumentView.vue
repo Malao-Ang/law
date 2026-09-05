@@ -52,12 +52,12 @@
       </v-alert>
 
       <template v-else-if="documentStore.review">
-      <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
-        {{ pdfExportError }}
-      </v-alert>
+        <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
+          {{ pdfExportError }}
+        </v-alert>
 
-      <v-alert
-        v-else-if="documentStore.review && !isPublished"
+        <v-alert
+          v-else-if="documentStore.review && !isPublished"
         type="info"
         variant="tonal"
         density="compact"
@@ -265,6 +265,8 @@
         <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
+      </template>
+
       </template>
 
       <ELawFooter />

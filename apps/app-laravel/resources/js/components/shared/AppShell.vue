@@ -76,7 +76,15 @@
         :items="breadcrumbs"
         density="compact"
         class="app-shell__breadcrumbs pa-0"
-      />
+      >
+        <template #title="{ item, index }">
+          <v-tooltip :text="item.title" location="bottom" open-delay="400">
+            <template #activator="{ props: tip }">
+              <span v-bind="tip" class="app-shell__breadcrumb-text">{{ item.title }}</span>
+            </template>
+          </v-tooltip>
+        </template>
+      </v-breadcrumbs>
       <div class="app-shell__topbar-right">
         <slot name="actions" />
         <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
@@ -279,6 +287,16 @@ function isActive(item: NavItem): boolean {
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+.app-shell__breadcrumb-text {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  cursor: default;
 }
 
 .app-shell__topbar-right {

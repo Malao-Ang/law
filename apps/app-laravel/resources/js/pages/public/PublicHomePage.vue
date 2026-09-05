@@ -21,10 +21,11 @@
           </div>
           <v-row class="mt-2">
             <v-col
-              v-for="doc in latestDocs.slice(0, 3)"
+              v-for="doc in latestDocs.slice(0, 10)"
               :key="doc._id"
               cols="12"
               md="4"
+              class="d-flex"
             >
               <ELawLawCard
                 :title="doc.metadata.title"
@@ -36,6 +37,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                style="width: 100%"
                 @click="openLaw(doc)"
               />
             </v-col>
@@ -59,6 +61,7 @@
               :key="doc._id"
               cols="12"
               md="4"
+            class="d-flex"
             >
               <ELawLawCard
                 :title="doc.metadata.title"
@@ -70,6 +73,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                style="width: 100%"
                 @click="openLaw(doc)"
               />
             </v-col>
@@ -93,6 +97,7 @@
               :key="doc._id"
               cols="12"
               md="4"
+            class="d-flex"
             >
               <ELawLawCard
                 :title="doc.metadata.title"
@@ -104,6 +109,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                style="width: 100%"
                 @click="openLaw(doc)"
               />
             </v-col>
@@ -127,6 +133,7 @@
               :key="doc._id"
               cols="12"
               md="4"
+            class="d-flex"
             >
               <ELawLawCard
                 :title="doc.metadata.title"
@@ -139,6 +146,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                style="width: 100%"
                 @click="openLaw(doc)"
               />
             </v-col>
@@ -216,7 +224,7 @@ onMounted(async () => {
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
       .map(mapSearchResultToDocumentVersion);
 
-    latestDocs.value = databaseDocs.slice(0, 4);
+    latestDocs.value = databaseDocs.slice(0, 10);
     rabiapDocs.value = docsByType(databaseDocs, 'rabiap');
     khoBangkhabDocs.value = docsByType(databaseDocs, 'kho-bangkhab');
     prakatDocs.value = docsByType(databaseDocs, 'prakat');
