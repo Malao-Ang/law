@@ -61,18 +61,18 @@
           <span class="law-info-row__label text-medium-emphasis">วันหมดอายุ</span>
           <span class="law-info-row__value font-weight-semibold text-error">{{ formatLawDate(meta.expiry_date) }}</span>
         </div>
-        <div v-if="meta.parent_document_ids?.length" class="law-info-row py-1">
+        <div v-if="parentNames.length" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กฎหมายแม่</span>
           <div class="d-flex flex-wrap ga-1 justify-end">
             <v-chip
-              v-for="documentId in meta.parent_document_ids"
-              :key="documentId"
-              :to="`/law/${encodeURIComponent(documentId)}`"
+              v-for="parent in parentNames"
+              :key="parent.id"
+              :to="`/law/${encodeURIComponent(parent.id)}`"
               size="x-small"
               variant="tonal"
               color="primary"
             >
-              {{ documentId }}
+              {{ parent.title }}
             </v-chip>
           </div>
         </div>
@@ -145,7 +145,17 @@ import type { LawMeta } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 
-const props = defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
+const props = defineProps<{
+  meta: LawMeta;
+  articleCount: number;
+  articleUnitLabel?: string;
+  showCount?: boolean;
+  versions?: VersionChainItem[];
+  viewedDocumentId?: string;
+  parentNames?: Array<{ id: string; title: string }>;
+}>();
+
+const parentNames = computed(() => props.parentNames ?? []);
 
 const showChangeStatus = computed(() => {
   const changeStatus = props.meta.change_status?.trim();

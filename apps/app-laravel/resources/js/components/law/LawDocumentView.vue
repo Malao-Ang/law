@@ -267,7 +267,7 @@
             </div>
           </div>
         </section>
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" />
       </aside>
       </div>
       </template>
@@ -390,6 +390,15 @@ const parentLawRelation = computed(() =>
   relations.value.find((rel) => rel.type === 'issued_under' && rel.scope === 'document' && rel.target_document_id) ?? null,
 );
 
+const parentNames = computed<Array<{ id: string; title: string }>>(() => {
+  const ids = meta.value.parent_document_ids ?? [];
+  if (!ids.length) return [];
+  return ids.map((id) => {
+    const rel = relations.value.find((r) => r.target_document_id === id);
+    return { id, title: rel?.target_title || id };
+  });
+});
+
 const notCurrentVersion = computed(() =>
   versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
 );
@@ -480,6 +489,14 @@ async function downloadPdf(): Promise<void> {
     pdfExportError.value = error instanceof Error ? error.message : 'ดาวน์โหลดไม่สำเร็จ';
   } finally {
     exportingPdf.value = false;
+  }
+}
+
+function printPage(): void {
+  if (usesOriginalPdfLayout.value) {
+    window.open(fileUrl.value, '_blank');
+  } else {
+    window.print();
   }
 }
 
