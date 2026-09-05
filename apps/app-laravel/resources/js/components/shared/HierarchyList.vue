@@ -4,6 +4,14 @@
     <div class="h-row">
       <v-icon :icon="rowIcon" size="20" class="h-icon" :color="node.level === 0 ? themeColor : undefined" />
       <span class="h-title">{{ node.row.title }}</span>
+      <span v-if="node.row.rawDate" class="h-meta">
+        <v-icon icon="mdi-calendar-outline" size="12" />
+        {{ node.row.editedAt }}
+      </span>
+      <span v-if="node.row.org" class="h-meta">
+        <v-icon icon="mdi-office-building-outline" size="12" />
+        {{ node.row.org }}
+      </span>
       <v-chip v-if="node.level === 0" size="x-small" :color="themeColor" variant="tonal" class="h-chip">
         Root
       </v-chip>
@@ -138,6 +146,16 @@ const statusChipColor = computed(() =>
 
 .h-chip {
   flex-shrink: 0;
+}
+
+.h-meta {
+  align-items: center;
+  color: #64748b;
+  display: inline-flex;
+  flex-shrink: 1;
+  font-size: 12px;
+  gap: 3px;
+  min-width: 0;
 }
 
 .h-toggle {

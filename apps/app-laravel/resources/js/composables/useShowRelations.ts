@@ -40,6 +40,8 @@ export interface ShowRelRow {
   editedAt: string;
   rawDate: string;
   parentIds: string[];
+  documentType: string;
+  source: string;
 }
 
 export interface RelTreeNode {
@@ -151,6 +153,8 @@ export function mapShowRelRows(documents: ReportDocument[]): ShowRelRow[] {
       editedAt: formatThaiDate(doc.date) || '-',
       rawDate: doc.date ?? '',
       parentIds: parentIdsOf(doc),
+      documentType: doc.document_type ?? 'new',
+      source: doc.source ?? '',
     };
   });
 }

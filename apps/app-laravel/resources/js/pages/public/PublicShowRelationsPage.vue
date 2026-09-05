@@ -170,12 +170,13 @@
 
     <template v-else-if="selectedRow">
       <v-card flat border rounded="xl" class="rel-root pa-6 mb-4">
-        <div class="text-caption font-weight-bold text-medium-emphasis mb-2">กฎหมายที่เลือก (ROOT)</div>
+        <div class="d-flex align-center ga-2 mb-2">
+          <v-icon icon="mdi-scale-balance" size="20" color="primary" />
+          <span class="text-caption font-weight-bold text-medium-emphasis">กฎหมายหลัก</span>
+        </div>
         <div class="rel-root__title mb-3">{{ selectedRow.title }}</div>
         <div class="d-flex flex-wrap ga-2 mb-4">
-          <v-chip v-if="selectedRow.lawType" size="small" variant="tonal" color="grey" rounded="lg">
-            {{ selectedRow.lawType }}
-          </v-chip>
+          <DocBadge v-if="lawTypeBadge" :type="lawTypeBadge" />
           <v-chip v-if="selectedRow.isParent" size="small" variant="tonal" color="grey" rounded="lg">
             กฎหมายแม่
           </v-chip>
@@ -189,22 +190,46 @@
             {{ selectedRow.metaStatus || selectedRow.workflowStage }}
           </v-chip>
           <v-spacer />
+          <v-btn
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-download"
+            class="text-none"
+            :loading="downloadLoading === selectedRow.id"
+            @click="downloadSingle"
+          >
+            ดาวน์โหลด PDF
+          </v-btn>
+          <v-btn
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-download-multiple"
+            class="text-none"
+            :loading="downloadAllLoading"
+            @click="downloadAll"
+          >
+            ดาวน์โหลดทั้งหมด
+          </v-btn>
           <v-btn size="small" variant="text" class="text-none" prepend-icon="mdi-swap-horizontal" @click="pickerOpen = true">
             เปลี่ยนกฎหมาย
           </v-btn>
         </div>
         <div class="rel-root__meta">
           <div>
-            <div class="rel-root__meta-label">วันที่ประกาศ</div>
+            <div class="rel-root__meta-label"><v-icon icon="mdi-calendar-outline" size="14" /> วันที่ประกาศ</div>
             <div class="rel-root__meta-value">{{ displayLawDate(rootMeta?.promulgation_date) }}</div>
           </div>
           <div>
-            <div class="rel-root__meta-label">วันที่มีผลใช้บังคับ</div>
+            <div class="rel-root__meta-label"><v-icon icon="mdi-calendar-check-outline" size="14" /> วันที่มีผลใช้บังคับ</div>
             <div class="rel-root__meta-value">{{ displayLawDate(rootMeta?.effective_date) }}</div>
           </div>
           <div>
-            <div class="rel-root__meta-label">หน่วยงาน</div>
+            <div class="rel-root__meta-label"><v-icon icon="mdi-office-building-outline" size="14" /> หน่วยงาน</div>
             <div class="rel-root__meta-value">{{ selectedRow.org || '—' }}</div>
+          </div>
+          <div v-if="rootMeta?.law_group">
+            <div class="rel-root__meta-label"><v-icon icon="mdi-folder-outline" size="14" /> กลุ่มกฎหมาย</div>
+            <div class="rel-root__meta-value">{{ rootMeta.law_group }}</div>
           </div>
         </div>
       </v-card>
@@ -362,12 +387,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchReportSummary, fetchReview } from '../../api/client';
+import { documentFileDownloadUrl, downloadPdfExport, fetchReportSummary, fetchReview } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
+import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import RelationTreeView from '../../components/shared/RelationTreeView.vue';
 import HierarchyList from '../../components/shared/HierarchyList.vue';
+import { lawTypeToBadge, type LawTypeBadge } from '../../components/shared/lawBadge';
 import {
   RELATION_FILTERS,
   buildRelationTree,
@@ -396,6 +423,8 @@ const router = useRouter();
 
 const loading = ref(false);
 const detailLoading = ref(false);
+const downloadLoading = ref<string | null>(null);
+const downloadAllLoading = ref(false);
 const summary = ref<ReportSummary>({
   totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
   by_type: [],
@@ -427,6 +456,9 @@ const selectedId = computed(() => props.documentId || (typeof route.params.docum
 
 const rows = computed(() => mapShowRelRows(summary.value.documents));
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null);
+const lawTypeBadge = computed<LawTypeBadge | null>(() =>
+  selectedRow.value ? lawTypeToBadge(selectedRow.value.lawType) : null,
+);
 
 
 const statusOptions = [
@@ -587,6 +619,50 @@ function confirmPick(): void {
   openDetail(pickerId.value);
 }
 
+function safePdfName(title: string): string {
+  return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.pdf`;
+}
+
+async function downloadRowPdf(row: ShowRelRow): Promise<void> {
+  const fileName = safePdfName(row.title || row.id);
+  if (row.documentType === 'old') {
+    const anchor = document.createElement('a');
+    anchor.href = documentFileDownloadUrl(row.id);
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    return;
+  }
+
+  await downloadPdfExport(row.id, fileName);
+}
+
+async function downloadSingle(): Promise<void> {
+  if (!selectedRow.value || downloadLoading.value) return;
+  downloadLoading.value = selectedRow.value.id;
+  try {
+    await downloadRowPdf(selectedRow.value);
+  } finally {
+    downloadLoading.value = null;
+  }
+}
+
+async function downloadAll(): Promise<void> {
+  if (!selectedRow.value || downloadAllLoading.value) return;
+  downloadAllLoading.value = true;
+  try {
+    await downloadRowPdf(selectedRow.value);
+    const relatedRows = flattenTree(filteredRootNode.value).map((node) => node.row);
+    for (const row of relatedRows) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await downloadRowPdf(row);
+    }
+  } finally {
+    downloadAllLoading.value = false;
+  }
+}
+
 async function loadDetail(id: string): Promise<void> {
   detailLoading.value = true;
   try {
@@ -661,23 +737,28 @@ watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () =>
 
 .rel-root__meta {
   background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   padding: 16px 20px;
 }
 
 .rel-root__meta-label {
+  align-items: center;
   color: #64748b;
+  display: flex;
   font-size: 12px;
+  font-weight: 600;
+  gap: 4px;
   margin-bottom: 4px;
 }
 
 .rel-root__meta-value {
-  color: #0f172a;
+  color: #1e293b;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .rel-stats {

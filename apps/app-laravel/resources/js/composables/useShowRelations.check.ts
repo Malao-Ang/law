@@ -37,6 +37,8 @@ function row(over: Partial<ShowRelRow> & Pick<ShowRelRow, 'id' | 'title'>): Show
     editedAt: '-',
     rawDate: '2024-01-01',
     parentIds: [],
+    documentType: 'new',
+    source: '',
     ...over,
   };
 }

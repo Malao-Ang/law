@@ -6,13 +6,7 @@
       <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
         <div class="rel-tree__card" :class="{ 'is-current': isCurrent }">
           <div class="d-flex align-center ga-2 mb-2">
-            <v-chip
-              v-if="node.row.lawType"
-              size="x-small"
-              variant="tonal"
-              color="grey"
-              class="font-weight-bold"
-            >{{ node.row.typeShort }}</v-chip>
+            <DocBadge v-if="typeBadge" :type="typeBadge" />
             <v-chip
               v-if="versionLabel"
               size="x-small"
@@ -25,6 +19,10 @@
             </v-chip>
           </div>
           <div class="rel-tree__title">{{ node.row.title }}</div>
+          <div class="rel-tree__meta">
+            <span v-if="node.row.rawDate"><v-icon icon="mdi-calendar-outline" size="12" /> {{ node.row.editedAt }}</span>
+            <span v-if="node.row.org"><v-icon icon="mdi-office-building-outline" size="12" /> {{ node.row.org }}</span>
+          </div>
           <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
             สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
           </div>
@@ -74,6 +72,8 @@
 import { computed, ref } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
 import { sameLevelVersionLabel, type RelTreeNode } from '../../composables/useShowRelations';
+import DocBadge from './DocBadge.vue';
+import { lawTypeToBadge } from './lawBadge';
 import SameLevelInlineChain from './SameLevelInlineChain.vue';
 
 defineOptions({ name: 'RelationTreeView' });
@@ -102,6 +102,7 @@ const peers = computed(() =>
 const versionLabel = computed(() =>
   sameLevelVersionLabel(versionChain.value, props.node.row.id),
 );
+const typeBadge = computed(() => lawTypeToBadge(props.node.row.lawType));
 
 const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
 
@@ -177,6 +178,22 @@ function statusClass(status: string): string {
   font-weight: 700;
   line-height: 1.45;
   color: #1e293b;
+}
+
+.rel-tree__meta {
+  color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rel-tree__meta span {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+  min-width: 0;
 }
 
 .rel-tree__toggle {
