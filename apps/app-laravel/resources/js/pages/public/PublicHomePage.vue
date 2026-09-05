@@ -16,16 +16,6 @@
               <p class="elaw-section-heading__sub">รวบรวมกฎหมายภายนอก ระเบียบ ข้อบังคับ และประกาศต่าง ๆ ที่มีการเปลี่ยนแปลงล่าสุด</p>
             </div>
             <div class="elaw-section-header__right">
-              <div class="elaw-filter-tabs">
-                <button
-                  v-for="tab in updateTabs"
-                  :key="tab.label"
-                  type="button"
-                  class="elaw-filter-tab"
-                  :class="{ 'elaw-filter-tab--active': activeUpdateTab === tab.label }"
-                  @click="activeUpdateTab = tab.label"
-                >{{ tab.label }}</button>
-              </div>
               <a class="elaw-section-link" @click.prevent="goToDatabase()">ดูทั้งหมด →</a>
             </div>
           </div>
@@ -156,9 +146,7 @@
         </section>
       </div>
 
-      <footer class="elaw-footer">
-        <p>© 2567 ระบบฐานข้อมูลกฎหมาย — มหาวิทยาลัยบูรพา</p>
-      </footer>
+      <ELawFooter />
     </v-main>
   </div>
 </template>
@@ -167,6 +155,7 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { searchLaws } from '../../api/client';
+import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawHeroSearch from '../../components/shared/ELawHeroSearch.vue';
 import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
@@ -180,13 +169,6 @@ import { canDisplayLawResult } from '../../utils/lawAccess';
 function toDocType(t: DocumentType): DocType {
   return t;
 }
-
-const activeUpdateTab = ref('ทั้งหมด');
-const updateTabs = [
-  { label: 'ล่าสุด' },
-  { label: 'ยอดนิยม' },
-  { label: 'ทั้งหมด' },
-];
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -396,7 +378,7 @@ function toDate(value?: string | null): Date | undefined {
   width: 4px;
   height: 40px;
   border-radius: 2px;
-  background: rgb(var(--v-theme-primary));
+  background: #b68d40;
   flex-shrink: 0;
 }
 
@@ -415,54 +397,19 @@ function toDate(value?: string | null): Date | undefined {
 
 .elaw-section-heading__sub {
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  font-size: 16px;
+  font-size: 14px;
   color: #64748b;
   margin: 0;
   padding-left: 14px;
 }
 
-/* Filter tabs (ล่าสุด / ยอดนิยม / ทั้งหมด) */
-.elaw-filter-tabs {
-  display: flex;
-  gap: 8px;
-}
-
-.elaw-filter-tab {
-  padding: 4px 16px;
-  border: 1px solid #d2c5b3;
-  border-radius: 9999px;
-  background: #ffffff;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  color: #3c2900;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.elaw-filter-tab--active {
-  background: #b68d40;
-  border-color: #b68d40;
-  color: #ffffff;
-}
-
 .elaw-section-link {
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  font-size: 16px;
-  color: rgb(var(--v-theme-primary));
+  font-size: 14px;
+  font-weight: 600;
+  color: #b68d40;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
 }
-
-.elaw-footer {
-  background: #1a2e52;
-  color: #ffffff;
-  text-align: center;
-  padding: 24px 16px;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  font-size: 16px;
-}
-
-.elaw-footer p { margin: 0; }
 </style>
