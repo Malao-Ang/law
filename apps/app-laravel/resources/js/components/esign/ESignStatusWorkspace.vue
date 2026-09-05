@@ -28,6 +28,13 @@
         >
           ยกเลิกการส่งลงนาม
         </v-btn>
+        <v-btn
+          size="small"
+          variant="tonal"
+          color="success"
+          class="text-none"
+          @click="markSigned"
+        >จำลองลงนามเสร็จ</v-btn>
       </template>
       <template v-else>
         <v-btn
@@ -348,7 +355,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { cancelDocumentESign, downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
+import { cancelDocumentESign, downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign, updateWorkflowProgress } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -639,6 +646,24 @@ async function cancelSubmit(): Promise<void> {
   } finally {
     cancelling.value = false;
   }
+}
+
+async function markSigned(): Promise<void> {
+  const now = new Date().toISOString();
+  session.value = pushActivity({
+    ...session.value,
+    status: 'signed',
+    signedAt: now,
+  }, {
+    title: 'ลงนามเสร็จสิ้น — พร้อมเผยแพร่',
+    detail: primarySigner.value ? `ผู้ลงนาม: ${primarySigner.value.name}` : undefined,
+    at: now,
+  });
+  try {
+    await updateWorkflowProgress(props.documentId, 6);
+  } catch { /* non-fatal */ }
+  writeStage(props.documentId, 'public');
+  persist();
 }
 
 async function publish(): Promise<void> {
