@@ -348,8 +348,8 @@
                   </p>
                   <div class="law-list-card__meta">
                     <span v-if="law.published_date">
-                      <v-icon size="13" icon="mdi-calendar-blank-outline" />
-                      นับบังคับตั้งแต่ {{ law.published_date }}
+                      <span class="mdi mdi-calendar" />
+                      นับบังคับตั้งแต่ {{ formatThaiDate(law.published_date) || law.published_date }}
                     </span>
                     <span v-if="law.agency">
                       <v-icon size="13" icon="mdi-domain" />
@@ -437,6 +437,7 @@ import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
+import { formatThaiDate } from '../../utils/thaiDate';
 
 const PER_PAGE = 20;
 
