@@ -110,6 +110,11 @@
         <v-card tag="section" class="lawx-headcard" elevation="0" :style="{ borderTopColor: badgeColor }">
           <DocBadge :type="badgeType" :label="badgeLabel" class="lawx-headcard__badge" />
           <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
+          <p v-if="buddhistYear" class="lawx-headcard__year">พ.ศ. {{ buddhistYear }}</p>
+          <p v-if="meta.issuer" class="lawx-headcard__issuer">
+            <span class="mdi mdi-office-building-outline" />
+            {{ meta.issuer }}
+          </p>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
             <span v-if="meta.gazette_reference"><span class="mdi mdi-book-open-variant" /> {{ meta.gazette_reference }}</span>
@@ -199,32 +204,32 @@
               />
             </div>
           </div>
-          <div v-if="sectionRelations(section.id).length" class="lawx-relcard">
-            <div class="lawx-relcard__head">
+          <div v-if="sectionRelations(section.id).length" class="lawx-section-relcard">
+            <div class="lawx-section-relcard__head">
               <span class="mdi mdi-scale-balance" />
               กฎหมายที่เกี่ยวข้อง
             </div>
             <div
               v-for="group in groupedSectionRelations(section.id)"
               :key="group.type"
-              class="lawx-relgroup"
+              class="lawx-section-relcard__group"
             >
-              <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+              <div class="lawx-section-relcard__group-label" :class="`is-${group.type}`">{{ group.label }}</div>
               <a
                 v-for="rel in group.items"
                 :key="rel.id"
-                class="lawx-relrow"
+                class="lawx-section-relcard__item"
                 :class="`is-${group.type}`"
                 :href="relationHref(rel) ?? undefined"
                 :target="safeUrl(rel.url) ? '_blank' : undefined"
                 rel="noopener"
               >
-                <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
-                <span class="lawx-relrow__main">
-                  <span class="lawx-relrow__title">{{ rel.target_title }}</span>
-                  <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+                <span class="mdi lawx-section-relcard__icon" :class="relationIcon(rel)" />
+                <span class="lawx-section-relcard__main">
+                  <span class="lawx-section-relcard__title">{{ rel.target_title }}</span>
+                  <span v-if="rel.note" class="lawx-section-relcard__note">— {{ rel.note }}</span>
                 </span>
-                <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+                <span v-if="rel.target_section" class="lawx-section-relcard__sec">{{ rel.target_section }}</span>
               </a>
             </div>
           </div>
@@ -253,7 +258,7 @@
               :target="safeUrl(rel.url) ? '_blank' : undefined"
               rel="noopener"
             >
-              <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+              <span class="mdi lawx-relrow__icon" :class="relationIcon(rel)" />
               <span class="lawx-relrow__main">
                 <span class="lawx-relrow__title">{{ rel.target_title }}</span>
                 <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
@@ -285,7 +290,7 @@
                   :target="safeUrl(rel.url) ? '_blank' : undefined"
                   rel="noopener"
                 >
-                  <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+                  <span class="mdi lawx-relrow__icon" :class="relationIcon(rel)" />
                   <span class="lawx-relrow__main">
                     <span class="lawx-relrow__title">{{ rel.target_title || rel.target_document_id || 'ไม่ระบุชื่อกฎหมาย' }}</span>
                     <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">— {{ rel.change_detail || rel.note }}</span>
@@ -376,6 +381,15 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
+const buddhistYear = computed(() => {
+  const dateValue = meta.value.effective_date || meta.value.promulgation_date;
+  if (!dateValue) return '';
+
+  const year = new Date(dateValue).getFullYear();
+  if (Number.isNaN(year)) return '';
+
+  return year > 2400 ? year : year + 543;
+});
 const isPublished = computed(() => !!documentStore.review?.law_meta?.published_date);
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith('pdf') ?? false);
@@ -451,6 +465,11 @@ function groupRelations(rels: LawRelation[]): Array<{ type: RelationType; label:
 
 function groupedSectionRelations(sectionId: string) {
   return groupRelations(sectionRelations(sectionId));
+}
+
+function relationIcon(rel: LawRelation): string {
+  if (rel.type === 'amends') return 'mdi-pencil';
+  return RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant';
 }
 
 const docRelations = computed<LawRelation[]>(() => documentRelations(relations.value));
@@ -733,6 +752,9 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-headcard__badge { margin-bottom: 12px; }
 .lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
+.lawx-headcard__year { color: #92400e; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 18px; font-weight: 700; margin: -4px 0 10px; }
+.lawx-headcard__issuer { align-items: center; color: #4e4538; display: flex; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; gap: 6px; justify-content: center; margin: 0 0 12px; }
+.lawx-headcard__issuer .mdi { color: #b68d40; }
 .lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
 
@@ -819,27 +841,34 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 
 .lawx-parentcard {
-  background: rgb(var(--v-theme-detail-surface));
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-top: 4px solid #7c3aed;
-  border-radius: 16px;
-  padding: 14px 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 18px 42px rgba(148, 163, 184, 0.14);
 }
 .lawx-parentcard__head {
+  font-weight: 700;
+  font-size: 14px;
+  color: #92400e;
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #1f1b14;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.lawx-parentcard__head .mdi { color: #7c3aed; }
+.lawx-parentcard__head .mdi { color: #b45309; }
 
 .lawx-parentcard--sections {
-  border-top-color: #2563eb;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.lawx-parentcard--sections .lawx-parentcard__head {
+  color: #1e3a5f;
+}
+
+.lawx-parentcard--sections .lawx-parentcard__head .mdi {
+  color: #2563eb;
 }
 
 .lawx-section-rel-summary {
@@ -874,21 +903,98 @@ onBeforeUnmount(() => observer?.disconnect());
   min-width: 0;
 }
 
-.lawx-relcard {
-  margin-top: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+.lawx-section-relcard {
   background: #f8fafc;
-  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 16px;
 }
-.lawx-relcard__head {
+
+.lawx-section-relcard__head {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1e3a5f;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.lawx-section-relcard__group {
+  margin-top: 8px;
+}
+
+.lawx-section-relcard__group-label {
+  font-size: 12px;
   font-weight: 700;
-  color: #1d4ed8;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
+}
+
+.lawx-section-relcard__group-label.is-repeals { color: #dc2626; }
+.lawx-section-relcard__group-label.is-amends { color: #7c3aed; }
+.lawx-section-relcard__group-label.is-related { color: #2563eb; }
+.lawx-section-relcard__group-label.is-supersedes { color: #ea580c; }
+.lawx-section-relcard__group-label.is-issued_under { color: #7c3aed; }
+
+.lawx-section-relcard__item {
+  font-size: 13px;
+  padding: 4px 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  text-decoration: none;
+}
+
+.lawx-section-relcard__item:hover {
+  color: #0f172a;
+}
+
+.lawx-section-relcard__icon {
+  flex-shrink: 0;
+}
+
+.lawx-section-relcard__item.is-repeals .lawx-section-relcard__icon { color: #dc2626; }
+.lawx-section-relcard__item.is-supersedes .lawx-section-relcard__icon { color: #ea580c; }
+.lawx-section-relcard__item.is-amends .lawx-section-relcard__icon { color: #7c3aed; }
+.lawx-section-relcard__item.is-issued_under .lawx-section-relcard__icon { color: #7c3aed; }
+.lawx-section-relcard__item.is-related .lawx-section-relcard__icon { color: #2563eb; }
+
+.lawx-section-relcard__main {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lawx-section-relcard__title {
+  display: block;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lawx-section-relcard__note {
+  color: #94a3b8;
+  flex: 0 1 auto;
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lawx-section-relcard__sec {
+  color: #64748b;
+  font-size: 12px;
+  justify-self: end;
+  min-width: 34px;
+  text-align: right;
+  white-space: nowrap;
 }
 .lawx-relgroup { margin-top: 8px; }
 .lawx-relgroup__label {
@@ -899,7 +1005,7 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 .lawx-relgroup__label.is-repeals { color: #dc2626; }
 .lawx-relgroup__label.is-supersedes { color: #ea580c; }
-.lawx-relgroup__label.is-amends { color: #0d9488; }
+.lawx-relgroup__label.is-amends { color: #7c3aed; }
 .lawx-relgroup__label.is-issued_under { color: #7c3aed; }
 
 .lawx-relrow {
@@ -939,7 +1045,7 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-relrow__icon { flex-shrink: 0; }
 .lawx-relrow.is-repeals .lawx-relrow__icon { color: #dc2626; }
 .lawx-relrow.is-supersedes .lawx-relrow__icon { color: #ea580c; }
-.lawx-relrow.is-amends .lawx-relrow__icon { color: #0d9488; }
+.lawx-relrow.is-amends .lawx-relrow__icon { color: #7c3aed; }
 .lawx-relrow.is-issued_under .lawx-relrow__icon { color: #7c3aed; }
 .lawx-relrow.is-related .lawx-relrow__icon { color: #2563eb; }
 .lawx-relrow__main {
@@ -1037,7 +1143,17 @@ onBeforeUnmount(() => observer?.disconnect());
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  .lawx-section-relcard__item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .lawx-relrow__sec {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .lawx-section-relcard__sec {
     grid-column: 2;
     justify-self: start;
     text-align: left;

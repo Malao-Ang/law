@@ -13,6 +13,10 @@
             {{ meta.status }}
           </span>
         </div>
+        <div v-if="showChangeStatus" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">สถานะการเปลี่ยนแปลง</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.change_status }}</span>
+        </div>
         <div v-if="meta.promulgation_date" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">วันที่ประกาศ</span>
           <span class="law-info-row__value font-weight-semibold">{{ formatLawDate(meta.promulgation_date) }}</span>
@@ -24,6 +28,10 @@
         <div v-if="meta.law_type" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">ประเภท</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.law_type }}</span>
+        </div>
+        <div v-if="meta.gazette_reference" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">อ้างอิง</span>
+          <span class="law-info-row__value font-weight-semibold">{{ meta.gazette_reference }}</span>
         </div>
         <div v-if="meta.issuer" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">ออกโดย</span>
@@ -111,11 +119,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { LawMeta } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 
-defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
+const props = defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; showCount?: boolean; versions?: VersionChainItem[]; viewedDocumentId?: string }>();
+
+const showChangeStatus = computed(() => {
+  const changeStatus = props.meta.change_status?.trim();
+  return !!changeStatus && changeStatus !== 'กฎหมายใหม่';
+});
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
