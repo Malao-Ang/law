@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     # Google Gemini vision OCR (optional)
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.6-flash"
     gemini_timeout_seconds: int = 120
     doc_conversion_timeout_seconds: int = 60
     soffice_binary: str = "soffice"

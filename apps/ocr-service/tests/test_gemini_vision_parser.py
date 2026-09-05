@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import fitz
+import pytest
 
 from app.services.gemini_vision_parser import GeminiVisionParser
 
@@ -98,7 +99,7 @@ def test_parse_pdf_calls_gemini_and_builds_pages(tmp_path: Path) -> None:
     assert "inline_data" in kwargs["json"]["contents"][0]["parts"][1]
 
 
-def test_gemini_mode_falls_back_to_local_on_api_error(tmp_path: Path) -> None:
+def test_gemini_mode_raises_on_api_error(tmp_path: Path) -> None:
     from app.api.routes import _extract_scan_pages
 
     with patch("app.api.routes.GeminiVisionParser") as mock_parser_cls, \
@@ -111,26 +112,39 @@ def test_gemini_mode_falls_back_to_local_on_api_error(tmp_path: Path) -> None:
         mock_parser.parse_pdf.side_effect = RuntimeError("gemini down")
         mock_parser_cls.return_value = mock_parser
 
-        mock_pipeline = MagicMock()
-        mock_pipeline.extract_scanned_pdf.return_value = [
-            {
-                "page_no": 1,
-                "blocks": [{"type": "paragraph", "raw_text": "ocr fallback", "confidence": 0.95, "flags": []}],
-            }
-        ]
-        mock_pipeline_fn.return_value = mock_pipeline
+        with pytest.raises(RuntimeError, match="gemini down"):
+            _extract_scan_pages(
+                file_path=tmp_path / "fake.pdf",
+                document_id="test-doc",
+                requested_mode="gemini",
+                data_root=tmp_path,
+            )
 
-        pages, mode, landingai_meta, gemini_meta = _extract_scan_pages(
-            file_path=tmp_path / "fake.pdf",
-            document_id="test-doc",
-            requested_mode="gemini",
-            data_root=tmp_path,
-        )
+    mock_pipeline_fn.assert_not_called()
 
-    assert mode == "local"
-    assert pages[0]["blocks"][0]["raw_text"] == "ocr fallback"
-    assert landingai_meta is None
-    assert gemini_meta is None
+
+def test_parse_pdf_raises_on_http_error(tmp_path: Path) -> None:
+    pdf_path = _make_pdf(tmp_path, page_count=1)
+    parser = GeminiVisionParser(data_root=tmp_path / "data")
+
+    response = MagicMock()
+    response.status_code = 404
+    response.text = '{"error":{"message":"model no longer available"}}'
+    response.json.return_value = {}
+
+    client = MagicMock()
+    client.post.return_value = response
+    cm = MagicMock()
+    cm.__enter__.return_value = client
+    cm.__exit__.return_value = False
+
+    with patch("app.services.gemini_vision_parser.get_settings") as mock_settings, \
+         patch("app.services.gemini_vision_parser.httpx.Client", return_value=cm):
+        mock_settings.return_value.gemini_api_key = "test-key"
+        mock_settings.return_value.gemini_model = "gemini-2.0-flash"
+        mock_settings.return_value.gemini_timeout_seconds = 30
+        with pytest.raises(RuntimeError, match="Gemini OCR failed on page 1"):
+            parser.parse_pdf(pdf_path, "doc-gemini-404")
 
 
 def test_should_force_gemini_scan_for_pdf_text_and_mixed() -> None:
@@ -138,6 +152,8 @@ def test_should_force_gemini_scan_for_pdf_text_and_mixed() -> None:
 
     assert _should_force_gemini_scan("pdf_text", "gemini") is True
     assert _should_force_gemini_scan("mixed", "gemini") is True
+    assert _should_force_gemini_scan("pdf_text", "landingai") is True
+    assert _should_force_gemini_scan("mixed", "landingai") is True
     assert _should_force_gemini_scan("pdf_scan", "gemini") is False
     assert _should_force_gemini_scan("pdf_text", "auto") is False
     assert _should_force_gemini_scan("pdf_text", "local") is False

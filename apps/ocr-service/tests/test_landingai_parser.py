@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import fitz
 import httpx
+import pytest
 
 from app.services.landingai_parser import LandingAiAdeParser
 
@@ -121,8 +122,8 @@ def test_landingai_timeout_in_auto_mode_falls_back_to_ocr(tmp_path):
     assert gemini_meta is None
 
 
-def test_landingai_http_error_in_landingai_mode_falls_back_to_ocr(tmp_path):
-    """landingai mode: HTTP 500 -> EasyOCR fallback, no exception raised."""
+def test_landingai_http_error_in_landingai_mode_raises(tmp_path):
+    """landingai mode: HTTP 500 fails the whole document (no EasyOCR fallback)."""
     from app.api.routes import _extract_scan_pages
 
     with patch("app.api.routes.LandingAiAdeParser") as mock_parser_cls, \
@@ -138,18 +139,12 @@ def test_landingai_http_error_in_landingai_mode_falls_back_to_ocr(tmp_path):
         )
         mock_parser_cls.return_value = mock_parser
 
-        mock_pipeline = MagicMock()
-        mock_pipeline.extract_scanned_pdf.return_value = [{"page_no": 1, "blocks": [{"type": "paragraph", "raw_text": "ocr fallback", "confidence": 0.95, "flags": []}]}]
-        mock_pipeline_fn.return_value = mock_pipeline
+        with pytest.raises(httpx.HTTPStatusError):
+            _extract_scan_pages(
+                file_path=tmp_path / "fake.pdf",
+                document_id="test-doc",
+                requested_mode="landingai",
+                data_root=tmp_path,
+            )
 
-        pages, mode, landingai_meta, gemini_meta = _extract_scan_pages(
-            file_path=tmp_path / "fake.pdf",
-            document_id="test-doc",
-            requested_mode="landingai",
-            data_root=tmp_path,
-        )
-
-    assert mode == "local"
-    assert pages[0]["blocks"][0]["raw_text"] == "ocr fallback"
-    assert landingai_meta is None
-    assert gemini_meta is None
+        mock_pipeline_fn.assert_not_called()

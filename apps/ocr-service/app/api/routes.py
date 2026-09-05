@@ -213,7 +213,7 @@ def _run_extraction(payload: ExtractRequest) -> None:
                 _post_callback(payload.callback_url, payload.document_id, {"status": "success", "output": output}, logger)
 
     except Exception as exc:
-        logger.error("extraction failed", extra={"error": str(exc)})
+        logger.error(f"extraction failed: {exc}")
 
         failure_payload = {
             "status": "failed",
@@ -261,12 +261,12 @@ def _post_callback(callback_url: str, document_id: str, payload: dict, logger: o
 
 
 def _should_force_gemini_scan(classification_mode: str, requested_scan_mode: str) -> bool:
-    """When the user explicitly picks gemini, run vision OCR on every PDF page.
+    """When the user explicitly picks Gemini or LandingAI, run cloud OCR on every PDF page.
 
-    Without this, pdf_text / mixed documents skip Gemini and use Docling even
-    though the upload form requested cloud OCR.
+    Without this, pdf_text / mixed documents skip cloud OCR and use Docling even
+    though the upload form requested a cloud provider.
     """
-    return requested_scan_mode == "gemini" and classification_mode in {"pdf_text", "mixed"}
+    return requested_scan_mode in {"gemini", "landingai"} and classification_mode in {"pdf_text", "mixed"}
 
 
 def _extract_scan_pages(
@@ -408,10 +408,10 @@ def _run_cloud_scan_mode(
         )
         return pages, provider, landingai_meta, gemini_meta
     except Exception as exc:
-        logger.warning(
-            f"{provider} mode: API call failed, falling back to local OCR",
-            extra={"error": str(exc)},
-        )
+        if provider in {"gemini", "landingai"}:
+            logger.error(f"{provider} mode: API call failed: {exc}")
+            raise
+        logger.warning(f"{provider} mode: API call failed, falling back to local OCR: {exc}")
         ocr_pipeline = get_ocr_pipeline(data_root=data_root)
         if page_indices is None:
             pages = ocr_pipeline.extract_scanned_pdf(file_path=file_path, document_id=document_id)

@@ -23,7 +23,7 @@ class StoreDocumentRequest extends FormRequest
                 'required', 'file', 'max:51200',
                 $isOld ? 'mimes:pdf' : 'mimes:pdf,doc,docx',
             ]),
-            'scan_extraction_mode' => ['nullable', 'in:local,gemini'],
+            'scan_extraction_mode' => ['nullable', 'in:local,gemini,landingai'],
             'extraction_engine' => ['nullable', 'in:standard,fast'],
             'document_type' => ['nullable', 'in:new,old'],
             'source' => ['nullable', 'in:internal,external'],
