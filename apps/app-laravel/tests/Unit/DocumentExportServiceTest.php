@@ -384,6 +384,39 @@ class DocumentExportServiceTest extends TestCase
         $this->assertSame(2, substr_count($documentXml, 'รวมช่อง'));
     }
 
+    public function test_docx_expands_rowspan_tables_for_page_safe_pdf_export(): void
+    {
+        $document = [
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'tbl1',
+                    'type' => 'table',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'table' => [
+                            'cells' => [
+                                [
+                                    ['text' => 'รวมช่อง', 'colspan' => 1, 'rowspan' => 2],
+                                    ['text' => 'แถวแรก', 'colspan' => 1, 'rowspan' => 1],
+                                ],
+                                [
+                                    ['text' => 'แถวสอง', 'colspan' => 1, 'rowspan' => 1],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
+
+        $this->assertStringNotContainsString('w:vMerge', $documentXml);
+        $this->assertStringContainsString('<w:cantSplit w:val="1"/>', $documentXml);
+        $this->assertSame(2, substr_count($documentXml, 'รวมช่อง'));
+    }
+
     public function test_docx_embeds_image_blocks(): void
     {
         $png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

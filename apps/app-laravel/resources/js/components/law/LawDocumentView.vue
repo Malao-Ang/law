@@ -34,6 +34,12 @@
           <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
             @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
+          <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
+            @click="printPage()">พิมพ์</v-btn>
+          <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
+            :loading="exportingPdf"
+            :disabled="exportingPdf"
+            @click="downloadPdf()">ดาวน์โหลด PDF</v-btn>
         </div>
       </div>
 
@@ -43,6 +49,11 @@
       </div>
       <v-alert v-else-if="documentStore.error" type="error" variant="tonal" density="compact" class="ma-4">
         {{ documentStore.error }}
+      </v-alert>
+
+      <template v-else-if="documentStore.review">
+      <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="ma-4">
+        {{ pdfExportError }}
       </v-alert>
 
       <v-alert
@@ -286,6 +297,8 @@ const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
 const { documentTypes, load: loadLookups } = useLookups();
+const exportingPdf = ref(false);
+const pdfExportError = ref('');
 
 // Fetch in the watcher (immediate) — same-route param changes (/law/A -> /law/B) reuse this
 // component, so onMounted never re-fires; the watcher keeps content + versions in sync.
@@ -423,6 +436,21 @@ function relationHref(rel: LawRelation): string | null {
   return rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : null;
 }
 
+
+async function downloadPdf(): Promise<void> {
+  if (exportingPdf.value) return;
+
+  exportingPdf.value = true;
+  pdfExportError.value = '';
+  try {
+    await downloadPdfExport(props.documentId);
+    await documentStore.fetch(props.documentId, true);
+  } catch (error) {
+    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
+  } finally {
+    exportingPdf.value = false;
+  }
+}
 
 const sectionEls = ref<Record<string, HTMLElement>>({});
 const activeId = ref('');

@@ -632,7 +632,6 @@ class DocumentExportService
                     }
 
                     $columnIndex += $colspan;
-
                     continue;
                 }
 
@@ -692,7 +691,6 @@ class DocumentExportService
 
         return false;
     }
-
     /**
      * A blank reviewer-inserted line: same 1.85 line spacing as real paragraphs
      * so its height matches the editor.

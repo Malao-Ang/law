@@ -449,6 +449,7 @@ import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import type { ChangeStatus, DocType } from '../../components/shared/lawBadge';
 import { useAuthStore } from '../../stores/authStore';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
+import type { LookupData } from '../../api/client';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
