@@ -176,18 +176,20 @@ function statusClass(status: string): string {
 <style scoped>
 .law-info-row {
   align-items: start;
-  column-gap: 16px;
+  column-gap: 12px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: minmax(0, 110px) minmax(0, 1fr);
 }
 
 .law-info-row__label {
   min-width: 0;
+  font-size: 13px;
 }
 
 .law-info-row__value {
   min-width: 0;
   overflow-wrap: anywhere;
+  word-break: break-word;
   text-align: end;
 }
 </style>

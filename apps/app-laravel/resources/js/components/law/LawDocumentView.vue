@@ -982,9 +982,8 @@ onBeforeUnmount(() => observer?.disconnect());
   display: block;
   font-weight: 500;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lawx-section-relcard__note {
@@ -1067,9 +1066,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-relrow__title {
   display: block;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-weight: 500;
 }
 
