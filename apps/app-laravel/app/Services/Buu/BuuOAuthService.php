@@ -89,6 +89,7 @@ class BuuOAuthService
             ->acceptJson()
             ->asJson()
             ->timeout((int) config('buu.timeout', 60))
+            ->withOptions(['force_ip_resolve' => 'v4'])
             ->post($url, $payload);
 
         if (! $response->successful()) {
