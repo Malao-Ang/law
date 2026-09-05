@@ -524,7 +524,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       if (r.isConfirmed) {
         await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
       } else if (r.isDenied) {
-        router.push(`/documents/${props.documentId}/law-info`);
+        router.push(`/documents/${props.documentId}/law-info?mode=edit`);
         return;
       } else {
         return;
