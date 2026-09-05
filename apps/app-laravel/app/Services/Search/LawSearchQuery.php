@@ -40,6 +40,20 @@ class LawSearchQuery
         return $this->hasBooleanSyntax;
     }
 
+    public function isNegatedOnly(): bool
+    {
+        if (! $this->hasBooleanSyntax || $this->terms === []) {
+            return false;
+        }
+        foreach ($this->terms as $term) {
+            if (! $term['negated']) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * @return array<int, array{operator:string, negated:bool, value:string, quoted:bool, variants:array<int,string>}>
      */
@@ -191,6 +205,32 @@ class LawSearchQuery
 
             $token = trim($token);
             if ($token === '') {
+                continue;
+            }
+
+            // Handle pipe-separated OR alternatives embedded in a token (e.g. ระเบียน|ข้อบังคับ).
+            // This runs after negation-prefix stripping so ~ระเบียน|ข้อบังคับ applies negation to all parts.
+            if (! $quoted && str_contains($token, '|')) {
+                $this->hasBooleanSyntax = true;
+                $parts = array_values(array_filter(array_map('trim', explode('|', $token))));
+                foreach ($parts as $i => $part) {
+                    if ($part === '') {
+                        continue;
+                    }
+                    $partVariants = $this->variantsFor($part);
+                    if (count($partVariants) > 1) {
+                        $this->hasNumeralVariants = true;
+                    }
+                    $this->terms[] = [
+                        'operator' => $i === 0 ? $operator : 'OR',
+                        'negated' => $negated,
+                        'value' => $part,
+                        'quoted' => false,
+                        'variants' => $partVariants,
+                    ];
+                }
+                $operator = 'AND';
+                $negateNext = false;
                 continue;
             }
 

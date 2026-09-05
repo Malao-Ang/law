@@ -276,6 +276,24 @@ class LawSearchController extends Controller
 
         $similarity = $this->textSimilarity($query->raw(), $title);
 
+        // Also check content chunks for fuzzy near-match (e.g. query 'โดยประกาศว่า'
+        // should hit a doc whose body contains 'ประกาศว่า').
+        if ($similarity < 0.42 && ! $restricted) {
+            foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
+                $chunkText = (string) ($chunk['text'] ?? '');
+                if ($chunkText === '') {
+                    continue;
+                }
+                $chunkSim = $this->textSimilarity($query->raw(), $chunkText);
+                if ($chunkSim > $similarity) {
+                    $similarity = $chunkSim;
+                }
+                if ($similarity >= 0.42) {
+                    break;
+                }
+            }
+        }
+
         return [
             'matched' => $similarity >= 0.42,
             'mode' => 'file_fuzzy',
@@ -400,6 +418,11 @@ class LawSearchController extends Controller
         }
         if (str_contains($candidate, $query)) {
             return 1.0;
+        }
+        // Partial match: if the query is a superstring that contains the candidate
+        // (e.g. typing 'โดยประกาศว่า' when the title has 'ประกาศว่า'), treat as a hit.
+        if (str_contains($query, $candidate)) {
+            return 0.9;
         }
 
         $best = $this->diceSimilarity($query, $candidate);

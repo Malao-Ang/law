@@ -24,12 +24,21 @@ class LawSearchService
         $body = $this->buildExactBody($q, $filters, $page, $perPage);
         $raw = $this->client->search($body);
 
+        $parsed = LawSearchQuery::parse($q);
         if ($q !== '' && mb_strlen($q) >= self::FUZZY_MIN_QUERY_LENGTH) {
             if (($raw['hits']['hits'] ?? []) === []) {
-                $mode = 'fuzzy';
-                $raw = $this->client->search($this->buildFuzzyBody($q, $filters, $page, $perPage));
+                // NOT-only queries legitimately return hits without positive terms;
+                // skip the fuzzy fallback so they are not re-queried unnecessarily.
+                if (! $parsed->isNegatedOnly()) {
+                    $mode = 'fuzzy';
+                    $raw = $this->client->search($this->buildFuzzyBody($q, $filters, $page, $perPage));
+                }
             } else {
-                $mode = $this->modeFromExactHits($raw, LawSearchQuery::parse($q)->rawVariants());
+                // For NOT-only queries there are no positive variants to check against hits;
+                // classify as exact to avoid a spurious 'fuzzy' mode label.
+                $mode = $parsed->isNegatedOnly()
+                    ? 'exact'
+                    : $this->modeFromExactHits($raw, $parsed->rawVariants());
             }
         }
 
