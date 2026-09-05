@@ -251,6 +251,8 @@ export interface DocumentListItem {
   parent_document_id?: string | null;
   parent_document_ids?: string[];
   law_type?: string | null;
+  law_status?: string | null;
+  published_date?: string | null;
   change_status?: string | null;
   access_scope?: 'public' | 'private';
   workflow_completed_step?: number | null;
@@ -258,6 +260,7 @@ export interface DocumentListItem {
   workflow_updated_at?: string | null;
   document_type?: DocumentType;
   source?: DocumentSource;
+  source_file?: string | null;
 }
 
 export interface LawCatalogSection {
@@ -342,6 +345,7 @@ export interface DocumentStatus {
   } | null;
   extraction_engine?: 'standard' | 'fast';
   correction_status?: 'not_required' | 'pending' | 'in_progress' | 'done' | 'failed';
+  rag_skipped?: boolean;
   fast_fallback_reason?: string;
   timings?: Record<string, number> | null;
   error?: string;
@@ -404,6 +408,7 @@ export interface ReportDocument {
   status: string;
   meta_status: string;
   change_status?: string;
+  published_date?: string;
   date: string | null;
   section_count: number | null;
   page_count: number;

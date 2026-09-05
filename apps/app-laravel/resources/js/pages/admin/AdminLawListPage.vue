@@ -145,12 +145,12 @@
             <td>
               <v-chip
                 size="x-small"
-                :color="law.metaStatus ? metaStatusColor(law.metaStatus) : workflowStageColor(law.workflowStage)"
+                :color="effectiveStatusColor(law)"
                 variant="tonal"
                 rounded="pill"
               >
                 <v-icon start icon="mdi-circle" size="8" />
-                {{ law.metaStatus || law.workflowStage }}
+                {{ effectiveStatusLabel(law) }}
               </v-chip>
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
@@ -300,20 +300,21 @@ const childCountMap = computed<Record<string, number>>(() => {
   return map;
 });
 
-function workflowStageLabel(doc: { status: string; meta_status: string; workflow_completed_step: number | null }): string {
-  if (doc.meta_status === 'ยกเลิก') return 'ยกเลิก';
+function workflowStageLabel(doc: { status: string; meta_status: string; published_date?: string; workflow_completed_step: number | null }): string {
+  if (doc.meta_status === 'ยกเลิก' || doc.meta_status === 'ยกเลิกการใช้งาน') return 'ยกเลิก';
+  // เผยแพร่ = ต้องมี published_date จริง ๆ ไม่ใช่ดูจาก pipeline status
+  if (doc.published_date) return 'เผยแพร่';
   const step = doc.workflow_completed_step ?? 0;
-  if (doc.status === 'exported' || doc.status === 'ingested') return 'เผยแพร่';
-  if (step >= 6) return 'พร้อมเผยแพร่';
+  if (step >= 6) return 'รอลงนาม';
   if (step >= 5) return 'รอส่ง eSign';
   if (step >= 4) return 'รอการเชื่อมโยงความสัมพันธ์';
-  if (doc.status === 'done') return 'ดำเนินการ';
+  if (doc.status === 'done' || doc.status === 'exported' || doc.status === 'ingested') return 'ดำเนินการ';
   return 'กำลังประมวลผล';
 }
 
 function workflowStageColor(stage: string): string {
   if (stage === 'เผยแพร่') return 'success';
-  if (stage === 'พร้อมเผยแพร่') return 'admin-primary';
+  if (stage === 'รอลงนาม') return 'admin-primary';
   if (stage === 'รอส่ง eSign') return 'deep-purple';
   if (stage === 'รอการเชื่อมโยงความสัมพันธ์') return 'orange';
   if (stage === 'ยกเลิก') return 'error';
@@ -326,6 +327,8 @@ interface LawRow {
   title: string;
   lawType: string;
   metaStatus: string;
+  changeStatus: string;
+  publishedDate: string;
   workflowStage: string;
   isParent: boolean;
   childCount: number;
@@ -343,6 +346,8 @@ const laws = computed<LawRow[]>(() =>
     title: doc.title,
     lawType: doc.type !== 'ไม่ระบุ' ? doc.type : '',
     metaStatus: doc.meta_status ?? '',
+    changeStatus: doc.change_status ?? '',
+    publishedDate: doc.published_date ?? '',
     workflowStage: workflowStageLabel(doc),
     isParent: (childCountMap.value[doc.id] ?? 0) > 0,
     childCount: childCountMap.value[doc.id] ?? 0,
@@ -376,7 +381,7 @@ const statusOptions = [
   { label: 'ดำเนินการ', value: 'ดำเนินการ' },
   { label: 'รอการเชื่อมโยงความสัมพันธ์', value: 'รอการเชื่อมโยงความสัมพันธ์' },
   { label: 'รอส่ง eSign', value: 'รอส่ง eSign' },
-  { label: 'พร้อมเผยแพร่', value: 'พร้อมเผยแพร่' },
+  { label: 'รอลงนาม', value: 'รอลงนาม' },
   { label: 'เผยแพร่', value: 'เผยแพร่' },
   { label: 'ยกเลิก', value: 'ยกเลิก' },
 ];
@@ -413,9 +418,22 @@ function typeColor(type: string): string {
 
 function metaStatusColor(status: string): string {
   if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
-  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
+  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
+}
+
+// สถานะกฎหมายที่แสดง: ยังไม่เผยแพร่ = "ร่าง" เสมอ; เผยแพร่แล้ว = ตาม meta_status จริง
+function effectiveStatusLabel(law: LawRow): string {
+  if (!law.publishedDate) return 'ร่าง';
+  if (law.metaStatus) return law.metaStatus;
+  return 'มีผลบังคับใช้';
+}
+
+function effectiveStatusColor(law: LawRow): string {
+  if (!law.publishedDate) return 'warning';
+  if (law.metaStatus) return metaStatusColor(law.metaStatus);
+  return 'success';
 }
 </script>
 
