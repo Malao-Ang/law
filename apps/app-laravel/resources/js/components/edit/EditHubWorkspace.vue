@@ -205,6 +205,7 @@
                   </p>
                 </div>
                 <v-switch
+                  :key="`publish-switch-${isPublished}`"
                   :model-value="isPublished"
                   :loading="publishToggleSaving"
                   :disabled="publishToggleSaving"
@@ -419,23 +420,27 @@ function relationTypeLabel(type: RelationType): string {
 }
 
 async function togglePublished(next: boolean | null): Promise<void> {
-  if (!!next) {
-    const status = await fetchStatus(props.documentId);
-    if (status?.rag_skipped) {
-      const result = await Swal.fire({
-        icon: 'warning',
-        title: 'ยังไม่ได้จัดลำดับ RAG',
-        html: 'เอกสารนี้เคยข้ามขั้นตอน RAG ไว้ ต้องกลับไปจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
-        showCancelButton: true,
-        confirmButtonText: 'ไปจัดลำดับ RAG',
-        cancelButtonText: 'ยกเลิก',
-        confirmButtonColor: '#1a3673',
-        cancelButtonColor: '#64748b',
-      });
-      if (result.isConfirmed) {
-        router.push(`/documents/${props.documentId}/rag`);
+  if (!!next && !isOldDoc.value) {
+    try {
+      const status = await fetchStatus(props.documentId);
+      if (status?.rag_skipped) {
+        const result = await Swal.fire({
+          icon: 'warning',
+          title: 'ยังไม่ได้จัดลำดับ RAG',
+          html: 'เอกสารนี้เคยข้ามขั้นตอน RAG ไว้ ต้องกลับไปจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
+          showCancelButton: true,
+          confirmButtonText: 'ไปจัดลำดับ RAG',
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: '#1a3673',
+          cancelButtonColor: '#64748b',
+        });
+        if (result.isConfirmed) {
+          router.push(`/documents/${props.documentId}/rag`);
+        }
+        return;
       }
-      return;
+    } catch {
+      // ถ้า fetch status ล้มเหลว ข้ามการตรวจ RAG และดำเนินการต่อ
     }
   }
   // Draft status check — after RAG check passes
