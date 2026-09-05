@@ -204,18 +204,6 @@
             </v-card>
 
             <v-card flat border rounded="lg" class="edit-hub-info-card">
-              <h2 class="edit-hub-section-title">ประวัติเวอร์ชัน</h2>
-              <VersionHistoryTimeline
-                v-if="versionStore.versions.length >= 2"
-                :versions="versionStore.versions"
-                :viewed-document-id="documentId"
-              />
-              <div v-else class="text-body-2 text-medium-emphasis">
-                ยังไม่มีประวัติเวอร์ชัน
-              </div>
-            </v-card>
-
-            <v-card flat border rounded="lg" class="edit-hub-info-card">
               <div class="edit-hub-publish">
                 <div>
                   <h2 class="edit-hub-section-title mb-1">การเผยแพร่</h2>
@@ -257,7 +245,6 @@ import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import PublishConfirmDialog from '../shared/PublishConfirmDialog.vue';
-import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useVersionStore } from '../../stores/versionStore';
 import { buildSections } from '../../composables/useLawSections';
