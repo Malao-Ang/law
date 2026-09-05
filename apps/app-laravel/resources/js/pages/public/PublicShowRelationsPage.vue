@@ -4,16 +4,23 @@
 
     <div class="psr-topbar">
       <v-container style="max-width:1200px" class="py-0">
-        <div class="d-flex align-center ga-2 py-3">
-          <v-breadcrumbs density="compact" class="pa-0 text-caption">
-            <v-breadcrumbs-item to="/" class="text-medium-emphasis">หน้าแรก</v-breadcrumbs-item>
+        <v-breadcrumbs density="compact" class="pa-0 psr-breadcrumbs">
+          <v-breadcrumbs-item to="/">หน้าแรก</v-breadcrumbs-item>
+          <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+          <v-breadcrumbs-item to="/database">สืบค้นกฎหมาย</v-breadcrumbs-item>
+          <template v-if="selectedRow">
             <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
-            <v-breadcrumbs-item to="/database" class="text-medium-emphasis">สืบค้นกฎหมาย</v-breadcrumbs-item>
-            <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
-            <v-breadcrumbs-item v-if="selectedRow" class="psr-breadcrumb-title">{{ selectedRow.title || 'เอกสาร' }}</v-breadcrumbs-item>
-            <v-breadcrumbs-item v-else>ความสัมพันธ์กฎหมาย</v-breadcrumbs-item>
-          </v-breadcrumbs>
-        </div>
+            <v-breadcrumbs-item :to="`/law/${selectedRow.id}`">
+              <v-tooltip :text="selectedRow.title || 'เอกสาร'" location="bottom">
+                <template #activator="{ props: tp }">
+                  <span v-bind="tp" class="psr-breadcrumb-title">{{ selectedRow.title || 'เอกสาร' }}</span>
+                </template>
+              </v-tooltip>
+            </v-breadcrumbs-item>
+          </template>
+          <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+          <v-breadcrumbs-item>โครงสร้างความสัมพันธ์</v-breadcrumbs-item>
+        </v-breadcrumbs>
       </v-container>
     </div>
 
@@ -725,13 +732,27 @@ watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () =>
 .psr-topbar {
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.psr-breadcrumbs {
+  font-size: 0.75rem !important;
+}
+
+.psr-breadcrumbs :deep(.v-breadcrumbs-item) {
+  font-size: 0.75rem;
 }
 
 .psr-breadcrumb-title {
-  max-width: 280px;
+  display: inline-block;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .rel-root__title {
