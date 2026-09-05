@@ -25,6 +25,7 @@
               :key="doc._id"
               :title="doc.metadata.title"
               :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
               :description="doc.metadata.summary"
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
@@ -60,6 +61,7 @@
               <ELawLawCard
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
+                :law-type="doc.metadata.lawTypeName"
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
@@ -96,6 +98,7 @@
               <ELawLawCard
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
+                :law-type="doc.metadata.lawTypeName"
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
@@ -132,6 +135,7 @@
               <ELawLawCard
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
+                :law-type="doc.metadata.lawTypeName"
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
@@ -256,6 +260,7 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     issuer: law.issuer ?? '',
     changeStatus: law.change_status ?? '',
     useStatus: law.status ?? '',
+    lawTypeName: law.law_type ?? '',
   });
 }
 
@@ -296,6 +301,7 @@ function buildDocumentVersion(input: {
   issuer?: string;
   changeStatus?: string;
   useStatus?: string;
+  lawTypeName?: string;
 }): DocumentVersion {
   const publishedDate = typeof input.publishedDate === 'string' ? new Date(input.publishedDate) : input.publishedDate;
 
@@ -316,6 +322,7 @@ function buildDocumentVersion(input: {
       issuer: input.issuer ?? '',
       changeStatus: input.changeStatus ?? '',
       useStatus: input.useStatus ?? '',
+      lawTypeName: input.lawTypeName ?? '',
       keywords: [],
     },
     createdAt: publishedDate,

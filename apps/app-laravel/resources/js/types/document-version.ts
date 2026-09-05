@@ -17,6 +17,7 @@ export interface DocumentVersion {
   metadata: {
     title: string;
     documentType: DocumentType;
+    lawTypeName?: string;
     documentGroupId?: ObjectId;
     publicationScope: PublicationScope;
     summary?: string;

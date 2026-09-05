@@ -1,7 +1,7 @@
 <template>
   <div
     class="elaw-card"
-    :class="`elaw-card--${docType}`"
+    :class="`elaw-card--${cardTypeClass}`"
     role="article"
     tabindex="0"
     @click="$emit('click')"
@@ -69,7 +69,16 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import DocBadge from './DocBadge.vue';
-import { changeStatusToBadge, docTypeToBadge, type ChangeStatus, type DocType } from './lawBadge';
+import {
+  LAW_TYPE_TO_BADGE,
+  LAW_TYPE_TO_DOC_TYPE,
+  changeStatusToBadge,
+  docTypeToBadge,
+  type ChangeStatus,
+  type DocType,
+  type LawTypeBadge,
+  type LawTypeCardClass,
+} from './lawBadge';
 import { cardChangeState } from '../../utils/cardChangeState';
 
 type Visibility = 'public' | 'private' | 'organization';
@@ -77,6 +86,7 @@ type Visibility = 'public' | 'private' | 'organization';
 const props = defineProps<{
   title: string;
   docType: DocType;
+  lawType?: string;
   description?: string;
   issuer?: string;
   changeStatusText?: string;
@@ -102,7 +112,14 @@ const typeLabels: Record<DocType, string> = {
 const changeState = computed(() => cardChangeState(props.changeStatusText, props.useStatus));
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
-const typeBadge = computed(() => docTypeToBadge(props.docType));
+const typeBadge = computed<LawTypeBadge | null>(() => {
+  if (props.lawType) return LAW_TYPE_TO_BADGE[props.lawType] ?? docTypeToBadge(props.docType);
+  return docTypeToBadge(props.docType);
+});
+const cardTypeClass = computed<LawTypeCardClass>(() => {
+  if (props.lawType) return LAW_TYPE_TO_DOC_TYPE[props.lawType] ?? props.docType;
+  return props.docType;
+});
 const statusBadge = computed(() => (props.changeStatus ? changeStatusToBadge(props.changeStatus) : null));
 
 const visibilityLabel = computed(() =>
@@ -137,6 +154,12 @@ const visibilityIcon = computed(() =>
 .elaw-card--prakat       { border-left-color: #fb923c; }
 .elaw-card--kotmai-phaainok { border-left-color: #854d0e; }
 .elaw-card--other        { border-left-color: #9e9e9e; }
+.elaw-card--prb          { border-left-color: #7c3aed; }
+.elaw-card--phrk         { border-left-color: #6d28d9; }
+.elaw-card--kotmai-krw   { border-left-color: #2563eb; }
+.elaw-card--prakat-krw   { border-left-color: #0369a1; }
+.elaw-card--command      { border-left-color: #64748b; }
+.elaw-card--resolution   { border-left-color: #475569; }
 
 /* Tags row */
 .elaw-card__tags {

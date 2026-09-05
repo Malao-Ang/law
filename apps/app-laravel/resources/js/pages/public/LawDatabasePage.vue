@@ -425,7 +425,13 @@ import { fetchLawFacets, getLookups, type LookupData } from '../../api/client';
 import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
-import type { ChangeStatus, DocType } from '../../components/shared/lawBadge';
+import {
+  LAW_TYPE_TO_BADGE,
+  LAW_TYPE_TO_DOC_TYPE,
+  type ChangeStatus,
+  type LawTypeBadge,
+  type LawTypeCardClass,
+} from '../../components/shared/lawBadge';
 import { useAuthStore } from '../../stores/authStore';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
@@ -999,24 +1005,11 @@ function extractYear(item: LawSearchResult): number {
   return match ? Number(match[0]) : 0;
 }
 
-const LAW_TYPE_TO_DOC_TYPE: Record<string, DocType> = {
-  phrb: 'kotmai-phaainok',
-  'พ.ร.บ.': 'kotmai-phaainok',
-  พระราชบัญญัติ: 'kotmai-phaainok',
-  'kotmai-krung': 'kotmai-phaainok',
-  'kotmai-phaainok': 'kotmai-phaainok',
-  กฎหมายภายนอก: 'kotmai-phaainok',
-  prakat: 'prakat',
-  ประกาศ: 'prakat',
-  'kho-bangkhab': 'kho-bangkhab',
-  ข้อบังคับ: 'kho-bangkhab',
-  rabiap: 'rabiap',
-  ระเบียบ: 'rabiap',
-};
-
-function toDocType(lawType: string | null | undefined): DocType {
-  if ((lawType ?? '').includes('ประกาศ')) return 'prakat';
-  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(lawType ?? '')] ?? 'other';
+function toDocType(lawType: string | null | undefined): LawTypeCardClass {
+  const raw = lawType ?? '';
+  return LAW_TYPE_TO_DOC_TYPE[raw]
+    ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(raw)]
+    ?? (raw.includes('ประกาศ') ? 'prakat' : 'other');
 }
 
 function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
@@ -1044,18 +1037,9 @@ function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined
   return undefined;
 }
 
-type DocBadgeKey = 'กฎหมายภายนอก' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ';
-
-const LAW_TYPE_TO_BADGE: Partial<Record<string, DocBadgeKey>> = {
-  'kotmai-phaainok': 'กฎหมายภายนอก',
-  'kho-bangkhab': 'ข้อบังคับ',
-  rabiap: 'ระเบียบ',
-  prakat: 'ประกาศ',
-};
-
-function lawTypeBadgeKey(lawType: string | null | undefined): DocBadgeKey | null {
+function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | null {
   if (!lawType) return null;
-  return LAW_TYPE_TO_BADGE[canonicalLawTypeValue(lawType)] ?? null;
+  return LAW_TYPE_TO_BADGE[lawType] ?? LAW_TYPE_TO_BADGE[canonicalLawTypeValue(lawType)] ?? null;
 }
 
 function useStatusClass(status: string | null | undefined): string {
@@ -1430,6 +1414,12 @@ onBeforeUnmount(() => {
 .law-list-card--rabiap       { border-left-color: #3b82f6; }
 .law-list-card--kho-bangkhab { border-left-color: #10b981; }
 .law-list-card--prakat       { border-left-color: #fb923c; }
+.law-list-card--prb          { border-left-color: #7c3aed; }
+.law-list-card--phrk         { border-left-color: #6d28d9; }
+.law-list-card--kotmai-krw   { border-left-color: #2563eb; }
+.law-list-card--prakat-krw   { border-left-color: #0369a1; }
+.law-list-card--command      { border-left-color: #64748b; }
+.law-list-card--resolution   { border-left-color: #475569; }
 
 .law-list-card__body {
   display: grid;
