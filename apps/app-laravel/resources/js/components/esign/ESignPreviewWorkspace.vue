@@ -22,15 +22,7 @@
         :loading="sending"
         @click="confirmSendOpen = true"
       >ส่งไปยังระบบ E-Sign</v-btn>
-      <v-btn
-        color="success"
-        size="small"
-        variant="tonal"
-        prepend-icon="mdi-check-decagram-outline"
-        class="text-none"
-        :loading="mockSigning"
-        @click="mockSignComplete"
-      >จำลองลงนามเสร็จสิ้น (Mock)</v-btn>
+
     </template>
 
     <div class="preview-page">
@@ -244,7 +236,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign, updateWorkflowProgress } from '../../api/client';
+import { downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -277,7 +269,6 @@ const addDialog = ref(false);
 const confirmSendOpen = ref(false);
 const savingDraft = ref(false);
 const sending = ref(false);
-const mockSigning = ref(false);
 const downloadingPdf = ref(false);
 const pdfPreviewKey = ref(0);
 const flash = ref('');
@@ -398,35 +389,6 @@ async function saveDraft(): Promise<void> {
     flash.value = 'บันทึกฉบับร่างแล้ว';
   } finally {
     savingDraft.value = false;
-  }
-}
-
-async function mockSignComplete(): Promise<void> {
-  mockSigning.value = true;
-  try {
-    const now = new Date().toISOString();
-    const current = loadSession(props.documentId);
-    const next = pushActivity({
-      ...current,
-      status: 'completed',
-      submittedAt: current.submittedAt || now,
-    }, {
-      title: 'จำลองลงนามเสร็จสิ้น (Mock)',
-      detail: 'ข้ามขั้นตอน e-Sign จริงเพื่อทดสอบ',
-      actor: documentStore.review?.law_meta?.imported_by || undefined,
-      at: now,
-    });
-    saveSession(props.documentId, next);
-    await updateWorkflowProgress(props.documentId, 6);
-    writeStage(props.documentId, 'public');
-    // TODO: Remove mock sign — replace with real e-Sign integration
-    // Refresh document data so publish dialog sees esign_confirmed_at
-    await documentStore.fetch(props.documentId);
-    await router.push(`/documents/${props.documentId}/edit`);
-  } catch (error) {
-    errorFlash.value = error instanceof Error ? error.message : 'Mock sign ไม่สำเร็จ';
-  } finally {
-    mockSigning.value = false;
   }
 }
 

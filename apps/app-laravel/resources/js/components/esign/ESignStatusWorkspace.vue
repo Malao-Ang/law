@@ -194,15 +194,6 @@
             ยังไม่มีกิจกรรม — ส่งเอกสารเข้าสู่ระบบ e-Sign เพื่อเริ่มติดตามสถานะ
           </div>
 
-          <div v-if="session.status === 'waiting'" class="mt-4 d-flex justify-end">
-            <v-btn
-              size="small"
-              variant="tonal"
-              color="success"
-              class="text-none"
-              @click="markSigned"
-            >จำลองลงนามเสร็จ</v-btn>
-          </div>
         </section>
       </div>
 
@@ -648,20 +639,6 @@ async function cancelSubmit(): Promise<void> {
   } finally {
     cancelling.value = false;
   }
-}
-
-function markSigned(): void {
-  const now = new Date().toISOString();
-  session.value = pushActivity({
-    ...session.value,
-    status: 'signed',
-    signedAt: now,
-  }, {
-    title: 'ลงนามเสร็จสิ้น — พร้อมเผยแพร่',
-    detail: primarySigner.value ? `ผู้ลงนาม: ${primarySigner.value.name}` : undefined,
-    at: now,
-  });
-  persist();
 }
 
 async function publish(): Promise<void> {
