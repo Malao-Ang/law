@@ -164,11 +164,13 @@ const visibilityIcon = computed(() =>
 /* Tags row */
 .elaw-card__tags {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 10px;
   flex-wrap: wrap;
   gap: 6px;
+  min-height: 52px;
+  align-content: flex-start;
 }
 
 .elaw-tag--fallback {
@@ -282,6 +284,10 @@ const visibilityIcon = computed(() =>
   color: #1e293b;
   line-height: 16px;
   margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .elaw-card__divider {
