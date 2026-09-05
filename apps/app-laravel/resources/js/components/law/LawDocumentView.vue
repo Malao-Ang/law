@@ -122,60 +122,8 @@
           </div>
         </v-card>
 
-        <v-card class="lawx-card lawx-download-card" elevation="0">
-          <div class="lawx-download-card__title">
-            <span class="mdi mdi-download-circle-outline" />
-            ดาวน์โหลดเอกสาร
-          </div>
-          <div class="lawx-download-card__actions">
-            <v-btn
-              :href="downloadUrl"
-              variant="tonal"
-              size="small"
-              prepend-icon="mdi-file-document-outline"
-            >
-              ดาวน์โหลดเอกสารต้นฉบับ
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              size="small"
-              prepend-icon="mdi-file-pdf-box"
-              :loading="pdfExportLoading"
-              @click="handlePdfExport"
-            >
-              ดาวน์โหลด PDF
-            </v-btn>
-          </div>
-
-          <template v-if="downloadableRelations.length">
-            <div class="lawx-download-card__subtitle">
-              <span class="mdi mdi-link-variant" />
-              เอกสารที่เชื่อมโยง
-            </div>
-            <div class="lawx-download-card__relations">
-              <div v-for="rel in downloadableRelations" :key="rel.id" class="lawx-download-card__relrow">
-                <span class="lawx-download-card__reltitle">{{ rel.target_title || rel.target_document_id }}</span>
-                <v-btn
-                  :href="relatedDocumentFileUrl(props.documentId, rel.target_document_id!)"
-                  variant="text"
-                  size="x-small"
-                  prepend-icon="mdi-download"
-                  class="text-none"
-                >
-                  ดาวน์โหลด
-                </v-btn>
-              </div>
-            </div>
-          </template>
-        </v-card>
-
         <template v-if="usesOriginalPdfLayout">
           <v-card tag="section" class="lawx-card" elevation="0">
-            <div class="d-flex justify-end mb-2">
-              <v-btn :href="downloadUrl" prepend-icon="mdi-download" variant="tonal" size="small">
-                ดาวน์โหลด PDF
-              </v-btn>
-            </div>
             <iframe :src="fileUrl" title="เอกสารต้นฉบับ" style="width:100%;height:80vh;border:0;border-radius:8px" />
           </v-card>
         </template>
@@ -238,6 +186,24 @@
       </main>
 
       <aside v-show="infoOpen" class="lawx-info">
+        <v-card v-if="parentLawRelation" flat class="lawx-parent-law-card mb-4" rounded="lg">
+          <div class="d-flex align-start ga-3 pa-4">
+            <v-avatar color="primary" variant="tonal" size="36">
+              <v-icon icon="mdi-bank" size="18" />
+            </v-avatar>
+            <div>
+              <div class="text-caption font-weight-bold text-medium-emphasis">กฎหมายแม่</div>
+              <a class="text-body-2 font-weight-bold d-block lawx-parent-law-card__link"
+                @click="router.push(`/law/${parentLawRelation.target_document_id}`)">
+                {{ parentLawRelation.target_title }}
+              </a>
+              <div v-if="parentLawRelation.target_section" class="text-caption text-medium-emphasis mt-1">
+                {{ parentLawRelation.target_section }}
+                <span v-if="parentLawRelation.note"> — {{ parentLawRelation.note }}</span>
+              </div>
+            </div>
+          </div>
+        </v-card>
         <section v-if="docRelations.length" class="lawx-parentcard">
           <div class="lawx-parentcard__head">
             <span class="mdi mdi-bank" />
@@ -324,7 +290,7 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, relatedDocumentFileUrl } from '../../api/client';
+import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport } from '../../api/client';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
@@ -396,7 +362,10 @@ const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith
 const usesOriginalPdfLayout = computed(() => isOld.value || isPdfSource.value);
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const downloadUrl = computed(() => documentFileDownloadUrl(props.documentId));
-const pdfExportLoading = ref(false);
+const safeFileName = computed(() => {
+  const title = meta.value.title || documentStore.review?.source_file || props.documentId;
+  return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.pdf`;
+});
 
 const articleCount = computed(() =>
   sections.value.filter((s) => s.badge.startsWith('มาตรา') || s.badge.startsWith('ข้อ')).length,
@@ -417,20 +386,9 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
-const downloadableRelations = computed(() =>
-  relations.value.filter((rel) => rel.target_document_id),
+const parentLawRelation = computed(() =>
+  relations.value.find((rel) => rel.type === 'issued_under' && rel.scope === 'document' && rel.target_document_id) ?? null,
 );
-
-async function handlePdfExport(): Promise<void> {
-  pdfExportLoading.value = true;
-  try {
-    await downloadPdfExport(props.documentId);
-  } catch (e) {
-    console.error('PDF export failed', e);
-  } finally {
-    pdfExportLoading.value = false;
-  }
-}
 
 const notCurrentVersion = computed(() =>
   versionStore.currentDocumentId !== '' && versionStore.currentDocumentId !== props.documentId,
@@ -507,10 +465,19 @@ async function downloadPdf(): Promise<void> {
   exportingPdf.value = true;
   pdfExportError.value = '';
   try {
-    await downloadPdfExport(props.documentId);
-    await documentStore.fetch(props.documentId, true);
+    if (usesOriginalPdfLayout.value) {
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl.value;
+      anchor.download = safeFileName.value;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+    } else {
+      await downloadPdfExport(props.documentId, safeFileName.value);
+      await documentStore.fetch(props.documentId, true);
+    }
   } catch (error) {
-    pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
+    pdfExportError.value = error instanceof Error ? error.message : 'ดาวน์โหลดไม่สำเร็จ';
   } finally {
     exportingPdf.value = false;
   }
@@ -857,6 +824,21 @@ onBeforeUnmount(() => observer?.disconnect());
   margin-bottom: 12px;
 }
 .lawx-parentcard__head .mdi { color: #b45309; }
+
+.lawx-parent-law-card {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.lawx-parent-law-card__link {
+  color: #1e3a5f;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.lawx-parent-law-card__link:hover {
+  text-decoration: underline;
+}
 
 .lawx-parentcard--sections {
   background: #f8fafc;

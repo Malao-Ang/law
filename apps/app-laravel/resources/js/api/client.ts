@@ -283,12 +283,12 @@ async function downloadBinaryExport(
   URL.revokeObjectURL(url);
 }
 
-export async function downloadPdfExport(documentId: string): Promise<void> {
+export async function downloadPdfExport(documentId: string, fallbackName = `document-${documentId}.pdf`): Promise<void> {
   return downloadBinaryExport(
     documentId,
     `/api/documents/${documentId}/export-pdf`,
     'application/pdf',
-    `document-${documentId}.pdf`,
+    fallbackName,
   );
 }
 

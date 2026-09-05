@@ -45,6 +45,37 @@
           <span class="law-info-row__label text-medium-emphasis">หน่วยงาน</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.agency }}</span>
         </div>
+        <div v-if="meta.agencies?.length > 1" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">หน่วยงานทั้งหมด</span>
+          <div class="d-flex flex-wrap ga-1 justify-end">
+            <v-chip v-for="agency in meta.agencies" :key="agency" size="x-small" variant="tonal">{{ agency }}</v-chip>
+          </div>
+        </div>
+        <div v-if="meta.law_groups?.length > 1" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมายทั้งหมด</span>
+          <div class="d-flex flex-wrap ga-1 justify-end">
+            <v-chip v-for="group in meta.law_groups" :key="group" size="x-small" variant="tonal">{{ group }}</v-chip>
+          </div>
+        </div>
+        <div v-if="meta.expiry_date" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">วันหมดอายุ</span>
+          <span class="law-info-row__value font-weight-semibold text-error">{{ formatLawDate(meta.expiry_date) }}</span>
+        </div>
+        <div v-if="meta.parent_document_ids?.length" class="law-info-row py-1">
+          <span class="law-info-row__label text-medium-emphasis">กฎหมายแม่</span>
+          <div class="d-flex flex-wrap ga-1 justify-end">
+            <v-chip
+              v-for="documentId in meta.parent_document_ids"
+              :key="documentId"
+              :to="`/law/${encodeURIComponent(documentId)}`"
+              size="x-small"
+              variant="tonal"
+              color="primary"
+            >
+              {{ documentId }}
+            </v-chip>
+          </div>
+        </div>
         <div v-if="meta.keywords.length" class="mt-3">
           <div class="text-caption text-medium-emphasis font-weight-bold mb-2">คำสำคัญ</div>
           <div class="d-flex flex-wrap ga-2">
@@ -101,16 +132,6 @@
             rounded="pill"
             class="ml-2"
           >{{ versions.length }}</v-chip>
-        </v-btn>
-        <v-btn
-          flat
-          variant="outlined"
-          prepend-icon="mdi-sitemap"
-          class="justify-start text-none"
-          :disabled="!viewedDocumentId"
-          :to="viewedDocumentId ? `/law/relations/${encodeURIComponent(viewedDocumentId)}` : undefined"
-        >
-          ดูโครงสร้างความสัมพันธ์ (Hierarchy)
         </v-btn>
       </v-card-text>
     </v-card>
