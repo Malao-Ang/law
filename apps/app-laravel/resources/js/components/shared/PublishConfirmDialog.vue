@@ -183,10 +183,8 @@ const hasRequiredFail = computed(() =>
 
 watch(
   () => props.modelValue,
-  (value) => {
-    if (value && props.publishing) {
-      void documentStore.getStatus();
-    }
+  (_value) => {
+    // review data already loaded in store; no extra fetch needed
   },
 );
 </script>
