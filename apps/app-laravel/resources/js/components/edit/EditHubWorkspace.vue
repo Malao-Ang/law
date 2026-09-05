@@ -34,11 +34,11 @@
               </v-chip>
               <v-chip
                 size="small"
-                :color="isPublished ? 'success' : 'warning'"
+                :color="isPublished ? 'success' : (meta.status && meta.status !== 'ร่าง' ? 'info' : 'warning')"
                 variant="flat"
                 class="font-weight-bold"
               >
-                {{ isPublished ? 'เผยแพร่แล้ว' : 'รอลงนาม' }}
+                {{ isPublished ? 'เผยแพร่แล้ว' : (meta.status || 'ร่าง') }}
               </v-chip>
               <v-chip size="small" variant="tonal" class="font-weight-medium">
                 # {{ documentId }}
