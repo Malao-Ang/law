@@ -8,7 +8,7 @@
       <v-card-text>
         <div v-if="meta.status" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">สถานะ</span>
-          <span class="law-info-row__value text-success font-weight-semibold d-flex align-center justify-end ga-1">
+          <span class="law-info-row__value font-weight-semibold d-flex align-center justify-end ga-1" :class="statusClass(meta.status)">
             <v-icon icon="mdi-circle" size="x-small" />
             {{ meta.status }}
           </span>
@@ -119,6 +119,12 @@ defineProps<{ meta: LawMeta; articleCount: number; articleUnitLabel?: string; sh
 
 function formatLawDate(value: string | null | undefined): string {
   return formatThaiDate(value) || value || '';
+}
+
+function statusClass(status: string): string {
+  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'text-success';
+  if (status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'text-error';
+  return 'text-warning';
 }
 </script>
 

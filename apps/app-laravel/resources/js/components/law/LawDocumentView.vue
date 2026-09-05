@@ -262,6 +262,40 @@
             </a>
           </div>
         </section>
+        <section v-if="sectionRelationSummaries.length" class="lawx-parentcard lawx-parentcard--sections">
+          <div class="lawx-parentcard__head">
+            <span class="mdi mdi-file-tree-outline" />
+            ความสัมพันธ์ราย{{ unitWord }}
+          </div>
+          <div v-for="summary in sectionRelationSummaries" :key="summary.sectionId" class="lawx-section-rel-summary">
+            <div class="lawx-section-rel-summary__badge">{{ summary.badge }}</div>
+            <div class="lawx-section-rel-summary__body">
+              <div
+                v-for="group in summary.groups"
+                :key="group.type"
+                class="lawx-relgroup"
+              >
+                <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+                <a
+                  v-for="rel in group.items"
+                  :key="rel.id"
+                  class="lawx-relrow lawx-relrow--compact"
+                  :class="`is-${group.type}`"
+                  :href="relationHref(rel) ?? undefined"
+                  :target="safeUrl(rel.url) ? '_blank' : undefined"
+                  rel="noopener"
+                >
+                  <span class="mdi lawx-relrow__icon" :class="RELATION_TYPE_ICONS[rel.type] ?? 'mdi-link-variant'" />
+                  <span class="lawx-relrow__main">
+                    <span class="lawx-relrow__title">{{ rel.target_title || rel.target_document_id || 'ไม่ระบุชื่อกฎหมาย' }}</span>
+                    <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">— {{ rel.change_detail || rel.note }}</span>
+                  </span>
+                  <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
         <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" />
       </aside>
       </div>
@@ -421,6 +455,15 @@ function groupedSectionRelations(sectionId: string) {
 
 const docRelations = computed<LawRelation[]>(() => documentRelations(relations.value));
 const groupedDocRelations = computed(() => groupRelations(docRelations.value));
+const sectionRelationSummaries = computed(() =>
+  sections.value
+    .map((section) => ({
+      sectionId: section.id,
+      badge: section.badge,
+      groups: groupedSectionRelations(section.id),
+    }))
+    .filter((summary) => summary.groups.length > 0),
+);
 
 function badgeOf(sectionId: string): string {
   return sections.value.find((section) => section.id === sectionId)?.badge ?? '';
@@ -795,6 +838,42 @@ onBeforeUnmount(() => observer?.disconnect());
 }
 .lawx-parentcard__head .mdi { color: #7c3aed; }
 
+.lawx-parentcard--sections {
+  border-top-color: #2563eb;
+}
+
+.lawx-section-rel-summary {
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.lawx-section-rel-summary:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.lawx-section-rel-summary__badge {
+  align-self: flex-start;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  color: #047857;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  max-width: 88px;
+  overflow-wrap: anywhere;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.lawx-section-rel-summary__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .lawx-relcard {
   margin-top: 14px;
   border: 1px solid #e2e8f0;
@@ -838,6 +917,25 @@ onBeforeUnmount(() => observer?.disconnect());
   text-decoration: none;
 }
 .lawx-relrow:hover { border-color: #cbd5e1; background: #fcfcfd; }
+.lawx-relrow--compact {
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 8px 10px;
+}
+
+.lawx-relrow--compact .lawx-relrow__main {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lawx-relrow--compact .lawx-relrow__note {
+  white-space: normal;
+}
+
+.lawx-relrow--compact .lawx-relrow__sec {
+  grid-column: 2;
+  justify-self: start;
+  text-align: left;
+}
 .lawx-relrow__icon { flex-shrink: 0; }
 .lawx-relrow.is-repeals .lawx-relrow__icon { color: #dc2626; }
 .lawx-relrow.is-supersedes .lawx-relrow__icon { color: #ea580c; }
