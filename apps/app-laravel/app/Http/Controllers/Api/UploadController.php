@@ -20,8 +20,16 @@ class UploadController extends Controller
     public function store(StoreDocumentRequest $request): JsonResponse
     {
         $extension = strtolower((string) $request->file('file')->getClientOriginalExtension());
-        $scanExtractionMode = $extension === 'pdf' ? 'gemini' : 'local';
-        $extractionEngine = $extension === 'pdf' ? 'standard' : 'fast';
+        $requestedMode = (string) $request->input('scan_extraction_mode', '');
+        if ($extension === 'pdf') {
+            $scanExtractionMode = in_array($requestedMode, ['gemini', 'landingai'], true)
+                ? $requestedMode
+                : 'gemini';
+            $extractionEngine = 'standard';
+        } else {
+            $scanExtractionMode = 'local';
+            $extractionEngine = 'fast';
+        }
 
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
