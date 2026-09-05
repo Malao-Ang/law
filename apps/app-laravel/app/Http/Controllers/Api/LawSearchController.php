@@ -189,6 +189,7 @@ class LawSearchController extends Controller
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
                 'snippets' => $restricted ? [] : $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')),
+                'keywords' => array_values(array_filter((array) ($r['keywords'] ?? []), 'is_string')),
             ];
         }, $paged);
 

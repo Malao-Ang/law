@@ -83,6 +83,7 @@
         >
           {{ item.lawStatus }}
         </v-chip>
+        <v-chip v-else size="small" color="warning" variant="tonal">ร่าง</v-chip>
       </template>
 
       <template #item.publishedDate="{ item }">

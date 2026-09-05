@@ -59,6 +59,7 @@ export interface LawSearchResult {
   confidence?: number;
   match_mode?: string;
   snippets: string[];
+  keywords?: string[];
   source?: 'internal' | 'external';
   issuer?: string | null;
 }

@@ -364,6 +364,20 @@
                       {{ law.signer_group }}
                     </span>
                   </div>
+                  <div v-if="law.keywords?.length" class="law-list-card__keywords">
+                    <v-icon size="12" icon="mdi-tag-outline" class="mr-1" />
+                    <v-chip
+                      v-for="kw in law.keywords.slice(0, 5)"
+                      :key="kw"
+                      size="x-small"
+                      variant="tonal"
+                      color="primary"
+                      rounded="pill"
+                      class="law-keyword-chip"
+                    >
+                      <span v-html="highlightKeyword(kw)"></span>
+                    </v-chip>
+                  </div>
                   <div class="law-list-card__children" :class="{ 'law-list-card__children--empty': childChips(law).length === 0 }">
                     <span v-if="childChips(law).length" class="law-list-card__children-label">
                       <v-icon size="12" icon="mdi-link-variant" />
@@ -1023,6 +1037,14 @@ function childChips(law: LawSearchResult): Array<{ type: string; label: string; 
     });
 }
 
+function highlightKeyword(kw: string): string {
+  const q = query.value.trim();
+  if (!q) return sanitizeHighlight(kw);
+
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return sanitizeHighlight(kw.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>'));
+}
+
 function openLaw(law: LawSearchResult): void {
   const lawPath = `/law/${encodeURIComponent(law.law_id)}`;
   if (law.restricted && !auth.isAuthenticated) {
@@ -1509,6 +1531,18 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.law-list-card__keywords {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.law-keyword-chip {
+  font-size: 11px !important;
 }
 
 .law-list-card__snippets {

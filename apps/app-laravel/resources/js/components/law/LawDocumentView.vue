@@ -109,7 +109,7 @@
       >
         <v-card tag="section" class="lawx-headcard" elevation="0" :style="{ borderTopColor: badgeColor }">
           <DocBadge :type="badgeType" :label="badgeLabel" class="lawx-headcard__badge" />
-          <h1 class="lawx-headcard__title">{{ meta.title || documentStore.review.source_file }}</h1>
+          <h1 class="lawx-headcard__title">{{ meta.title || cleanSourceFile || 'เอกสาร' }}</h1>
           <p v-if="buddhistYear" class="lawx-headcard__year">พ.ศ. {{ buddhistYear }}</p>
           <p v-if="meta.issuer" class="lawx-headcard__issuer">
             <span class="mdi mdi-office-building-outline" />
@@ -362,6 +362,10 @@ const isPdfSource = computed(() => documentStore.review?.source_type?.startsWith
 const usesOriginalPdfLayout = computed(() => isOld.value || isPdfSource.value);
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const downloadUrl = computed(() => documentFileDownloadUrl(props.documentId));
+const cleanSourceFile = computed(() => {
+  const raw = documentStore.review?.source_file || '';
+  return raw.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+});
 const safeFileName = computed(() => {
   const title = meta.value.title || documentStore.review?.source_file || props.documentId;
   return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.pdf`;
@@ -566,6 +570,7 @@ onBeforeUnmount(() => observer?.disconnect());
 <style scoped>
 .lawx {
   min-height: 100vh;
+  padding-top: 96px;
   font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
   color: #1e293b;
   background: #f6f4ef;
