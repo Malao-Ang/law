@@ -111,7 +111,11 @@
             <td class="text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
             <td class="py-3" style="max-width: 400px">
               <div class="d-flex align-center ga-2 flex-wrap mb-1">
-                <span class="text-body-2 font-weight-bold">{{ law.title }}</span>
+                <v-tooltip :text="law.title" location="top">
+                  <template #activator="{ props: tooltipProps }">
+                    <span v-bind="tooltipProps" class="adm-law-title text-body-2 font-weight-bold">{{ law.title }}</span>
+                  </template>
+                </v-tooltip>
                 <v-chip v-if="law.isParent" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
                   <v-icon start icon="mdi-link-variant" size="11" />
                   กฎหมายที่อ้างถึง
@@ -273,11 +277,12 @@ const statCards = computed(() => {
     const matchesType = (value: string) => (
       typeName === 'ประกาศ' ? value.includes('ประกาศ') : value === typeName
     );
-    const count = summary.value.by_type
-      .filter((b) => matchesType(b.key))
-      .reduce((sum, b) => sum + b.count, 0);
-    const recent = summary.value.documents.filter(
-      (d) => matchesType(d.type) && d.date && new Date(d.date).getTime() > thirtyDaysAgo,
+    const docsForType = typeName === FEATURED_TYPES[0]
+      ? summary.value.documents.filter((d) => d.source === 'external')
+      : summary.value.documents.filter((d) => matchesType(d.type));
+    const count = docsForType.length;
+    const recent = docsForType.filter(
+      (d) => d.date && new Date(d.date).getTime() > thirtyDaysAgo,
     ).length;
     const meta = TYPE_META[typeName] ?? { color: 'grey', icon: 'mdi-file-outline' };
     return { type: typeName, count, recent, ...meta };
@@ -447,5 +452,14 @@ function effectiveStatusColor(law: LawRow): string {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.adm-law-title {
+  display: inline-block;
+  max-width: min(520px, 42vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 </style>

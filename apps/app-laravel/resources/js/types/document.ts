@@ -409,6 +409,8 @@ export interface ReportDocument {
   meta_status: string;
   change_status?: string;
   published_date?: string;
+  source?: DocumentSource;
+  document_type?: DocumentType;
   date: string | null;
   section_count: number | null;
   page_count: number;

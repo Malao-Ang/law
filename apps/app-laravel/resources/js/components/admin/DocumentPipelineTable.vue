@@ -59,7 +59,11 @@
       </template>
 
       <template #item.title="{ item }">
-        <span class="text-body-2 font-weight-medium">{{ item.title }}</span>
+        <v-tooltip :text="item.title" location="top">
+          <template #activator="{ props: tooltipProps }">
+            <span v-bind="tooltipProps" class="pipeline-title text-body-2 font-weight-medium">{{ item.title }}</span>
+          </template>
+        </v-tooltip>
       </template>
 
       <template #item.lawType="{ item }">
@@ -79,7 +83,6 @@
         >
           {{ item.lawStatus }}
         </v-chip>
-        <span v-else class="text-caption text-medium-emphasis">—</span>
       </template>
 
       <template #item.publishedDate="{ item }">
@@ -362,6 +365,15 @@ defineExpose({ load });
 
 .pipeline-table :deep(thead th:nth-child(2)) {
   text-align: left !important;
+}
+
+.pipeline-title {
+  display: inline-block;
+  max-width: min(560px, 44vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .pipeline-filter-bar {

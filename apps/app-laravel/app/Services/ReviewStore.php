@@ -231,6 +231,8 @@ class ReviewStore
                     'updated_at' => $status['updated_at'] ?? null,
                     'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
                     'permission_group_ids' => $permissionGroupIds,
+                    'source' => trim((string) ($meta['source'] ?? '')),
+                    'document_type' => trim((string) ($meta['document_type'] ?? 'new')),
                     'law_type' => trim((string) ($meta['law_type'] ?? '')),
                     'meta_status' => LawMetaNormalizer::legacyStatus($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
