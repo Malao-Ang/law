@@ -52,6 +52,16 @@
               <v-chip size="small" variant="tonal" class="font-weight-medium">
                 # {{ documentId }}
               </v-chip>
+              <v-chip
+                v-if="esignChip"
+                size="small"
+                :color="esignChip.color"
+                variant="tonal"
+                class="font-weight-medium"
+              >
+                <v-icon :icon="esignChip.icon" size="14" start />
+                {{ esignChip.label }}
+              </v-chip>
             </div>
 
             <h1 class="edit-hub-hero__title">{{ docTitle }}</h1>
@@ -295,6 +305,7 @@ const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
 const publishDialogOpen = ref(false);
 const publishDialogNext = ref<boolean | null>(null);
+const docStatus = ref<Awaited<ReturnType<typeof fetchStatus>> | null>(null);
 const sections = computed(() => buildSections(documentStore.review));
 const relations = computed<LawRelation[]>(() => documentStore.review?.relations ?? []);
 
@@ -345,6 +356,20 @@ const relationTypeSummary = computed(() => {
     counts.set(relation.type, (counts.get(relation.type) ?? 0) + 1);
   }
   return Array.from(counts.entries()).map(([type, count]) => ({ type, count }));
+});
+
+const esignChip = computed<{ label: string; color: string; icon: string } | null>(() => {
+  if (isOldDoc.value) return null;
+  const ds = docStatus.value;
+  if (!ds) return null;
+  if (ds.esign_confirmed_at) {
+    return { label: 'ลงนามสำเร็จ', color: 'success', icon: 'mdi-check-decagram' };
+  }
+  const step = ds.workflow_completed_step ?? 0;
+  if (step >= 5) {
+    return { label: 'รอลงนาม', color: 'deep-purple', icon: 'mdi-clock-outline' };
+  }
+  return null;
 });
 
 const actions = computed(() => {
@@ -540,6 +565,7 @@ onMounted(() => {
     void documentStore.fetch(props.documentId);
   }
   void versionStore.fetch(props.documentId);
+  fetchStatus(props.documentId).then((s) => { docStatus.value = s; }).catch(() => {});
 });
 
 watch(() => props.documentId, (id) => {
