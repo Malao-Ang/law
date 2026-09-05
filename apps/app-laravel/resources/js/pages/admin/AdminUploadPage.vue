@@ -9,25 +9,25 @@
 
       <!-- ── Document type selection cards ─────────────────── -->
       <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row">
-        <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:320px">
+        <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:300px">
           <v-icon size="32" color="admin-primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
           <h3 class="text-h6">เอกสารใหม่ (New Document)</h3>
           <p class="text-body-2 text-medium-emphasis">
             เอกสารที่ยังไม่ผ่านกระบวนการจัดการของระบบ จะต้องผ่านขั้นตอนการตรวจทาน และจัดลำดับเนื้อหา (Structuring) ด้วย AI
           </p>
-          <v-btn block color="admin-primary" variant="flat" @click="pickFiles('new')">ดำเนินการต่อ</v-btn>
+          <v-btn block color="admin-primary" variant="flat" @click="pickFiles({ key: 'new', documentType: 'new' })">ดำเนินการต่อ</v-btn>
         </v-card>
 
-        <v-card class="flex-1-1 pa-6 position-relative" elevation="0" rounded="lg" style="min-width:320px">
+        <v-card class="flex-1-1 pa-6 position-relative" elevation="0" rounded="lg" style="min-width:300px">
           <v-chip color="success" size="small" variant="flat" class="position-absolute" style="top:16px; right:16px">
             <v-icon start icon="mdi-check" size="14" />ลงนามเสร็จสิ้น
           </v-chip>
           <v-icon size="32" color="success" class="mb-2">mdi-file-check-outline</v-icon>
           <h3 class="text-h6">เอกสารเก่า (Historical Document)</h3>
           <p class="text-body-2 text-medium-emphasis">
-            เอกสารที่ผ่านการลงนามเสร็จสิ้นแล้ว ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบเอกสารต้นฉบับ
+            PDF เอกสารที่ผ่านการลงนามแล้ว ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบต้นฉบับ
           </p>
-          <v-btn block color="success" variant="flat" @click="pickFiles('old')">ดำเนินการต่อ</v-btn>
+          <v-btn block color="success" variant="flat" @click="pickFiles({ key: 'old-external', documentType: 'old', source: 'external' })">ดำเนินการต่อ</v-btn>
         </v-card>
       </div>
 
@@ -61,7 +61,7 @@
             <v-icon icon="mdi-file-document-multiple-outline" color="admin-primary" size="22" />
             <div class="flex-1">
               <div class="adm-dlg-head__title">รายการไฟล์</div>
-              <div class="adm-dlg-head__sub">{{ pendingItems.length }} ไฟล์ที่เลือก</div>
+              <div class="adm-dlg-head__sub">{{ pendingItems.length }} ไฟล์ที่เลือก · {{ uploadSourceLabel }}</div>
             </div>
             <button type="button" class="adm-btn-sm adm-btn-sm--outline" @click="fileInputEl?.click()">
               <v-icon icon="mdi-plus" size="15" />
@@ -201,21 +201,36 @@ interface PendingItem {
   error: string;
 }
 
+type UploadPresetKey = 'new' | 'old-internal' | 'old-external';
+
+interface UploadPreset {
+  key: UploadPresetKey;
+  documentType: 'new' | 'old';
+  source?: 'internal' | 'external';
+}
+
 const uploadStore = useUploadStore();
 const snackbar = useSnackbarStore();
 
 const fileInputEl = ref<HTMLInputElement | null>(null);
 const pendingItems = ref<PendingItem[]>([]);
 const uploadDialog = ref(false);
-const uploadMode = ref<'new' | 'old'>('new');
+const uploadPreset = ref<UploadPreset>({ key: 'new', documentType: 'new' });
+const uploadMode = computed(() => uploadPreset.value.documentType);
+const oldDocSource = ref<'internal' | 'external' | null>(null);
+const uploadSourceLabel = computed(() => {
+  if (uploadPreset.value.source === 'external') return 'เอกสารภายนอกหน่วยงาน';
+  if (uploadPreset.value.source === 'internal') return 'เอกสารภายในหน่วยงาน';
+  return 'เอกสารใหม่';
+});
 const pipelineTable = ref<InstanceType<typeof DocumentPipelineTable> | null>(null);
 
 const isUploading = computed(() => pendingItems.value.some(i => i.uploading));
 const allDone = computed(() => pendingItems.value.length > 0 && pendingItems.value.every(i => i.done));
 const pendingCount = computed(() => pendingItems.value.filter(i => !i.done).length);
 
-function pickFiles(mode: 'new' | 'old'): void {
-  uploadMode.value = mode;
+function pickFiles(preset: UploadPreset): void {
+  uploadPreset.value = preset;
   pendingItems.value = [];
   fileInputEl.value?.click();
 }
@@ -326,7 +341,10 @@ async function uploadAll(): Promise<void> {
       item.uploading = true;
       item.error = '';
       try {
-        await uploadStore.upload(item.file, item.scanMode, engineFor(item), { documentType: uploadMode.value });
+        await uploadStore.upload(item.file, item.scanMode, engineFor(item), {
+          documentType: uploadPreset.value.documentType,
+          source: uploadPreset.value.source,
+        });
         item.done = true;
       } catch (err) {
         item.error = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';

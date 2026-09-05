@@ -262,9 +262,19 @@ function isActive(item: NavItem): boolean {
   flex: 1 1 0;
 }
 
+.app-shell__breadcrumbs :deep(.v-breadcrumbs) {
+  min-width: 0;
+}
+
+.app-shell__breadcrumbs :deep(.v-breadcrumbs-item) {
+  min-width: 0;
+}
+
 .app-shell__breadcrumbs :deep(.v-breadcrumbs-item:last-child) {
   display: inline-block;
-  max-width: 420px;
+  flex: 0 1 auto;
+  max-width: 220px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

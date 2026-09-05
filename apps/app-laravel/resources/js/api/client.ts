@@ -526,3 +526,15 @@ export function deletePermissionGroup(groupId: string): Promise<{ group_id: stri
     method: 'DELETE',
   });
 }
+
+export interface RagSkipResponse {
+  document_id: string;
+  rag_skipped: boolean;
+}
+
+export function updateRagSkipped(documentId: string, ragSkipped: boolean): Promise<RagSkipResponse> {
+  return jsonRequest<RagSkipResponse>(`/api/documents/${encodeURIComponent(documentId)}/rag-skip`, {
+    method: 'PATCH',
+    body: JSON.stringify({ rag_skipped: ragSkipped }),
+  });
+}

@@ -448,10 +448,10 @@ onBeforeUnmount(() => {
 }
 
 .law-rel-picker__columns {
+  align-items: stretch;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  min-height: 320px;
 }
 
 .law-rel-picker__columns.is-single {

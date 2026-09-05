@@ -42,6 +42,7 @@ Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versio
 Route::get('/documents/{documentId}/preview', [ReviewController::class, 'preview']);
 Route::put('/documents/{documentId}/document-review', [ReviewController::class, 'updateDocumentReview']);
 Route::patch('/documents/{documentId}/workflow-progress', [ReviewController::class, 'updateWorkflowProgress']);
+Route::patch('/documents/{documentId}/rag-skip', [ReviewController::class, 'updateRagSkipped']);
 Route::post('/documents/{documentId}/blocks/reorder', [ReviewController::class, 'reorderBlocks']);
 Route::delete('/documents/{documentId}/blocks/{blockId}', [ReviewController::class, 'deleteBlock']);
 Route::post('/documents/{documentId}/blocks/merge', [ReviewController::class, 'mergeBlocks']);

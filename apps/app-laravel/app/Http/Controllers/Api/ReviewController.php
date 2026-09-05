@@ -474,6 +474,26 @@ class ReviewController extends Controller
         ]);
     }
 
+    public function updateRagSkipped(string $documentId, Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'rag_skipped' => ['required', 'boolean'],
+        ]);
+
+        if ($this->reviewStore->getStatus($documentId) === null) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $this->reviewStore->setStatus($documentId, [
+            'rag_skipped' => (bool) $validated['rag_skipped'],
+        ]);
+
+        return response()->json([
+            'document_id' => $documentId,
+            'rag_skipped' => (bool) $validated['rag_skipped'],
+        ]);
+    }
+
     public function createBlock(Request $request, string $documentId): JsonResponse
     {
         $validated = $request->validate([

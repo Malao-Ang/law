@@ -100,4 +100,32 @@ class OldDocumentMinioUploadTest extends TestCase
 
         $store->deleteDocument($docId);
     }
+
+    public function test_old_external_upload_prefills_metadata_source_external(): void
+    {
+        Bus::fake();
+        config(['buu.minio_enabled' => false]);
+
+        $mock = Mockery::mock(BuuMinioService::class);
+        $mock->shouldNotReceive('putFile');
+        $this->app->instance(BuuMinioService::class, $mock);
+
+        $response = $this->postJson('/api/documents', [
+            'file' => UploadedFile::fake()->create('external-law.pdf', 100, 'application/pdf'),
+            'document_type' => 'old',
+            'source' => 'external',
+        ]);
+
+        $response->assertStatus(202)->assertJsonPath('status', 'done');
+
+        $docId = $response->json('document_id');
+        $store = app(ReviewStore::class);
+        $review = $store->getReviewDocument($docId);
+
+        $this->assertSame('old', $review['law_meta']['document_type']);
+        $this->assertSame('external', $review['law_meta']['source']);
+        $this->assertSame('', $review['law_meta']['law_type']);
+
+        $store->deleteDocument($docId);
+    }
 }

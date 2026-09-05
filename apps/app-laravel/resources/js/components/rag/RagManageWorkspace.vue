@@ -4,8 +4,12 @@
       :step="3"
       :next-disabled="blockBusy"
       :next-loading="documentStore.saving"
+      extra-label="ข้ามขั้นตอนนี้"
+      extra-icon="mdi-skip-next-outline"
+      :extra-disabled="documentStore.saving || blockBusy"
       @back="router.push(`/documents/${props.documentId}/review`)"
       @next="goToLawInfo"
+      @extra="skipRagStep"
     />
 
     <!-- Loading -->
@@ -217,6 +221,7 @@ import SplitBlockDialog from './SplitBlockDialog.vue';
 import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS, normalizeChunkType } from '../../types/chunkType';
 import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
+import { updateRagSkipped } from '../../api/client';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -298,26 +303,53 @@ async function goToLawInfo(): Promise<void> {
   // Block if any section still has no type.
   const missing = sections.value.filter((s) => !s.headBlock.meta.chunk_type);
   if (missing.length > 0) {
-    await Swal.fire({
+    const swalResult = await Swal.fire({
       icon: 'warning',
       title: 'ยังกำหนดประเภทไม่ครบ',
       html:
         'กรุณาเลือกประเภทให้ส่วนต่อไปนี้ก่อนดำเนินการต่อ:<br><br>' +
         missing.map((s) => `• ${escapeForHtml(s.badge)}`).join('<br>'),
+      showCancelButton: true,
       confirmButtonText: 'ตกลง',
+      cancelButtonText: 'ข้ามขั้นตอนนี้',
       confirmButtonColor: '#1a3673',
+      cancelButtonColor: '#f59e0b',
     });
-    // Scroll to and highlight the first untyped section so the user can fix it.
-    const firstMissingId = missing[0].id;
-    blockListEl.value
-      ?.querySelector<HTMLElement>(`[data-section-id="${firstMissingId}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (swalResult.isConfirmed) {
+      // Scroll to and highlight the first untyped section so the user can fix it.
+      const firstMissingId = missing[0].id;
+      blockListEl.value
+        ?.querySelector<HTMLElement>(`[data-section-id="${firstMissingId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (swalResult.dismiss === Swal.DismissReason.cancel) {
+      await skipRagStep(true);
+    }
     return;
   }
 
   const progressed = await documentStore.completeWorkflowStep(3);
   if (!progressed) return;
+  await updateRagSkipped(props.documentId, false);
   history.value = [];
+  router.push(`/documents/${props.documentId}/law-info`);
+}
+
+async function skipRagStep(skipConfirm = false): Promise<void> {
+  if (!skipConfirm) {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'ข้ามขั้นตอนจัดลำดับ RAG?',
+      html: 'หากข้ามขั้นตอนนี้ จะยังไม่สามารถเผยแพร่เอกสารได้จนกว่าจะกลับมากรอก RAG ให้เสร็จ',
+      showCancelButton: true,
+      confirmButtonText: 'ข้ามขั้นตอนนี้',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#f59e0b',
+      cancelButtonColor: '#64748b',
+    });
+    if (!result.isConfirmed) return;
+  }
+
+  await updateRagSkipped(props.documentId, true);
   router.push(`/documents/${props.documentId}/law-info`);
 }
 

@@ -69,6 +69,7 @@ class ExportController extends Controller
             'progress' => 100,
             'export_path' => $result['export_path'],
             'ingested_chunk_count' => $chunkCount,
+            'rag_skipped' => false,
         ];
         if ($ingestPath !== null) {
             $statusPatch['ingest_path'] = $ingestPath;

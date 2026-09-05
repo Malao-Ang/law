@@ -373,7 +373,8 @@ import { buildSections, buildTocGroups } from '../../composables/useLawSections'
 import { writeStage } from '../../data/documentPipeline';
 import type { LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
-import { documentFileUrl } from '../../api/client';
+import { documentFileUrl, fetchStatus } from '../../api/client';
+import Swal from 'sweetalert2';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 
@@ -427,6 +428,48 @@ const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
 
 async function togglePublished(next: boolean | null): Promise<void> {
+  if (next) {
+    const status = await fetchStatus(props.documentId);
+    if (status?.rag_skipped) {
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'ยังไม่ได้จัดลำดับ RAG',
+        html: 'เอกสารนี้เคยข้ามขั้นตอน RAG ไว้ ต้องกลับไปจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
+        showCancelButton: true,
+        confirmButtonText: 'ไปจัดลำดับ RAG',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1a3673',
+        cancelButtonColor: '#64748b',
+      });
+      if (result.isConfirmed) {
+        router.push(`/documents/${props.documentId}/rag`);
+      }
+      return;
+    }
+  }
+  // Draft status check — after RAG check passes
+  if (next && (!meta.value.status || meta.value.status === 'ร่าง')) {
+    const result = await Swal.fire({
+      title: 'เอกสารยังเป็นร่าง',
+      html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>หากเผยแพร่ สถานะจะเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> โดยอัตโนมัติ',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
+      cancelButtonText: 'ยกเลิก',
+      denyButtonText: 'ไปแก้ไขสถานะเอง',
+      denyButtonColor: '#6b7280',
+      confirmButtonColor: '#1a3673',
+    });
+
+    if (result.isConfirmed) {
+      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+    } else if (result.isDenied) {
+      router.push(`/documents/${props.documentId}/law-info`);
+      return;
+    } else {
+      return;
+    }
+  }
   publishToggleSaving.value = true;
   try {
     await documentStore.saveLawMeta({
