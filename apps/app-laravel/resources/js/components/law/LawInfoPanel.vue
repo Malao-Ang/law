@@ -133,6 +133,16 @@
             class="ml-2"
           >{{ versions.length }}</v-chip>
         </v-btn>
+        <v-btn
+          flat
+          variant="outlined"
+          prepend-icon="mdi-graph-outline"
+          class="justify-start text-none"
+          :disabled="!viewedDocumentId"
+          :to="viewedDocumentId ? `/law/relations/${encodeURIComponent(viewedDocumentId)}` : undefined"
+        >
+          ความสัมพันธ์กฎหมาย
+        </v-btn>
       </v-card-text>
     </v-card>
 

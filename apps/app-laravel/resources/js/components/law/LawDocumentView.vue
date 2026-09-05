@@ -396,11 +396,20 @@ const parentLawRelation = computed(() =>
 
 const parentNames = computed<Array<{ id: string; title: string }>>(() => {
   const ids = meta.value.parent_document_ids ?? [];
-  if (!ids.length) return [];
-  return ids.map((id) => {
-    const rel = relations.value.find((r) => r.target_document_id === id);
-    return { id, title: rel?.target_title || id };
-  });
+  if (ids.length) {
+    return ids.map((id) => {
+      const rel = relations.value.find((r) => r.target_document_id === id);
+      return { id, title: rel?.target_title || 'ไม่ระบุชื่อกฎหมาย' };
+    });
+  }
+  // Fallback: derive from issued_under document-level relations
+  const issuedUnderRels = relations.value.filter(
+    (r) => r.type === 'issued_under' && r.scope === 'document' && r.target_document_id,
+  );
+  return issuedUnderRels.map((r) => ({
+    id: r.target_document_id!,
+    title: r.target_title || 'ไม่ระบุชื่อกฎหมาย',
+  }));
 });
 
 const notCurrentVersion = computed(() =>
