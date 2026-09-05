@@ -41,6 +41,12 @@ export interface LawSearchMeta {
   suggestions: string[];
 }
 
+export interface RelatedLawSummary {
+  document_id: string;
+  title: string;
+  type: string;
+}
+
 export interface LawSearchResult {
   law_id: string;
   title: string | null;
@@ -56,6 +62,7 @@ export interface LawSearchResult {
   restricted?: boolean;
   requires_permission?: boolean;
   child_types?: Record<string, number>;
+  related_laws?: RelatedLawSummary[];
   confidence?: number;
   match_mode?: string;
   snippets: string[];

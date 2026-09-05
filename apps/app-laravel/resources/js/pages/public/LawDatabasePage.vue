@@ -378,19 +378,23 @@
                       <span v-html="highlightKeyword(kw)"></span>
                     </v-chip>
                   </div>
-                  <div class="law-list-card__children" :class="{ 'law-list-card__children--empty': childChips(law).length === 0 }">
-                    <span v-if="childChips(law).length" class="law-list-card__children-label">
+                  <div class="law-list-card__children" :class="{ 'law-list-card__children--empty': referencedLawChips(law).length === 0 }">
+                    <span v-if="referencedLawChips(law).length" class="law-list-card__children-label">
                       <v-icon size="12" icon="mdi-link-variant" />
                       เอกสารที่อ้างถึง
                     </span>
-                    <span
-                      v-for="chip in childChips(law)"
-                      :key="chip.type"
-                      class="law-child-chip"
-                      :class="`law-child-chip--${chip.type}`"
+                    <v-tooltip
+                      v-for="chip in referencedLawChips(law)"
+                      :key="chip.document_id || chip.title"
+                      :text="chip.title"
+                      location="top"
                     >
-                      {{ chip.label }} {{ chip.count }}
-                    </span>
+                      <template #activator="{ props: tooltipProps }">
+                        <span v-bind="tooltipProps" class="law-child-chip law-child-chip--reference">
+                          {{ chip.title }}
+                        </span>
+                      </template>
+                    </v-tooltip>
                   </div>
                   <div class="law-list-card__snippets" :class="{ 'law-list-card__snippets--empty': law.snippets.length === 0 }">
                     <div
@@ -1037,6 +1041,12 @@ function childChips(law: LawSearchResult): Array<{ type: string; label: string; 
     });
 }
 
+function referencedLawChips(law: LawSearchResult): Array<{ document_id: string; title: string; type: string }> {
+  return (law.related_laws ?? [])
+    .filter((item) => item.title?.trim())
+    .slice(0, 3);
+}
+
 function highlightKeyword(kw: string): string {
   const q = query.value.trim();
   if (!q) return sanitizeHighlight(kw);
@@ -1584,6 +1594,13 @@ onBeforeUnmount(() => {
   border-radius: 9999px;
   background: #f3f4f6;
   color: #374151;
+}
+
+.law-child-chip--reference {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .law-child-chip--kotmai-phaainok {

@@ -55,7 +55,7 @@ class LawSearchController extends Controller
                 return response()->json($this->withSearchSuggestions([
                     'total' => max((int) ($fileBased['total'] ?? 0), count($results)),
                     'results' => $results,
-                    'facets' => $esResult['facets'] ?? $fileBased['facets'],
+                    'facets' => $this->computeResultFacets($results),
                     'fuzzy' => ($esResult['meta']['mode'] ?? 'exact') !== 'exact',
                     'meta' => [
                         'engine' => $supplement === [] ? 'elastic' : 'mixed',
@@ -93,6 +93,7 @@ class LawSearchController extends Controller
         }
         $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
         $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
+        $row['related_laws'] = $fileRow['related_laws'] ?? [];
         if ($row['restricted']) {
             $row['snippets'] = [];
         }
@@ -110,6 +111,7 @@ class LawSearchController extends Controller
         $perPage = max(1, (int) ($params['per_page'] ?? 20));
 
         $allMeta = $store->listLawMeta();
+        $metaById = array_column($allMeta, null, 'document_id');
         $childTypeIndex = [];
         foreach ($allMeta as $meta) {
             $type = $this->canonicalType((string) ($meta['law_type'] ?? ''));
@@ -164,7 +166,7 @@ class LawSearchController extends Controller
             }
         }
 
-        $results = array_map(function (array $r) use ($query, $store, $childTypeIndex): array {
+        $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById): array {
             $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
@@ -186,6 +188,7 @@ class LawSearchController extends Controller
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
+                'related_laws' => $this->relatedLawSummaries($id, $store, $metaById),
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
                 'snippets' => $restricted ? [] : $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')),
@@ -572,6 +575,59 @@ class LawSearchController extends Controller
         }
 
         return [];
+    }
+
+    /**
+     * @param  array<string,array<string,mixed>>  $metaById
+     * @return list<array{document_id:string,title:string,type:string}>
+     */
+    private function relatedLawSummaries(string $documentId, ReviewStore $store, array $metaById): array
+    {
+        $review = $store->getReviewDocument($documentId);
+        $relations = is_array($review['relations'] ?? null) ? $review['relations'] : [];
+        $items = [];
+
+        foreach ($relations as $rel) {
+            if (! is_array($rel) || (($rel['scope'] ?? 'document') !== 'document')) {
+                continue;
+            }
+
+            $targetId = trim((string) ($rel['target_document_id'] ?? ''));
+            $title = trim((string) ($rel['target_title'] ?? ''));
+            if ($title === '' && $targetId !== '' && isset($metaById[$targetId])) {
+                $title = trim((string) ($metaById[$targetId]['title'] ?? ''));
+            }
+            if ($title === '') {
+                continue;
+            }
+
+            $items[$targetId !== '' ? $targetId : $title] = [
+                'document_id' => $targetId,
+                'title' => $title,
+                'type' => (string) ($rel['type'] ?? 'related'),
+            ];
+        }
+
+        return array_slice(array_values($items), 0, 3);
+    }
+
+    /**
+     * @param  array<int, array<string,mixed>>  $results
+     * @return array<string, mixed>
+     */
+    private function computeResultFacets(array $results): array
+    {
+        $rows = array_map(static fn (array $r): array => [
+            'law_type' => (string) ($r['law_type'] ?? ''),
+            'meta_status' => (string) ($r['status'] ?? ''),
+            'change_status' => (string) ($r['change_status'] ?? ''),
+            'signer_group' => (string) ($r['signer_group'] ?? ''),
+            'agencies' => array_values(array_filter([(string) ($r['agency'] ?? '')])),
+            'law_groups' => array_values(array_filter([(string) ($r['law_group'] ?? '')])),
+            'promulgation_date' => (string) ($r['published_date'] ?? ''),
+        ], $results);
+
+        return $this->computeFileBasedFacets($rows);
     }
 
     /**
