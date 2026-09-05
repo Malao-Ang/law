@@ -90,9 +90,9 @@
           prepend-icon="mdi-history"
           class="justify-start text-none"
           :disabled="!viewedDocumentId"
-          :to="viewedDocumentId ? `/law/${encodeURIComponent(viewedDocumentId)}/versions` : undefined"
+          :to="viewedDocumentId ? `/law/relations/${encodeURIComponent(viewedDocumentId)}` : undefined"
         >
-          ดูเวอร์ชันและความสัมพันธ์
+          ดูประวัติการแก้ไข
           <v-chip
             v-if="versions && versions.length"
             size="x-small"
