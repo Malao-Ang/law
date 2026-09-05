@@ -191,15 +191,15 @@
                 </v-expansion-panel>
 
                 <v-expansion-panel value="year">
-                  <v-expansion-panel-title>ปีประกาศ</v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <div class="d-flex ga-2 align-center">
-                      <v-select v-model="yearFrom" :items="years" label="ปีเริ่มต้น" density="compact" hide-details />
-                      <span class="text-caption">ถึง</span>
-                      <v-select v-model="yearTo" :items="years" label="ปีสิ้นสุด" density="compact" hide-details />
-                    </div>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
+                    <v-expansion-panel-title>ปีประกาศ</v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <div class="d-flex ga-2 align-center">
+                        <v-combobox v-model="yearFrom" :items="years" label="ปี พ.ศ. เริ่มต้น" density="compact" hide-details />
+                        <span class="text-caption">ถึง</span>
+                        <v-combobox v-model="yearTo" :items="years" label="ปี พ.ศ. สิ้นสุด" density="compact" hide-details />
+                      </div>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
 
                 <v-expansion-panel value="agency">
                   <v-expansion-panel-title>หน่วยงาน</v-expansion-panel-title>
@@ -634,7 +634,8 @@ const changeStatusFilters = computed(() => canonicalFacetOptions('change_status'
 const useStatusFilters = computed(() => canonicalFacetOptions('status', (value) => value, statusLabel));
 const years = computed(() => {
   const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
-  const values = yearBuckets.map((bucket) => String(bucket.year));
+  // Convert CE years from facets to Buddhist Era (พ.ศ. = ค.ศ. + 543)
+  const values = yearBuckets.map((bucket) => String(bucket.year + 543));
   if (yearFrom.value) values.push(yearFrom.value);
   if (yearTo.value) values.push(yearTo.value);
 
@@ -728,8 +729,9 @@ function currentFilters(): LawSearchFilters {
     agency: selectedAgencies.value.length > 0 ? selectedAgencies.value : undefined,
     law_group: selectedGroups.value.length > 0 ? selectedGroups.value : undefined,
     signer_group: selectedKeeperGroups.value.length > 0 ? selectedKeeperGroups.value : undefined,
-    year_from: yearFrom.value ? Number(yearFrom.value) : null,
-    year_to: yearTo.value ? Number(yearTo.value) : null,
+    // yearFrom/yearTo hold พ.ศ. values; subtract 543 to convert back to ค.ศ. for the API
+    year_from: yearFrom.value ? Number(yearFrom.value) - 543 : null,
+    year_to: yearTo.value ? Number(yearTo.value) - 543 : null,
   };
 }
 
