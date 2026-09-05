@@ -419,6 +419,9 @@ async function mockSignComplete(): Promise<void> {
     saveSession(props.documentId, next);
     await updateWorkflowProgress(props.documentId, 6);
     writeStage(props.documentId, 'public');
+    // TODO: Remove mock sign — replace with real e-Sign integration
+    // Refresh document data so publish dialog sees esign_confirmed_at
+    await documentStore.fetch(props.documentId);
     await router.push(`/documents/${props.documentId}/edit`);
   } catch (error) {
     errorFlash.value = error instanceof Error ? error.message : 'Mock sign ไม่สำเร็จ';

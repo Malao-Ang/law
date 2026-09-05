@@ -73,8 +73,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useDocumentStore } from '../../stores/documentStore';
+import { fetchStatus } from '../../api/client';
+import type { DocumentStatus } from '../../types/document';
 
 type ChecklistLevel = 'required' | 'optional';
 
@@ -98,6 +100,7 @@ const emit = defineEmits<{
 }>();
 
 const documentStore = useDocumentStore();
+const docStatus = ref<DocumentStatus | null>(null);
 
 const open = computed({
   get: () => props.modelValue,
@@ -105,12 +108,11 @@ const open = computed({
 });
 
 const meta = computed(() => documentStore.review?.law_meta);
-const status = computed(() => documentStore.status);
 const isOldDoc = computed(() => meta.value?.document_type === 'old');
 
 const checklist = computed<ChecklistItem[]>(() => {
   const currentMeta = meta.value;
-  const currentStatus = status.value;
+  const currentStatus = docStatus.value;
   const workflowCompletedStep = currentStatus?.workflow_completed_step ?? null;
   const ragStatus = currentStatus?.status ?? '';
 
@@ -187,8 +189,14 @@ const hasRequiredFail = computed(() =>
 
 watch(
   () => props.modelValue,
-  (_value) => {
-    // review data already loaded in store; no extra fetch needed
+  async (value) => {
+    if (value && props.publishing) {
+      try {
+        docStatus.value = await fetchStatus(documentStore.documentId);
+      } catch {
+        docStatus.value = null;
+      }
+    }
   },
 );
 </script>
