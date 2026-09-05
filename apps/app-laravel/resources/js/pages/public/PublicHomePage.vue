@@ -379,6 +379,7 @@ function toDate(value?: string | null): Date | undefined {
   position: relative;
   display: flex;
   align-items: stretch;
+  padding: 0 28px;
 }
 
 .elaw-carousel__track {
@@ -428,11 +429,11 @@ function toDate(value?: string | null): Date | undefined {
 }
 
 .elaw-carousel__arrow--left {
-  left: -16px;
+  left: -20px;
 }
 
 .elaw-carousel__arrow--right {
-  right: -16px;
+  right: -20px;
 }
 
 @media (max-width: 768px) {
