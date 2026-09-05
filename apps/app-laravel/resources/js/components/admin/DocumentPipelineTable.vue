@@ -244,7 +244,7 @@ const rows = computed<Row[]>(() =>
     updatedAt: formatDate(doc.updated_at),
     stage: effectiveStage(doc),
     lawType: doc.law_type ?? '',
-    lawStatus: doc.law_status ?? '',
+    lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
     publishedDate: doc.published_date ?? '',
     documentType: doc.document_type ?? 'new',
   })),

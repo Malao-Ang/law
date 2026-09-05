@@ -251,27 +251,6 @@
                   </v-expansion-panel-text>
                 </v-expansion-panel>
 
-                <v-expansion-panel value="keeper-group">
-                  <v-expansion-panel-title>กลุ่มผู้ออกคำสั่ง/ลงนาม</v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <v-checkbox
-                      v-for="keeper in keeperGroupFilters"
-                      :key="keeper.value"
-                      v-model="selectedKeeperGroups"
-                      :value="keeper.value"
-                      density="compact"
-                      hide-details
-                      class="mb-n1"
-                    >
-                      <template #label>
-                        <span class="elaw-filter-option">
-                          <span>{{ keeper.label }}</span>
-                          <v-chip size="x-small" color="primary" variant="tonal" rounded="pill">{{ keeper.count }}</v-chip>
-                        </span>
-                      </template>
-                    </v-checkbox>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
               </v-expansion-panels>
 
               <v-divider class="my-3" />

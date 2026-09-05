@@ -31,7 +31,16 @@
           </v-list>
 
           <v-alert
-            v-if="hasOptionalWarnings"
+            v-if="hasRequiredFail"
+            type="error"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อนเผยแพร่
+          </v-alert>
+          <v-alert
+            v-else-if="checklist.some(i => i.level === 'optional' && !i.ok)"
             type="warning"
             variant="tonal"
             density="compact"
@@ -53,6 +62,7 @@
           color="admin-primary"
           variant="flat"
           :loading="loading"
+          :disabled="publishing && hasRequiredFail"
           @click="emit('confirm')"
         >
           {{ publishing ? 'ยืนยันเผยแพร่' : 'ยืนยัน' }}
@@ -167,8 +177,8 @@ const checklist = computed<ChecklistItem[]>(() => {
   return items;
 });
 
-const hasOptionalWarnings = computed(() =>
-  checklist.value.some((item) => item.level === 'optional' && !item.ok),
+const hasRequiredFail = computed(() =>
+  checklist.value.some((item) => item.level === 'required' && !item.ok),
 );
 
 watch(

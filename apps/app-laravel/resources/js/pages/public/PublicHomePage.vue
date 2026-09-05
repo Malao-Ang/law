@@ -19,29 +19,23 @@
               <a class="elaw-section-link" @click.prevent="goToDatabase()">ดูทั้งหมด →</a>
             </div>
           </div>
-          <v-row class="mt-2">
-            <v-col
+          <div class="elaw-hscroll mt-2">
+            <ELawLawCard
               v-for="doc in latestDocs.slice(0, 10)"
               :key="doc._id"
-              cols="12"
-              md="4"
-              class="d-flex"
-            >
-              <ELawLawCard
-                :title="doc.metadata.title"
-                :doc-type="toDocType(doc.metadata.documentType)"
-                :description="doc.metadata.summary"
-                :change-status-text="doc.metadata.changeStatus"
-                :use-status="doc.metadata.useStatus"
-                :department="doc.metadata.ownerAgencyId"
-                :law-group="doc.metadata.documentGroupId"
-                :date="formatThaiDate(doc.metadata.publishedDate)"
-                :visibility="doc.metadata.publicationScope"
-                style="width: 100%"
-                @click="openLaw(doc)"
-              />
-            </v-col>
-          </v-row>
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-hscroll__card"
+              @click="openLaw(doc)"
+            />
+          </div>
         </section>
 
         <!-- Section: ระเบียบ -->
@@ -349,6 +343,34 @@ function toDate(value?: string | null): Date | undefined {
 
 .elaw-home-section {
   width: 100%;
+}
+
+.elaw-hscroll {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.elaw-hscroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.elaw-hscroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 2px;
+}
+
+.elaw-hscroll::-webkit-scrollbar-thumb {
+  background: #b68d40;
+  border-radius: 2px;
+}
+
+.elaw-hscroll__card {
+  flex: 0 0 320px;
+  scroll-snap-align: start;
 }
 
 /* Section header: heading + tabs row */

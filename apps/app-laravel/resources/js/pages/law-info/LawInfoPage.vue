@@ -98,7 +98,7 @@
                 />
               </v-radio-group>
             </v-col>
-            <v-col v-if="isEditMode" cols="12" sm="6">
+            <v-col v-if="isEditMode || isOld" cols="12" sm="6">
               <v-autocomplete
                 v-model="form.status"
                 :items="statuses"
