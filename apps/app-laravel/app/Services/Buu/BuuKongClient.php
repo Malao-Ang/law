@@ -57,7 +57,8 @@ class BuuKongClient
         $request = $this->http
             ->acceptJson()
             ->withToken($token)
-            ->timeout((int) config('buu.timeout', 60));
+            ->timeout((int) config('buu.timeout', 60))
+            ->withOptions(['force_ip_resolve' => 'v4']);
 
         $response = $send($request, $url);
 
@@ -68,7 +69,8 @@ class BuuKongClient
             $request = $this->http
                 ->acceptJson()
                 ->withToken($token)
-                ->timeout((int) config('buu.timeout', 60));
+                ->timeout((int) config('buu.timeout', 60))
+                ->withOptions(['force_ip_resolve' => 'v4']);
             $response = $send($request, $url);
         }
 
