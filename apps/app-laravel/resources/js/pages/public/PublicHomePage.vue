@@ -19,23 +19,31 @@
               <a class="elaw-section-link" @click.prevent="goToDatabase()">ดูทั้งหมด →</a>
             </div>
           </div>
-          <div class="elaw-hscroll mt-2">
-            <ELawLawCard
-              v-for="doc in latestDocs.slice(0, 10)"
-              :key="doc._id"
-              :title="doc.metadata.title"
-              :doc-type="toDocType(doc.metadata.documentType)"
-              :law-type="doc.metadata.lawTypeName"
-              :description="doc.metadata.summary"
-              :change-status-text="doc.metadata.changeStatus"
-              :use-status="doc.metadata.useStatus"
-              :department="doc.metadata.ownerAgencyId"
-              :law-group="doc.metadata.documentGroupId"
-              :date="formatThaiDate(doc.metadata.publishedDate)"
-              :visibility="doc.metadata.publicationScope"
-              class="elaw-hscroll__card"
-              @click="openLaw(doc)"
-            />
+          <div class="elaw-carousel mt-2">
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
+              <v-icon icon="mdi-chevron-left" />
+            </button>
+            <div class="elaw-carousel__track" ref="latestTrack">
+              <ELawLawCard
+                v-for="doc in latestDocs.slice(0, 10)"
+                :key="doc._id"
+                :title="doc.metadata.title"
+                :doc-type="toDocType(doc.metadata.documentType)"
+                :law-type="doc.metadata.lawTypeName"
+                :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
+                :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
+                :date="formatThaiDate(doc.metadata.publishedDate)"
+                :visibility="doc.metadata.publicationScope"
+                class="elaw-carousel__card"
+                @click="openLaw(doc)"
+              />
+            </div>
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
+              <v-icon icon="mdi-chevron-right" />
+            </button>
           </div>
         </section>
 
@@ -174,6 +182,16 @@ import { canDisplayLawResult } from '../../utils/lawAccess';
 
 function toDocType(t: DocumentType): DocType {
   return t;
+}
+
+const latestTrack = ref<HTMLElement | null>(null);
+
+function scrollCarousel(event: Event, direction: number): void {
+  const btn = (event.currentTarget as HTMLElement);
+  const track = btn.closest('.elaw-carousel')?.querySelector('.elaw-carousel__track') as HTMLElement | null;
+  if (!track) return;
+  const cardWidth = 340;
+  track.scrollBy({ left: direction * cardWidth * 3, behavior: 'smooth' });
 }
 
 const router = useRouter();
@@ -352,35 +370,68 @@ function toDate(value?: string | null): Date | undefined {
   width: 100%;
 }
 
-.elaw-hscroll {
+.elaw-carousel {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.elaw-carousel__track {
   display: flex;
   align-items: stretch;
   gap: 20px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 8px;
+  padding: 4px 0 8px;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
 }
 
-.elaw-hscroll::-webkit-scrollbar {
-  height: 4px;
+.elaw-carousel__track::-webkit-scrollbar {
+  display: none;
 }
 
-.elaw-hscroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 2px;
-}
-
-.elaw-hscroll::-webkit-scrollbar-thumb {
-  background: #b68d40;
-  border-radius: 2px;
-}
-
-.elaw-hscroll__card {
+.elaw-carousel__card {
   flex: 0 0 320px;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
+}
+
+.elaw-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+
+.elaw-carousel__arrow:hover {
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.elaw-carousel__arrow--left {
+  left: -16px;
+}
+
+.elaw-carousel__arrow--right {
+  right: -16px;
+}
+
+@media (max-width: 768px) {
+  .elaw-carousel__arrow { display: none; }
 }
 
 /* Section header: heading + tabs row */
