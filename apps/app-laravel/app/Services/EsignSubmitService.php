@@ -150,6 +150,11 @@ class EsignSubmitService
             'esign_cancelled_at' => now()->toIso8601String(),
             'esign_cancel_response' => $response,
             'esign_sign_status' => 'C',
+            'esign_send_response' => null,
+            'esign_submitted_at' => null,
+            'esign_confirmed_at' => null,
+            'workflow_completed_step' => 5,
+            'workflow_current_step' => 6,
         ]);
 
         return [
