@@ -42,11 +42,13 @@ class EsignSubmitControllerTest extends TestCase
                 string $originalExtension,
                 ?string $bucket,
                 string $folderPath,
+                bool $qrVerify,
             ) {
                 return is_file($absolutePath)
                     && $originalExtension === 'pdf'
                     && $bucket === 'buu-contract'
-                    && $folderPath === '/';
+                    && $folderPath === '/'
+                    && $qrVerify === true;
             })
             ->andReturn('stored-abc.pdf');
         $buu->shouldReceive('sendDocumentSign')->never();

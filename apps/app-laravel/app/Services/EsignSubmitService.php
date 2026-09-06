@@ -74,6 +74,7 @@ class EsignSubmitService
                 originalExtension: 'pdf',
                 bucket: $bucket,
                 folderPath: '/',
+                qrVerify: true,
             );
         } finally {
             @unlink($pdfPath);
