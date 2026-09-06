@@ -332,6 +332,7 @@ export interface DocumentStatus {
   esign_confirmed_at?: string | null;
   esign_submitted_at?: string | null;
   esign_sign_status?: string | null;
+  esign_send_response?: { status?: string; message?: string } | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;
