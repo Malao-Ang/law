@@ -67,6 +67,7 @@ class EsignSubmitService
         $pdfPath = $tempPath.'.pdf';
         @unlink($tempPath);
 
+        $result = null;
         try {
             if (file_put_contents($pdfPath, $pdfBytes) === false) {
                 throw new BuuApiException('Failed to write temporary PDF file.');
@@ -86,6 +87,10 @@ class EsignSubmitService
             );
         } finally {
             @unlink($pdfPath);
+        }
+
+        if ($result === null) {
+            throw new BuuApiException('e-Sign upload returned no result.');
         }
 
         $now = now()->toIso8601String();
