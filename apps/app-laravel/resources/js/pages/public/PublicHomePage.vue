@@ -58,15 +58,15 @@
             </div>
             <a class="elaw-section-link" @click.prevent="goToDatabase('rabiap')">ดูทั้งหมด →</a>
           </div>
-          <v-row class="mt-2">
-            <v-col
-              v-for="doc in rabiapDocs.slice(0, 3)"
-              :key="doc._id"
-              cols="12"
-              md="4"
-            class="d-flex"
-            >
+          <!-- carousel when >3 items -->
+          <div v-if="rabiapDocs.length > 3" class="elaw-carousel mt-2">
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
+              <v-icon icon="mdi-chevron-left" />
+            </button>
+            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
+                v-for="doc in rabiapDocs"
+                :key="doc._id"
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :law-type="doc.metadata.lawTypeName"
@@ -77,11 +77,33 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
-                style="width: 100%"
+                class="elaw-carousel__card"
                 @click="openLaw(doc)"
               />
-            </v-col>
-          </v-row>
+            </div>
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
+              <v-icon icon="mdi-chevron-right" />
+            </button>
+          </div>
+          <!-- equal-width grid when ≤3 items -->
+          <div v-else class="elaw-grid mt-2">
+            <ELawLawCard
+              v-for="doc in rabiapDocs"
+              :key="doc._id"
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-grid__card"
+              @click="openLaw(doc)"
+            />
+          </div>
         </section>
 
         <!-- Section: ข้อบังคับ -->
@@ -95,15 +117,15 @@
             </div>
             <a class="elaw-section-link" @click.prevent="goToDatabase('kho-bangkhab')">ดูทั้งหมด →</a>
           </div>
-          <v-row class="mt-2">
-            <v-col
-              v-for="doc in khoBangkhabDocs.slice(0, 3)"
-              :key="doc._id"
-              cols="12"
-              md="4"
-            class="d-flex"
-            >
+          <!-- carousel when >3 items -->
+          <div v-if="khoBangkhabDocs.length > 3" class="elaw-carousel mt-2">
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
+              <v-icon icon="mdi-chevron-left" />
+            </button>
+            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
+                v-for="doc in khoBangkhabDocs"
+                :key="doc._id"
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :law-type="doc.metadata.lawTypeName"
@@ -114,15 +136,37 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
-                style="width: 100%"
+                class="elaw-carousel__card"
                 @click="openLaw(doc)"
               />
-            </v-col>
-          </v-row>
+            </div>
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
+              <v-icon icon="mdi-chevron-right" />
+            </button>
+          </div>
+          <!-- equal-width grid when ≤3 items -->
+          <div v-else class="elaw-grid mt-2">
+            <ELawLawCard
+              v-for="doc in khoBangkhabDocs"
+              :key="doc._id"
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-grid__card"
+              @click="openLaw(doc)"
+            />
+          </div>
         </section>
 
-        <!-- Section: ประกาศ -->
-        <section v-if="prakatDocs.length" class="elaw-home-section">
+        <!-- Section: ประกาศ (sorted: มหาวิทยาลัย first, then สภามหาวิทยาลัย) -->
+        <section v-if="sortedPrakatDocs.length" class="elaw-home-section">
           <div class="elaw-section-header">
             <div class="elaw-section-header__left">
               <div class="elaw-section-heading">
@@ -132,15 +176,15 @@
             </div>
             <a class="elaw-section-link" @click.prevent="goToDatabase('prakat')">ดูทั้งหมด →</a>
           </div>
-          <v-row class="mt-2">
-            <v-col
-              v-for="doc in prakatDocs.slice(0, 3)"
-              :key="doc._id"
-              cols="12"
-              md="4"
-            class="d-flex"
-            >
+          <!-- carousel when >3 items -->
+          <div v-if="sortedPrakatDocs.length > 3" class="elaw-carousel mt-2">
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
+              <v-icon icon="mdi-chevron-left" />
+            </button>
+            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
+                v-for="doc in sortedPrakatDocs"
+                :key="doc._id"
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
                 :law-type="doc.metadata.lawTypeName"
@@ -152,11 +196,34 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
-                style="width: 100%"
+                class="elaw-carousel__card"
                 @click="openLaw(doc)"
               />
-            </v-col>
-          </v-row>
+            </div>
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
+              <v-icon icon="mdi-chevron-right" />
+            </button>
+          </div>
+          <!-- equal-width grid when ≤3 items -->
+          <div v-else class="elaw-grid mt-2">
+            <ELawLawCard
+              v-for="doc in sortedPrakatDocs"
+              :key="doc._id"
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :issuer="doc.metadata.issuer"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-grid__card"
+              @click="openLaw(doc)"
+            />
+          </div>
         </section>
       </div>
 
@@ -166,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { searchLaws } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
@@ -258,8 +325,19 @@ onMounted(async () => {
 });
 
 function docsByType(docs: DocumentVersion[], type: DocumentType): DocumentVersion[] {
-  return docs.filter((doc) => doc.metadata.documentType === type).slice(0, 3);
+  return docs.filter((doc) => doc.metadata.documentType === type).slice(0, 10);
 }
+
+function issuerRank(doc: DocumentVersion): number {
+  const issuer = doc.metadata.issuer ?? '';
+  if (issuer.includes('สภามหาวิทยาลัย')) return 1;
+  if (issuer.includes('มหาวิทยาลัย')) return 0;
+  return 2;
+}
+
+const sortedPrakatDocs = computed(() =>
+  [...prakatDocs.value].sort((a, b) => issuerRank(a) - issuerRank(b))
+);
 
 function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion {
   const docType = docTypeFromSource(law);
@@ -508,5 +586,16 @@ function toDate(value?: string | null): Date | undefined {
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* Equal-width grid for ≤3 cards */
+.elaw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 320px);
+  gap: 20px;
+}
+
+.elaw-grid__card {
+  width: 320px;
 }
 </style>
