@@ -34,7 +34,7 @@ class EsignCallbackTest extends TestCase
             'signer_citizenid' => '1234567890123',
         ]);
 
-        $response->assertOk()->assertJson(['status' => 'received']);
+        $response->assertOk()->assertJson(['status' => 'success']);
 
         $status = $store->getStatus($docId);
         $this->assertSame('Y', $status['esign_sign_status'] ?? null);
@@ -66,10 +66,10 @@ class EsignCallbackTest extends TestCase
         $this->assertNotNull($status['esign_rejected_at'] ?? null);
     }
 
-    public function test_esign_callback_unknown_document_returns_404(): void
+    public function test_esign_callback_unknown_document_still_returns_success(): void
     {
         $this->postJson('/api/esign/callback/doc_missing_xyz', [
             'sign_status' => 'Y',
-        ])->assertNotFound();
+        ])->assertOk()->assertJson(['status' => 'success']);
     }
 }

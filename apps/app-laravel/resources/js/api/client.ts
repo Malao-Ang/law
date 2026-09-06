@@ -343,6 +343,14 @@ export type ESignSendPayload = {
   owner_citizen_id?: string;
   comment?: string;
   return_type?: 'L' | 'A';
+  attachments?: {
+    attachment_name?: string;
+    name?: string;
+    attachment_filename?: string;
+    filename?: string;
+    attachment_bucket?: string;
+    bucket?: string;
+  }[];
 };
 
 export type ESignUploadResponse = {

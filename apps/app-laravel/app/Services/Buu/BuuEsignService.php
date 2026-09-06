@@ -35,6 +35,7 @@ class BuuEsignService
      * When $returnUrl is null, uses callbackUrl($documentId) — $documentId is then required.
      *
      * @param  list<array{psn_citizenid: string, docs_comment?: string}>  $signers
+     * @param  list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>  $attachments
      * @param  'L'|'A'  $returnType  L = last signer / reject only; A = every signature
      * @return array<string, mixed>
      */
@@ -49,6 +50,7 @@ class BuuEsignService
         string $returnType = 'L',
         ?string $comment = null,
         ?string $sysName = null,
+        array $attachments = [],
     ): array {
         $resolvedReturnUrl = $returnUrl;
         if ($resolvedReturnUrl === null || $resolvedReturnUrl === '') {
@@ -58,7 +60,7 @@ class BuuEsignService
             $resolvedReturnUrl = $this->callbackUrl($documentId);
         }
 
-        return $this->kong->postJson('esign.send', [
+        $payload = [
             'psn_citizenid' => $ownerCitizenId,
             'doc_name' => $docName,
             'doc_filename' => $docFilename,
@@ -68,7 +70,13 @@ class BuuEsignService
             'doc_sysname' => $sysName ?? (string) config('buu.esign_sysname'),
             'doc_comment' => $comment ?? '',
             'doc_signer' => array_values($signers),
-        ]);
+        ];
+
+        if ($attachments !== []) {
+            $payload['doc_attachments'] = array_values($attachments);
+        }
+
+        return $this->kong->postJson('esign.send', $payload);
     }
 
     /**

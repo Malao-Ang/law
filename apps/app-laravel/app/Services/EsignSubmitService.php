@@ -81,6 +81,8 @@ class EsignSubmitService
         }
 
         $now = now()->toIso8601String();
+        $currentStatus = $this->reviewStore->getStatus($documentId) ?? [];
+        $attachments = $this->sourceAttachment($currentStatus, $bucket, $minioFilename);
         $this->reviewStore->setStatus($documentId, [
             'esign_exported_at' => $now,
             'esign_uploaded_at' => $now,
@@ -92,6 +94,7 @@ class EsignSubmitService
             'esign_return_type' => $returnType,
             'esign_comment' => $comment,
             'esign_signers' => $docSigners,
+            'esign_attachments' => $attachments,
             'esign_send_response' => null,
             'esign_submitted_at' => null,
             'esign_sign_status' => null,
@@ -129,6 +132,7 @@ class EsignSubmitService
         ?string $ownerCitizenId = null,
         ?string $comment = null,
         ?string $returnType = null,
+        array $attachments = [],
     ): array {
         $documentId = basename($documentId);
         $status = $this->reviewStore->getStatus($documentId);
@@ -160,6 +164,13 @@ class EsignSubmitService
         }
         $resolvedComment = $comment ?? (isset($status['esign_comment']) ? (string) $status['esign_comment'] : null);
         $returnUrl = (string) ($status['esign_return_url'] ?? $this->buuEsign->callbackUrl($documentId));
+        $docAttachments = $this->resolveAttachments(
+            $attachments,
+            is_array($status['esign_attachments'] ?? null) ? $status['esign_attachments'] : [],
+            $status,
+            $bucket,
+            $docFilename,
+        );
 
         $esign = $this->buuEsign->sendDocumentSign(
             ownerCitizenId: $owner,
@@ -171,6 +182,7 @@ class EsignSubmitService
             bucket: $bucket !== '' ? $bucket : null,
             returnType: $resolvedReturnType,
             comment: $resolvedComment,
+            attachments: $docAttachments,
         );
 
         $now = now()->toIso8601String();
@@ -180,6 +192,7 @@ class EsignSubmitService
             'esign_return_url' => $returnUrl,
             'esign_return_type' => $resolvedReturnType,
             'esign_signers' => $docSigners,
+            'esign_attachments' => $docAttachments,
             'esign_send_response' => $esign,
             'esign_sign_status' => null,
             'esign_rejected_at' => null,
@@ -330,5 +343,90 @@ class EsignSubmitService
         }
 
         return $this->exportService->safeFilenameBase($document);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $requested
+     * @param  list<array<string, mixed>>  $persisted
+     * @param  array<string, mixed>  $status
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function resolveAttachments(
+        array $requested,
+        array $persisted,
+        array $status,
+        string $bucket,
+        string $signingFilename,
+    ): array {
+        $fromRequest = $this->normalizeAttachments($requested, $bucket);
+        if ($fromRequest !== []) {
+            return $fromRequest;
+        }
+
+        $fromStatus = $this->normalizeAttachments($persisted, $bucket);
+        if ($fromStatus !== []) {
+            return $fromStatus;
+        }
+
+        return $this->sourceAttachment($status, $bucket, $signingFilename);
+    }
+
+    /**
+     * @param  array<string, mixed>  $status
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function sourceAttachment(array $status, string $bucket, string $signingFilename): array
+    {
+        $sourceKey = trim((string) ($status['minio_source_filename'] ?? ''));
+        if ($sourceKey === '') {
+            return [];
+        }
+
+        $sourceBasename = basename(str_replace('\\', '/', $sourceKey));
+        if ($sourceBasename === '' || $sourceBasename === $signingFilename) {
+            return [];
+        }
+
+        $name = trim((string) ($status['source_path'] ?? ''));
+        if ($name === '') {
+            $name = $sourceBasename;
+        }
+
+        return [[
+            'attachment_name' => basename($name),
+            'attachment_filename' => $sourceKey,
+            'attachment_bucket' => $bucket,
+        ]];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $attachments
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function normalizeAttachments(array $attachments, string $defaultBucket): array
+    {
+        $normalized = [];
+
+        foreach ($attachments as $attachment) {
+            if (! is_array($attachment)) {
+                continue;
+            }
+
+            $filename = trim((string) ($attachment['attachment_filename'] ?? $attachment['filename'] ?? ''));
+            if ($filename === '') {
+                continue;
+            }
+
+            $name = trim((string) ($attachment['attachment_name'] ?? $attachment['name'] ?? ''));
+            $itemBucket = trim((string) ($attachment['attachment_bucket'] ?? $attachment['bucket'] ?? $defaultBucket));
+
+            $normalized[] = [
+                'attachment_name' => $name !== '' ? $name : basename($filename),
+                'attachment_filename' => $filename,
+                'attachment_bucket' => $itemBucket !== '' ? $itemBucket : $defaultBucket,
+            ];
+        }
+
+        return $normalized;
     }
 }

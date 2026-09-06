@@ -60,6 +60,7 @@ class EsignController extends Controller
                 ownerCitizenId: $validated['owner_citizen_id'] ?? null,
                 comment: $validated['comment'] ?? null,
                 returnType: $validated['return_type'] ?? null,
+                attachments: $validated['attachments'] ?? [],
             );
         } catch (BuuApiException $exception) {
             return $this->buuError($exception);
@@ -111,7 +112,8 @@ class EsignController extends Controller
      *     owner_citizen_id?: string,
      *     comment?: string,
      *     return_type?: string,
-     *     signers?: list<array<string, mixed>>
+     *     signers?: list<array<string, mixed>>,
+     *     attachments?: list<array<string, mixed>>
      * }
      */
     private function validatedSendPayload(Request $request, bool $signersRequired): array
@@ -130,6 +132,13 @@ class EsignController extends Controller
             'signers.*.docs_comment' => ['nullable', 'string', 'max:500'],
             'signers.*.note' => ['nullable', 'string', 'max:500'],
             'signers.*.name' => ['nullable', 'string', 'max:255'],
+            'attachments' => ['sometimes', 'array'],
+            'attachments.*.attachment_name' => ['nullable', 'string', 'max:255'],
+            'attachments.*.name' => ['nullable', 'string', 'max:255'],
+            'attachments.*.attachment_filename' => ['nullable', 'string', 'max:500'],
+            'attachments.*.filename' => ['nullable', 'string', 'max:500'],
+            'attachments.*.attachment_bucket' => ['nullable', 'string', 'max:255'],
+            'attachments.*.bucket' => ['nullable', 'string', 'max:255'],
         ]);
     }
 
