@@ -329,6 +329,9 @@ export interface DocumentStatus {
   workflow_current_step?: number | null;
   workflow_updated_at?: string | null;
   esign_exported_at?: string | null;
+  esign_confirmed_at?: string | null;
+  esign_submitted_at?: string | null;
+  esign_sign_status?: string | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;

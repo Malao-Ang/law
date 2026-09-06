@@ -349,12 +349,17 @@ const esignChip = computed<{ label: string; color: string; icon: string } | null
   if (isOldDoc.value) return null;
   const ds = docStatus.value;
   if (!ds) return null;
-  if (ds.esign_confirmed_at) {
+  // ลงนามสำเร็จจริง: ต้องมี esign_confirmed_at และไม่มี esign_send_response.status === 'fail'
+  if (ds.esign_confirmed_at && ds.esign_sign_status !== 'rejected') {
     return { label: 'ลงนามสำเร็จ', color: 'success', icon: 'mdi-check-decagram' };
+  }
+  // ส่งไปแล้วแต่ยังไม่ลงนาม
+  if (ds.esign_submitted_at) {
+    return { label: 'รอลงนาม', color: 'deep-purple', icon: 'mdi-clock-outline' };
   }
   const step = ds.workflow_completed_step ?? 0;
   if (step >= 5) {
-    return { label: 'รอลงนาม', color: 'deep-purple', icon: 'mdi-clock-outline' };
+    return { label: 'รอส่ง e-Sign', color: 'warning', icon: 'mdi-send-clock-outline' };
   }
   return null;
 });
@@ -460,7 +465,8 @@ async function togglePublished(next: boolean | null): Promise<void> {
     try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
 
     // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
-    if (!docStatus?.esign_confirmed_at) {
+    const esignConfirmed = !!docStatus?.esign_confirmed_at && docStatus?.esign_sign_status !== 'rejected';
+    if (!esignConfirmed) {
       const isWaitingSign = !!docStatus?.esign_submitted_at;
       await Swal.fire({
         icon: 'warning',
