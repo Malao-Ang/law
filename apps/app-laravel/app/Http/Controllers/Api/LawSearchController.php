@@ -21,6 +21,9 @@ class LawSearchController extends Controller
         // File-based is authoritative: it reads status files directly and always
         // reflects the current publish state without depending on ES being up-to-date.
         $fileBased = $this->fileBasedSearch($params, $store);
+        if (trim((string) ($params['q'] ?? '')) === '') {
+            return response()->json($fileBased);
+        }
 
         // Published allowlist (ingested + has published_date) drops any
         // unpublished docs the ES index may still contain.
@@ -166,7 +169,8 @@ class LawSearchController extends Controller
             }
         }
 
-        $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById): array {
+        $includeHeavyDetails = ! $query->isEmpty();
+        $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById, $includeHeavyDetails): array {
             $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
@@ -188,10 +192,10 @@ class LawSearchController extends Controller
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
-                'related_laws' => $this->relatedLawSummaries($id, $store, $metaById),
+                'related_laws' => $includeHeavyDetails ? $this->relatedLawSummaries($id, $store, $metaById) : [],
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
-                'snippets' => $restricted ? [] : $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')),
+                'snippets' => ($includeHeavyDetails && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
                 'keywords' => array_values(array_filter((array) ($r['keywords'] ?? []), 'is_string')),
             ];
         }, $paged);

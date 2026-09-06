@@ -385,10 +385,11 @@ export function fetchLawFacets(): Promise<LawSearchFacets> {
   return jsonRequest<LawSearchFacets>('/api/laws/facets');
 }
 
-export function searchLaws(params: LawSearchParams): Promise<LawSearchResponse> {
+export function searchLaws(params: LawSearchParams, signal?: AbortSignal): Promise<LawSearchResponse> {
   return jsonRequest<LawSearchResponse>('/api/laws/search', {
     method: 'POST',
     body: JSON.stringify(params),
+    signal,
   });
 }
 

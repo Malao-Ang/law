@@ -793,6 +793,11 @@ function queueSuggest(): void {
     clearTimeout(suggestTimer);
   }
 
+  if (query.value.trim().length < 2) {
+    searchStore.clearSuggestions();
+    return;
+  }
+
   suggestTimer = setTimeout(() => {
     void searchStore.suggest(query.value);
   }, 350);
@@ -866,7 +871,12 @@ async function replaceRoute(): Promise<void> {
 
 async function runSearch(): Promise<void> {
   await searchStore.search(query.value.trim(), currentFilters(), page.value, PER_PAGE);
-  if (searchStore.total === 0 && query.value.trim().length >= 2) {
+  if (
+    searchStore.total === 0
+    && query.value.trim().length >= 2
+    && searchStore.meta.suggestions.length === 0
+    && searchStore.suggestions.length === 0
+  ) {
     await searchStore.suggest(query.value, 5);
   }
   if (page.value > pageCount.value) {
@@ -1097,10 +1107,25 @@ onMounted(() => {
   fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
   getLookups().then((lookups) => { lookupFacets.value = lookupDataToFacets(lookups); }).catch(() => { /* non-fatal */ });
   refreshTimer = setInterval(() => {
+    if (searchStore.loading || searchStore.suggesting || hasActiveSearchState()) {
+      return;
+    }
     void runSearch();
-    fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
+    void fetchLawFacets().then((f) => { baseFacets.value = f; }).catch(() => { /* non-fatal */ });
   }, 30_000);
 });
+
+function hasActiveSearchState(): boolean {
+  return query.value.trim() !== ''
+    || currentTypes.value.length > 0
+    || selectedGroups.value.length > 0
+    || selectedStatuses.value.length > 0
+    || selectedUseStatuses.value.length > 0
+    || selectedAgencies.value.length > 0
+    || selectedKeeperGroups.value.length > 0
+    || yearFrom.value !== null
+    || yearTo.value !== null;
+}
 
 onBeforeUnmount(() => {
   if (suggestTimer) clearTimeout(suggestTimer);
