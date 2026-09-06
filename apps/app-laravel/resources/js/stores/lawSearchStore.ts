@@ -26,6 +26,8 @@ type SearchCacheEntry = {
 };
 
 const SEARCH_CACHE_TTL_MS = 20_000;
+const SEARCH_REQUEST_TIMEOUT_MS = 8_000;
+const SUGGEST_REQUEST_TIMEOUT_MS = 2_000;
 const searchCache = new Map<string, SearchCacheEntry>();
 
 export const useLawSearchStore = defineStore('lawSearch', () => {
@@ -57,6 +59,11 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
     searchController?.abort();
     const controller = new AbortController();
     searchController = controller;
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, SEARCH_REQUEST_TIMEOUT_MS);
     loading.value = true;
     error.value = null;
 
@@ -68,6 +75,9 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
       }
     } catch (errorValue) {
       if (errorValue instanceof Error && errorValue.name === 'AbortError') {
+        if (timedOut && searchController === controller) {
+          error.value = 'ค้นหานานเกินไป กรุณาลองใหม่อีกครั้ง';
+        }
         return;
       }
 
@@ -79,6 +89,7 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
         total.value = 0;
       }
     } finally {
+      window.clearTimeout(timeoutId);
       if (searchController === controller) {
         loading.value = false;
       }
@@ -95,6 +106,11 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
     suggestController?.abort();
     const controller = new AbortController();
     suggestController = controller;
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, SUGGEST_REQUEST_TIMEOUT_MS);
     suggesting.value = true;
     suggestError.value = null;
 
@@ -105,6 +121,10 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
       }
     } catch (errorValue) {
       if (errorValue instanceof Error && errorValue.name === 'AbortError') {
+        if (timedOut && suggestController === controller) {
+          suggestError.value = 'คำแนะนำการค้นหาช้าเกินไป';
+          suggestions.value = [];
+        }
         return;
       }
 
@@ -113,6 +133,7 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
         suggestions.value = [];
       }
     } finally {
+      window.clearTimeout(timeoutId);
       if (suggestController === controller) {
         suggesting.value = false;
       }

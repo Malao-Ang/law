@@ -15,6 +15,11 @@ class ElasticClient
     {
         $this->client = ClientBuilder::create()
             ->setHosts([config('search.host')])
+            ->setRetries((int) config('search.retries', 0))
+            ->setHttpClientOptions([
+                'connect_timeout' => (float) config('search.connect_timeout', 0.5),
+                'timeout' => (float) config('search.timeout', 1.5),
+            ])
             ->build();
         $this->index = config('search.index');
     }

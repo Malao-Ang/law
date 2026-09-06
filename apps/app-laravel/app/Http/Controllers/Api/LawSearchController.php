@@ -10,6 +10,7 @@ use App\Services\Search\LawSearchQuery;
 use App\Services\Search\LawSearchService;
 use App\Services\Search\LawSuggestService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
@@ -26,6 +27,12 @@ class LawSearchController extends Controller
             return response()->json($fileBased);
         }
         if ($query->hasNegatedTerms()) {
+            return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
+        }
+        if ((int) ($fileBased['total'] ?? 0) > 0) {
+            return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
+        }
+        if ($this->elasticSearchUnavailable()) {
             return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
         }
 
@@ -74,10 +81,29 @@ class LawSearchController extends Controller
                 ], $params, $suggestService));
             }
         } catch (\Throwable $exception) {
+            $this->markElasticSearchUnavailable();
             Log::warning('Law search failed, falling back to file-based', ['error' => $exception->getMessage()]);
         }
 
         return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
+    }
+
+    private function elasticSearchUnavailable(): bool
+    {
+        return (bool) Cache::get($this->elasticSearchFailureCacheKey(), false);
+    }
+
+    private function markElasticSearchUnavailable(): void
+    {
+        $seconds = max(0, (int) config('search.failure_cooldown_seconds', 15));
+        if ($seconds > 0) {
+            Cache::put($this->elasticSearchFailureCacheKey(), true, now()->addSeconds($seconds));
+        }
+    }
+
+    private function elasticSearchFailureCacheKey(): string
+    {
+        return 'law-search:elastic-unavailable:'.sha1((string) config('search.host').'|'.(string) config('search.index'));
     }
 
     /**
@@ -129,6 +155,8 @@ class LawSearchController extends Controller
         }
 
         $rows = [];
+        $deferredContentRows = [];
+        $deferContentSearch = ! $query->isEmpty() && ! $query->isBoolean();
         foreach ($allMeta as $row) {
             if (($row['status'] ?? '') !== 'ingested') {
                 continue;
@@ -137,30 +165,36 @@ class LawSearchController extends Controller
                 continue;
             }
 
-            $match = $this->fileSearchMatch($row, $query, $store);
+            if (! $this->rowMatchesFilters($row, $filters)) {
+                continue;
+            }
+
+            $match = $this->fileSearchMatch($row, $query, $store, ! $deferContentSearch);
             if (! $query->isEmpty()) {
                 if (! $match['matched']) {
+                    if ($deferContentSearch) {
+                        $deferredContentRows[] = $row;
+                    }
                     continue;
                 }
-            }
-            foreach (['law_type', 'change_status', 'signer_group'] as $field) {
-                $want = $filters[$field] ?? null;
-                if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
-                    continue 2;
-                }
-            }
-            $wantAgency = $filters['agency'] ?? null;
-            if (! empty($wantAgency) && array_intersect((array) $wantAgency, $row['agencies'] ?? []) === []) {
-                continue;
-            }
-            $wantGroup = $filters['law_group'] ?? null;
-            if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
-                continue;
             }
 
             $row['_search_match_mode'] = $match['mode'];
             $row['_search_confidence'] = $match['confidence'];
             $rows[] = $row;
+        }
+
+        if ($rows === [] && $deferredContentRows !== []) {
+            foreach ($deferredContentRows as $row) {
+                $match = $this->fileSearchMatch($row, $query, $store);
+                if (! $match['matched']) {
+                    continue;
+                }
+
+                $row['_search_match_mode'] = $match['mode'];
+                $row['_search_confidence'] = $match['confidence'];
+                $rows[] = $row;
+            }
         }
 
         $total = count($rows);
@@ -174,7 +208,9 @@ class LawSearchController extends Controller
             }
         }
 
-        $includeHeavyDetails = ! $query->isEmpty() && ! $query->isNegatedOnly();
+        $includeHeavyDetails = (bool) config('search.file_heavy_details', false)
+            && ! $query->isEmpty()
+            && ! $query->isNegatedOnly();
         $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById, $includeHeavyDetails): array {
             $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
@@ -229,6 +265,32 @@ class LawSearchController extends Controller
     }
 
     /**
+     * @param  array<string,mixed>  $row
+     * @param  array<string,mixed>  $filters
+     */
+    private function rowMatchesFilters(array $row, array $filters): bool
+    {
+        foreach (['law_type', 'change_status', 'signer_group'] as $field) {
+            $want = $filters[$field] ?? null;
+            if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
+                return false;
+            }
+        }
+
+        $wantAgency = $filters['agency'] ?? null;
+        if (! empty($wantAgency) && array_intersect((array) $wantAgency, $row['agencies'] ?? []) === []) {
+            return false;
+        }
+
+        $wantGroup = $filters['law_group'] ?? null;
+        if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Concatenate a document's searchable metadata into one haystack string.
      *
      * @param  array<string,mixed>  $row
@@ -258,7 +320,7 @@ class LawSearchController extends Controller
      * @param  array<string,mixed>  $row
      * @return array{matched:bool,mode:string,confidence:float}
      */
-    private function fileSearchMatch(array $row, LawSearchQuery $query, ReviewStore $store): array
+    private function fileSearchMatch(array $row, LawSearchQuery $query, ReviewStore $store, bool $includeContent = true): array
     {
         if ($query->isEmpty()) {
             return ['matched' => true, 'mode' => 'file_browse', 'confidence' => 0.5];
@@ -274,7 +336,7 @@ class LawSearchController extends Controller
                 ];
             }
 
-            if (LawMetaNormalizer::effectiveVisibility($row) !== 'restricted') {
+            if ($includeContent && LawMetaNormalizer::effectiveVisibility($row) !== 'restricted') {
                 foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
                     $haystack .= ' '.(string) ($chunk['text'] ?? '');
                 }
@@ -298,7 +360,7 @@ class LawSearchController extends Controller
         }
 
         $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
-        if (! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
+        if ($includeContent && ! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
             return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.7];
         }
 
@@ -306,7 +368,7 @@ class LawSearchController extends Controller
 
         // Also check content chunks for fuzzy near-match (e.g. query 'โดยประกาศว่า'
         // should hit a doc whose body contains 'ประกาศว่า').
-        if ($similarity < 0.42 && ! $restricted) {
+        if ($includeContent && $similarity < 0.42 && ! $restricted) {
             foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
                 $chunkText = (string) ($chunk['text'] ?? '');
                 if ($chunkText === '') {

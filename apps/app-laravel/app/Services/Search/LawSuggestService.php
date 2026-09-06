@@ -2,6 +2,9 @@
 
 namespace App\Services\Search;
 
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
 class LawSuggestService
 {
     private const FUZZY_MIN_QUERY_LENGTH = 4;
@@ -20,11 +23,21 @@ class LawSuggestService
         if (mb_strlen($query) < 2) {
             return ['suggestions' => []];
         }
+        if ($this->elasticSearchUnavailable()) {
+            return ['suggestions' => []];
+        }
 
-        $raw = $this->client->search($this->buildPrefixBody($query, $size));
+        try {
+            $raw = $this->client->search($this->buildPrefixBody($query, $size));
 
-        if (($raw['hits']['hits'] ?? []) === [] && mb_strlen($query) >= self::FUZZY_MIN_QUERY_LENGTH) {
-            $raw = $this->client->search($this->buildFuzzyBody($query, $size));
+            if (($raw['hits']['hits'] ?? []) === [] && mb_strlen($query) >= self::FUZZY_MIN_QUERY_LENGTH) {
+                $raw = $this->client->search($this->buildFuzzyBody($query, $size));
+            }
+        } catch (\Throwable $exception) {
+            $this->markElasticSearchUnavailable();
+            Log::warning('Law search suggestions failed', ['error' => $exception->getMessage()]);
+
+            return ['suggestions' => []];
         }
 
         return ['suggestions' => $this->parseSuggestions($raw)];
@@ -168,5 +181,23 @@ class LawSuggestService
         }
 
         return $suggestions;
+    }
+
+    private function elasticSearchUnavailable(): bool
+    {
+        return (bool) Cache::get($this->elasticSearchFailureCacheKey(), false);
+    }
+
+    private function markElasticSearchUnavailable(): void
+    {
+        $seconds = max(0, (int) config('search.failure_cooldown_seconds', 15));
+        if ($seconds > 0) {
+            Cache::put($this->elasticSearchFailureCacheKey(), true, now()->addSeconds($seconds));
+        }
+    }
+
+    private function elasticSearchFailureCacheKey(): string
+    {
+        return 'law-search:elastic-unavailable:'.sha1((string) config('search.host').'|'.(string) config('search.index'));
     }
 }
