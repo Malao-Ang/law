@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\Buu\BuuApiException;
 use App\Services\Buu\BuuMinioService;
+use Illuminate\Http\UploadedFile;
 use Mockery;
 use Tests\TestCase;
 
@@ -68,5 +69,38 @@ class MinioTestControllerTest extends TestCase
             ->assertJsonPath('access_ok', false)
             ->assertJsonPath('bucket', 'missing-bucket')
             ->assertJsonPath('body.message', 'not found');
+    }
+
+    public function test_upload_sends_received_file_to_minio_with_original_filename(): void
+    {
+        config(['buu.minio_enabled' => true]);
+
+        $mock = Mockery::mock(BuuMinioService::class);
+        $mock->shouldReceive('putFile')
+            ->once()
+            ->withArgs(function (
+                string $path,
+                string $originalExtension,
+                ?string $bucket = null,
+                ?string $fileName = null,
+                string $folderPath = '/',
+            ): bool {
+                return is_file($path)
+                    && $originalExtension === 'pdf'
+                    && $bucket === null
+                    && $fileName === 'test-file.pdf'
+                    && $folderPath === '/test';
+            })
+            ->andReturn('stored-test-file.pdf');
+        $this->app->instance(BuuMinioService::class, $mock);
+
+        $this->post('/api/test/minio/upload', [
+            'file' => UploadedFile::fake()->create('test-file.pdf', 10, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('status', 'ok')
+            ->assertJsonPath('minio_filename', 'stored-test-file.pdf')
+            ->assertJsonPath('received_file.field', 'file')
+            ->assertJsonPath('received_file.original_name', 'test-file.pdf');
     }
 }

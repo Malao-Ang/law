@@ -21,7 +21,8 @@
       <!-- Upload -->
       <v-card flat border rounded="lg" class="mb-4 pa-5">
         <div class="text-subtitle-2 font-weight-bold mb-3">2. Upload file (POST /api/test/minio/upload)</div>
-        <v-file-input v-model="uploadFiles" label="เลือกไฟล์" variant="outlined" density="compact" hide-details class="mb-3" />
+        <v-file-input v-model="uploadFiles" label="เลือกไฟล์" variant="outlined" density="compact" hide-details show-size class="mb-3" />
+        <pre v-if="selectedUploadFileInfo" class="mb-3 result-box is-info">{{ JSON.stringify(selectedUploadFileInfo, null, 2) }}</pre>
         <v-btn color="admin-primary" size="small" :loading="uploading" :disabled="!selectedUploadFile" @click="uploadFile">Upload</v-btn>
         <pre v-if="uploadResult" class="mt-3 result-box" :class="uploadResult.error ? 'is-error' : 'is-ok'">{{ JSON.stringify(uploadResult, null, 2) }}</pre>
       </v-card>
@@ -62,6 +63,21 @@ const selectedUploadFile = computed(() => {
     return uploadFiles.value[0] ?? null;
   }
   return uploadFiles.value ?? null;
+});
+
+const selectedUploadFileInfo = computed(() => {
+  const file = selectedUploadFile.value;
+  if (!file) {
+    return null;
+  }
+
+  return {
+    will_send_field: 'file',
+    name: file.name,
+    size: file.size,
+    type: file.type || '(unknown)',
+    is_file: file instanceof File,
+  };
 });
 
 async function api(method: string, path: string, body?: FormData | Record<string, unknown>) {
@@ -106,9 +122,13 @@ async function listFiles() {
 async function uploadFile() {
   const file = selectedUploadFile.value;
   if (!file) return;
+  if (!(file instanceof File)) {
+    uploadResult.value = { error: 'Selected value is not a browser File object.', selected: file };
+    return;
+  }
   uploading.value = true;
   const fd = new FormData();
-  fd.append('file', file);
+  fd.append('file', file, file.name);
   try {
     uploadResult.value = await api('POST', '/api/test/minio/upload', fd);
     if (uploadResult.value?.minio_filename) {
@@ -138,5 +158,6 @@ async function presign() {
   max-height: 280px;
 }
 .is-error { border-left: 4px solid #ef4444; }
+.is-info { border-left: 4px solid #3b82f6; }
 .is-ok { border-left: 4px solid #22c55e; }
 </style>

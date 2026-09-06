@@ -80,15 +80,58 @@ class MinioTestController extends Controller
 
         $file = $request->file('file');
         $tmpPath = $file->getRealPath();
+        $originalName = $file->getClientOriginalName();
         $ext = $file->getClientOriginalExtension();
 
+        if (! is_string($tmpPath) || $tmpPath === '' || ! is_file($tmpPath)) {
+            return response()->json([
+                'error' => 'Laravel received the upload field, but the temporary file is not readable.',
+                'received_file' => [
+                    'field' => 'file',
+                    'original_name' => $originalName,
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'is_valid' => $file->isValid(),
+                    'upload_error' => $file->getErrorMessage(),
+                    'tmp_path' => $tmpPath,
+                ],
+            ], 422);
+        }
+
         try {
-            $stored = $this->minio->putFile($tmpPath, $ext, folderPath: '/test');
-            return response()->json(['status' => 'ok', 'minio_filename' => $stored]);
+            $stored = $this->minio->putFile($tmpPath, $ext, fileName: $originalName, folderPath: '/test');
+
+            return response()->json([
+                'status' => 'ok',
+                'minio_filename' => $stored,
+                'received_file' => [
+                    'field' => 'file',
+                    'original_name' => $originalName,
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ],
+            ]);
         } catch (BuuApiException $e) {
-            return response()->json(['error' => $e->getMessage(), 'body' => $e->responseBody], 502);
+            return response()->json([
+                'error' => $e->getMessage(),
+                'body' => $e->responseBody,
+                'received_file' => [
+                    'field' => 'file',
+                    'original_name' => $originalName,
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ],
+            ], 502);
         } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => $e->getMessage(),
+                'received_file' => [
+                    'field' => 'file',
+                    'original_name' => $originalName,
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ],
+            ], 500);
         }
     }
 
