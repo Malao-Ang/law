@@ -184,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
@@ -231,7 +231,14 @@ const pendingCount = computed(() => pendingItems.value.filter(i => !i.done).leng
 function pickFiles(preset: UploadPreset): void {
   uploadPreset.value = preset;
   pendingItems.value = [];
-  fileInputEl.value?.click();
+  // Reset input value so browser allows re-selecting same file,
+  // then wait nextTick so :accept attribute updates before click.
+  if (fileInputEl.value) {
+    fileInputEl.value.value = '';
+  }
+  nextTick(() => {
+    fileInputEl.value?.click();
+  });
 }
 
 function isPdf(file: File): boolean {
