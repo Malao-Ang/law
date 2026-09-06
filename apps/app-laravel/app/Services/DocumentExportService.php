@@ -273,7 +273,11 @@ class DocumentExportService
             if ($comma !== false) {
                 $bytes = base64_decode(substr($dataUri, $comma + 1), true);
                 if ($bytes !== false && $bytes !== '') {
-                    $tmp = tempnam(sys_get_temp_dir(), 'esign_img_');
+                    $tmpBase = tempnam(sys_get_temp_dir(), 'esign_img_');
+                    $tmp = $tmpBase === false ? false : $tmpBase.$this->imageExtensionFromDataUri($dataUri);
+                    if ($tmpBase !== false) {
+                        @unlink($tmpBase);
+                    }
                     if ($tmp !== false && file_put_contents($tmp, $bytes) !== false) {
                         return [$tmp, true];
                     }
@@ -281,15 +285,52 @@ class DocumentExportService
             }
         }
 
-        $srcPath = (string) ($imgMeta['src_path'] ?? $meta['image_path'] ?? '');
-        if ($srcPath !== '' && $this->reviewStore !== null) {
-            $absolute = $this->reviewStore->absolutePath($srcPath);
-            if (is_file($absolute)) {
-                return [$absolute, false];
+        foreach ([$imgMeta['src_path'] ?? null, $meta['image_path'] ?? null, $imgMeta['src_url'] ?? null] as $source) {
+            $path = $this->resolveStoredImagePath((string) $source);
+            if ($path !== null) {
+                return [$path, false];
             }
         }
 
         return [null, false];
+    }
+
+    private function imageExtensionFromDataUri(string $dataUri): string
+    {
+        if (preg_match('/^data:image\/([a-z0-9.+-]+);base64,/i', $dataUri, $matches) !== 1) {
+            return '.png';
+        }
+
+        return match (strtolower($matches[1])) {
+            'jpeg', 'jpg', 'pjpeg' => '.jpg',
+            'gif' => '.gif',
+            'webp' => '.webp',
+            'bmp' => '.bmp',
+            default => '.png',
+        };
+    }
+
+    private function resolveStoredImagePath(string $source): ?string
+    {
+        $source = trim(str_replace('\\', '/', $source));
+        if ($source === '') {
+            return null;
+        }
+        if (is_file($source)) {
+            return $source;
+        }
+        if ($this->reviewStore === null) {
+            return null;
+        }
+
+        $relative = $source;
+        if (preg_match('~^/api/documents/([^/]+)/images/([^/?#]+)~', $source, $matches) === 1) {
+            $relative = 'images/'.rawurldecode($matches[1]).'/'.rawurldecode($matches[2]);
+        }
+
+        $absolute = $this->reviewStore->absolutePath($relative);
+
+        return is_file($absolute) ? $absolute : null;
     }
 
     /**

@@ -6,7 +6,6 @@ use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
 use App\Services\ReviewStore;
-use App\Services\Storage\MongoBlobStore;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 use ZipArchive;
@@ -34,11 +33,18 @@ class DocumentExportServiceTest extends TestCase
         return $xml;
     }
 
-    private function makeService(?LibreOfficeConverter $converter = null): DocumentExportService
+    private function makeService(?LibreOfficeConverter $converter = null, ?string $basePath = null): DocumentExportService
     {
         $html = new DocumentHtmlService();
-        $blob = $this->createStub(MongoBlobStore::class);
-        $store = new ReviewStore($html, $blob, sys_get_temp_dir().'/doc-export-'.uniqid('', true));
+        $store = $basePath === null ? null : new class($basePath) extends ReviewStore
+        {
+            public function __construct(private readonly string $basePath) {}
+
+            public function absolutePath(string $relativePath): string
+            {
+                return $this->basePath.'/'.str_replace('\\', '/', ltrim($relativePath, '/'));
+            }
+        };
 
         return new DocumentExportService($html, $converter ?? new LibreOfficeConverter(), $store);
     }
@@ -714,9 +720,51 @@ class DocumentExportServiceTest extends TestCase
 
         $xml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
 
-        $this->assertStringContainsString('wp:extent cx="1076400"', $xml);
+        $this->assertStringContainsString('style="width:84.755905533pt;', $xml);
         $this->assertStringContainsString('w:jc w:val="center"', $xml);
         $this->assertStringContainsString('w:line="360"', $xml);
+    }
+
+    public function test_docx_embeds_image_blocks_from_review_image_url(): void
+    {
+        $documentId = 'doc-url-logo';
+        $basePath = sys_get_temp_dir().'/doc-export-url-'.uniqid('', true);
+        $imageDir = $basePath.'/images/'.$documentId;
+        mkdir($imageDir, 0777, true);
+        file_put_contents($imageDir.'/logo.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+
+        $document = [
+            'document_id' => $documentId,
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [[
+                    'block_id' => 'img1',
+                    'type' => 'image',
+                    'reading_order' => 1,
+                    'meta' => [
+                        'image' => [
+                            'src_url' => '/api/documents/'.$documentId.'/images/logo.png',
+                            'is_logo' => true,
+                            'display_width_cm' => 2.99,
+                            'spacing_after_line_height' => 1.5,
+                        ],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $bytes = $this->makeService(basePath: $basePath)->toDocx($document);
+        $documentXml = $this->readDocxXml($bytes, 'word/document.xml');
+        $relationsXml = $this->readDocxXml($bytes, 'word/_rels/document.xml.rels');
+
+        $this->assertStringContainsString('media/', $relationsXml);
+        $this->assertStringContainsString('style="width:84.755905533pt;', $documentXml);
+        $this->assertStringContainsString('w:jc w:val="center"', $documentXml);
+
+        @unlink($imageDir.'/logo.png');
+        @rmdir($imageDir);
+        @rmdir(dirname($imageDir));
+        @rmdir($basePath);
     }
 
     public function test_to_pdf_renders_docx_via_libreoffice(): void
