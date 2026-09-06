@@ -72,6 +72,7 @@ Route::get('/documents/{documentId}/images/{filename}', [ImageController::class,
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
 
 // MinIO test endpoints (dev/debug only)
+Route::get('/test/minio/bucket', [MinioTestController::class, 'bucket']);
 Route::get('/test/minio', [MinioTestController::class, 'index']);
 Route::post('/test/minio/upload', [MinioTestController::class, 'upload']);
 Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);

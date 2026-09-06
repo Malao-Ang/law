@@ -12,6 +12,44 @@ class MinioTestController extends Controller
 {
     public function __construct(private readonly BuuMinioService $minio) {}
 
+    public function bucket(Request $request): JsonResponse
+    {
+        if (! config('buu.minio_enabled')) {
+            return response()->json(['error' => 'BUU_MINIO_ENABLED is false'], 503);
+        }
+
+        $bucket = trim((string) $request->query('bucket', ''));
+        $bucket = $bucket !== '' ? $bucket : null;
+        $targetBucket = $bucket ?? config('buu.default_bucket');
+
+        try {
+            $files = $this->minio->listFiles('/', $bucket);
+
+            return response()->json([
+                'status' => 'ok',
+                'exists' => true,
+                'access_ok' => true,
+                'bucket' => $targetBucket,
+                'file_count' => count($files),
+            ]);
+        } catch (BuuApiException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+                'exists' => false,
+                'access_ok' => false,
+                'bucket' => $targetBucket,
+                'body' => $e->responseBody,
+            ], 502);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+                'exists' => false,
+                'access_ok' => false,
+                'bucket' => $targetBucket,
+            ], 500);
+        }
+    }
+
     public function index(): JsonResponse
     {
         if (! config('buu.minio_enabled')) {

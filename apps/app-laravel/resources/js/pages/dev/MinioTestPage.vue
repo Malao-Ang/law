@@ -3,6 +3,14 @@
     <AppShell :breadcrumbs="['Dev', 'MinIO Test']" title="MinIO Test" hide-top-bar>
       <p class="text-caption text-medium-emphasis mb-4">Base: {{ base }}</p>
 
+      <!-- Bucket -->
+      <v-card flat border rounded="lg" class="mb-4 pa-5">
+        <div class="text-subtitle-2 font-weight-bold mb-3">0. Check bucket (GET /api/test/minio/bucket)</div>
+        <v-text-field v-model="bucketName" label="Bucket name" placeholder="Leave empty to use BUU_MINIO_BUCKET" variant="outlined" density="compact" hide-details class="mb-3" />
+        <v-btn color="admin-primary" size="small" :loading="checkingBucket" @click="checkBucket">Check Bucket</v-btn>
+        <pre v-if="bucketResult" class="mt-3 result-box" :class="bucketResult.error ? 'is-error' : 'is-ok'">{{ JSON.stringify(bucketResult, null, 2) }}</pre>
+      </v-card>
+
       <!-- List -->
       <v-card flat border rounded="lg" class="mb-4 pa-5">
         <div class="text-subtitle-2 font-weight-bold mb-3">1. List files (GET /api/test/minio)</div>
@@ -35,14 +43,17 @@ import AppShell from '../../components/shared/AppShell.vue';
 
 const base = window.location.origin;
 
+const checkingBucket = ref(false);
 const listing = ref(false);
 const uploading = ref(false);
 const presigning = ref(false);
 
+const bucketResult = ref<Record<string, unknown> | null>(null);
 const listResult = ref<Record<string, unknown> | null>(null);
 const uploadResult = ref<Record<string, unknown> | null>(null);
 const presignResult = ref<Record<string, unknown> | null>(null);
 
+const bucketName = ref('');
 const uploadFiles = ref<File | File[] | null>(null);
 const presignFilename = ref('');
 
@@ -70,6 +81,19 @@ async function api(method: string, path: string, body?: FormData | Record<string
     payload = { error: text || res.statusText };
   }
   return { http_status: res.status, ok: res.ok, ...payload };
+}
+
+async function checkBucket() {
+  checkingBucket.value = true;
+  const params = new URLSearchParams();
+  const bucket = bucketName.value.trim();
+  if (bucket) {
+    params.set('bucket', bucket);
+  }
+  const path = `/api/test/minio/bucket${params.toString() ? `?${params.toString()}` : ''}`;
+  try { bucketResult.value = await api('GET', path); }
+  catch (e) { bucketResult.value = { error: (e as Error).message }; }
+  finally { checkingBucket.value = false; }
 }
 
 async function listFiles() {
