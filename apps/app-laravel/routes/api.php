@@ -63,6 +63,7 @@ Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, '
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
+Route::post('/documents/{documentId}/esign/upload', [EsignController::class, 'upload']);
 Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send']);
 Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel']);
 Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);

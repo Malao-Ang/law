@@ -17,7 +17,7 @@ class EsignSubmitControllerTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_send_uploads_via_mocked_buu_and_persists_status(): void
+    public function test_upload_puts_file_without_sending_esign(): void
     {
         config([
             'buu.default_bucket' => 'buu-contract',
@@ -34,38 +34,33 @@ class EsignSubmitControllerTest extends TestCase
         $this->app->instance(DocumentExportService::class, $export);
 
         $buu = Mockery::mock(BuuEsignService::class);
-        $buu->shouldReceive('uploadAndSend')
+        $buu->shouldReceive('callbackUrl')->andReturn("https://example.test/api/esign/callback/{$documentId}");
+        $buu->shouldReceive('uploadPdf')
             ->once()
             ->withArgs(function (
                 string $absolutePath,
                 string $originalExtension,
-                string $ownerCitizenId,
-                string $docName,
-                array $signers,
-                ?string $docId,
-            ) use ($documentId) {
+                ?string $bucket,
+                string $folderPath,
+            ) {
                 return is_file($absolutePath)
                     && $originalExtension === 'pdf'
-                    && $ownerCitizenId === '1111111111111'
-                    && $docName === 'กฎหมายทดสอบ'
-                    && $signers[0]['psn_citizenid'] === '2222222222222'
-                    && $docId === $documentId;
+                    && $bucket === 'buu-contract'
+                    && $folderPath === '/';
             })
-            ->andReturn([
-                'minio_filename' => 'stored-abc.pdf',
-                'esign' => ['status' => 'ok', 'result' => 'queued'],
-                'return_url' => "https://example.test/api/esign/callback/{$documentId}",
-            ]);
+            ->andReturn('stored-abc.pdf');
+        $buu->shouldReceive('sendDocumentSign')->never();
+        $buu->shouldReceive('uploadAndSend')->never();
         $this->app->instance(BuuEsignService::class, $buu);
 
-        $response = $this->postJson("/api/documents/{$documentId}/esign/send", [
+        $response = $this->postJson("/api/documents/{$documentId}/esign/upload", [
             'signers' => [
                 ['citizen_id' => '2222222222222', 'name' => 'ผู้ลงนามทดสอบ', 'note' => 'sandbox'],
             ],
         ]);
 
         $response->assertOk()
-            ->assertJsonPath('status', 'submitted')
+            ->assertJsonPath('status', 'uploaded')
             ->assertJsonPath('minio_filename', 'stored-abc.pdf')
             ->assertJsonPath('bucket', 'buu-contract')
             ->assertJsonPath('owner_citizen_id', '1111111111111');
@@ -73,21 +68,67 @@ class EsignSubmitControllerTest extends TestCase
         $status = $store->getStatus($documentId);
         $this->assertSame('stored-abc.pdf', $status['esign_doc_filename'] ?? null);
         $this->assertSame('1111111111111', $status['esign_owner_citizenid'] ?? null);
-        $this->assertNotNull($status['esign_submitted_at'] ?? null);
         $this->assertNotNull($status['esign_exported_at'] ?? null);
+        $this->assertNotNull($status['esign_uploaded_at'] ?? null);
+        $this->assertNull($status['esign_submitted_at'] ?? null);
     }
 
-    public function test_send_requires_signers(): void
+    public function test_send_calls_esign_after_upload(): void
+    {
+        config([
+            'buu.default_bucket' => 'buu-contract',
+            'buu.esign_callback_base_url' => 'https://example.test',
+        ]);
+
+        $store = app(ReviewStore::class);
+        $documentId = $this->seedDocument($store);
+        $store->setStatus($documentId, [
+            'esign_doc_filename' => 'stored-abc.pdf',
+            'esign_bucket' => 'buu-contract',
+            'esign_owner_citizenid' => '1111111111111',
+            'esign_doc_name' => 'กฎหมายทดสอบ',
+            'esign_return_url' => "https://example.test/api/esign/callback/{$documentId}",
+            'esign_return_type' => 'L',
+            'esign_signers' => [['psn_citizenid' => '2222222222222']],
+        ]);
+
+        $buu = Mockery::mock(BuuEsignService::class);
+        $buu->shouldReceive('uploadPdf')->never();
+        $buu->shouldReceive('sendDocumentSign')
+            ->once()
+            ->andReturn(['status' => 'ok', 'result' => 'queued']);
+        $this->app->instance(BuuEsignService::class, $buu);
+
+        $this->postJson("/api/documents/{$documentId}/esign/send")
+            ->assertOk()
+            ->assertJsonPath('status', 'submitted')
+            ->assertJsonPath('minio_filename', 'stored-abc.pdf')
+            ->assertJsonPath('esign.status', 'ok');
+
+        $status = $store->getStatus($documentId);
+        $this->assertNotNull($status['esign_submitted_at'] ?? null);
+    }
+
+    public function test_upload_requires_signers(): void
     {
         $store = app(ReviewStore::class);
         $documentId = $this->seedDocument($store);
 
-        $this->postJson("/api/documents/{$documentId}/esign/send", [
+        $this->postJson("/api/documents/{$documentId}/esign/upload", [
             'signers' => [],
         ])->assertStatus(422);
     }
 
-    public function test_send_reuses_first_signer_as_owner_when_owner_unset(): void
+    public function test_send_without_prior_upload_returns_422(): void
+    {
+        $store = app(ReviewStore::class);
+        $documentId = $this->seedDocument($store);
+
+        $this->postJson("/api/documents/{$documentId}/esign/send")
+            ->assertStatus(422);
+    }
+
+    public function test_upload_reuses_first_signer_as_owner_when_owner_unset(): void
     {
         config([
             'buu.default_bucket' => 'buu-contract',
@@ -104,26 +145,12 @@ class EsignSubmitControllerTest extends TestCase
         $this->app->instance(DocumentExportService::class, $export);
 
         $buu = Mockery::mock(BuuEsignService::class);
-        $buu->shouldReceive('uploadAndSend')
-            ->once()
-            ->withArgs(function (
-                string $absolutePath,
-                string $originalExtension,
-                string $ownerCitizenId,
-                string $docName,
-                array $signers,
-            ) {
-                return $ownerCitizenId === '3210500467156'
-                    && $signers[0]['psn_citizenid'] === '3210500467156';
-            })
-            ->andReturn([
-                'minio_filename' => 'stored-same.pdf',
-                'esign' => ['status' => 'ok'],
-                'return_url' => "https://example.test/api/esign/callback/{$documentId}",
-            ]);
+        $buu->shouldReceive('callbackUrl')->andReturn("https://example.test/api/esign/callback/{$documentId}");
+        $buu->shouldReceive('uploadPdf')->once()->andReturn('stored-same.pdf');
+        $buu->shouldReceive('sendDocumentSign')->never();
         $this->app->instance(BuuEsignService::class, $buu);
 
-        $this->postJson("/api/documents/{$documentId}/esign/send", [
+        $this->postJson("/api/documents/{$documentId}/esign/upload", [
             'signers' => [
                 ['citizen_id' => '3210500467156', 'name' => 'ศ.ดร.สมพร ประธาน'],
             ],

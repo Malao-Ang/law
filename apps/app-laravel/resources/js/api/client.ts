@@ -338,6 +338,23 @@ export type ESignSendSignerPayload = {
   name?: string;
 };
 
+export type ESignSendPayload = {
+  signers: ESignSendSignerPayload[];
+  owner_citizen_id?: string;
+  comment?: string;
+  return_type?: 'L' | 'A';
+};
+
+export type ESignUploadResponse = {
+  status: 'uploaded';
+  document_id: string;
+  minio_filename: string;
+  bucket: string;
+  return_url: string;
+  doc_name: string;
+  owner_citizen_id: string;
+};
+
 export type ESignSendResponse = {
   status: 'submitted';
   document_id: string;
@@ -356,19 +373,33 @@ export type ESignCancelResponse = {
   esign: Record<string, unknown>;
 };
 
-export function sendDocumentESign(
-  documentId: string,
-  payload: {
-    signers: ESignSendSignerPayload[];
-    owner_citizen_id?: string;
-    comment?: string;
-    return_type?: 'L' | 'A';
-  },
-): Promise<ESignSendResponse> {
+export function uploadDocumentESign(documentId: string, payload: ESignSendPayload): Promise<ESignUploadResponse> {
+  return jsonRequest<ESignUploadResponse>(`/api/documents/${encodeURIComponent(documentId)}/esign/upload`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function submitDocumentESign(documentId: string, payload: ESignSendPayload): Promise<ESignSendResponse> {
   return jsonRequest<ESignSendResponse>(`/api/documents/${encodeURIComponent(documentId)}/esign/send`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+/** Upload PDF to MinIO first, then SendDocumentSign. MinIO success is kept even if send times out. */
+export async function sendDocumentESign(
+  documentId: string,
+  payload: ESignSendPayload,
+): Promise<ESignSendResponse> {
+  const uploaded = await uploadDocumentESign(documentId, payload);
+
+  try {
+    return await submitDocumentESign(documentId, payload);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'ส่ง e-sign ไม่สำเร็จ';
+    throw new Error(`${reason} (อัปโหลด MinIO แล้ว: ${uploaded.minio_filename})`);
+  }
 }
 
 export function cancelDocumentESign(

@@ -2,8 +2,6 @@
 
 namespace App\Services\Buu;
 
-use Illuminate\Support\Facades\Log;
-
 /**
  * e-Sign APIs via Kong (Develop).
  *
@@ -74,6 +72,27 @@ class BuuEsignService
     }
 
     /**
+     * Upload a local file to MinIO only (bucket root). Returns the basename e-sign expects.
+     */
+    public function uploadPdf(
+        string $absolutePath,
+        string $originalExtension,
+        ?string $bucket = null,
+        string $folderPath = '/',
+        bool $qrVerify = false,
+    ): string {
+        $stored = $this->minio->putFile(
+            absolutePath: $absolutePath,
+            originalExtension: $originalExtension,
+            bucket: $bucket,
+            folderPath: $folderPath,
+            qrVerify: $qrVerify,
+        );
+
+        return $this->esignObjectName($stored);
+    }
+
+    /**
      * Convenience: upload local file to MinIO then send to e-sign.
      *
      * @param  list<array{psn_citizenid: string, docs_comment?: string}>  $signers
@@ -103,7 +122,7 @@ class BuuEsignService
             $resolvedReturnUrl = $this->callbackUrl($documentId);
         }
 
-        $stored = $this->minio->putFile(
+        $stored = $this->uploadPdf(
             absolutePath: $absolutePath,
             originalExtension: $originalExtension,
             bucket: $bucket,
@@ -194,6 +213,14 @@ class BuuEsignService
         $result = $response['result'] ?? [];
 
         return is_array($result) ? array_values($result) : [];
+    }
+
+    /**
+     * BUU e-sign sample uses a basename in the bucket root, not a folder key.
+     */
+    private function esignObjectName(string $stored): string
+    {
+        return basename(str_replace('\\', '/', ltrim($stored, '/')));
     }
 
     private function defaultBucket(): string

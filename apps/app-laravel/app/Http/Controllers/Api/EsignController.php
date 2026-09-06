@@ -15,22 +15,12 @@ class EsignController extends Controller
 {
     public function __construct(private readonly EsignSubmitService $esignSubmit) {}
 
-    public function send(Request $request, string $documentId): JsonResponse
+    public function upload(Request $request, string $documentId): JsonResponse
     {
-        $validated = $request->validate([
-            'owner_citizen_id' => ['nullable', 'string', 'max:32'],
-            'comment' => ['nullable', 'string', 'max:2000'],
-            'return_type' => ['nullable', 'string', 'in:L,A'],
-            'signers' => ['required', 'array', 'min:1'],
-            'signers.*.citizen_id' => ['nullable', 'string', 'max:32'],
-            'signers.*.psn_citizenid' => ['nullable', 'string', 'max:32'],
-            'signers.*.docs_comment' => ['nullable', 'string', 'max:500'],
-            'signers.*.note' => ['nullable', 'string', 'max:500'],
-            'signers.*.name' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $this->validatedSendPayload($request, signersRequired: true);
 
         try {
-            $result = $this->esignSubmit->submit(
+            $result = $this->esignSubmit->upload(
                 documentId: $documentId,
                 signers: $validated['signers'],
                 ownerCitizenId: $validated['owner_citizen_id'] ?? null,
@@ -44,6 +34,35 @@ class EsignController extends Controller
             $status = $message === 'PDF service unavailable' ? 503 : 500;
 
             return response()->json(['message' => $message], $status);
+        } catch (Throwable $exception) {
+            Log::error('e-sign upload failed', [
+                'document_id' => $documentId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json(['message' => 'Failed to upload document to MinIO.'], 500);
+        }
+
+        return response()->json([
+            'status' => 'uploaded',
+            ...$result,
+        ]);
+    }
+
+    public function send(Request $request, string $documentId): JsonResponse
+    {
+        $validated = $this->validatedSendPayload($request, signersRequired: false);
+
+        try {
+            $result = $this->esignSubmit->send(
+                documentId: $documentId,
+                signers: $validated['signers'] ?? [],
+                ownerCitizenId: $validated['owner_citizen_id'] ?? null,
+                comment: $validated['comment'] ?? null,
+                returnType: $validated['return_type'] ?? null,
+            );
+        } catch (BuuApiException $exception) {
+            return $this->buuError($exception);
         } catch (Throwable $exception) {
             Log::error('e-sign send failed', [
                 'document_id' => $documentId,
@@ -84,6 +103,33 @@ class EsignController extends Controller
         return response()->json([
             'status' => 'cancelled',
             ...$result,
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     owner_citizen_id?: string,
+     *     comment?: string,
+     *     return_type?: string,
+     *     signers?: list<array<string, mixed>>
+     * }
+     */
+    private function validatedSendPayload(Request $request, bool $signersRequired): array
+    {
+        $signersRule = $signersRequired
+            ? ['required', 'array', 'min:1']
+            : ['sometimes', 'array', 'min:1'];
+
+        return $request->validate([
+            'owner_citizen_id' => ['nullable', 'string', 'max:32'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'return_type' => ['nullable', 'string', 'in:L,A'],
+            'signers' => $signersRule,
+            'signers.*.citizen_id' => ['nullable', 'string', 'max:32'],
+            'signers.*.psn_citizenid' => ['nullable', 'string', 'max:32'],
+            'signers.*.docs_comment' => ['nullable', 'string', 'max:500'],
+            'signers.*.note' => ['nullable', 'string', 'max:500'],
+            'signers.*.name' => ['nullable', 'string', 'max:255'],
         ]);
     }
 
