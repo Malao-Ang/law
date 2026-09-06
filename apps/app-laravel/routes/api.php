@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\MinioTestController;
 use App\Http\Controllers\Api\EsignCallbackController;
 use App\Http\Controllers\Api\EsignController;
 use App\Http\Controllers\Api\ReportController;
@@ -69,6 +70,11 @@ Route::get('/documents/{documentId}/related-download.zip', RelatedDocumentsZipCo
 Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentFileController::class, 'showRelated']);
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
+
+// MinIO test endpoints (dev/debug only)
+Route::get('/test/minio', [MinioTestController::class, 'index']);
+Route::post('/test/minio/upload', [MinioTestController::class, 'upload']);
+Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
 
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');
