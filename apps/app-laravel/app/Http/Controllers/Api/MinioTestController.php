@@ -82,6 +82,7 @@ class MinioTestController extends Controller
         $tmpPath = $file->getRealPath();
         $originalName = $file->getClientOriginalName();
         $ext = $file->getClientOriginalExtension();
+        $qrVerify = true;
 
         if (! is_string($tmpPath) || $tmpPath === '' || ! is_file($tmpPath)) {
             return response()->json([
@@ -99,7 +100,7 @@ class MinioTestController extends Controller
         }
 
         try {
-            $stored = $this->minio->putFile($tmpPath, $ext, fileName: $originalName, folderPath: '/test');
+            $stored = $this->minio->putFile($tmpPath, $ext, fileName: $originalName, folderPath: '/test', qrVerify: $qrVerify);
 
             return response()->json([
                 'status' => 'ok',
