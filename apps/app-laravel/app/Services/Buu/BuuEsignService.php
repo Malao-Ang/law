@@ -2,6 +2,8 @@
 
 namespace App\Services\Buu;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * e-Sign APIs via Kong (Develop).
  *
