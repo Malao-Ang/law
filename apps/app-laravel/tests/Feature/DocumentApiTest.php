@@ -17,7 +17,12 @@ class DocumentApiTest extends TestCase
         Queue::fake();
 
         $response = $this->post('/api/documents', [
-            'file' => UploadedFile::fake()->create('thai-legal.pdf', 64, 'application/pdf'),
+            'file' => UploadedFile::fake()->create(
+                'thai-legal.docx',
+                64,
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+            'document_type' => 'new',
         ]);
 
         $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
@@ -34,67 +39,60 @@ class DocumentApiTest extends TestCase
             ]);
     }
 
-    public function test_pdf_upload_always_uses_gemini_scan_mode(): void
+    public function test_new_document_upload_uses_local_fast_extraction(): void
     {
         Queue::fake();
 
         $response = $this->post('/api/documents', [
-            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
-            'scan_extraction_mode' => 'local',
-        ]);
-
-        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
-        $documentId = (string) $response->json('document_id');
-
-        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
-            return $job->scanExtractionMode === 'gemini';
-        });
-
-        $this->getJson('/api/documents/'.$documentId)
-            ->assertOk()
-            ->assertJsonPath('scan_extraction_mode_requested', 'gemini');
-    }
-
-    public function test_upload_accepts_landingai_scan_extraction_mode_and_passes_it_to_job(): void
-    {
-        Queue::fake();
-
-        $response = $this->post('/api/documents', [
-            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
-            'scan_extraction_mode' => 'landingai',
-        ]);
-
-        $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
-        $documentId = (string) $response->json('document_id');
-
-        Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
-            return $job->scanExtractionMode === 'landingai';
-        });
-
-        $this->getJson('/api/documents/'.$documentId)
-            ->assertOk()
-            ->assertJsonPath('scan_extraction_mode_requested', 'landingai');
-    }
-
-    public function test_upload_accepts_gemini_scan_extraction_mode_and_passes_it_to_job(): void
-    {
-        Queue::fake();
-
-        $response = $this->post('/api/documents', [
-            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
+            'file' => UploadedFile::fake()->create(
+                'draft.docx',
+                64,
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+            'document_type' => 'new',
             'scan_extraction_mode' => 'gemini',
+            'extraction_engine' => 'standard',
         ]);
 
         $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);
         $documentId = (string) $response->json('document_id');
 
         Queue::assertPushed(ExtractDocumentJob::class, function (ExtractDocumentJob $job): bool {
-            return $job->scanExtractionMode === 'gemini';
+            return $job->scanExtractionMode === 'local' && $job->extractionEngine === 'fast';
         });
 
         $this->getJson('/api/documents/'.$documentId)
             ->assertOk()
-            ->assertJsonPath('scan_extraction_mode_requested', 'gemini');
+            ->assertJsonPath('scan_extraction_mode_requested', 'local')
+            ->assertJsonPath('extraction_engine', 'fast');
+    }
+
+    public function test_new_document_rejects_pdf_upload(): void
+    {
+        Queue::fake();
+
+        $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create('scan.pdf', 64, 'application/pdf'),
+            'document_type' => 'new',
+        ])->assertStatus(302);
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_old_document_rejects_word_upload(): void
+    {
+        Queue::fake();
+
+        $this->post('/api/documents', [
+            'file' => UploadedFile::fake()->create(
+                'old.docx',
+                64,
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+            'document_type' => 'old',
+        ])->assertStatus(302);
+
+        Queue::assertNothingPushed();
     }
 
     public function test_upload_accepts_legacy_doc_files(): void
@@ -103,6 +101,7 @@ class DocumentApiTest extends TestCase
 
         $response = $this->post('/api/documents', [
             'file' => UploadedFile::fake()->create('legacy.doc', 64, 'application/msword'),
+            'document_type' => 'new',
         ]);
 
         $response->assertStatus(202)->assertJsonStructure(['document_id', 'status']);

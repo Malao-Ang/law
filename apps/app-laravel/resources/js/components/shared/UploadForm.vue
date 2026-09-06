@@ -1,11 +1,19 @@
 <template>
   <div class="upload-form">
+    <div v-if="!pendingFile" class="mb-3">
+      <div class="text-caption text-medium-emphasis mb-1">ประเภทเอกสาร</div>
+      <v-btn-toggle v-model="documentType" mandatory divided density="comfortable" color="admin-primary">
+        <v-btn value="new">เอกสารใหม่ (.doc, .docx)</v-btn>
+        <v-btn value="old">เอกสารเก่า (.pdf)</v-btn>
+      </v-btn-toggle>
+    </div>
+
     <!-- Step 1: pick file -->
     <v-file-input
       v-if="!pendingFile"
       v-model="fileModel"
-      accept=".doc,.docx,.pdf"
-      label="เลือกไฟล์ (.doc, .docx, .pdf)"
+      :accept="acceptedExtensions"
+      :label="fileInputLabel"
       variant="outlined"
       density="comfortable"
       hide-details
@@ -21,7 +29,7 @@
       </div>
 
       <!-- scan mode selector — shown for all types; label changes per type -->
-      <div class="mt-3">
+      <div v-if="documentType !== 'old'" class="mt-3">
         <div class="text-caption text-medium-emphasis mb-1">{{ modeLabel }}</div>
         <v-select
           v-model="scanMode"
@@ -57,6 +65,7 @@ const uploadStore = useUploadStore();
 
 const fileModel = ref<File | File[] | null>(null);
 const pendingFile = ref<File | null>(null);
+const documentType = ref<'new' | 'old'>('new');
 const scanMode = ref<ScanExtractionMode>('local');
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -65,8 +74,18 @@ const fileExt = computed(() => pendingFile.value?.name.split('.').pop()?.toLower
 
 const isPdf = computed(() => fileExt.value === 'pdf');
 
+const acceptedFileExtensions = computed(() => (documentType.value === 'old' ? ['pdf'] : ['doc', 'docx']));
+
+const acceptedExtensions = computed(() => acceptedFileExtensions.value.map(ext => `.${ext}`).join(','));
+
+const fileInputLabel = computed(() =>
+  documentType.value === 'old'
+    ? 'เลือกไฟล์เอกสารเก่า (.pdf)'
+    : 'เลือกไฟล์เอกสารใหม่ (.doc, .docx)',
+);
+
 const extractionEngine = computed((): 'fast' | 'standard' => {
-  return isPdf.value ? 'standard' : 'fast';
+  return documentType.value === 'old' ? 'standard' : 'fast';
 });
 
 const fileTypeLabel = computed(() => ({ pdf: 'PDF', docx: 'DOCX', doc: 'DOC' }[fileExt.value] ?? fileExt.value.toUpperCase()));
@@ -100,11 +119,18 @@ const modeHint = computed(() => {
 function onFileSelected(file: File | File[] | null): void {
   const f = Array.isArray(file) ? (file[0] ?? null) : file;
   if (!f) return;
+  const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!acceptedFileExtensions.value.includes(ext)) {
+    fileModel.value = null;
+    error.value = documentType.value === 'old'
+      ? 'เอกสารเก่ารับเฉพาะไฟล์ PDF'
+      : 'เอกสารใหม่รับเฉพาะไฟล์ DOC หรือ DOCX';
+    return;
+  }
+
   pendingFile.value = f;
   error.value = null;
-  // smart default
-  const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-  scanMode.value = ext === 'pdf' ? 'gemini' : 'local';
+  scanMode.value = documentType.value === 'old' ? 'gemini' : 'local';
 }
 
 async function doUpload(): Promise<void> {
@@ -112,7 +138,12 @@ async function doUpload(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const documentId = await uploadStore.upload(pendingFile.value, scanMode.value, extractionEngine.value);
+    const documentId = await uploadStore.upload(
+      pendingFile.value,
+      scanMode.value,
+      extractionEngine.value,
+      { documentType: documentType.value },
+    );
     emit('uploaded', documentId);
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';

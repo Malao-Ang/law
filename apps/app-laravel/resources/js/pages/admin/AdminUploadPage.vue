@@ -189,7 +189,7 @@ import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
 import type { ScanExtractionMode } from '../../types/document';
-import { formatGeminiUploadError, useUploadStore, waitForDocumentStatus } from '../../stores/uploadStore';
+import { useUploadStore } from '../../stores/uploadStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 
 interface PendingItem {
@@ -246,6 +246,11 @@ function iconFor(file: File): string {
   return isPdf(file) ? 'mdi-file-pdf-box' : 'mdi-file-word-box';
 }
 
+function isAllowedForCurrentMode(file: File): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return uploadMode.value === 'old' ? ext === 'pdf' : ['doc', 'docx'].includes(ext);
+}
+
 function sizeOf(file: File): string {
   const b = file.size;
   return b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / (1024 * 1024)).toFixed(1)} MB`;
@@ -274,7 +279,16 @@ function engineFor(item: PendingItem): 'fast' | 'standard' {
 }
 
 function addFiles(files: FileList | File[]): void {
-  const incoming = uploadMode.value === 'old' ? Array.from(files).slice(0, 1) : Array.from(files);
+  const selected = Array.from(files);
+  const invalid = selected.filter(file => !isAllowedForCurrentMode(file));
+  if (invalid.length) {
+    snackbar.error?.(uploadMode.value === 'old'
+      ? 'เอกสารเก่ารับเฉพาะไฟล์ PDF'
+      : 'เอกสารใหม่รับเฉพาะไฟล์ DOC หรือ DOCX');
+  }
+
+  const allowed = selected.filter(file => isAllowedForCurrentMode(file));
+  const incoming = uploadMode.value === 'old' ? allowed.slice(0, 1) : allowed;
   // old = single file: reset here too so the dialog's "เพิ่มไฟล์" button (which
   // skips pickFiles) still replaces rather than appends. New mode appends.
   if (uploadMode.value === 'old') pendingItems.value = [];
@@ -343,13 +357,10 @@ async function uploadAll(): Promise<void> {
       item.uploading = true;
       item.error = '';
       try {
-        const documentId = await uploadStore.upload(item.file, item.scanMode, engineFor(item), { documentType: uploadMode.value });
-        if (uploadMode.value === 'new' && isPdf(item.file)) {
-          const status = await waitForDocumentStatus(documentId);
-          if (status.status === 'failed') {
-            throw new Error(formatGeminiUploadError(status.error || 'ไม่สามารถอ่านเอกสารได้'));
-          }
-        }
+        const documentId = await uploadStore.upload(item.file, item.scanMode, engineFor(item), {
+          documentType: uploadMode.value,
+          source: uploadPreset.value.source,
+        });
         item.done = true;
       } catch (err) {
         item.error = err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ';
