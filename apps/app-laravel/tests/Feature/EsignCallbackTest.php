@@ -72,4 +72,11 @@ class EsignCallbackTest extends TestCase
             'sign_status' => 'Y',
         ])->assertOk()->assertJson(['status' => 'success']);
     }
+
+    public function test_esign_callback_accepts_get_probe(): void
+    {
+        $this->getJson('/api/esign/callback/doc_missing_xyz')
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+    }
 }

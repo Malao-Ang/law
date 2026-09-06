@@ -81,6 +81,6 @@ Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');
 
-Route::post('/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
+Route::match(['GET', 'POST'], '/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
     ->where('documentId', '[A-Za-z0-9_\-]+')
     ->name('esign.callback');
