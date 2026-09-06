@@ -14,7 +14,7 @@
       <v-card flat border rounded="lg" class="mb-4 pa-5">
         <div class="text-subtitle-2 font-weight-bold mb-3">2. Upload file (POST /api/test/minio/upload)</div>
         <v-file-input v-model="uploadFiles" label="เลือกไฟล์" variant="outlined" density="compact" hide-details class="mb-3" />
-        <v-btn color="admin-primary" size="small" :loading="uploading" :disabled="!uploadFiles?.length" @click="uploadFile">Upload</v-btn>
+        <v-btn color="admin-primary" size="small" :loading="uploading" :disabled="!selectedUploadFile" @click="uploadFile">Upload</v-btn>
         <pre v-if="uploadResult" class="mt-3 result-box" :class="uploadResult.error ? 'is-error' : 'is-ok'">{{ JSON.stringify(uploadResult, null, 2) }}</pre>
       </v-card>
 
@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const base = window.location.origin;
@@ -43,8 +43,15 @@ const listResult = ref<Record<string, unknown> | null>(null);
 const uploadResult = ref<Record<string, unknown> | null>(null);
 const presignResult = ref<Record<string, unknown> | null>(null);
 
-const uploadFiles = ref<File[] | null>(null);
+const uploadFiles = ref<File | File[] | null>(null);
 const presignFilename = ref('');
+
+const selectedUploadFile = computed(() => {
+  if (Array.isArray(uploadFiles.value)) {
+    return uploadFiles.value[0] ?? null;
+  }
+  return uploadFiles.value ?? null;
+});
 
 async function api(method: string, path: string, body?: FormData | Record<string, unknown>) {
   const opts: RequestInit = { method, headers: {} };
@@ -55,7 +62,14 @@ async function api(method: string, path: string, body?: FormData | Record<string
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(base + path, opts);
-  return res.json() as Promise<Record<string, unknown>>;
+  const text = await res.text();
+  let payload: Record<string, unknown>;
+  try {
+    payload = text ? JSON.parse(text) as Record<string, unknown> : {};
+  } catch {
+    payload = { error: text || res.statusText };
+  }
+  return { http_status: res.status, ok: res.ok, ...payload };
 }
 
 async function listFiles() {
@@ -66,7 +80,7 @@ async function listFiles() {
 }
 
 async function uploadFile() {
-  const file = uploadFiles.value?.[0];
+  const file = selectedUploadFile.value;
   if (!file) return;
   uploading.value = true;
   const fd = new FormData();
