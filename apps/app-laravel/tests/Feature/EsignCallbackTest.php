@@ -12,11 +12,24 @@ class EsignCallbackTest extends TestCase
     {
         config([
             'buu.esign_callback_base_url' => 'https://example.test',
+            'buu.esign_return_url' => '',
         ]);
 
         $url = app(BuuEsignService::class)->callbackUrl('doc_abc_123');
 
         $this->assertSame('https://example.test/api/esign/callback/doc_abc_123', $url);
+    }
+
+    public function test_callback_url_uses_exact_return_url_when_set(): void
+    {
+        config([
+            'buu.esign_callback_base_url' => 'https://example.test',
+            'buu.esign_return_url' => 'https://service-api-dev.buu.ac.th/api/getTestApiPost',
+        ]);
+
+        $url = app(BuuEsignService::class)->callbackUrl('doc_abc_123');
+
+        $this->assertSame('https://service-api-dev.buu.ac.th/api/getTestApiPost', $url);
     }
 
     public function test_esign_callback_records_approval(): void

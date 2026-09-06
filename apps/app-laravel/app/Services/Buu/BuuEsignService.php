@@ -19,11 +19,16 @@ class BuuEsignService
      */
     public function callbackUrl(string $documentId): string
     {
+        $exact = rtrim((string) config('buu.esign_return_url'), '/');
+        if ($exact !== '') {
+            return $exact;
+        }
+
         $base = rtrim((string) config('buu.esign_callback_base_url'), '/');
         $id = rawurlencode(basename($documentId));
 
         if ($base === '') {
-            throw new BuuApiException('BUU_ESIGN_CALLBACK_BASE_URL / APP_URL is not configured.');
+            throw new BuuApiException('BUU_ESIGN_RETURN_URL / BUU_ESIGN_CALLBACK_BASE_URL / APP_URL is not configured.');
         }
 
         return "{$base}/api/esign/callback/{$id}";
