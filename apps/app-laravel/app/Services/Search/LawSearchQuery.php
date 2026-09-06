@@ -4,6 +4,9 @@ namespace App\Services\Search;
 
 class LawSearchQuery
 {
+    private const NEGATED_NEAR_MIN_LENGTH = 4;
+    private const NEGATED_NEAR_THRESHOLD = 0.82;
+
     /** @var array<int, array{operator:string, negated:bool, value:string, quoted:bool, variants:array<int,string>}> */
     private array $terms = [];
 
@@ -52,6 +55,17 @@ class LawSearchQuery
         }
 
         return true;
+    }
+
+    public function hasNegatedTerms(): bool
+    {
+        foreach ($this->terms as $term) {
+            if ($term['negated']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -125,6 +139,17 @@ class LawSearchQuery
     {
         foreach ($needles as $needle) {
             if ($needle !== '' && mb_stripos($text, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function textContainsNearAny(string $text, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if ($this->textContainsNear($text, $needle)) {
                 return true;
             }
         }
@@ -259,6 +284,7 @@ class LawSearchQuery
         foreach ($group as $term) {
             $contains = $this->textContainsAny($text, $term['variants']);
             if ($term['negated']) {
+                $contains = $contains || (! $term['quoted'] && $this->textContainsNearAny($text, $term['variants']));
                 if ($contains) {
                     return false;
                 }
@@ -272,6 +298,76 @@ class LawSearchQuery
         }
 
         return $hasPositive || $group !== [];
+    }
+
+    private function textContainsNear(string $text, string $needle): bool
+    {
+        $needle = $this->normalizeComparableText($needle);
+        $haystack = $this->normalizeComparableText($text);
+        $needleLength = mb_strlen($needle);
+        $haystackLength = mb_strlen($haystack);
+
+        if ($needleLength < self::NEGATED_NEAR_MIN_LENGTH || $haystackLength < self::NEGATED_NEAR_MIN_LENGTH) {
+            return false;
+        }
+        if (str_contains($haystack, $needle)) {
+            return true;
+        }
+
+        $minWindow = max(self::NEGATED_NEAR_MIN_LENGTH, $needleLength - 1);
+        $maxWindow = min($haystackLength, $needleLength + 1);
+        for ($windowSize = $minWindow; $windowSize <= $maxWindow; $windowSize++) {
+            for ($i = 0; $i <= $haystackLength - $windowSize; $i++) {
+                if ($this->diceSimilarity($needle, mb_substr($haystack, $i, $windowSize)) >= self::NEGATED_NEAR_THRESHOLD) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeComparableText(string $text): string
+    {
+        return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(self::normalizeDigits($text))));
+    }
+
+    private function diceSimilarity(string $left, string $right): float
+    {
+        $leftGrams = $this->characterNgrams($left);
+        $rightGrams = $this->characterNgrams($right);
+        if ($leftGrams === [] || $rightGrams === []) {
+            return $left === $right ? 1.0 : 0.0;
+        }
+
+        $rightCounts = array_count_values($rightGrams);
+        $intersection = 0;
+        foreach ($leftGrams as $gram) {
+            if (($rightCounts[$gram] ?? 0) > 0) {
+                $intersection++;
+                $rightCounts[$gram]--;
+            }
+        }
+
+        return (2 * $intersection) / (count($leftGrams) + count($rightGrams));
+    }
+
+    /**
+     * @return string[]
+     */
+    private function characterNgrams(string $text): array
+    {
+        $length = mb_strlen($text);
+        if ($length <= 1) {
+            return $text === '' ? [] : [$text];
+        }
+
+        $grams = [];
+        for ($i = 0; $i < $length - 1; $i++) {
+            $grams[] = mb_substr($text, $i, 2);
+        }
+
+        return $grams;
     }
 
     /**

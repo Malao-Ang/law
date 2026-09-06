@@ -66,4 +66,13 @@ class LawSearchQueryTest extends TestCase
         $this->assertTrue($query->matchesText('ภาษีที่ดิน'));
         $this->assertFalse($query->matchesText('ภาษีอากร'));
     }
+
+    public function test_negated_terms_exclude_near_matches(): void
+    {
+        $query = LawSearchQuery::parse('~ระเบียบ');
+
+        $this->assertTrue($query->matchesText('ประกาศมหาวิทยาลัย'));
+        $this->assertFalse($query->matchesText('ระเบียบมหาวิทยาลัย'));
+        $this->assertFalse($query->matchesText('ระเบียนเอกสารมหาวิทยาลัย'));
+    }
 }

@@ -21,6 +21,7 @@ class LawSearchController extends Controller
         // File-based is authoritative: it reads status files directly and always
         // reflects the current publish state without depending on ES being up-to-date.
         $fileBased = $this->fileBasedSearch($params, $store);
+        $query = LawSearchQuery::parse(trim((string) ($params['q'] ?? '')));
         if (trim((string) ($params['q'] ?? '')) === '') {
             return response()->json($fileBased);
         }
@@ -49,7 +50,8 @@ class LawSearchController extends Controller
                         fn (array $row): array => $this->overlayCurrentAccessState($row, $fileRowsById[(string) ($row['law_id'] ?? '')] ?? null),
                         $esResult['results'] ?? [],
                     ),
-                    fn (array $row): bool => isset($publishedIds[(string) ($row['law_id'] ?? '')]),
+                    fn (array $row): bool => isset($publishedIds[(string) ($row['law_id'] ?? '')])
+                        && (! $query->hasNegatedTerms() || isset($fileRowsById[(string) ($row['law_id'] ?? '')])),
                 ));
                 $results = array_merge($esRows, $supplement);
                 $usedFuzzy = (string) ($esResult['meta']['mode'] ?? 'exact') === 'fuzzy'
