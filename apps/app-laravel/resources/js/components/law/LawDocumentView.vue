@@ -4,22 +4,23 @@
 
     <div class="lawx-breadcrumb">
       <v-container style="max-width: 1360px" class="py-0">
-        <div class="lawx-bc">
-          <button type="button" class="lawx-bc__item" @click="router.push('/')">
-            <v-icon icon="mdi-home-outline" size="13" />
-            หน้าหลัก
-          </button>
-          <span class="lawx-bc__sep">/</span>
-          <button type="button" class="lawx-bc__item" @click="router.push('/database')">
-            ฐานข้อมูลกฎหมาย
-          </button>
+        <v-breadcrumbs density="compact" class="pa-0 lawx-breadcrumbs">
+          <v-breadcrumbs-item to="/">หน้าแรก</v-breadcrumbs-item>
+          <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+          <v-breadcrumbs-item to="/database">สืบค้นกฎหมาย</v-breadcrumbs-item>
           <template v-if="meta.law_type">
-            <span class="lawx-bc__sep">/</span>
-            <span class="lawx-bc__item">{{ meta.law_type }}</span>
+            <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+            <v-breadcrumbs-item>{{ meta.law_type }}</v-breadcrumbs-item>
           </template>
-          <span class="lawx-bc__sep">/</span>
-          <span class="lawx-bc__item lawx-bc__item--current">{{ meta.title || 'กฎหมาย' }}</span>
-        </div>
+          <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
+          <v-breadcrumbs-item>
+            <v-tooltip :text="meta.title || 'กฎหมาย'" location="bottom">
+              <template #activator="{ props: tp }">
+                <span v-bind="tp" class="lawx-breadcrumb-title">{{ meta.title || 'กฎหมาย' }}</span>
+              </template>
+            </v-tooltip>
+          </v-breadcrumbs-item>
+        </v-breadcrumbs>
       </v-container>
     </div>
 
@@ -592,56 +593,27 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-breadcrumb {
   background: #ffffff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  min-height: 52px;
+  min-height: 40px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
-.lawx-bc {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-  padding: 0 24px;
+.lawx-breadcrumbs {
+  font-size: 0.75rem !important;
 }
 
-.lawx-bc__sep {
-  color: #94a3b8;
-  font-size: 14px;
-  line-height: 1;
-  user-select: none;
+.lawx-breadcrumbs :deep(.v-breadcrumbs-item) {
+  font-size: 0.75rem;
 }
 
-.lawx-bc__item {
-  align-items: center;
-  background: none;
-  border: none;
-  color: #475569;
-  cursor: pointer;
-  display: inline-flex;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  font-size: 13px;
-  gap: 4px;
-  line-height: 1.2;
+.lawx-breadcrumb-title {
+  display: inline-block;
   max-width: 220px;
   overflow: hidden;
-  padding: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.lawx-bc__item:hover {
-  color: #0f172a;
-  text-decoration: underline;
-}
-
-.lawx-bc__item--current {
-  color: #0f172a;
-  cursor: default;
-  font-weight: 700;
-  max-width: 320px;
-  text-decoration: none !important;
+  vertical-align: bottom;
 }
 
 .lawx-main {
