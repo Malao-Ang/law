@@ -19,13 +19,13 @@
               <a class="elaw-section-link" @click.prevent="goToDatabase()">ดูทั้งหมด →</a>
             </div>
           </div>
-          <div class="elaw-carousel mt-2">
+          <div v-if="latestDocs.length > 3" class="elaw-carousel mt-2">
             <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
               <v-icon icon="mdi-chevron-left" />
             </button>
-            <div class="elaw-carousel__track" ref="latestTrack" @wheel.prevent="handleWheelScroll">
+            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
-                v-for="doc in latestDocs.slice(0, 10)"
+                v-for="doc in latestDocs"
                 :key="doc._id"
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
@@ -44,6 +44,24 @@
             <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
               <v-icon icon="mdi-chevron-right" />
             </button>
+          </div>
+          <div v-else class="elaw-grid mt-2">
+            <ELawLawCard
+              v-for="doc in latestDocs"
+              :key="doc._id"
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-grid__card"
+              @click="openLaw(doc)"
+            />
           </div>
         </section>
 
@@ -89,65 +107,6 @@
           <div v-else class="elaw-grid mt-2">
             <ELawLawCard
               v-for="doc in rabiapDocs"
-              :key="doc._id"
-              :title="doc.metadata.title"
-              :doc-type="toDocType(doc.metadata.documentType)"
-              :law-type="doc.metadata.lawTypeName"
-              :description="doc.metadata.summary"
-              :change-status-text="doc.metadata.changeStatus"
-              :use-status="doc.metadata.useStatus"
-              :department="doc.metadata.ownerAgencyId"
-              :law-group="doc.metadata.documentGroupId"
-              :date="formatThaiDate(doc.metadata.publishedDate)"
-              :visibility="doc.metadata.publicationScope"
-              class="elaw-grid__card"
-              @click="openLaw(doc)"
-            />
-          </div>
-        </section>
-
-        <!-- Section: ข้อบังคับ -->
-        <section v-if="khoBangkhabDocs.length" class="elaw-home-section">
-          <div class="elaw-section-header">
-            <div class="elaw-section-header__left">
-              <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar elaw-section-heading__bar--kho-bangkhab" />
-                <h2 class="elaw-section-heading__text">ข้อบังคับ</h2>
-              </div>
-            </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase('kho-bangkhab')">ดูทั้งหมด →</a>
-          </div>
-          <!-- carousel when >3 items -->
-          <div v-if="khoBangkhabDocs.length > 3" class="elaw-carousel mt-2">
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
-              <v-icon icon="mdi-chevron-left" />
-            </button>
-            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
-              <ELawLawCard
-                v-for="doc in khoBangkhabDocs"
-                :key="doc._id"
-                :title="doc.metadata.title"
-                :doc-type="toDocType(doc.metadata.documentType)"
-                :law-type="doc.metadata.lawTypeName"
-                :description="doc.metadata.summary"
-                :change-status-text="doc.metadata.changeStatus"
-                :use-status="doc.metadata.useStatus"
-                :department="doc.metadata.ownerAgencyId"
-                :law-group="doc.metadata.documentGroupId"
-                :date="formatThaiDate(doc.metadata.publishedDate)"
-                :visibility="doc.metadata.publicationScope"
-                class="elaw-carousel__card"
-                @click="openLaw(doc)"
-              />
-            </div>
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
-              <v-icon icon="mdi-chevron-right" />
-            </button>
-          </div>
-          <!-- equal-width grid when ≤3 items -->
-          <div v-else class="elaw-grid mt-2">
-            <ELawLawCard
-              v-for="doc in khoBangkhabDocs"
               :key="doc._id"
               :title="doc.metadata.title"
               :doc-type="toDocType(doc.metadata.documentType)"
@@ -225,6 +184,65 @@
             />
           </div>
         </section>
+
+        <!-- Section: ข้อบังคับ -->
+        <section v-if="khoBangkhabDocs.length" class="elaw-home-section">
+          <div class="elaw-section-header">
+            <div class="elaw-section-header__left">
+              <div class="elaw-section-heading">
+                <span class="elaw-section-heading__bar elaw-section-heading__bar--kho-bangkhab" />
+                <h2 class="elaw-section-heading__text">ข้อบังคับ</h2>
+              </div>
+            </div>
+            <a class="elaw-section-link" @click.prevent="goToDatabase('kho-bangkhab')">ดูทั้งหมด →</a>
+          </div>
+          <!-- carousel when >3 items -->
+          <div v-if="khoBangkhabDocs.length > 3" class="elaw-carousel mt-2">
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
+              <v-icon icon="mdi-chevron-left" />
+            </button>
+            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
+              <ELawLawCard
+                v-for="doc in khoBangkhabDocs"
+                :key="doc._id"
+                :title="doc.metadata.title"
+                :doc-type="toDocType(doc.metadata.documentType)"
+                :law-type="doc.metadata.lawTypeName"
+                :description="doc.metadata.summary"
+                :change-status-text="doc.metadata.changeStatus"
+                :use-status="doc.metadata.useStatus"
+                :department="doc.metadata.ownerAgencyId"
+                :law-group="doc.metadata.documentGroupId"
+                :date="formatThaiDate(doc.metadata.publishedDate)"
+                :visibility="doc.metadata.publicationScope"
+                class="elaw-carousel__card"
+                @click="openLaw(doc)"
+              />
+            </div>
+            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
+              <v-icon icon="mdi-chevron-right" />
+            </button>
+          </div>
+          <!-- equal-width grid when ≤3 items -->
+          <div v-else class="elaw-grid mt-2">
+            <ELawLawCard
+              v-for="doc in khoBangkhabDocs"
+              :key="doc._id"
+              :title="doc.metadata.title"
+              :doc-type="toDocType(doc.metadata.documentType)"
+              :law-type="doc.metadata.lawTypeName"
+              :description="doc.metadata.summary"
+              :change-status-text="doc.metadata.changeStatus"
+              :use-status="doc.metadata.useStatus"
+              :department="doc.metadata.ownerAgencyId"
+              :law-group="doc.metadata.documentGroupId"
+              :date="formatThaiDate(doc.metadata.publishedDate)"
+              :visibility="doc.metadata.publicationScope"
+              class="elaw-grid__card"
+              @click="openLaw(doc)"
+            />
+          </div>
+        </section>
       </div>
 
       <ELawFooter />
@@ -251,14 +269,16 @@ function toDocType(t: DocumentType): DocType {
   return t;
 }
 
-const latestTrack = ref<HTMLElement | null>(null);
+const HOME_SECTION_LIMIT = 10;
+const HOME_SEARCH_PAGE_SIZE = 80;
+const HOME_CARD_WIDTH = 320;
+const HOME_CARD_GAP = 20;
 
 function scrollCarousel(event: Event, direction: number): void {
   const btn = (event.currentTarget as HTMLElement);
   const track = btn.closest('.elaw-carousel')?.querySelector('.elaw-carousel__track') as HTMLElement | null;
   if (!track) return;
-  const cardWidth = 340;
-  track.scrollBy({ left: direction * cardWidth * 3, behavior: 'smooth' });
+  track.scrollBy({ left: direction * (HOME_CARD_WIDTH + HOME_CARD_GAP) * 3, behavior: 'smooth' });
 }
 
 function handleWheelScroll(event: WheelEvent): void {
@@ -307,12 +327,12 @@ const prakatDocs = ref<DocumentVersion[]>([]);
 
 onMounted(async () => {
   try {
-    const response = await searchLaws({ q: '', filters: {}, page: 1, per_page: 24 });
+    const response = await searchLaws({ q: '', filters: {}, page: 1, per_page: HOME_SEARCH_PAGE_SIZE });
     const databaseDocs = response.results
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
       .map(mapSearchResultToDocumentVersion);
 
-    latestDocs.value = databaseDocs.slice(0, 10);
+    latestDocs.value = databaseDocs.slice(0, HOME_SECTION_LIMIT);
     rabiapDocs.value = docsByType(databaseDocs, 'rabiap');
     khoBangkhabDocs.value = docsByType(databaseDocs, 'kho-bangkhab');
     prakatDocs.value = docsByType(databaseDocs, 'prakat');
@@ -325,18 +345,27 @@ onMounted(async () => {
 });
 
 function docsByType(docs: DocumentVersion[], type: DocumentType): DocumentVersion[] {
-  return docs.filter((doc) => doc.metadata.documentType === type).slice(0, 10);
+  return docs.filter((doc) => doc.metadata.documentType === type).slice(0, HOME_SECTION_LIMIT);
 }
 
 function issuerRank(doc: DocumentVersion): number {
-  const issuer = doc.metadata.issuer ?? '';
-  if (issuer.includes('สภามหาวิทยาลัย')) return 1;
-  if (issuer.includes('มหาวิทยาลัย')) return 0;
+  const source = [
+    doc.metadata.lawTypeName,
+    doc.metadata.issuer,
+    doc.metadata.title,
+  ].join(' ');
+
+  if (source.includes('สภามหาวิทยาลัย')) return 1;
+  if (source.includes('มหาวิทยาลัย')) return 0;
   return 2;
 }
 
 const sortedPrakatDocs = computed(() =>
-  [...prakatDocs.value].sort((a, b) => issuerRank(a) - issuerRank(b))
+  [...prakatDocs.value].sort((a, b) => {
+    const rank = issuerRank(a) - issuerRank(b);
+    if (rank !== 0) return rank;
+    return (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0);
+  })
 );
 
 function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion {
@@ -441,6 +470,8 @@ function toDate(value?: string | null): Date | undefined {
 
 <style scoped>
 .elaw-home-sections {
+  --elaw-home-card-width: 320px;
+  --elaw-home-card-gap: 20px;
   max-width: 1215px;
   margin: 0 auto;
   padding: 50px 24px 60px;
@@ -463,7 +494,8 @@ function toDate(value?: string | null): Date | undefined {
 .elaw-carousel__track {
   display: flex;
   align-items: stretch;
-  gap: 20px;
+  gap: var(--elaw-home-card-gap);
+  width: 100%;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
@@ -477,7 +509,9 @@ function toDate(value?: string | null): Date | undefined {
 }
 
 .elaw-carousel__card {
-  flex: 0 0 320px;
+  flex: 0 0 var(--elaw-home-card-width);
+  width: var(--elaw-home-card-width);
+  max-width: var(--elaw-home-card-width);
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
@@ -591,11 +625,19 @@ function toDate(value?: string | null): Date | undefined {
 /* Equal-width grid for ≤3 cards */
 .elaw-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 320px);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, var(--elaw-home-card-width));
+  gap: var(--elaw-home-card-gap);
+  justify-content: start;
 }
 
 .elaw-grid__card {
-  width: 320px;
+  width: var(--elaw-home-card-width);
+  max-width: var(--elaw-home-card-width);
+}
+
+@media (max-width: 420px) {
+  .elaw-home-sections {
+    --elaw-home-card-width: min(320px, calc(100vw - 48px));
+  }
 }
 </style>
