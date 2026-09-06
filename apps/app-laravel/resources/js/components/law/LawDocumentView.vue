@@ -29,7 +29,7 @@
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
           @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>
         <div class="lawx-actions">
-          <v-btn variant="outlined" size="small"
+          <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="tocOpen ? 'mdi-eye-off-outline' : 'mdi-table-of-contents'"
             @click="tocOpen = !tocOpen">{{ tocOpen ? 'ซ่อนสารบัญ' : 'เปิดสารบัญ' }}</v-btn>
           <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
@@ -77,7 +77,7 @@
           'is-original-pdf': usesOriginalPdfLayout,
         }"
       >
-      <v-card v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
+      <v-card v-if="!usesOriginalPdfLayout" v-show="tocOpen" tag="aside" class="lawx-toc" elevation="0">
         <p class="lawx-toc__title"><span class="mdi mdi-format-list-bulleted" /> สารบัญ{{ unitWord }}</p>
         <div class="lawx-toc__scroll">
           <template v-if="tocGroups.length > 0">
@@ -99,8 +99,8 @@
             </div>
           </template>
           <div v-else class="lawx-toc__empty">
-            <span class="mdi mdi-file-pdf-box" style="font-size:2rem;opacity:0.4" />
-            <p class="text-body-2 text-medium-emphasis text-center px-4 mt-2">เอกสาร PDF ต้นฉบับ — ใช้สารบัญของ PDF viewer</p>
+            <span class="mdi mdi-format-list-bulleted" style="font-size:2rem;opacity:0.4" />
+            <p class="text-body-2 text-medium-emphasis text-center px-4 mt-2">ไม่มีสารบัญ</p>
           </div>
         </div>
       </v-card>
@@ -238,41 +238,7 @@
             </a>
           </div>
         </section>
-        <section v-if="sectionRelationSummaries.length" class="lawx-parentcard lawx-parentcard--sections">
-          <div class="lawx-parentcard__head">
-            <span class="mdi mdi-file-tree-outline" />
-            ความสัมพันธ์ราย{{ unitWord }}
-          </div>
-          <div v-for="summary in sectionRelationSummaries" :key="summary.sectionId" class="lawx-section-rel-summary">
-            <div class="lawx-section-rel-summary__badge">{{ summary.badge }}</div>
-            <div class="lawx-section-rel-summary__body">
-              <div
-                v-for="group in summary.groups"
-                :key="group.type"
-                class="lawx-relgroup"
-              >
-                <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
-                <a
-                  v-for="rel in group.items"
-                  :key="rel.id"
-                  class="lawx-relrow lawx-relrow--compact"
-                  :class="`is-${group.type}`"
-                  :href="relationHref(rel) ?? undefined"
-                  :target="safeUrl(rel.url) ? '_blank' : undefined"
-                  rel="noopener"
-                >
-                  <span class="mdi lawx-relrow__icon" :class="relationIcon(rel)" />
-                  <span class="lawx-relrow__main">
-                    <span class="lawx-relrow__title">{{ rel.target_title || rel.target_document_id || 'ไม่ระบุชื่อกฎหมาย' }}</span>
-                    <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">— {{ rel.change_detail || rel.note }}</span>
-                  </span>
-                  <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" />
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" :section-relation-summaries="sectionRelationSummaries" :unit-word="unitWord" />
       </aside>
       </div>
       </template>

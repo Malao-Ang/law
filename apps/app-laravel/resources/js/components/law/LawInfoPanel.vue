@@ -58,23 +58,8 @@
           </div>
         </div>
         <div v-if="meta.expiry_date" class="law-info-row py-1">
-          <span class="law-info-row__label text-medium-emphasis">วันหมดอายุ</span>
+          <span class="law-info-row__label text-medium-emphasis">วันที่สิ้นสุดการใช้</span>
           <span class="law-info-row__value font-weight-semibold text-error">{{ formatLawDate(meta.expiry_date) }}</span>
-        </div>
-        <div v-if="parentNames.length" class="law-info-row py-1">
-          <span class="law-info-row__label text-medium-emphasis">กฎหมายแม่</span>
-          <div class="d-flex flex-wrap ga-1 justify-end">
-            <v-chip
-              v-for="parent in parentNames"
-              :key="parent.id"
-              :to="`/law/${encodeURIComponent(parent.id)}`"
-              size="x-small"
-              variant="tonal"
-              color="primary"
-            >
-              {{ parent.title }}
-            </v-chip>
-          </div>
         </div>
         <div v-if="meta.keywords.length" class="mt-3">
           <div class="text-caption text-medium-emphasis font-weight-bold mb-2">คำสำคัญ</div>
@@ -106,6 +91,38 @@
             {{ law }}
           </div>
         </div>
+
+        <template v-if="sectionRelationSummaries.length">
+          <div class="text-caption text-medium-emphasis font-weight-bold mt-4 mb-2">
+            <v-icon icon="mdi-file-tree-outline" size="x-small" class="mr-1" />
+            ความสัมพันธ์ราย{{ unitWord ?? 'ข้อ' }}
+          </div>
+          <div v-for="summary in sectionRelationSummaries" :key="summary.sectionId" class="lawx-section-rel-summary mb-2">
+            <div class="text-caption font-weight-bold mb-1 text-primary">{{ summary.badge }}</div>
+            <div
+              v-for="group in summary.groups"
+              :key="group.type"
+              class="lawx-relgroup"
+            >
+              <div class="lawx-relgroup__label" :class="`is-${group.type}`">{{ group.label }}</div>
+              <a
+                v-for="rel in group.items"
+                :key="rel.id"
+                class="lawx-relrow lawx-relrow--compact"
+                :class="`is-${group.type}`"
+                :href="rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : (rel.url ?? undefined)"
+                :target="rel.url ? '_blank' : undefined"
+                rel="noopener"
+              >
+                <span class="lawx-relrow__main">
+                  <span class="lawx-relrow__title">{{ rel.target_title || rel.target_document_id || 'ไม่ระบุชื่อกฎหมาย' }}</span>
+                  <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">— {{ rel.change_detail || rel.note }}</span>
+                </span>
+                <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
+              </a>
+            </div>
+          </div>
+        </template>
       </v-card-text>
     </v-card>
 
@@ -133,16 +150,6 @@
             class="ml-2"
           >{{ versions.length }}</v-chip>
         </v-btn>
-        <v-btn
-          flat
-          variant="outlined"
-          prepend-icon="mdi-graph-outline"
-          class="justify-start text-none"
-          :disabled="!viewedDocumentId"
-          :to="viewedDocumentId ? `/law/relations/${encodeURIComponent(viewedDocumentId)}` : undefined"
-        >
-          ความสัมพันธ์กฎหมาย
-        </v-btn>
       </v-card-text>
     </v-card>
 
@@ -151,9 +158,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { LawMeta } from '../../types/document';
+import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
+
+interface SectionRelationGroup {
+  type: RelationType;
+  label: string;
+  items: LawRelation[];
+}
+
+interface SectionRelationSummary {
+  sectionId: string;
+  badge: string;
+  groups: SectionRelationGroup[];
+}
 
 const props = defineProps<{
   meta: LawMeta;
@@ -163,9 +182,12 @@ const props = defineProps<{
   versions?: VersionChainItem[];
   viewedDocumentId?: string;
   parentNames?: Array<{ id: string; title: string }>;
+  sectionRelationSummaries?: SectionRelationSummary[];
+  unitWord?: string;
 }>();
 
 const parentNames = computed(() => props.parentNames ?? []);
+const sectionRelationSummaries = computed(() => props.sectionRelationSummaries ?? []);
 
 const showChangeStatus = computed(() => {
   const changeStatus = props.meta.change_status?.trim();
