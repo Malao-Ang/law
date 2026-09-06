@@ -6,6 +6,39 @@ class LawSearchService
 {
     private const TERM_FILTERS = ['law_type', 'status', 'change_status', 'agency', 'law_group', 'signer_group'];
     private const FUZZY_MIN_QUERY_LENGTH = 4;
+    private const EXTERNAL_LAW_TYPE_ALIASES = [
+        'กฎหมายภายนอก',
+        'พระราชบัญญัติ',
+        'พระราชกำหนด',
+        'กฎกระทรวง',
+        'ประกาศกระทรวง',
+        'พ.ร.บ.',
+        'พ.ร.บ',
+        'พรบ',
+        'พ.ร.ก.',
+        'พ.ร.ก',
+        'พรก',
+        'phrb',
+        'prb',
+        'phrk',
+        'kotmai-krung',
+        'kotmai-phaainok',
+        'kot-krathruang',
+        'kotmai-krw',
+        'prakat-krw',
+    ];
+    private const EXTERNAL_LAW_GROUP_ALIASES = [
+        'กฎหมายภายนอก',
+        'kotmai-phaainok',
+        'kotmai-krung',
+    ];
+    private const LAW_TYPE_FILTER_ALIASES = [
+        'external' => ['กฎหมายภายนอก', 'kotmai-phaainok', 'kotmai-krung'],
+        'external-act' => ['พระราชบัญญัติ', 'พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'],
+        'external-decree' => ['พระราชกำหนด', 'พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'],
+        'external-ministerial-rule' => ['กฎกระทรวง', 'kot-krathruang', 'kotmai-krw'],
+        'external-ministerial-announcement' => ['ประกาศกระทรวง', 'prakat-krw'],
+    ];
 
     public function __construct(private readonly ElasticClient $client) {}
 
@@ -296,7 +329,11 @@ class LawSearchService
         $filterClauses = [$this->visibleAccessFilter()];
         foreach (self::TERM_FILTERS as $field) {
             if (! empty($filters[$field])) {
-                $filterClauses[] = ['terms' => [$field => array_values((array) $filters[$field])]];
+                $values = array_values((array) $filters[$field]);
+                if ($field === 'law_type') {
+                    $values = $this->expandLawTypeFilterValues($values);
+                }
+                $filterClauses[] = ['terms' => [$field => $values]];
             }
         }
 
@@ -345,6 +382,66 @@ class LawSearchService
             'from' => ($page - 1) * $perPage,
             'size' => $perPage,
         ];
+    }
+
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandLawTypeFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $type = trim((string) $value);
+            if ($type === '') {
+                continue;
+            }
+            $key = $this->lawTypeFilterKey($type);
+            if ($key === 'external') {
+                array_push($expanded, ...self::EXTERNAL_LAW_TYPE_ALIASES);
+                continue;
+            }
+            $aliases = self::LAW_TYPE_FILTER_ALIASES[$key] ?? [$type];
+            foreach ($aliases as $alias) {
+                $expanded[] = $alias;
+            }
+        }
+
+        return array_values(array_unique($expanded));
+    }
+
+    private function canonicalLawType(string $lawType): string
+    {
+        $lawType = trim($lawType);
+        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+
+        return match (true) {
+            in_array($compact, self::EXTERNAL_LAW_TYPE_ALIASES, true),
+                str_contains($lawType, 'พระราชบัญญัติ'),
+                str_contains($lawType, 'พระราชกำหนด'),
+                str_contains($lawType, 'กฎกระทรวง'),
+                str_contains($lawType, 'ประกาศกระทรวง') => 'kotmai-phaainok',
+            default => 'other',
+        };
+    }
+
+    private function lawTypeFilterKey(string $lawType): string
+    {
+        $lawType = trim($lawType);
+        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+
+        return match (true) {
+            in_array($compact, self::EXTERNAL_LAW_GROUP_ALIASES, true) => 'external',
+            str_contains($lawType, 'พระราชบัญญัติ'),
+                in_array($compact, ['พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'], true) => 'external-act',
+            str_contains($lawType, 'พระราชกำหนด'),
+                in_array($compact, ['พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'], true) => 'external-decree',
+            str_contains($lawType, 'กฎกระทรวง'),
+                in_array($compact, ['kot-krathruang', 'kotmai-krw'], true) => 'external-ministerial-rule',
+            str_contains($lawType, 'ประกาศกระทรวง'),
+                $compact === 'prakat-krw' => 'external-ministerial-announcement',
+            default => 'other',
+        };
     }
 
     /**

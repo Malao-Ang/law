@@ -9,6 +9,9 @@ const MAX_DEPTH = 6;
 export const TYPE_META: Record<string, { color: string; short: string }> = {
   กฎหมายภายนอก: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
   พระราชบัญญัติ: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
+  พระราชกำหนด: { color: 'doc-phaainok', short: 'พ.ร.ก.' },
+  กฎกระทรวง: { color: 'doc-phaainok', short: 'กฎกระทรวง' },
+  ประกาศกระทรวง: { color: 'doc-phaainok', short: 'ประกาศ ก.' },
   ข้อบังคับ: { color: 'doc-kho-bangkhab', short: 'ข้อบังคับ' },
   ระเบียบ: { color: 'doc-rabiap', short: 'ระเบียบ' },
   ประกาศ: { color: 'doc-prakat', short: 'ประกาศ' },
@@ -61,7 +64,13 @@ export function typeShort(type: string): string {
 }
 
 export function typeIcon(type: string): string {
-  if (type === 'กฎหมายภายนอก' || type === 'พระราชบัญญัติ') return 'mdi-office-building-outline';
+  if (
+    type === 'กฎหมายภายนอก'
+    || type === 'พระราชบัญญัติ'
+    || type === 'พระราชกำหนด'
+    || type === 'กฎกระทรวง'
+    || type === 'ประกาศกระทรวง'
+  ) return 'mdi-office-building-outline';
   if (type === 'ข้อบังคับ') return 'mdi-scale-balance';
   if (type === 'ระเบียบ') return 'mdi-folder-outline';
   if (type.includes('ประกาศ')) return 'mdi-bullhorn-outline';

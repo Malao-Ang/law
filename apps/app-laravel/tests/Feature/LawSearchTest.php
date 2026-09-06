@@ -93,21 +93,32 @@ class LawSearchTest extends TestCase
 
     public function test_search_endpoint_accepts_thai_change_status_filter(): void
     {
-        $this->mock(LawSearchService::class, function ($mock): void {
-            $mock->shouldReceive('search')
-                ->once()
-                ->with(\Mockery::on(fn (array $params): bool => ($params['filters']['change_status'] ?? null) === ['กฎหมายล่าสุด']))
-                ->andReturn([
-                    'total' => 0,
-                    'results' => [],
-                    'facets' => [],
-                ]);
-        });
+        $this->mock(LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->never());
 
-        $this->postJson('/api/laws/search', [
+        $store = app(ReviewStore::class);
+        $documentId = 'law_change_status_'.uniqid();
+        $store->setStatus($documentId, ['status' => 'ingested']);
+        $store->writeReviewDocument($documentId, [
+            'document_id' => $documentId,
+            'law_meta' => [
+                'title' => 'ประกาศทดสอบ',
+                'law_type' => 'ประกาศ',
+                'change_status' => 'กฎหมายล่าสุด',
+                'access_scope' => 'public',
+                'published_date' => '2565-01-01',
+            ],
+            'pages' => [],
+        ]);
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', [
             'q' => '',
             'filters' => ['change_status' => ['กฎหมายล่าสุด']],
-        ])->assertOk();
+        ])
+            ->assertOk();
+
+        $this->assertContains($documentId, collect($response->json('results'))->pluck('law_id')->all());
     }
 
     public function test_search_falls_back_to_file_based_when_es_unavailable(): void
@@ -122,6 +133,8 @@ class LawSearchTest extends TestCase
 
     public function test_file_based_search_matches_document_content_not_just_title(): void
     {
+        config()->set('search.file_heavy_details', true);
+
         // ES unavailable → controller uses the file-based fallback.
         $this->mock(LawSearchService::class, fn ($mock) => $mock->shouldReceive('search')->andThrow(new \RuntimeException('es down')));
 
@@ -281,5 +294,79 @@ class LawSearchTest extends TestCase
         $this->assertSame('external', $bySource['EXT1']['source']);
         $this->assertSame('internal', $bySource['PRK1']['source']);
         $this->assertSame('มหาวิทยาลัย', $bySource['PRK1']['issuer']);
+    }
+
+    public function test_external_law_filter_includes_all_external_subtypes(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->never());
+
+        $store = app(\App\Services\ReviewStore::class);
+        $token = 'external_filter_'.uniqid();
+        $documents = [
+            'act' => 'พระราชบัญญัติ',
+            'decree' => 'พระราชกำหนด',
+            'rule' => 'กฎกระทรวง',
+            'announcement' => 'ประกาศกระทรวง',
+        ];
+
+        foreach ($documents as $suffix => $lawType) {
+            $id = "{$token}_{$suffix}";
+            $store->setStatus($id, ['status' => 'ingested']);
+            $store->writeReviewDocument($id, [
+                'document_id' => $id,
+                'law_meta' => [
+                    'title' => "{$token} {$lawType}",
+                    'law_type' => $lawType,
+                    'access_scope' => 'public',
+                    'published_date' => '2565-01-01',
+                ],
+                'pages' => [],
+            ]);
+        }
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', [
+            'q' => $token,
+            'filters' => ['law_type' => ['kotmai-phaainok']],
+        ])->assertOk();
+
+        $ids = collect($response->json('results'))->pluck('law_id')->all();
+        foreach (array_keys($documents) as $suffix) {
+            $this->assertContains("{$token}_{$suffix}", $ids);
+        }
+    }
+
+    public function test_external_law_subtype_filter_stays_specific(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->never());
+
+        $store = app(\App\Services\ReviewStore::class);
+        $token = 'external_subtype_'.uniqid();
+        foreach (['act' => 'พระราชบัญญัติ', 'decree' => 'พระราชกำหนด'] as $suffix => $lawType) {
+            $id = "{$token}_{$suffix}";
+            $store->setStatus($id, ['status' => 'ingested']);
+            $store->writeReviewDocument($id, [
+                'document_id' => $id,
+                'law_meta' => [
+                    'title' => "{$token} {$lawType}",
+                    'law_type' => $lawType,
+                    'access_scope' => 'public',
+                    'published_date' => '2565-01-01',
+                ],
+                'pages' => [],
+            ]);
+        }
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', [
+            'q' => $token,
+            'filters' => ['law_type' => ['พระราชกำหนด']],
+        ])->assertOk();
+
+        $ids = collect($response->json('results'))->pluck('law_id')->all();
+        $this->assertContains("{$token}_decree", $ids);
+        $this->assertNotContains("{$token}_act", $ids);
     }
 }

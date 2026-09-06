@@ -38,8 +38,36 @@ class LawSearchServiceTest extends TestCase
 
         $filters = Collection::make($captured['query']['bool']['filter']);
         $this->assertTrue($filters->contains(fn (array $filter): bool => ($filter['bool']['minimum_should_match'] ?? null) === 1));
-        $this->assertTrue($filters->contains(['terms' => ['law_type' => ['phrb']]]));
+        $lawTypeFilter = $filters->first(fn (array $filter): bool => isset($filter['terms']['law_type']));
+        $this->assertContains('phrb', $lawTypeFilter['terms']['law_type']);
+        $this->assertContains('พระราชบัญญัติ', $lawTypeFilter['terms']['law_type']);
+        $this->assertNotContains('พระราชกำหนด', $lawTypeFilter['terms']['law_type']);
         $this->assertTrue($filters->contains(fn (array $filter): bool => isset($filter['range']['published_year'])));
+    }
+
+    public function test_external_law_group_filter_expands_to_all_external_types(): void
+    {
+        $captured = [];
+        $mock = \Mockery::mock(ElasticClient::class);
+        $mock->shouldReceive('search')->once()->andReturnUsing(function (array $body) use (&$captured): array {
+            $captured = $body;
+
+            return ['hits' => ['hits' => []], 'aggregations' => ['total_laws' => ['value' => 0]]];
+        });
+
+        (new LawSearchService($mock))->search([
+            'q' => '',
+            'filters' => ['law_type' => ['kotmai-phaainok']],
+            'page' => 1,
+            'per_page' => 20,
+        ]);
+
+        $filters = Collection::make($captured['query']['bool']['filter']);
+        $lawTypeFilter = $filters->first(fn (array $filter): bool => isset($filter['terms']['law_type']));
+        $this->assertContains('พระราชบัญญัติ', $lawTypeFilter['terms']['law_type']);
+        $this->assertContains('พระราชกำหนด', $lawTypeFilter['terms']['law_type']);
+        $this->assertContains('กฎกระทรวง', $lawTypeFilter['terms']['law_type']);
+        $this->assertContains('ประกาศกระทรวง', $lawTypeFilter['terms']['law_type']);
     }
 
     public function test_parses_response_into_results_and_facets(): void

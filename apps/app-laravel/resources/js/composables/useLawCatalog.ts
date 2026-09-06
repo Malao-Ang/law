@@ -163,9 +163,18 @@ export function matchesParentLawFamily(lawType: string | null | undefined, famil
   if (family === 'ordinance') return type.includes('ข้อบังคับ');
   if (family === 'announcement') return type.includes('ประกาศ');
   return type.includes('พระราชบัญญัติ')
+    || type.includes('พระราชกำหนด')
+    || type.includes('กฎกระทรวง')
+    || type.includes('ประกาศกระทรวง')
     || type.includes('พ.ร.บ')
+    || type.includes('พ.ร.ก')
     || type.includes('กฎหมายภายนอก')
     || type === 'phrb'
+    || type === 'prb'
+    || type === 'phrk'
+    || type === 'kot-krathruang'
+    || type === 'kotmai-krw'
+    || type === 'prakat-krw'
     || type === 'kotmai-phaainok';
 }
 

@@ -15,6 +15,34 @@ use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
 {
+    private const EXTERNAL_LAW_TYPE_ALIASES = [
+        'กฎหมายภายนอก',
+        'พระราชบัญญัติ',
+        'พระราชกำหนด',
+        'กฎกระทรวง',
+        'ประกาศกระทรวง',
+        'พ.ร.บ.',
+        'พ.ร.บ',
+        'พรบ',
+        'พ.ร.ก.',
+        'พ.ร.ก',
+        'พรก',
+        'phrb',
+        'prb',
+        'phrk',
+        'kotmai-krung',
+        'kotmai-phaainok',
+        'kot-krathruang',
+        'kotmai-krw',
+        'prakat-krw',
+    ];
+
+    private const EXTERNAL_LAW_GROUP_ALIASES = [
+        'กฎหมายภายนอก',
+        'kotmai-phaainok',
+        'kotmai-krung',
+    ];
+
     public function search(LawSearchRequest $request, LawSearchService $service, LawSuggestService $suggestService, ReviewStore $store): JsonResponse
     {
         $params = $request->validated();
@@ -270,7 +298,11 @@ class LawSearchController extends Controller
      */
     private function rowMatchesFilters(array $row, array $filters): bool
     {
-        foreach (['law_type', 'change_status', 'signer_group'] as $field) {
+        if (! $this->rowMatchesLawTypeFilter((string) ($row['law_type'] ?? ''), $filters['law_type'] ?? null)) {
+            return false;
+        }
+
+        foreach (['change_status', 'signer_group'] as $field) {
             $want = $filters[$field] ?? null;
             if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
                 return false;
@@ -288,6 +320,27 @@ class LawSearchController extends Controller
         }
 
         return true;
+    }
+
+    private function rowMatchesLawTypeFilter(string $lawType, mixed $want): bool
+    {
+        if (empty($want)) {
+            return true;
+        }
+
+        $rowKey = $this->lawTypeFilterKey($lawType);
+        foreach ((array) $want as $wantedType) {
+            $wanted = (string) $wantedType;
+            $wantedKey = $this->lawTypeFilterKey($wanted);
+            if ($lawType === $wanted || $rowKey === $wantedKey) {
+                return true;
+            }
+            if ($wantedKey === 'external' && $this->canonicalType($lawType) === 'kotmai-phaainok') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -878,7 +931,7 @@ class LawSearchController extends Controller
     private function sourceForLawType(string $lawType): string
     {
         $lawType = trim($lawType);
-        if ($lawType === 'กฎหมายภายนอก') {
+        if ($this->canonicalType($lawType) === 'kotmai-phaainok') {
             return 'external';
         }
         foreach ((array) config('lookups.document_types', []) as $type) {
@@ -892,12 +945,38 @@ class LawSearchController extends Controller
 
     private function canonicalType(string $lawType): string
     {
+        $lawType = trim($lawType);
+        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+
         return match (true) {
-            str_contains($lawType, 'พระราชบัญญัติ'), $lawType === 'พ.ร.บ.', $lawType === 'phrb', $lawType === 'kotmai-krung', $lawType === 'กฎหมายภายนอก', $lawType === 'kotmai-phaainok' => 'kotmai-phaainok',
+            in_array($compact, self::EXTERNAL_LAW_TYPE_ALIASES, true),
+                str_contains($lawType, 'พระราชบัญญัติ'),
+                str_contains($lawType, 'พระราชกำหนด'),
+                str_contains($lawType, 'กฎกระทรวง'),
+                str_contains($lawType, 'ประกาศกระทรวง') => 'kotmai-phaainok',
             str_contains($lawType, 'ข้อบังคับ'), $lawType === 'kho-bangkhab' => 'kho-bangkhab',
             str_contains($lawType, 'ระเบียบ'), $lawType === 'rabiap' => 'rabiap',
             str_contains($lawType, 'ประกาศ'), $lawType === 'prakat', $lawType === 'command', $lawType === 'resolution', str_contains($lawType, 'คำสั่ง'), str_contains($lawType, 'มติ') => 'prakat',
             default => 'other',
+        };
+    }
+
+    private function lawTypeFilterKey(string $lawType): string
+    {
+        $lawType = trim($lawType);
+        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+
+        return match (true) {
+            in_array($compact, self::EXTERNAL_LAW_GROUP_ALIASES, true) => 'external',
+            str_contains($lawType, 'พระราชบัญญัติ'),
+                in_array($compact, ['พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'], true) => 'external-act',
+            str_contains($lawType, 'พระราชกำหนด'),
+                in_array($compact, ['พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'], true) => 'external-decree',
+            str_contains($lawType, 'กฎกระทรวง'),
+                in_array($compact, ['kot-krathruang', 'kotmai-krw'], true) => 'external-ministerial-rule',
+            str_contains($lawType, 'ประกาศกระทรวง'),
+                $compact === 'prakat-krw' => 'external-ministerial-announcement',
+            default => $this->canonicalType($lawType),
         };
     }
 
