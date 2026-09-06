@@ -329,7 +329,7 @@ class LawSearchQuery
 
     private function normalizeComparableText(string $text): string
     {
-        return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(self::normalizeDigits($text))));
+        return trim((string) preg_replace('/[^\p{L}\p{M}\p{N}]+/u', '', mb_strtolower(self::normalizeDigits($text))));
     }
 
     private function diceSimilarity(string $left, string $right): float

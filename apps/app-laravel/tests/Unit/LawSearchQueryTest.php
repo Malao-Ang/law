@@ -73,6 +73,7 @@ class LawSearchQueryTest extends TestCase
 
         $this->assertTrue($query->matchesText('ประกาศมหาวิทยาลัย'));
         $this->assertFalse($query->matchesText('ระเบียบมหาวิทยาลัย'));
+        $this->assertFalse($query->matchesText('ระเบียบีมหาวิทยาลัยบูรพา'));
         $this->assertFalse($query->matchesText('ระเบียนเอกสารมหาวิทยาลัย'));
     }
 }

@@ -25,6 +25,9 @@ class LawSearchController extends Controller
         if (trim((string) ($params['q'] ?? '')) === '') {
             return response()->json($fileBased);
         }
+        if ($query->hasNegatedTerms()) {
+            return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
+        }
 
         // Published allowlist (ingested + has published_date) drops any
         // unpublished docs the ES index may still contain.
@@ -171,7 +174,7 @@ class LawSearchController extends Controller
             }
         }
 
-        $includeHeavyDetails = ! $query->isEmpty();
+        $includeHeavyDetails = ! $query->isEmpty() && ! $query->isNegatedOnly();
         $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById, $includeHeavyDetails): array {
             $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
@@ -261,23 +264,42 @@ class LawSearchController extends Controller
             return ['matched' => true, 'mode' => 'file_browse', 'confidence' => 0.5];
         }
 
+        if ($query->isBoolean()) {
+            $haystack = $this->metadataHaystack($row);
+            if ($query->isNegatedOnly()) {
+                return [
+                    'matched' => $query->matchesText($haystack),
+                    'mode' => 'file_boolean',
+                    'confidence' => 0.78,
+                ];
+            }
+
+            if (LawMetaNormalizer::effectiveVisibility($row) !== 'restricted') {
+                foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
+                    $haystack .= ' '.(string) ($chunk['text'] ?? '');
+                }
+            }
+
+            return [
+                'matched' => $query->matchesText($haystack),
+                'mode' => 'file_boolean',
+                'confidence' => 0.78,
+            ];
+        }
+
         $title = (string) ($row['title'] ?? '');
         if ($title !== '' && $query->matchesText($title)) {
-            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.82 : 0.84];
+            return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.84];
         }
 
         $metaHaystack = $this->metadataHaystack($row);
         if ($metaHaystack !== '' && $query->matchesText($metaHaystack)) {
-            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.78 : 0.8];
+            return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.8];
         }
 
         $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
         if (! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
-            return ['matched' => true, 'mode' => $query->isBoolean() ? 'file_boolean' : 'file_exact', 'confidence' => $query->isBoolean() ? 0.74 : 0.7];
-        }
-
-        if ($query->isBoolean()) {
-            return ['matched' => false, 'mode' => 'file_boolean', 'confidence' => 0.0];
+            return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.7];
         }
 
         $similarity = $this->textSimilarity($query->raw(), $title);
@@ -515,8 +537,6 @@ class LawSearchController extends Controller
             if ($chunks === [] && $documentId !== '') {
                 $chunks = $this->chunksFromReview($documentId, $store);
             }
-            // ponytail: O(n) export/review reads per search; move to ES-only if the
-            // doc set grows large enough that this fallback dominates latency.
             $this->exportChunkCache[$documentId] = $chunks;
         }
 
@@ -575,6 +595,10 @@ class LawSearchController extends Controller
         }
 
         $needles = $query->isBoolean() ? $query->positiveVariants() : $query->rawVariants();
+        if ($needles === []) {
+            return [];
+        }
+
         $snippets = [];
         foreach ($this->loadExportChunks($documentId, $store) as $chunk) {
             $text = (string) ($chunk['text'] ?? '');
