@@ -27,6 +27,7 @@ const ESignStatusPage = () => import('../pages/esign/ESignStatusPage.vue');
 const LawPage = () => import('../pages/law/LawPage.vue');
 const LawVersionsPage = () => import('../pages/law/LawVersionsPage.vue');
 const PublicShowRelationsPage = () => import('../pages/public/PublicShowRelationsPage.vue');
+const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
@@ -55,6 +56,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/law/:documentId/versions', name: 'law-versions', component: LawVersionsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/relations/:documentId?', name: 'public-show-relations', component: PublicShowRelationsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
+  { path: '/dev/minio', name: 'dev-minio', component: MinioTestPage, meta: { bareLayout: false } },
 ];
 
 export const router = createRouter({

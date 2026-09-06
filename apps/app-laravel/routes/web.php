@@ -10,6 +10,7 @@ Route::get('/health', fn () => response()->json([
 
 Route::view('/', 'app');
 Route::view('/database', 'app');
+Route::view('/dev/minio', 'app');
 Route::view('/admin', 'app');
 Route::view('/admin/laws', 'app');
 Route::view('/admin/upload', 'app');
