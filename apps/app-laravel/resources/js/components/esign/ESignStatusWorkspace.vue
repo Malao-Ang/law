@@ -341,11 +341,9 @@
       :signed="session.status === 'signed'"
     />
 
-    <PublishLawDialog
+    <PublishConfirmDialog
       v-model="publishOpen"
-      :document-title="docTitle"
-      :tracking-id="session.trackingId"
-      :signed-at="session.signedAt"
+      :publishing="true"
       :loading="publishing"
       @confirm="publish"
     />
@@ -355,14 +353,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { cancelDocumentESign, downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign, updateWorkflowProgress } from '../../api/client';
+import { cancelDocumentESign, downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, updateWorkflowProgress } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
 import DocumentScrollPreviewDialog from './DocumentScrollPreviewDialog.vue';
-import PublishLawDialog from './PublishLawDialog.vue';
+import PublishConfirmDialog from '../shared/PublishConfirmDialog.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { documentRelations } from '../../composables/useLawSections';
+import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { writeStage } from '../../data/documentPipeline';
 import {
   ROLE_LABELS,
@@ -667,6 +666,22 @@ async function markSigned(): Promise<void> {
 }
 
 async function publish(): Promise<void> {
+  // Validate all publish gates before proceeding
+  let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
+  try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
+
+  const meta = documentStore.review?.law_meta;
+  const relations = documentStore.review?.relations ?? [];
+  const isOldDoc = meta?.document_type === 'old';
+  const { hasRequiredFail, gates } = evaluatePublishGates(meta, docStatus, relations, isOldDoc);
+
+  if (hasRequiredFail) {
+    const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
+    publishOpen.value = false;
+    errorFlash.value = `ไม่สามารถเผยแพร่ได้: ${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${failedGate?.status ?? ''}`;
+    return;
+  }
+
   publishing.value = true;
   try {
     const saved = await documentStore.saveLawMeta({

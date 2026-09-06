@@ -77,16 +77,7 @@ import { computed, ref, watch } from 'vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { fetchStatus } from '../../api/client';
 import type { DocumentStatus } from '../../types/document';
-
-type ChecklistLevel = 'required' | 'optional';
-
-interface ChecklistItem {
-  key: string;
-  label: string;
-  ok: boolean;
-  status: string;
-  level: ChecklistLevel;
-}
+import { evaluatePublishGates } from '../../composables/usePublishGates';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -110,82 +101,17 @@ const open = computed({
 const meta = computed(() => documentStore.review?.law_meta);
 const isOldDoc = computed(() => meta.value?.document_type === 'old');
 
-const checklist = computed<ChecklistItem[]>(() => {
-  const currentMeta = meta.value;
-  const currentStatus = docStatus.value;
-  const workflowCompletedStep = currentStatus?.workflow_completed_step ?? null;
-  const ragStatus = currentStatus?.status ?? '';
-
-  const items: ChecklistItem[] = [];
-
-  // === เอกสารภายใน: 5 gates ตามลำดับ ===
-  if (!isOldDoc.value) {
-    // 1. e-Sign ต้องลงนามสำเร็จ (required)
-    items.push({
-      key: 'esign',
-      label: 'ผ่านการลงนาม e-Sign',
-      ok: !!currentStatus?.esign_confirmed_at,
-      status: currentStatus?.esign_confirmed_at ? 'ยืนยันแล้ว' : 'ยังไม่ผ่าน e-Sign',
-      level: 'required',
-    });
-
-    // 2. RAG ต้องจัดลำดับ (required)
-    const ragOk = (ragStatus === 'exported' || ragStatus === 'ingested' || (workflowCompletedStep ?? 0) >= 3) && !currentStatus?.rag_skipped;
-    items.push({
-      key: 'rag',
-      label: 'จัดลำดับ RAG',
-      ok: ragOk,
-      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน — ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับ'),
-      level: 'required',
-    });
-  }
-
-  // 3. กำหนดสิทธิ์ (required)
-  items.push({
-    key: 'access_scope',
-    label: 'กำหนดสิทธิ์การเข้าถึง',
-    ok: !!currentMeta?.access_scope,
-    status: currentMeta?.access_scope ? currentMeta.access_scope : 'ยังไม่ได้กำหนด',
-    level: 'required',
-  });
-
-  // 4. ความสัมพันธ์กฎหมาย (optional)
-  const relationCount = documentStore.review?.relations?.length ?? 0;
-  items.push({
-    key: 'relations',
-    label: 'ความสัมพันธ์กฎหมาย',
-    ok: relationCount > 0,
-    status: relationCount > 0 ? `${relationCount} รายการ` : 'ยังไม่มี',
-    level: 'optional',
-  });
-
-  // 5. สถานะบังคับใช้ (required — ต้องไม่เป็น "ร่าง")
-  const statusOk = !!currentMeta?.status && currentMeta.status !== 'ร่าง';
-  items.push({
-    key: 'status',
-    label: 'สถานะการบังคับใช้',
-    ok: statusOk,
-    status: statusOk ? currentMeta!.status : 'ยังเป็นร่าง',
-    level: 'required',
-  });
-
-  // Metadata ครบ (required ทั้ง old + new)
-  items.push({
-    key: 'metadata',
-    label: 'ข้อมูลกฎหมายครบ (ชื่อ + ประเภท + วันที่)',
-    ok: !!(currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)),
-    status: currentMeta?.title && currentMeta.law_type && (currentMeta.promulgation_date || currentMeta.effective_date)
-      ? 'ครบถ้วน'
-      : 'ยังขาดข้อมูลจำเป็น',
-    level: 'required',
-  });
-
-  return items;
-});
-
-const hasRequiredFail = computed(() =>
-  checklist.value.some((item) => item.level === 'required' && !item.ok),
+const gateResult = computed(() =>
+  evaluatePublishGates(
+    meta.value,
+    docStatus.value,
+    documentStore.review?.relations ?? [],
+    isOldDoc.value,
+  ),
 );
+
+const checklist = computed(() => gateResult.value.gates);
+const hasRequiredFail = computed(() => gateResult.value.hasRequiredFail);
 
 watch(
   () => props.modelValue,

@@ -251,6 +251,7 @@ import { buildSections } from '../../composables/useLawSections';
 import { documentFileUrl, fetchStatus } from '../../api/client';
 import Swal from 'sweetalert2';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
+import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ documentId: string }>();
@@ -463,15 +464,22 @@ async function togglePublished(next: boolean | null): Promise<void> {
     return;
   }
 
-  // ======= เอกสารภายใน: ตรวจ 4 gates =======
-  if (!isOldDoc.value) {
-    let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
-    try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
+  // ======= ตรวจ gates ด้วย usePublishGates =======
+  let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
+  try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
 
-    // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
-    const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
-    const esignConfirmed = !!docStatus?.esign_confirmed_at && docStatus?.esign_sign_status !== 'rejected' && !esignSendFailed;
-    if (!esignConfirmed) {
+  const { gates, hasRequiredFail } = evaluatePublishGates(
+    meta.value,
+    docStatus,
+    documentStore.review?.relations ?? [],
+    isOldDoc.value,
+  );
+
+  if (hasRequiredFail) {
+    // Find the first failing required gate and show appropriate alert
+    const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
+
+    if (failedGate?.key === 'esign') {
       const isWaitingSign = !!docStatus?.esign_submitted_at;
       await Swal.fire({
         icon: 'warning',
@@ -485,9 +493,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
 
-    // Gate 2: RAG ต้องทำหรือยืนยันข้าม
-    const ragDone = (docStatus?.status === 'exported' || docStatus?.status === 'ingested' || (docStatus?.workflow_completed_step ?? 0) >= 3);
-    if (!ragDone || docStatus?.rag_skipped) {
+    if (failedGate?.key === 'rag') {
       const r = await Swal.fire({
         icon: 'warning',
         title: 'ยังไม่ได้จัดลำดับ RAG',
@@ -502,8 +508,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
 
-    // Gate 3: ต้องกำหนดสิทธิ์ public/private
-    if (!meta.value.access_scope) {
+    if (failedGate?.key === 'access_scope') {
       const r = await Swal.fire({
         icon: 'info',
         title: 'ยังไม่ได้กำหนดสิทธิ์การเข้าถึง',
@@ -518,28 +523,38 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
 
-    // Gate 4: สถานะยังเป็น "ร่าง"
-    if (!meta.value.status || meta.value.status === 'ร่าง') {
-      const r = await Swal.fire({
-        icon: 'question',
-        title: 'เอกสารยังเป็นร่าง',
-        html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>ต้องการเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> ก่อนเผยแพร่หรือไม่?',
-        showCancelButton: true,
-        showDenyButton: true,
-        confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
-        denyButtonText: 'ไปแก้ไขสถานะเอง',
-        cancelButtonText: 'ยกเลิก',
-        denyButtonColor: '#6b7280',
-        confirmButtonColor: '#1a3673',
-      });
-      if (r.isConfirmed) {
-        await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
-      } else if (r.isDenied) {
-        router.push(`/documents/${props.documentId}/law-info?mode=edit`);
-        return;
-      } else {
-        return;
-      }
+    // Other required failures (status, metadata) — show generic block
+    await Swal.fire({
+      icon: 'warning',
+      title: 'ข้อมูลไม่ครบ',
+      html: `ไม่สามารถเผยแพร่ได้: <strong>${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'}</strong>`,
+      confirmButtonText: 'รับทราบ',
+      confirmButtonColor: '#1a3673',
+    });
+    return;
+  }
+
+  // All required gates pass — special handling for ร่าง status (post-gate)
+  if (!meta.value.status || meta.value.status === 'ร่าง') {
+    const r = await Swal.fire({
+      icon: 'question',
+      title: 'เอกสารยังเป็นร่าง',
+      html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>ต้องการเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> ก่อนเผยแพร่หรือไม่?',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
+      denyButtonText: 'ไปแก้ไขสถานะเอง',
+      cancelButtonText: 'ยกเลิก',
+      denyButtonColor: '#6b7280',
+      confirmButtonColor: '#1a3673',
+    });
+    if (r.isConfirmed) {
+      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+    } else if (r.isDenied) {
+      router.push(`/documents/${props.documentId}/law-info?mode=edit`);
+      return;
+    } else {
+      return;
     }
   }
 
