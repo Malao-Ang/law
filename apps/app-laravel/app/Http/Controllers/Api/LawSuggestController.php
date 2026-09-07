@@ -15,20 +15,40 @@ class LawSuggestController extends Controller
     {
         $params = $request->validated();
 
+        // Published allowlist: ingested + has published_date + not draft — mirrors LawSearchController::fileBasedSearch
+        $publishedIds = [];
+        foreach ($store->listLawMeta() as $metaRow) {
+            if (
+                ($metaRow['status'] ?? '') === 'ingested'
+                && ($metaRow['published_date'] ?? '') !== ''
+                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+            ) {
+                $publishedIds[(string) $metaRow['document_id']] = true;
+            }
+        }
+
         try {
             $result = $service->suggest($params);
-            if (($result['suggestions'] ?? []) !== []) {
+            // Strip any ES suggestions that are not in the published allowlist
+            $result['suggestions'] = array_values(array_filter(
+                $result['suggestions'] ?? [],
+                fn (array $s): bool => isset($publishedIds[(string) ($s['law_id'] ?? '')]),
+            ));
+            if ($result['suggestions'] !== []) {
                 return response()->json($result);
             }
         } catch (\Throwable $exception) {
             Log::warning('Law suggest failed, falling back to file-based', ['error' => $exception->getMessage()]);
         }
 
-        return response()->json($this->fileBasedSuggest($params, $store));
+        return response()->json($this->fileBasedSuggest($params, $store, $publishedIds));
     }
 
-    /** @param array<string,mixed> $params */
-    private function fileBasedSuggest(array $params, ReviewStore $store): array
+    /**
+     * @param array<string,mixed>  $params
+     * @param array<string, true>  $publishedIds  allowlist from suggest(); must encode all three published conditions
+     */
+    private function fileBasedSuggest(array $params, ReviewStore $store, array $publishedIds = []): array
     {
         $query = mb_strtolower(trim((string) ($params['q'] ?? '')));
         $size = min(10, max(1, (int) ($params['size'] ?? 8)));
@@ -39,7 +59,8 @@ class LawSuggestController extends Controller
 
         $rows = [];
         foreach ($store->listLawMeta() as $row) {
-            if (($row['status'] ?? '') !== 'ingested') {
+            // Published gate: status=ingested, has published_date, not draft (ร่าง)
+            if (! isset($publishedIds[(string) ($row['document_id'] ?? '')])) {
                 continue;
             }
             if (($row['access_scope'] ?? 'public') === 'private') {
