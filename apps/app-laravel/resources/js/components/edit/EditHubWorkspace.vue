@@ -479,6 +479,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   );
   const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
 
+  if (hasRequiredFail) {
     // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
     const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
     const esignConfirmed = isEsignApproved(docStatus) && !esignSendFailed;
