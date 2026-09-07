@@ -64,11 +64,11 @@ class LawSearchController extends Controller
             return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
         }
 
-        // Published allowlist (ingested + has published_date) drops any
-        // unpublished docs the ES index may still contain.
+        // Published allowlist (ingested + has published_date + not draft) drops any
+        // unpublished or draft docs the ES index may still contain.
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
-            if (($metaRow['status'] ?? '') === 'ingested' && ($metaRow['published_date'] ?? '') !== '') {
+            if (($metaRow['status'] ?? '') === 'ingested' && ($metaRow['published_date'] ?? '') !== '' && ($metaRow['meta_status'] ?? '') !== 'ร่าง') {
                 $publishedIds[(string) $metaRow['document_id']] = true;
             }
         }
@@ -191,6 +191,9 @@ class LawSearchController extends Controller
             }
             if (($row['published_date'] ?? '') === '') {
                 continue;
+            }
+            if (($row['meta_status'] ?? '') === 'ร่าง') {
+                continue; // Hide draft documents from public search
             }
 
             if (! $this->rowMatchesFilters($row, $filters)) {
