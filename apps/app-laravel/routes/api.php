@@ -63,8 +63,10 @@ Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, '
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
 Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
+Route::post('/documents/{documentId}/esign/upload', [EsignController::class, 'upload']);
 Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send']);
 Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel']);
+Route::get('/documents/{documentId}/esign/signed-pdf', [EsignController::class, 'signedPdf']);
 Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);
 Route::get('/documents/{documentId}/related-download.zip', RelatedDocumentsZipController::class);
 Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentFileController::class, 'showRelated']);
@@ -80,6 +82,6 @@ Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');
 
-Route::post('/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
+Route::match(['GET', 'POST'], '/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
     ->where('documentId', '[A-Za-z0-9_\-]+')
     ->name('esign.callback');

@@ -2,6 +2,7 @@
 
 namespace App\Services\Buu;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -52,29 +53,73 @@ class BuuKongClient
     {
         $path = $this->path($endpointKey);
         $url = $this->apiUrl($path);
-        $token = $this->oauth->bearerToken($endpointKey);
+        $timeout = (int) config('buu.timeout', 60);
+        $started = microtime(true);
 
-        $request = $this->http
-            ->acceptJson()
-            ->withToken($token)
-            ->timeout((int) config('buu.timeout', 60))
-            ->withOptions(['force_ip_resolve' => 'v4']);
+        Log::info('BUU Kong request start', [
+            'endpoint' => $endpointKey,
+            'url' => $url,
+            'timeout_seconds' => $timeout,
+        ]);
 
-        $response = $send($request, $url);
-
-        // One retry on 401 with a fresh token
-        if ($response->status() === 401) {
-            $this->oauth->forgetCachedToken($endpointKey);
-            $token = $this->oauth->bearerToken($endpointKey, forceRefresh: true);
-            $request = $this->http
-                ->acceptJson()
-                ->withToken($token)
-                ->timeout((int) config('buu.timeout', 60))
-                ->withOptions(['force_ip_resolve' => 'v4']);
+        try {
+            $token = $this->oauth->bearerToken($endpointKey);
+            $request = $this->httpClient($token, $timeout);
             $response = $send($request, $url);
+
+            // One retry on 401 with a fresh token
+            if ($response->status() === 401) {
+                Log::info('BUU Kong request 401, retrying with fresh token', [
+                    'endpoint' => $endpointKey,
+                    'url' => $url,
+                    'elapsed_ms' => $this->elapsedMs($started),
+                ]);
+                $this->oauth->forgetCachedToken($endpointKey);
+                $token = $this->oauth->bearerToken($endpointKey, forceRefresh: true);
+                $request = $this->httpClient($token, $timeout);
+                $response = $send($request, $url);
+            }
+        } catch (ConnectionException $exception) {
+            $elapsedMs = $this->elapsedMs($started);
+            Log::error('BUU Kong request timeout or connection error', [
+                'endpoint' => $endpointKey,
+                'url' => $url,
+                'elapsed_ms' => $elapsedMs,
+                'timeout_seconds' => $timeout,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new BuuApiException(
+                "BUU API \"{$endpointKey}\" timed out or connection failed after {$elapsedMs}ms (client timeout {$timeout}s): ".$exception->getMessage(),
+                504,
+                null,
+                $exception,
+            );
         }
 
+        Log::info('BUU Kong request done', [
+            'endpoint' => $endpointKey,
+            'url' => $url,
+            'http_status' => $response->status(),
+            'elapsed_ms' => $this->elapsedMs($started),
+            'timeout_seconds' => $timeout,
+        ]);
+
         return $response;
+    }
+
+    private function httpClient(string $token, int $timeout): PendingRequest
+    {
+        return $this->http
+            ->acceptJson()
+            ->withToken($token)
+            ->timeout($timeout)
+            ->withOptions(['force_ip_resolve' => 'v4']);
+    }
+
+    private function elapsedMs(float $started): int
+    {
+        return (int) round((microtime(true) - $started) * 1000);
     }
 
     /**
@@ -90,6 +135,7 @@ class BuuKongClient
                 'endpoint' => $endpointKey,
                 'status' => $response->status(),
                 'body' => $json,
+                'client_timeout_seconds' => (int) config('buu.timeout', 60),
             ]);
 
             throw new BuuApiException(

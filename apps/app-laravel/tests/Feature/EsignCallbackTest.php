@@ -12,11 +12,24 @@ class EsignCallbackTest extends TestCase
     {
         config([
             'buu.esign_callback_base_url' => 'https://example.test',
+            'buu.esign_return_url' => '',
         ]);
 
         $url = app(BuuEsignService::class)->callbackUrl('doc_abc_123');
 
         $this->assertSame('https://example.test/api/esign/callback/doc_abc_123', $url);
+    }
+
+    public function test_callback_url_uses_exact_return_url_when_set(): void
+    {
+        config([
+            'buu.esign_callback_base_url' => 'https://example.test',
+            'buu.esign_return_url' => 'https://service-api-dev.buu.ac.th/api/getTestApiPost',
+        ]);
+
+        $url = app(BuuEsignService::class)->callbackUrl('doc_abc_123');
+
+        $this->assertSame('https://service-api-dev.buu.ac.th/api/getTestApiPost', $url);
     }
 
     public function test_esign_callback_records_approval(): void
@@ -34,13 +47,15 @@ class EsignCallbackTest extends TestCase
             'signer_citizenid' => '1234567890123',
         ]);
 
-        $response->assertOk()->assertJson(['status' => 'received']);
+        $response->assertOk()->assertJson(['status' => 'success']);
 
         $status = $store->getStatus($docId);
         $this->assertSame('Y', $status['esign_sign_status'] ?? null);
         $this->assertSame('abc123.pdf', $status['esign_doc_filename'] ?? null);
         $this->assertSame('1234567890123', $status['esign_last_signer_citizenid'] ?? null);
         $this->assertNotNull($status['esign_signed_at'] ?? null);
+        $this->assertNotNull($status['esign_confirmed_at'] ?? null);
+        $this->assertSame('abc123.pdf', $status['esign_signed_filename'] ?? null);
         $this->assertCount(1, $status['esign_callbacks'] ?? []);
     }
 
@@ -64,12 +79,41 @@ class EsignCallbackTest extends TestCase
         $this->assertSame('N', $status['esign_sign_status'] ?? null);
         $this->assertSame('เอกสารไม่ครบ', $status['esign_sign_message'] ?? null);
         $this->assertNotNull($status['esign_rejected_at'] ?? null);
+        $this->assertNull($status['esign_confirmed_at'] ?? null);
     }
 
-    public function test_esign_callback_unknown_document_returns_404(): void
+    public function test_callback_probe_does_not_overwrite_signed_status(): void
+    {
+        $store = app(ReviewStore::class);
+        $docId = 'test-esign-probe-'.uniqid();
+        $store->setStatus($docId, [
+            'status' => 'done',
+            'document_id' => $docId,
+            'esign_sign_status' => 'Y',
+            'esign_signed_at' => '2026-01-01T00:00:00+00:00',
+            'esign_confirmed_at' => '2026-01-01T00:00:00+00:00',
+        ]);
+
+        $this->postJson("/api/esign/callback/{$docId}", [
+            'esign' => 'check_callback',
+        ])->assertOk()->assertJson(['status' => 'success']);
+
+        $status = $store->getStatus($docId);
+        $this->assertSame('Y', $status['esign_sign_status'] ?? null);
+        $this->assertSame('2026-01-01T00:00:00+00:00', $status['esign_confirmed_at'] ?? null);
+    }
+
+    public function test_esign_callback_unknown_document_still_returns_success(): void
     {
         $this->postJson('/api/esign/callback/doc_missing_xyz', [
             'sign_status' => 'Y',
-        ])->assertNotFound();
+        ])->assertOk()->assertJson(['status' => 'success']);
+    }
+
+    public function test_esign_callback_accepts_get_probe(): void
+    {
+        $this->getJson('/api/esign/callback/doc_missing_xyz')
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
     }
 }

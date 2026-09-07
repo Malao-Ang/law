@@ -21,11 +21,16 @@ class BuuEsignService
      */
     public function callbackUrl(string $documentId): string
     {
+        $exact = rtrim((string) config('buu.esign_return_url'), '/');
+        if ($exact !== '') {
+            return $exact;
+        }
+
         $base = rtrim((string) config('buu.esign_callback_base_url'), '/');
         $id = rawurlencode(basename($documentId));
 
         if ($base === '') {
-            throw new BuuApiException('BUU_ESIGN_CALLBACK_BASE_URL / APP_URL is not configured.');
+            throw new BuuApiException('BUU_ESIGN_RETURN_URL / BUU_ESIGN_CALLBACK_BASE_URL / APP_URL is not configured.');
         }
 
         return "{$base}/api/esign/callback/{$id}";
@@ -37,6 +42,7 @@ class BuuEsignService
      * When $returnUrl is null, uses callbackUrl($documentId) — $documentId is then required.
      *
      * @param  list<array{psn_citizenid: string, docs_comment?: string}>  $signers
+     * @param  list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>  $attachments
      * @param  'L'|'A'  $returnType  L = last signer / reject only; A = every signature
      * @return array<string, mixed>
      */
@@ -51,6 +57,7 @@ class BuuEsignService
         string $returnType = 'L',
         ?string $comment = null,
         ?string $sysName = null,
+        array $attachments = [],
     ): array {
         $resolvedReturnUrl = $returnUrl;
         if ($resolvedReturnUrl === null || $resolvedReturnUrl === '') {
@@ -60,7 +67,7 @@ class BuuEsignService
             $resolvedReturnUrl = $this->callbackUrl($documentId);
         }
 
-        return $this->kong->postJson('esign.send', [
+        $payload = [
             'psn_citizenid' => $ownerCitizenId,
             'doc_name' => $docName,
             'doc_filename' => $docFilename,
@@ -70,7 +77,71 @@ class BuuEsignService
             'doc_sysname' => $sysName ?? (string) config('buu.esign_sysname'),
             'doc_comment' => $comment ?? '',
             'doc_signer' => array_values($signers),
+        ];
+
+        if ($attachments !== []) {
+            $payload['doc_attachments'] = array_values($attachments);
+        }
+
+        Log::info('e-sign SendDocumentSign request', [
+            'document_id' => $documentId,
+            'doc_name' => $docName,
+            'doc_filename' => $docFilename,
+            'doc_bucket' => $payload['doc_bucket'],
+            'doc_returnurl' => $resolvedReturnUrl,
+            'doc_returntype' => $returnType,
+            'doc_sysname' => $payload['doc_sysname'],
+            'signer_count' => count($signers),
+            'attachment_count' => count($attachments),
         ]);
+
+        $started = microtime(true);
+
+        try {
+            $result = $this->kong->postJson('esign.send', $payload);
+        } catch (BuuApiException $exception) {
+            Log::error('e-sign SendDocumentSign failed', [
+                'document_id' => $documentId,
+                'doc_filename' => $docFilename,
+                'doc_returnurl' => $resolvedReturnUrl,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+                'http_status' => $exception->statusCode,
+                'message' => $exception->getMessage(),
+                'body' => $exception->responseBody,
+            ]);
+
+            throw $exception;
+        }
+
+        Log::info('e-sign SendDocumentSign response', [
+            'document_id' => $documentId,
+            'doc_filename' => $docFilename,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'status' => $result['status'] ?? null,
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Upload a local file to MinIO only (bucket root). Returns the basename e-sign expects.
+     */
+    public function uploadPdf(
+        string $absolutePath,
+        string $originalExtension,
+        ?string $bucket = null,
+        string $folderPath = '/',
+        bool $qrVerify = false,
+    ): string {
+        $stored = $this->minio->putFile(
+            absolutePath: $absolutePath,
+            originalExtension: $originalExtension,
+            bucket: $bucket,
+            folderPath: $folderPath,
+            qrVerify: $qrVerify,
+        );
+
+        return $this->esignObjectName($stored);
     }
 
     /**
@@ -103,7 +174,7 @@ class BuuEsignService
             $resolvedReturnUrl = $this->callbackUrl($documentId);
         }
 
-        $stored = $this->minio->putFile(
+        $stored = $this->uploadPdf(
             absolutePath: $absolutePath,
             originalExtension: $originalExtension,
             bucket: $bucket,
@@ -194,6 +265,14 @@ class BuuEsignService
         $result = $response['result'] ?? [];
 
         return is_array($result) ? array_values($result) : [];
+    }
+
+    /**
+     * BUU e-sign sample uses a basename in the bucket root, not a folder key.
+     */
+    private function esignObjectName(string $stored): string
+    {
+        return basename(str_replace('\\', '/', ltrim($stored, '/')));
     }
 
     private function defaultBucket(): string

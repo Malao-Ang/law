@@ -31,8 +31,14 @@ return [
     /**
      * Public base URL that BUU e-sign can POST back to.
      * Final callback: {base}/api/esign/callback/{documentId}
+     * Ignored when esign_return_url is set.
      */
     'esign_callback_base_url' => rtrim((string) env('BUU_ESIGN_CALLBACK_BASE_URL', env('APP_URL', 'http://localhost')), '/'),
+
+    /**
+     * Exact doc_returnurl (sandbox). When set, this is sent as-is — no path is appended.
+     */
+    'esign_return_url' => rtrim((string) env('BUU_ESIGN_RETURN_URL', ''), '/'),
 
     /** Document owner citizen ID when the UI does not send owner_citizen_id */
     'esign_owner_citizenid' => env('BUU_ESIGN_OWNER_CITIZENID', ''),

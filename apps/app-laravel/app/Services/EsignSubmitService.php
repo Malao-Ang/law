@@ -4,10 +4,11 @@ namespace App\Services;
 
 use App\Services\Buu\BuuApiException;
 use App\Services\Buu\BuuEsignService;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * App-level e-sign flow: export PDF → MinIO (via Kong) → SendDocumentSign → persist status.
+ * App-level e-sign flow: upload PDF to MinIO, then SendDocumentSign as a separate step.
  */
 class EsignSubmitService
 {
@@ -18,6 +19,8 @@ class EsignSubmitService
     ) {}
 
     /**
+     * Export review PDF and PutFile only. Does not call SendDocumentSign.
+     *
      * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string}>  $signers
      * @param  'L'|'A'  $returnType
      * @return array{
@@ -26,11 +29,10 @@ class EsignSubmitService
      *     bucket: string,
      *     return_url: string,
      *     doc_name: string,
-     *     owner_citizen_id: string,
-     *     esign: array<string, mixed>
+     *     owner_citizen_id: string
      * }
      */
-    public function submit(
+    public function upload(
         string $documentId,
         array $signers,
         ?string $ownerCitizenId = null,
@@ -46,17 +48,13 @@ class EsignSubmitService
         }
 
         $docSigners = $this->normalizeSigners($signers);
-        // Sandbox mock: reuse first signer as document owner when not configured.
         $owner = $this->resolveOwnerCitizenId(
             $ownerCitizenId,
             $docSigners[0]['psn_citizenid'] ?? null,
         );
         $docName = $this->docName($document);
-        $bucket = (string) config('buu.default_bucket');
-
-        if ($bucket === '') {
-            throw new BuuApiException('BUU_MINIO_BUCKET is not configured.');
-        }
+        $bucket = $this->requireBucket();
+        $returnUrl = $this->buuEsign->callbackUrl($documentId);
 
         $pdfBytes = $this->exportService->toPdf($document);
         $tempPath = tempnam(sys_get_temp_dir(), 'esign_pdf_');
@@ -67,57 +65,170 @@ class EsignSubmitService
         $pdfPath = $tempPath.'.pdf';
         @unlink($tempPath);
 
-        $result = null;
         try {
             if (file_put_contents($pdfPath, $pdfBytes) === false) {
                 throw new BuuApiException('Failed to write temporary PDF file.');
             }
 
-            $result = $this->buuEsign->uploadAndSend(
+            $minioFilename = $this->buuEsign->uploadPdf(
                 absolutePath: $pdfPath,
                 originalExtension: 'pdf',
-                ownerCitizenId: $owner,
-                docName: $docName,
-                signers: $docSigners,
-                documentId: $documentId,
                 bucket: $bucket,
-                returnType: $returnType,
-                comment: $comment,
-                folderPath: '/'.$documentId,
+                folderPath: '/',
+                qrVerify: true,
             );
         } finally {
             @unlink($pdfPath);
         }
 
-        if ($result === null) {
-            throw new BuuApiException('e-Sign upload returned no result.');
-        }
-
         $now = now()->toIso8601String();
+        $currentStatus = $this->reviewStore->getStatus($documentId) ?? [];
+        $attachments = $this->sourceAttachment($currentStatus, $bucket, $minioFilename);
         $this->reviewStore->setStatus($documentId, [
             'esign_exported_at' => $now,
-            'esign_submitted_at' => $now,
+            'esign_uploaded_at' => $now,
             'esign_doc_name' => $docName,
-            'esign_doc_filename' => $result['minio_filename'],
+            'esign_doc_filename' => $minioFilename,
             'esign_bucket' => $bucket,
             'esign_owner_citizenid' => $owner,
-            'esign_return_url' => $result['return_url'],
+            'esign_return_url' => $returnUrl,
             'esign_return_type' => $returnType,
+            'esign_comment' => $comment,
             'esign_signers' => $docSigners,
-            'esign_send_response' => $result['esign'],
+            'esign_attachments' => $attachments,
+            'esign_send_response' => null,
+            'esign_submitted_at' => null,
             'esign_sign_status' => null,
             'esign_rejected_at' => null,
         ]);
 
         return [
             'document_id' => $documentId,
-            'minio_filename' => $result['minio_filename'],
+            'minio_filename' => $minioFilename,
             'bucket' => $bucket,
-            'return_url' => $result['return_url'],
+            'return_url' => $returnUrl,
             'doc_name' => $docName,
             'owner_citizen_id' => $owner,
-            'esign' => $result['esign'],
         ];
+    }
+
+    /**
+     * Call SendDocumentSign for a document already uploaded to MinIO.
+     *
+     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string}>  $signers
+     * @param  'L'|'A'  $returnType
+     * @return array{
+     *     document_id: string,
+     *     minio_filename: string,
+     *     bucket: string,
+     *     return_url: string,
+     *     doc_name: string,
+     *     owner_citizen_id: string,
+     *     esign: array<string, mixed>
+     * }
+     */
+    public function send(
+        string $documentId,
+        array $signers = [],
+        ?string $ownerCitizenId = null,
+        ?string $comment = null,
+        ?string $returnType = null,
+        array $attachments = [],
+    ): array {
+        $documentId = basename($documentId);
+        $status = $this->reviewStore->getStatus($documentId);
+
+        if ($status === null) {
+            throw new BuuApiException("Document not found: {$documentId}", 404);
+        }
+
+        $docFilename = (string) ($status['esign_doc_filename'] ?? '');
+        if ($docFilename === '') {
+            throw new BuuApiException('Upload the PDF to MinIO first (POST .../esign/upload).', 422);
+        }
+
+        $persistedSigners = is_array($status['esign_signers'] ?? null) ? $status['esign_signers'] : [];
+        $docSigners = $signers !== [] ? $this->normalizeSigners($signers) : $persistedSigners;
+        if ($docSigners === []) {
+            throw new BuuApiException('At least one signer is required.', 422);
+        }
+
+        $owner = $this->resolveOwnerCitizenId(
+            $ownerCitizenId ?: (string) ($status['esign_owner_citizenid'] ?? ''),
+            $docSigners[0]['psn_citizenid'] ?? null,
+        );
+        $bucket = (string) ($status['esign_bucket'] ?? $this->requireBucket());
+        $docName = (string) ($status['esign_doc_name'] ?? $documentId);
+        $resolvedReturnType = $returnType ?: (string) ($status['esign_return_type'] ?? 'L');
+        if ($resolvedReturnType !== 'A' && $resolvedReturnType !== 'L') {
+            $resolvedReturnType = 'L';
+        }
+        $resolvedComment = $comment ?? (isset($status['esign_comment']) ? (string) $status['esign_comment'] : null);
+        $returnUrl = $this->buuEsign->callbackUrl($documentId);
+        $docAttachments = $this->resolveAttachments(
+            $attachments,
+            is_array($status['esign_attachments'] ?? null) ? $status['esign_attachments'] : [],
+            $status,
+            $bucket,
+            $docFilename,
+        );
+
+        Log::info('e-sign submit calling SendDocumentSign (no callback wait)', [
+            'document_id' => $documentId,
+            'doc_filename' => $docFilename,
+            'doc_returnurl' => $returnUrl,
+            'doc_returntype' => $resolvedReturnType,
+        ]);
+
+        $esign = $this->buuEsign->sendDocumentSign(
+            ownerCitizenId: $owner,
+            docName: $docName,
+            docFilename: $docFilename,
+            signers: $docSigners,
+            returnUrl: $returnUrl,
+            documentId: $documentId,
+            bucket: $bucket !== '' ? $bucket : null,
+            returnType: $resolvedReturnType,
+            comment: $resolvedComment,
+            attachments: $docAttachments,
+        );
+
+        $now = now()->toIso8601String();
+        $this->reviewStore->setStatus($documentId, [
+            'esign_submitted_at' => $now,
+            'esign_owner_citizenid' => $owner,
+            'esign_return_url' => $returnUrl,
+            'esign_return_type' => $resolvedReturnType,
+            'esign_signers' => $docSigners,
+            'esign_attachments' => $docAttachments,
+            'esign_send_response' => $esign,
+            'esign_sign_status' => null,
+            'esign_rejected_at' => null,
+            'esign_signed_filename' => null,
+            'esign_signed_bucket' => null,
+            'esign_confirmed_at' => null,
+        ]);
+
+        return [
+            'document_id' => $documentId,
+            'minio_filename' => $docFilename,
+            'bucket' => $bucket,
+            'return_url' => $returnUrl,
+            'doc_name' => $docName,
+            'owner_citizen_id' => $owner,
+            'esign' => $esign,
+        ];
+    }
+
+    private function requireBucket(): string
+    {
+        $bucket = (string) config('buu.default_bucket');
+
+        if ($bucket === '') {
+            throw new BuuApiException('BUU_MINIO_BUCKET is not configured.');
+        }
+
+        return $bucket;
     }
 
     /**
@@ -158,6 +269,8 @@ class EsignSubmitService
             'esign_send_response' => null,
             'esign_submitted_at' => null,
             'esign_confirmed_at' => null,
+            'esign_signed_filename' => null,
+            'esign_signed_bucket' => null,
             'workflow_completed_step' => 5,
             'workflow_current_step' => 6,
         ]);
@@ -166,6 +279,42 @@ class EsignSubmitService
             'document_id' => $documentId,
             'minio_filename' => $docFilename,
             'esign' => $response,
+        ];
+    }
+
+    /**
+     * MinIO object for a fully signed document (callback Y), or null if not signed yet.
+     *
+     * @return array{filename: string, bucket: string, name: string}|null
+     */
+    public function signedPdfObject(string $documentId): ?array
+    {
+        $documentId = basename($documentId);
+        $status = $this->reviewStore->getStatus($documentId);
+        if ($status === null) {
+            return null;
+        }
+
+        $code = strtoupper(trim((string) ($status['esign_sign_status'] ?? '')));
+        if ($code === 'N' || $code === 'C') {
+            return null;
+        }
+
+        $filename = trim((string) ($status['esign_signed_filename'] ?? ''));
+        if ($filename === '' && $code === 'Y') {
+            $filename = trim((string) ($status['esign_doc_filename'] ?? ''));
+        }
+
+        if ($filename === '') {
+            return null;
+        }
+
+        $bucket = trim((string) ($status['esign_signed_bucket'] ?? $status['esign_bucket'] ?? config('buu.default_bucket')));
+
+        return [
+            'filename' => $filename,
+            'bucket' => $bucket,
+            'name' => basename(str_replace('\\', '/', $filename)),
         ];
     }
 
@@ -243,5 +392,90 @@ class EsignSubmitService
         }
 
         return $this->exportService->safeFilenameBase($document);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $requested
+     * @param  list<array<string, mixed>>  $persisted
+     * @param  array<string, mixed>  $status
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function resolveAttachments(
+        array $requested,
+        array $persisted,
+        array $status,
+        string $bucket,
+        string $signingFilename,
+    ): array {
+        $fromRequest = $this->normalizeAttachments($requested, $bucket);
+        if ($fromRequest !== []) {
+            return $fromRequest;
+        }
+
+        $fromStatus = $this->normalizeAttachments($persisted, $bucket);
+        if ($fromStatus !== []) {
+            return $fromStatus;
+        }
+
+        return $this->sourceAttachment($status, $bucket, $signingFilename);
+    }
+
+    /**
+     * @param  array<string, mixed>  $status
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function sourceAttachment(array $status, string $bucket, string $signingFilename): array
+    {
+        $sourceKey = trim((string) ($status['minio_source_filename'] ?? ''));
+        if ($sourceKey === '') {
+            return [];
+        }
+
+        $sourceBasename = basename(str_replace('\\', '/', $sourceKey));
+        if ($sourceBasename === '' || $sourceBasename === $signingFilename) {
+            return [];
+        }
+
+        $name = trim((string) ($status['source_path'] ?? ''));
+        if ($name === '') {
+            $name = $sourceBasename;
+        }
+
+        return [[
+            'attachment_name' => basename($name),
+            'attachment_filename' => $sourceKey,
+            'attachment_bucket' => $bucket,
+        ]];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $attachments
+     * @return list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>
+     */
+    private function normalizeAttachments(array $attachments, string $defaultBucket): array
+    {
+        $normalized = [];
+
+        foreach ($attachments as $attachment) {
+            if (! is_array($attachment)) {
+                continue;
+            }
+
+            $filename = trim((string) ($attachment['attachment_filename'] ?? $attachment['filename'] ?? ''));
+            if ($filename === '') {
+                continue;
+            }
+
+            $name = trim((string) ($attachment['attachment_name'] ?? $attachment['name'] ?? ''));
+            $itemBucket = trim((string) ($attachment['attachment_bucket'] ?? $attachment['bucket'] ?? $defaultBucket));
+
+            $normalized[] = [
+                'attachment_name' => $name !== '' ? $name : basename($filename),
+                'attachment_filename' => $filename,
+                'attachment_bucket' => $itemBucket !== '' ? $itemBucket : $defaultBucket,
+            ];
+        }
+
+        return $normalized;
     }
 }

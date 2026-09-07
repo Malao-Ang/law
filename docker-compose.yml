@@ -14,6 +14,9 @@ services:
       dockerfile: Dockerfile
     container_name: thai-ocr-laravel-app
     working_dir: /var/www/html
+    # artisan serve is single-process unless PHP_CLI_SERVER_WORKERS > 1.
+    # e-sign POSTs doc_returnurl while SendDocumentSign is still waiting on Kong;
+    # without extra workers that callback deadlocks and Kong returns 504.
     command: >
       sh -c "mkdir -p storage/app/poc
       && rm -f public/hot
@@ -29,6 +32,7 @@ services:
     environment:
       - COMPOSER_ALLOW_SUPERUSER=1
       - PDF_SERVICE_URL=http://pdf-service:3001
+      - PHP_CLI_SERVER_WORKERS=${PHP_CLI_SERVER_WORKERS:-8}
     volumes:
       - poc_storage:/var/www/html/storage/app/poc
     env_file:

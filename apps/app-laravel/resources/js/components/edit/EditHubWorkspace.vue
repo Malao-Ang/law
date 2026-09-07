@@ -253,6 +253,7 @@ import Swal from 'sweetalert2';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
 
 const props = defineProps<{ documentId: string }>();
 
@@ -351,8 +352,10 @@ const esignChip = computed<{ label: string; color: string; icon: string } | null
   const ds = docStatus.value;
   if (!ds) return null;
   const sendFailed = ds.esign_send_response?.status === 'fail';
-  // ลงนามสำเร็จ: confirmed + ไม่ rejected + send ไม่ fail
-  if (ds.esign_confirmed_at && ds.esign_sign_status !== 'rejected' && !sendFailed) {
+  if (isEsignRejected(ds)) {
+    return { label: 'ไม่อนุมัติการลงนาม', color: 'error', icon: 'mdi-close-octagon-outline' };
+  }
+  if (isEsignApproved(ds) && !sendFailed) {
     return { label: 'ลงนามสำเร็จ', color: 'success', icon: 'mdi-check-decagram' };
   }
   // ส่งไปแล้ว (submitted) แต่ยังไม่ลงนาม หรือ send fail
@@ -468,18 +471,10 @@ async function togglePublished(next: boolean | null): Promise<void> {
   let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
   try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
 
-  const { gates, hasRequiredFail } = evaluatePublishGates(
-    meta.value,
-    docStatus,
-    documentStore.review?.relations ?? [],
-    isOldDoc.value,
-  );
-
-  if (hasRequiredFail) {
-    // Find the first failing required gate and show appropriate alert
-    const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
-
-    if (failedGate?.key === 'esign') {
+    // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
+    const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
+    const esignConfirmed = isEsignApproved(docStatus) && !esignSendFailed;
+    if (!esignConfirmed) {
       const isWaitingSign = !!docStatus?.esign_submitted_at;
       await Swal.fire({
         icon: 'warning',
@@ -587,6 +582,7 @@ onMounted(() => {
 watch(() => props.documentId, (id) => {
   void documentStore.fetch(id);
   void versionStore.fetch(id);
+  fetchStatus(id).then((s) => { docStatus.value = s; }).catch(() => {});
 });
 
 onBeforeUnmount(() => {

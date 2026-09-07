@@ -142,10 +142,12 @@
           <div class="d-flex align-center justify-space-between ga-3 mb-3">
             <div>
               <div class="text-subtitle-2 font-weight-bold">
-                {{ session.status === 'signed' ? 'เอกสาร PDF ที่ลงนามแล้ว' : 'ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว' }}
+                {{ showingSignedPdf ? 'เอกสาร PDF ที่ลงนามแล้ว' : 'ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว' }}
               </div>
               <div class="text-caption text-medium-emphasis">
-                Generate จากข้อมูล review ล่าสุด ไม่ใช้ไฟล์ต้นฉบับ
+                {{ showingSignedPdf
+                  ? 'ดึงจากไฟล์บน MinIO หลังลงนามครบ (มีลายน้ำท้ายกระดาษ)'
+                  : 'Generate จากข้อมูล review ล่าสุด ไม่ใช้ไฟล์ต้นฉบับ' }}
               </div>
             </div>
             <div class="d-flex ga-1">
@@ -161,7 +163,7 @@
             </div>
           </div>
           <div class="status-pdf">
-            <object :key="pdfPreviewKey" class="status-pdf__frame" :data="pdfPreviewUrl" type="application/pdf">
+            <object :key="pdfPreviewUrl" class="status-pdf__frame" :data="pdfPreviewUrl" type="application/pdf">
               <div class="status-pdf__fallback">
                 <v-icon icon="mdi-file-pdf-box" size="40" color="error" />
                 <div class="text-body-2 font-weight-bold mt-2">{{ packageName }}</div>
@@ -173,7 +175,7 @@
                 </v-btn>
               </div>
             </object>
-            <div v-if="session.status === 'signed'" class="status-pdf__signed">
+            <div v-if="showingSignedPdf" class="status-pdf__signed">
               <v-icon icon="mdi-shield-check" size="14" />
               Digital Signature Verified
             </div>
@@ -338,7 +340,8 @@
     <DocumentScrollPreviewDialog
       v-model="docPreviewOpen"
       :document-id="documentId"
-      :signed="session.status === 'signed'"
+      :signed="showingSignedPdf"
+      :pdf-src="showingSignedPdf ? signedPdfPreviewUrl : undefined"
     />
 
     <PublishConfirmDialog
@@ -353,7 +356,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { cancelDocumentESign, downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, updateWorkflowProgress } from '../../api/client';
+import { cancelDocumentESign, downloadPdfExport, fetchSignedEsignPdfLinks, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, signedEsignPdfUrl, updateWorkflowProgress } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -372,8 +375,9 @@ import {
   saveSigners,
 } from '../../data/esignSession';
 import type { ESignSession, ESignSigner } from '../../types/esign';
-import type { LawMeta } from '../../types/document';
+import type { DocumentStatus, LawMeta } from '../../types/document';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
+import { isEsignApproved, isEsignRejected, hasSignedEsignPdf } from '../../utils/esignStatus';
 import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
@@ -395,6 +399,10 @@ const publishing = ref(false);
 const downloadingPdf = ref(false);
 const pdfPreviewKey = ref(0);
 const errorFlash = ref('');
+let esignPollTimer: ReturnType<typeof setInterval> | null = null;
+const serverStatus = ref<DocumentStatus | null>(null);
+const signedViewUrl = ref('');
+const signedDownloadUrl = ref('');
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -443,7 +451,16 @@ const packageName = computed(() => {
   return `${base}_v1.0.pdf`;
 });
 
-const pdfPreviewUrl = computed(() => `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`);
+const showingSignedPdf = computed(() => hasSignedEsignPdf(serverStatus.value) && signedViewUrl.value !== '');
+
+const signedPdfPreviewUrl = computed(() => signedViewUrl.value);
+
+const pdfPreviewUrl = computed(() => {
+  if (showingSignedPdf.value) {
+    return signedPdfPreviewUrl.value;
+  }
+  return `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`;
+});
 
 const metaOk = computed(() => Boolean(meta.value.title && meta.value.law_type && (meta.value.promulgation_date || meta.value.effective_date)));
 const structureOk = computed(() => (documentStore.review?.summary.block_count ?? 0) > 0);
@@ -577,6 +594,10 @@ function refreshPdfPreview(): void {
 async function downloadPdf(): Promise<void> {
   downloadingPdf.value = true;
   try {
+    if (showingSignedPdf.value) {
+      window.open(signedDownloadUrl.value || signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
+      return;
+    }
     await downloadPdfExport(props.documentId);
   } finally {
     downloadingPdf.value = false;
@@ -619,6 +640,7 @@ async function submitToESign(): Promise<void> {
     writeStage(props.documentId, 'wait_esign');
     persist();
     confirmSendOpen.value = false;
+    startEsignPoll();
   } catch (error) {
     errorFlash.value = error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ';
   } finally {
@@ -640,10 +662,90 @@ async function cancelSubmit(): Promise<void> {
       actor: meta.value.imported_by || undefined,
     });
     persist();
+    stopEsignPoll();
   } catch (error) {
     errorFlash.value = error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ';
   } finally {
     cancelling.value = false;
+  }
+}
+
+function stopEsignPoll(): void {
+  if (esignPollTimer !== null) {
+    clearInterval(esignPollTimer);
+    esignPollTimer = null;
+  }
+}
+
+function startEsignPoll(): void {
+  if (esignPollTimer !== null || session.value.status !== 'waiting') {
+    return;
+  }
+  esignPollTimer = setInterval(() => {
+    void refreshEsignFromServer();
+  }, 5000);
+}
+
+function applyServerEsignStatus(status: DocumentStatus): void {
+  serverStatus.value = status;
+  void loadSignedPdfLinks(status);
+  if (isEsignApproved(status)) {
+    stopEsignPoll();
+    if (session.value.status === 'signed') {
+      return;
+    }
+    const at = status.esign_signed_at || status.esign_confirmed_at || new Date().toISOString();
+    const signer = status.esign_last_signer_username || status.esign_last_signer_citizenid;
+    session.value = pushActivity({
+      ...session.value,
+      status: 'signed',
+      signedAt: at,
+      submittedAt: session.value.submittedAt ?? status.esign_submitted_at ?? at,
+    }, {
+      title: 'ลงนามเสร็จสิ้น — พร้อมเผยแพร่',
+      detail: signer ? `ผู้ลงนาม: ${signer}` : undefined,
+      at,
+    });
+    writeStage(props.documentId, 'public');
+    persist();
+    return;
+  }
+
+  if (isEsignRejected(status)) {
+    stopEsignPoll();
+    errorFlash.value = status.esign_sign_message
+      ? `ไม่อนุมัติการลงนาม: ${status.esign_sign_message}`
+      : 'ไม่อนุมัติการลงนาม';
+  }
+}
+
+async function loadSignedPdfLinks(status: DocumentStatus): Promise<void> {
+  if (!hasSignedEsignPdf(status)) {
+    signedViewUrl.value = '';
+    signedDownloadUrl.value = '';
+    return;
+  }
+
+  try {
+    const links = await fetchSignedEsignPdfLinks(props.documentId);
+    signedViewUrl.value = links.view || links.download || '';
+    signedDownloadUrl.value = links.download || links.view || '';
+  } catch (error) {
+    signedViewUrl.value = '';
+    signedDownloadUrl.value = '';
+    errorFlash.value = error instanceof Error ? error.message : 'ไม่สามารถดึงลิงก์ PDF ที่ลงนามแล้วได้';
+  }
+}
+
+async function refreshEsignFromServer(): Promise<void> {
+  try {
+    const status = await fetchStatus(props.documentId);
+    applyServerEsignStatus(status);
+    if (session.value.status === 'waiting' && !isEsignApproved(status) && !isEsignRejected(status)) {
+      startEsignPoll();
+    }
+  } catch {
+    /* keep waiting; next poll retries */
   }
 }
 
@@ -663,6 +765,7 @@ async function markSigned(): Promise<void> {
   } catch { /* non-fatal */ }
   writeStage(props.documentId, 'public');
   persist();
+  stopEsignPoll();
 }
 
 async function publish(): Promise<void> {
@@ -704,10 +807,16 @@ onMounted(() => {
   session.value = loadSession(props.documentId);
   signers.value = loadSigners(props.documentId);
   refreshPdfPreview();
-  writeStage(props.documentId, 'wait_esign');
+  if (session.value.status !== 'signed') {
+    writeStage(props.documentId, 'wait_esign');
+  }
+  void refreshEsignFromServer();
 });
 
-onBeforeUnmount(() => documentStore.reset());
+onBeforeUnmount(() => {
+  stopEsignPoll();
+  documentStore.reset();
+});
 </script>
 
 <style scoped>

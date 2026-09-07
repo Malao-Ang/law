@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Buu\BuuApiException;
+use App\Services\Buu\BuuMinioService;
 use App\Services\EsignSubmitService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -13,24 +15,17 @@ use Throwable;
 
 class EsignController extends Controller
 {
-    public function __construct(private readonly EsignSubmitService $esignSubmit) {}
+    public function __construct(
+        private readonly EsignSubmitService $esignSubmit,
+        private readonly BuuMinioService $minio,
+    ) {}
 
-    public function send(Request $request, string $documentId): JsonResponse
+    public function upload(Request $request, string $documentId): JsonResponse
     {
-        $validated = $request->validate([
-            'owner_citizen_id' => ['nullable', 'string', 'max:32'],
-            'comment' => ['nullable', 'string', 'max:2000'],
-            'return_type' => ['nullable', 'string', 'in:L,A'],
-            'signers' => ['required', 'array', 'min:1'],
-            'signers.*.citizen_id' => ['nullable', 'string', 'max:32'],
-            'signers.*.psn_citizenid' => ['nullable', 'string', 'max:32'],
-            'signers.*.docs_comment' => ['nullable', 'string', 'max:500'],
-            'signers.*.note' => ['nullable', 'string', 'max:500'],
-            'signers.*.name' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $this->validatedSendPayload($request, signersRequired: true);
 
         try {
-            $result = $this->esignSubmit->submit(
+            $result = $this->esignSubmit->upload(
                 documentId: $documentId,
                 signers: $validated['signers'],
                 ownerCitizenId: $validated['owner_citizen_id'] ?? null,
@@ -45,13 +40,59 @@ class EsignController extends Controller
 
             return response()->json(['message' => $message], $status);
         } catch (Throwable $exception) {
+            Log::error('e-sign upload failed', [
+                'document_id' => $documentId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json(['message' => 'Failed to upload document to MinIO.'], 500);
+        }
+
+        return response()->json([
+            'status' => 'uploaded',
+            ...$result,
+        ]);
+    }
+
+    public function send(Request $request, string $documentId): JsonResponse
+    {
+        $started = microtime(true);
+        Log::info('e-sign send endpoint start', ['document_id' => $documentId]);
+
+        $validated = $this->validatedSendPayload($request, signersRequired: false);
+
+        try {
+            $result = $this->esignSubmit->send(
+                documentId: $documentId,
+                signers: $validated['signers'] ?? [],
+                ownerCitizenId: $validated['owner_citizen_id'] ?? null,
+                comment: $validated['comment'] ?? null,
+                returnType: $validated['return_type'] ?? null,
+                attachments: $validated['attachments'] ?? [],
+            );
+        } catch (BuuApiException $exception) {
+            Log::warning('e-sign send endpoint failed (BUU)', [
+                'document_id' => $documentId,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+                'http_status' => $exception->statusCode,
+            ]);
+
+            return $this->buuError($exception);
+        } catch (Throwable $exception) {
             Log::error('e-sign send failed', [
                 'document_id' => $documentId,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
                 'error' => $exception->getMessage(),
             ]);
 
             return response()->json(['message' => 'Failed to submit e-sign request.'], 500);
         }
+
+        Log::info('e-sign send endpoint done', [
+            'document_id' => $documentId,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'return_url' => $result['return_url'] ?? null,
+        ]);
 
         return response()->json([
             'status' => 'submitted',
@@ -84,6 +125,90 @@ class EsignController extends Controller
         return response()->json([
             'status' => 'cancelled',
             ...$result,
+        ]);
+    }
+
+    public function signedPdf(Request $request, string $documentId): JsonResponse|RedirectResponse
+    {
+        $object = $this->esignSubmit->signedPdfObject($documentId);
+        if ($object === null) {
+            abort(404, 'Signed e-sign PDF is not available yet.');
+        }
+
+        try {
+            $links = $this->minio->getPublicLinks(
+                ['file' => $object['filename']],
+                ['file' => $object['name']],
+                60,
+                'M',
+                $object['bucket'] !== '' ? $object['bucket'] : null,
+            );
+        } catch (BuuApiException $exception) {
+            Log::warning('e-sign signed PDF MinIO link failed', [
+                'document_id' => $documentId,
+                'filename' => $object['filename'],
+                'error' => $exception->getMessage(),
+            ]);
+
+            abort(502, 'Failed to resolve signed PDF from MinIO.');
+        }
+
+        $fileLinks = is_array($links['file'] ?? null) ? $links['file'] : [];
+        $view = is_string($fileLinks['view'] ?? null) ? $fileLinks['view'] : '';
+        $download = is_string($fileLinks['download'] ?? null) ? $fileLinks['download'] : '';
+
+        if ($view === '' && $download === '') {
+            abort(502, 'MinIO did not return a signed PDF URL.');
+        }
+
+        if ($request->boolean('download')) {
+            return redirect()->away($download !== '' ? $download : $view);
+        }
+
+        if ($request->boolean('redirect')) {
+            return redirect()->away($view !== '' ? $view : $download);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'filename' => $object['filename'],
+            'view' => $view,
+            'download' => $download,
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     owner_citizen_id?: string,
+     *     comment?: string,
+     *     return_type?: string,
+     *     signers?: list<array<string, mixed>>,
+     *     attachments?: list<array<string, mixed>>
+     * }
+     */
+    private function validatedSendPayload(Request $request, bool $signersRequired): array
+    {
+        $signersRule = $signersRequired
+            ? ['required', 'array', 'min:1']
+            : ['sometimes', 'array', 'min:1'];
+
+        return $request->validate([
+            'owner_citizen_id' => ['nullable', 'string', 'max:32'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'return_type' => ['nullable', 'string', 'in:L,A'],
+            'signers' => $signersRule,
+            'signers.*.citizen_id' => ['nullable', 'string', 'max:32'],
+            'signers.*.psn_citizenid' => ['nullable', 'string', 'max:32'],
+            'signers.*.docs_comment' => ['nullable', 'string', 'max:500'],
+            'signers.*.note' => ['nullable', 'string', 'max:500'],
+            'signers.*.name' => ['nullable', 'string', 'max:255'],
+            'attachments' => ['sometimes', 'array'],
+            'attachments.*.attachment_name' => ['nullable', 'string', 'max:255'],
+            'attachments.*.name' => ['nullable', 'string', 'max:255'],
+            'attachments.*.attachment_filename' => ['nullable', 'string', 'max:500'],
+            'attachments.*.filename' => ['nullable', 'string', 'max:500'],
+            'attachments.*.attachment_bucket' => ['nullable', 'string', 'max:255'],
+            'attachments.*.bucket' => ['nullable', 'string', 'max:255'],
         ]);
     }
 
