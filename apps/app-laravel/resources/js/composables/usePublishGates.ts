@@ -73,13 +73,13 @@ export function evaluatePublishGates(
 
     gates.push({
       key: 'rag',
-      label: 'จัดลำดับ RAG',
+      label: 'จัดลำดับเนื้อหา',
       ok: ragOk,
       status: ragOk
         ? 'พร้อมใช้งาน'
         : docStatus?.rag_skipped
           ? 'ข้ามขั้นตอน — ต้องกลับไปทำ'
-          : 'ยังไม่ได้จัดลำดับ',
+          : 'ยังไม่ได้จัดลำดับเนื้อหา',
       level: 'required',
     });
   }

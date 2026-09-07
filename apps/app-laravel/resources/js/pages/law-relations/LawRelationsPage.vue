@@ -41,7 +41,7 @@
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-2">
             <v-icon icon="mdi-file-tree" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">ลำดับชั้นเอกสาร</span>
+            <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์กฎหมาย</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
             {{ parentPickerHint }}
@@ -276,7 +276,7 @@ const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
 });
 const documentRelationsHint = computed(() => {
   if (changeStatus.value === 'กฎหมายใหม่') {
-    return 'กฎหมายใหม่ระบุได้แค่ลำดับชั้นเอกสาร (กฎหมายแม่) ไม่ผูกฉบับขั้นเดียวกัน';
+    return 'ระบุความสัมพันธ์ของข้อบังคับ ระเบียบ หรือประกาศที่มีระดับสูงกว่าหรือระดับเดียวกัน';
   }
   if (isWholeDocumentChange.value) {
     return parentIds.value.length

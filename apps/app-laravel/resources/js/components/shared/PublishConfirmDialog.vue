@@ -134,9 +134,9 @@ const checklist = computed<ChecklistItem[]>(() => {
     const ragOk = (ragStatus === 'exported' || ragStatus === 'ingested' || (workflowCompletedStep ?? 0) >= 3) && !currentStatus?.rag_skipped;
     items.push({
       key: 'rag',
-      label: 'จัดลำดับ RAG',
+      label: 'จัดลำดับเนื้อหา',
       ok: ragOk,
-      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน — ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับ'),
+      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน — ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับเนื้อหา'),
       level: 'required',
     });
   }

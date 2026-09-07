@@ -12,7 +12,7 @@
         ย้อนกลับ
       </v-btn>
       <div class="law-rel-picker__crumbs text-body-2 text-medium-emphasis">
-        <template v-if="breadcrumbs.length === 0">เลือกกฎหมายเป้าหมาย</template>
+        <template v-if="breadcrumbs.length === 0">เลือกข้อบังคับ ระเบียบ ประกาศที่ต้องการอ้างอิง</template>
         <template v-else>
           <span
             v-for="(crumb, index) in breadcrumbs"
@@ -189,9 +189,9 @@ const catalogMode = computed(() => {
 const col1Head = computed(() => {
   const hasParent = (props.parentDocumentIds?.length ?? 0) > 0;
   if (catalogMode.value === 'siblings') {
-    return hasParent ? 'กฎหมายแม่และชั้นเดียวกัน' : 'กฎหมายที่เป็นราก (ไม่มีกฎหมายแม่)';
+    return hasParent ? 'กฎหมายระดับสูงกว่าหรือระดับเดียวกัน' : 'กฎหมายที่เป็นราก (ไม่มีกฎหมายแม่)';
   }
-  if (catalogMode.value === 'parents') return 'กฎหมายแม่';
+  if (catalogMode.value === 'parents') return 'กฎหมายระดับสูงกว่า';
   return hasParent ? 'กฎหมายที่อ้างถึง' : 'กฎหมายที่เป็นราก (ไม่มีกฎหมายแม่)';
 });
 

@@ -406,8 +406,8 @@ const actions = computed(() => {
     list.push({
       key: 'rag',
       icon: 'mdi-sort-variant',
-      title: 'จัดลำดับ RAG',
-      description: 'จัดกลุ่ม เลือก และเรียงบล็อกก่อนบันทึกเข้าคลัง RAG',
+      title: 'จัดลำดับเนื้อหา',
+      description: 'จัดกลุ่ม เลือก และเรียงบล็อกเนื้อหาก่อนเผยแพร่',
       to: `/documents/${props.documentId}/rag`,
     });
   }
@@ -491,10 +491,10 @@ async function togglePublished(next: boolean | null): Promise<void> {
     if (failedGate?.key === 'rag') {
       const r = await Swal.fire({
         icon: 'warning',
-        title: 'ยังไม่ได้จัดลำดับ RAG',
-        html: 'ต้องจัดลำดับเนื้อหา RAG ให้เสร็จก่อนเผยแพร่',
+        title: 'ยังไม่ได้จัดลำดับเนื้อหา',
+        html: 'ต้องจัดลำดับเนื้อหาให้เสร็จก่อนเผยแพร่',
         showCancelButton: true,
-        confirmButtonText: 'ไปจัดลำดับ RAG',
+        confirmButtonText: 'ไปจัดลำดับเนื้อหา',
         cancelButtonText: 'ยกเลิก',
         confirmButtonColor: '#1a3673',
         cancelButtonColor: '#64748b',
