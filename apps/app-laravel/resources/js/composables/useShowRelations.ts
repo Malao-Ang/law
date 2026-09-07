@@ -123,6 +123,22 @@ export function isCancelledStatus(status: string): boolean {
   return status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน' || status.includes('ยกเลิก');
 }
 
+/**
+ * Single source of truth for "the public may see this document".
+ * Mirrors LawSearchController::fileBasedSearch published gate:
+ * pipeline status ingested + has a published date + not a draft.
+ */
+export function isPublishedLaw(doc: {
+  status?: string | null;
+  published_date?: string | null;
+  meta_status?: string | null;
+}): boolean {
+  const status = (doc.status ?? '').trim();
+  const publishedDate = (doc.published_date ?? '').trim();
+  const metaStatus = (doc.meta_status ?? '').trim();
+  return status === 'ingested' && publishedDate !== '' && metaStatus !== 'ร่าง';
+}
+
 export function isKeptInRelationGraph(row: Pick<ShowRelRow, 'metaStatus' | 'workflowStage'>): boolean {
   return isCancelledStatus(row.metaStatus) || isCancelledStatus(row.workflowStage);
 }
@@ -135,7 +151,7 @@ export function displayLawDate(value: string | null | undefined): string {
 }
 
 export function mapShowRelRows(documents: ReportDocument[]): ShowRelRow[] {
-  const completed = documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4);
+  const completed = documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4 && isPublishedLaw(doc));
   const childCountMap: Record<string, number> = {};
   for (const doc of completed) {
     for (const parentId of parentIdsOf(doc)) {
