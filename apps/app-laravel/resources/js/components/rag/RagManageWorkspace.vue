@@ -18,13 +18,6 @@
       <span>กำลังโหลดบล็อก...</span>
     </div>
 
-    <!-- Error -->
-    <div v-else-if="composeStore.error" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
-      <v-icon icon="mdi-alert-circle-outline" size="32" color="error" />
-      <span>{{ composeStore.error }}</span>
-      <v-btn variant="outlined" size="small" @click="composeStore.setError()">ปิด</v-btn>
-    </div>
-
     <template v-else>
       <div class="rag-content-area">
         <!-- Selection action bar -->
@@ -206,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
 import { useBlockStore } from '../../stores/blockStore';
@@ -235,6 +228,12 @@ type PageBlocks = { page_no: number; blocks: DocumentBlock[] };
 type HistoryEntry = { id: string; label: string; snapshot: PageBlocks[] };
 
 const sections = computed(() => buildSections(composeStore.review));
+
+watch(() => composeStore.error, (err) => {
+  if (err) {
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err });
+  }
+});
 
 function containerType(section: LawSection): ChunkType | null {
   const stored = normalizeChunkType(section.headBlock.meta.chunk_type);
