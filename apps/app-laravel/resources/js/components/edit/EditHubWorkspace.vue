@@ -471,6 +471,14 @@ async function togglePublished(next: boolean | null): Promise<void> {
   let docStatus: Awaited<ReturnType<typeof fetchStatus>> | null = null;
   try { docStatus = await fetchStatus(props.documentId); } catch { /* non-fatal */ }
 
+  const { hasRequiredFail, gates } = evaluatePublishGates(
+    meta.value,
+    docStatus,
+    relations.value,
+    isOldDoc.value,
+  );
+  const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
+
     // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน
     const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
     const esignConfirmed = isEsignApproved(docStatus) && !esignSendFailed;
