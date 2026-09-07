@@ -266,7 +266,7 @@
             <div class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between mb-3 ga-3">
               <div class="d-flex flex-column">
                 <span class="text-body-2">
-                  พบผลการค้นหา <strong>{{ searchStore.total }}</strong> รายการ
+                  พบผลการค้นหา <strong>{{ sortedResults.length }}</strong> รายการ
                 </span>
                 <span v-if="searchStore.loading" class="text-caption text-medium-emphasis">กำลังค้นหา...</span>
               </div>
@@ -453,6 +453,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import type { FacetBucket, LawSearchFacets, LawSearchFilters, LawSearchResult, LawSuggestion } from '../../types/lawSearch';
+import { canDisplayLawResult } from '../../utils/lawAccess';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
@@ -643,7 +644,7 @@ const years = computed(() => {
 });
 
 const sortedResults = computed(() => {
-  const items = [...searchStore.results];
+  const items = searchStore.results.filter((law) => canDisplayLawResult(law, auth.isAuthenticated));
 
   switch (sortBy.value) {
     case 'thai-asc':
