@@ -89,9 +89,9 @@ Commit: `fix(relations): hide non-published documents from graph, stats, and dow
 
 ## Task 3 — Homepage search parity with database page
 
-> **Blocked on Open Question A** — confirm what "search หน้า main" renders. Two sub-cases:
+> **RESOLVED (code-confirmed): Case A1.** `ELawHeroSearch.vue` uses `searchStore.suggest()` for the autocomplete dropdown and `emit('search', ...)` → `PublicHomePage.onSearch` routes to `/database`. No inline results view on the homepage. Task 3 = make the SUGGEST endpoint apply the same published filter as search.
 
-### Case A1 — Hero search only routes to /database (most likely)
+### Case A1 — Hero search only routes to /database (CONFIRMED)
 File: `apps/app-laravel/resources/js/pages/public/PublicHomePage.vue::onSearch` (line 292) already does `router.push({ path: '/database', query: {...} })`. Since `/database` now applies published filter + `canDisplayLawResult` (done in previous batch), parity is already achieved for the routed results. 
 
 The only gap: the hero search **autocomplete/suggestions** dropdown. Check `ELawHeroSearch.vue` — it imports `LawSuggestion` and calls a suggest endpoint. Verify the suggest endpoint (`LawSuggestController` / `/api/laws/suggest`) also excludes unpublished docs.
