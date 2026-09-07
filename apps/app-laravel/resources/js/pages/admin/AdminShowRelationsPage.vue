@@ -224,6 +224,17 @@
             @click="toggleTypeFilter(filter.value)"
           >{{ filter.label }}</v-chip>
           <v-spacer />
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="admin-primary"
+            class="text-none"
+            prepend-icon="mdi-download-multiple"
+            :loading="downloadAllLoading"
+            @click="() => { selectedDownloadIds = allDownloadItems.map(i => i.id); downloadSelectionOpen = true; }"
+          >
+            ดาวน์โหลดทั้งหมด
+          </v-btn>
           <v-btn-toggle v-model="viewMode" mandatory density="compact" color="admin-primary" rounded="lg" divided>
             <v-btn value="hierarchy" class="text-none px-3" size="small" prepend-icon="mdi-graph-outline">Hierarchy</v-btn>
             <v-btn value="tree" class="text-none px-3" size="small" prepend-icon="mdi-file-tree-outline">Tree</v-btn>
@@ -343,21 +354,31 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <RelationDownloadDialog
+      v-model="downloadSelectionOpen"
+      :items="allDownloadItems"
+      v-model:selected-ids="selectedDownloadIds"
+      :loading="downloadAllLoading"
+      @confirm="downloadSelected"
+    />
   </AppShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchReportSummary, fetchReview } from '../../api/client';
+import { fetchReportSummary, fetchReview, documentFileDownloadUrl, downloadPdfExport } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
 import RelationTreeView from '../../components/shared/RelationTreeView.vue';
 import HierarchyList from '../../components/shared/HierarchyList.vue';
+import RelationDownloadDialog from '../../components/shared/RelationDownloadDialog.vue';
 import {
   RELATION_FILTERS,
+  MAX_DEPTH,
   buildRelationTree,
   collectDescendantIds,
+  collectRelatedIds,
   displayLawDate,
   flattenTree,
   loadRecentIds,
@@ -382,6 +403,9 @@ const router = useRouter();
 
 const loading = ref(false);
 const detailLoading = ref(false);
+const downloadAllLoading = ref(false);
+const downloadSelectionOpen = ref(false);
+const selectedDownloadIds = ref<string[]>([]);
 const summary = ref<ReportSummary>({
   totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
   by_type: [],
@@ -555,6 +579,25 @@ const stats = computed(() => {
   ];
 });
 
+const allDownloadItems = computed(() => {
+  const seen = new Set<string>();
+  const result: Array<{ id: string; title: string; version?: string }> = [];
+  if (selectedRow.value) {
+    seen.add(selectedRow.value.id);
+    result.push({ id: selectedRow.value.id, title: selectedRow.value.title, version: undefined });
+  }
+  for (const node of flattenTree(rootNode.value)) {
+    if (!seen.has(node.row.id)) {
+      seen.add(node.row.id);
+      const chain = node.sameLevelVersions;
+      const idx = chain.findIndex((r) => r.id === node.row.id);
+      const version = chain.length > 1 && idx >= 0 ? String(idx + 1) : undefined;
+      result.push({ id: node.row.id, title: node.row.title, version });
+    }
+  }
+  return result;
+});
+
 function toggleTypeFilter(type: RelationType): void {
   if (typeFilters.value.includes(type)) {
     typeFilters.value = typeFilters.value.filter((item) => item !== type);
@@ -578,23 +621,84 @@ function confirmPick(): void {
   openDetail(pickerId.value);
 }
 
+function safePdfName(title: string): string {
+  return `${title.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}.pdf`;
+}
+
+async function downloadRowPdf(row: ShowRelRow): Promise<void> {
+  const fileName = safePdfName(row.title || row.id);
+  if (row.documentType === 'old') {
+    const anchor = document.createElement('a');
+    anchor.href = documentFileDownloadUrl(row.id);
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    return;
+  }
+  await downloadPdfExport(row.id, fileName);
+}
+
+async function downloadSelected(): Promise<void> {
+  if (!selectedRow.value || selectedDownloadIds.value.length === 0 || downloadAllLoading.value) return;
+  downloadAllLoading.value = true;
+  downloadSelectionOpen.value = false;
+  try {
+    const idSet = new Set(selectedDownloadIds.value);
+    const toDownload = allDownloadItems.value.filter((item) => idSet.has(item.id));
+    for (const item of toDownload) {
+      const row = rows.value.find((r) => r.id === item.id);
+      if (!row) continue;
+      await downloadRowPdf(row);
+    }
+  } finally {
+    downloadAllLoading.value = false;
+  }
+}
+
 async function loadDetail(id: string): Promise<void> {
   detailLoading.value = true;
   try {
     const review = await fetchReview(id);
     rootMeta.value = review.law_meta ?? null;
     const bag: Record<string, LawRelation[]> = { [id]: review.relations ?? [] };
-    const extraIds = collectDescendantIds(id, rows.value);
-    const extras = await Promise.all(
-      extraIds.map((documentId) =>
+    const fetched = new Set<string>([id]);
+
+    // Seed with parentIds descendants
+    const seedIds = collectDescendantIds(id, rows.value);
+    const seedExtras = await Promise.all(
+      seedIds.map((documentId) =>
         fetchReview(documentId)
           .then((item) => [documentId, item.relations ?? []] as const)
           .catch(() => [documentId, []] as const),
       ),
     );
-    for (const [documentId, rels] of extras) {
+    for (const [documentId, rels] of seedExtras) {
       bag[documentId] = rels;
+      fetched.add(documentId);
     }
+
+    // Iteratively fetch relations for any target ids not yet fetched
+    for (let depth = 0; depth < MAX_DEPTH; depth += 1) {
+      const related = new Set([
+        ...collectRelatedIds(id, bag),
+        ...collectDescendantIds(id, rows.value),
+      ]);
+      const newIds = [...related].filter((rid) => !fetched.has(rid));
+      if (newIds.length === 0) break;
+      const newExtras = await Promise.all(
+        newIds.map((documentId) =>
+          fetchReview(documentId)
+            .then((item) => [documentId, item.relations ?? []] as const)
+            .catch(() => [documentId, []] as const),
+        ),
+      );
+      for (const [documentId, rels] of newExtras) {
+        bag[documentId] = rels;
+        fetched.add(documentId);
+      }
+    }
+
     rootRelations.value = bag;
     rememberRecentId(id);
   } catch {
