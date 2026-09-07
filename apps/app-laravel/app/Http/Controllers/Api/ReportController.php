@@ -177,6 +177,8 @@ class ReportController extends Controller
             'parent_document_id' => $r['parent_document_id'] ?? null,
             'parent_document_ids' => is_array($r['parent_document_ids'] ?? null) ? $r['parent_document_ids'] : [],
             'workflow_completed_step' => isset($r['workflow_completed_step']) ? (int) $r['workflow_completed_step'] : null,
+            'esign_sign_status' => $r['esign_sign_status'] ?? null,
+            'esign_submitted_at' => $r['esign_submitted_at'] ?? null,
         ], array_values($rows));
     }
 }

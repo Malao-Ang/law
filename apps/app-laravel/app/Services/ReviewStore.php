@@ -186,6 +186,8 @@ class ReviewStore
                 'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
                 'workflow_current_step' => isset($status['workflow_current_step']) ? (int) $status['workflow_current_step'] : null,
                 'workflow_updated_at' => $status['workflow_updated_at'] ?? null,
+                'esign_sign_status' => isset($status['esign_sign_status']) ? (string) $status['esign_sign_status'] : null,
+                'esign_submitted_at' => $status['esign_submitted_at'] ?? null,
             ];
         }
 
@@ -270,6 +272,8 @@ class ReviewStore
                     'parent_document_id' => $parentDocumentId !== '' ? $parentDocumentId : null,
                     'parent_document_ids' => $parentDocumentIds,
                     'workflow_completed_step' => isset($status['workflow_completed_step']) ? (int) $status['workflow_completed_step'] : null,
+                    'esign_sign_status' => isset($status['esign_sign_status']) ? (string) $status['esign_sign_status'] : null,
+                    'esign_submitted_at' => $status['esign_submitted_at'] ?? null,
                 ];
             }
 
@@ -550,20 +554,20 @@ class ReviewStore
             $hasFile = $sourcePath !== '' && is_file($this->absolutePath($sourcePath));
 
             $versions[] = [
-                'document_id'      => $row['document_id'],
+                'document_id' => $row['document_id'],
                 // ponytail: positional label, not a stable id — if a middle version is later
                 // inserted, labels shift. Add a persisted label to law_meta if stability is needed.
-                'version_label'    => 'v'.($index + 1).'.0',
-                'is_current'       => $row['document_id'] === $currentId,
-                'status'           => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
-                'change_status'    => (string) ($row['change_status'] ?? ''),
-                'issuer'           => (string) ($row['issuer'] ?? ''),
-                'agency'           => $row['agencies'][0] ?? '',
-                'promulgation_date'=> (string) ($row['promulgation_date'] ?? ''),
-                'title'            => (string) ($row['title'] ?? ''),
-                'source_type'      => $sourceType,
-                'has_file'         => $hasFile,
-                'source_file'      => (string) ($vStatus['source_file'] ?? ''),
+                'version_label' => 'v'.($index + 1).'.0',
+                'is_current' => $row['document_id'] === $currentId,
+                'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
+                'change_status' => (string) ($row['change_status'] ?? ''),
+                'issuer' => (string) ($row['issuer'] ?? ''),
+                'agency' => $row['agencies'][0] ?? '',
+                'promulgation_date' => (string) ($row['promulgation_date'] ?? ''),
+                'title' => (string) ($row['title'] ?? ''),
+                'source_type' => $sourceType,
+                'has_file' => $hasFile,
+                'source_file' => (string) ($vStatus['source_file'] ?? ''),
             ];
         }
 
