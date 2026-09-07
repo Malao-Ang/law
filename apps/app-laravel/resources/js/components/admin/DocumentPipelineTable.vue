@@ -42,6 +42,18 @@
           hide-details
           label="สถานะ: ทั้งหมด"
         />
+        <v-select
+          v-model="filterEsign"
+          class="pipeline-filter-select"
+          :items="esignOptions"
+          item-title="title"
+          item-value="value"
+          clearable
+          density="compact"
+          variant="outlined"
+          hide-details
+          label="e-Sign: ทั้งหมด"
+        />
       </div>
     </div>
 
@@ -93,6 +105,12 @@
           variant="tonal"
         >
           {{ item.publishedDate ? 'เผยแพร่แล้ว' : 'ยังไม่เผยแพร่' }}
+        </v-chip>
+      </template>
+
+      <template #item.esign="{ item }">
+        <v-chip size="small" :color="item.esignColor" variant="tonal" rounded="pill">
+          {{ item.esignLabel }}
         </v-chip>
       </template>
 
@@ -151,7 +169,8 @@ import Swal from 'sweetalert2';
 import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
-import { formatThaiDate } from '../../utils/thaiDate';
+import { formatThaiDateNumeric } from '../../utils/thaiDate';
+import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
 import PipelineStageChip from './PipelineStageChip.vue';
 import {
   deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
@@ -168,6 +187,8 @@ interface Row {
   lawStatus: string;
   publishedDate: string;
   documentType: 'new' | 'old';
+  esignLabel: string;
+  esignColor: string;
 }
 
 const router = useRouter();
@@ -181,6 +202,7 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 const filterText = ref<string | null>('');
 const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
+const filterEsign = ref<string | null>(null);
 
 const statusOptions = [
   { title: 'รออัปโหลด/รอประมวลผล', value: 'queued' },
@@ -193,6 +215,24 @@ const statusOptions = [
   { title: 'ยกเลิก', value: 'cancelled' },
 ];
 
+const esignOptions = [
+  { title: 'ลงนามแล้ว', value: 'signed' },
+  { title: 'รอลงนาม', value: 'waiting' },
+  { title: 'ยังไม่ส่งลงนาม', value: 'not_sent' },
+  { title: 'ยกเลิกการส่ง', value: 'cancelled' },
+  { title: 'ถูกปฏิเสธ', value: 'rejected' },
+];
+
+function esignBucket(doc: DocumentListItem): string {
+  if (doc.document_type === 'old') return 'old';
+  const code = String(doc.esign_sign_status ?? '').trim().toUpperCase();
+  if (code === 'Y') return 'signed';
+  if (code === 'N') return 'rejected';
+  if (code === 'C') return 'cancelled';
+  if (doc.esign_submitted_at) return 'waiting';
+  return 'not_sent';
+}
+
 const filteredDocs = computed(() => {
   const needle = (filterText.value ?? '').trim().toLowerCase();
 
@@ -200,7 +240,8 @@ const filteredDocs = computed(() => {
     const searchableTitle = (d.title || d.document_id || d.source_file || '').toLowerCase();
     return (!needle || searchableTitle.includes(needle)) &&
     (!filterType.value || d.law_type === filterType.value) &&
-    (!filterStatus.value || d.status === filterStatus.value);
+    (!filterStatus.value || d.status === filterStatus.value) &&
+    (!filterEsign.value || esignBucket(d) === filterEsign.value);
   });
 });
 
@@ -215,6 +256,7 @@ const headers = [
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
   { title: 'สถานะกฎหมาย', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
   { title: 'สถานะเผยแพร่', key: 'publishedDate', sortable: false, align: 'center' as const, width: 120 },
+  { title: 'e-Sign', key: 'esign', sortable: false, align: 'center' as const, width: 130 },
   { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const, width: 140 },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
   { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 140 },
@@ -251,6 +293,8 @@ const rows = computed<Row[]>(() =>
     lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
     publishedDate: doc.published_date ?? '',
     documentType: doc.document_type ?? 'new',
+    esignLabel: esignStatusLabel(doc),
+    esignColor: esignStatusColor(doc),
   })),
 );
 
@@ -320,7 +364,7 @@ async function confirmDelete(row: Row): Promise<void> {
 
 function formatDate(iso?: string | null): string {
   if (!iso) return '—';
-  return formatThaiDate(iso) || '—';
+  return formatThaiDateNumeric(iso) || '—';
 }
 
 function hasActive(): boolean {
