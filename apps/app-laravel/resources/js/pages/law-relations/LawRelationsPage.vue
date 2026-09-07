@@ -320,7 +320,7 @@ const parentItems = computed(() =>
 const parentPickerHint = computed(() => {
   const lawType = documentStore.review?.law_meta?.law_type;
   if (changeStatus.value === 'กฎหมายใหม่') {
-    return 'กฎหมายใหม่เลือกได้เฉพาะกฎหมายแม่ (root) ไม่ระบุฉบับขั้นเดียวกัน';
+    return 'เลือก พ.ร.บ. ข้อบังคับ ระเบียบ ประกาศ หรือกฎหมายภายนอกที่ต้องการอ้างอิง';
   }
   if (isUniversityAnnouncementType(lawType)) {
     return 'ประกาศที่ออกโดยมหาวิทยาลัย เลือกกฎหมายแม่ได้เฉพาะระเบียบและข้อบังคับ';
