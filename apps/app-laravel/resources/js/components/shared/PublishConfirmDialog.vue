@@ -188,9 +188,6 @@ const hasRequiredFail = computed(() =>
   checklist.value.some((item) => item.level === 'required' && !item.ok),
 );
 
-const checklist = computed(() => gateResult.value.gates);
-const hasRequiredFail = computed(() => gateResult.value.hasRequiredFail);
-
 watch(
   () => props.modelValue,
   async (value) => {
