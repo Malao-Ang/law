@@ -42,14 +42,35 @@ class DocumentFileController extends Controller
 
         $ext = strtolower(pathinfo($relative, PATHINFO_EXTENSION));
         $mimeMap = [
-            'pdf'  => 'application/pdf',
+            'pdf' => 'application/pdf',
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'doc'  => 'application/msword',
+            'doc' => 'application/msword',
         ];
         $mime = $mimeMap[$ext] ?? 'application/octet-stream';
         $isDownload = $request->boolean('download');
 
-        // 1. Try local file first
+        // 1. MinIO first (source of truth once uploaded).
+        // TODO(minio-only): when MinIO is proven stable in prod, drop the
+        // local fallback below and 404 if MinIO has no object.
+        if (config('buu.minio_enabled')) {
+            $minioKey = (string) ($status['minio_source_filename'] ?? '');
+            if ($minioKey !== '') {
+                try {
+                    $links = $this->minioService->getPublicLinks(
+                        ['file' => $minioKey],
+                        ['file' => basename((string) ($status['source_file'] ?? $relative))],
+                    );
+                    $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
+                    if (is_string($url) && $url !== '') {
+                        return redirect($url);
+                    }
+                } catch (\Throwable) {
+                    // Fall through to local streaming.
+                }
+            }
+        }
+
+        // 2. Local fallback (dev, or MinIO miss/error).
         $path = $this->reviewStore->absolutePath($relative);
         if (File::exists($path)) {
             $disposition = $isDownload
@@ -60,27 +81,10 @@ class DocumentFileController extends Controller
             $dispositionHeader = HeaderUtils::makeDisposition($disposition, $filename, $asciiFallback);
 
             return response(File::get($path), 200, [
-                'Content-Type'        => $mime,
+                'Content-Type' => $mime,
                 'Content-Disposition' => $dispositionHeader,
-                'Cache-Control'       => 'private, max-age=3600',
+                'Cache-Control' => 'private, max-age=3600',
             ]);
-        }
-
-        // 2. MinIO fallback
-        if (config('buu.minio_enabled')) {
-            $minioKey = (string) ($status['minio_source_filename'] ?? $relative);
-            try {
-                $links = $this->minioService->getPublicLinks(
-                    ['file' => $minioKey],
-                    ['file' => basename((string) ($status['source_file'] ?? $relative))],
-                );
-                $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
-                if (is_string($url) && $url !== '') {
-                    return redirect($url);
-                }
-            } catch (\Throwable) {
-                // Fall through to the same 404 as missing local files.
-            }
         }
 
         abort(404, 'File not found.');
