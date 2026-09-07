@@ -37,7 +37,9 @@ export function evaluatePublishGates(
   if (!isOldDoc) {
     // Gate 1: e-Sign
     const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
+    const esignSignedY = String(docStatus?.esign_sign_status ?? '').trim().toUpperCase() === 'Y';
     const esignOk =
+      esignSignedY &&
       !!docStatus?.esign_confirmed_at &&
       docStatus?.esign_sign_status !== 'rejected' &&
       !esignSendFailed;
