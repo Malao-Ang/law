@@ -2,6 +2,8 @@
 
 namespace App\Services\Buu;
 
+use Illuminate\Support\Facades\Log;
+
 /**
  * e-Sign APIs via Kong (Develop).
  *
@@ -81,7 +83,44 @@ class BuuEsignService
             $payload['doc_attachments'] = array_values($attachments);
         }
 
-        return $this->kong->postJson('esign.send', $payload);
+        Log::info('e-sign SendDocumentSign request', [
+            'document_id' => $documentId,
+            'doc_name' => $docName,
+            'doc_filename' => $docFilename,
+            'doc_bucket' => $payload['doc_bucket'],
+            'doc_returnurl' => $resolvedReturnUrl,
+            'doc_returntype' => $returnType,
+            'doc_sysname' => $payload['doc_sysname'],
+            'signer_count' => count($signers),
+            'attachment_count' => count($attachments),
+        ]);
+
+        $started = microtime(true);
+
+        try {
+            $result = $this->kong->postJson('esign.send', $payload);
+        } catch (BuuApiException $exception) {
+            Log::error('e-sign SendDocumentSign failed', [
+                'document_id' => $documentId,
+                'doc_filename' => $docFilename,
+                'doc_returnurl' => $resolvedReturnUrl,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+                'http_status' => $exception->statusCode,
+                'message' => $exception->getMessage(),
+                'body' => $exception->responseBody,
+            ]);
+
+            throw $exception;
+        }
+
+        Log::info('e-sign SendDocumentSign response', [
+            'document_id' => $documentId,
+            'doc_filename' => $docFilename,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'status' => $result['status'] ?? null,
+        ]);
+
+        return $result;
     }
 
     /**

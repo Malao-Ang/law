@@ -17,13 +17,25 @@ class EsignCallbackController
 {
     public function receive(Request $request, string $documentId, ReviewStore $reviewStore): JsonResponse
     {
+        $started = microtime(true);
         $documentId = basename($documentId);
         $payload = $request->all();
+
+        Log::info('e-sign callback hit', [
+            'document_id' => $documentId,
+            'method' => $request->method(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'sign_status' => $request->input('sign_status'),
+            'payload_keys' => array_keys($payload),
+            'has_sign_status' => $request->filled('sign_status'),
+        ]);
 
         if ($reviewStore->getStatus($documentId) === null) {
             Log::warning('e-sign callback for unknown document', [
                 'document_id' => $documentId,
                 'payload' => $payload,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
             ]);
 
             return response()->json(['status' => 'success']);
@@ -81,6 +93,8 @@ class EsignCallbackController
             'document_id' => $documentId,
             'sign_status' => $signStatus,
             'signer_citizenid' => $signerCitizenId,
+            'doc_filename' => $docFilename,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
         ]);
 
         return response()->json(['status' => 'success']);

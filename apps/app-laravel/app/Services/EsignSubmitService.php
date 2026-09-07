@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Services\Buu\BuuApiException;
 use App\Services\Buu\BuuEsignService;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -163,7 +164,7 @@ class EsignSubmitService
             $resolvedReturnType = 'L';
         }
         $resolvedComment = $comment ?? (isset($status['esign_comment']) ? (string) $status['esign_comment'] : null);
-        $returnUrl = (string) ($status['esign_return_url'] ?? $this->buuEsign->callbackUrl($documentId));
+        $returnUrl = $this->buuEsign->callbackUrl($documentId);
         $docAttachments = $this->resolveAttachments(
             $attachments,
             is_array($status['esign_attachments'] ?? null) ? $status['esign_attachments'] : [],
@@ -171,6 +172,13 @@ class EsignSubmitService
             $bucket,
             $docFilename,
         );
+
+        Log::info('e-sign submit calling SendDocumentSign (no callback wait)', [
+            'document_id' => $documentId,
+            'doc_filename' => $docFilename,
+            'doc_returnurl' => $returnUrl,
+            'doc_returntype' => $resolvedReturnType,
+        ]);
 
         $esign = $this->buuEsign->sendDocumentSign(
             ownerCitizenId: $owner,

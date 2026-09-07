@@ -51,6 +51,9 @@ class EsignController extends Controller
 
     public function send(Request $request, string $documentId): JsonResponse
     {
+        $started = microtime(true);
+        Log::info('e-sign send endpoint start', ['document_id' => $documentId]);
+
         $validated = $this->validatedSendPayload($request, signersRequired: false);
 
         try {
@@ -63,15 +66,28 @@ class EsignController extends Controller
                 attachments: $validated['attachments'] ?? [],
             );
         } catch (BuuApiException $exception) {
+            Log::warning('e-sign send endpoint failed (BUU)', [
+                'document_id' => $documentId,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+                'http_status' => $exception->statusCode,
+            ]);
+
             return $this->buuError($exception);
         } catch (Throwable $exception) {
             Log::error('e-sign send failed', [
                 'document_id' => $documentId,
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
                 'error' => $exception->getMessage(),
             ]);
 
             return response()->json(['message' => 'Failed to submit e-sign request.'], 500);
         }
+
+        Log::info('e-sign send endpoint done', [
+            'document_id' => $documentId,
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            'return_url' => $result['return_url'] ?? null,
+        ]);
 
         return response()->json([
             'status' => 'submitted',

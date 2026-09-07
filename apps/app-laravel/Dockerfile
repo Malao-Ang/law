@@ -59,4 +59,8 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
 
 EXPOSE 8000
 
+# Built-in server is single-process unless this is set (Unix/Docker only).
+# Needed so e-sign can POST /api/esign/callback while SendDocumentSign waits on Kong.
+ENV PHP_CLI_SERVER_WORKERS=8
+
 CMD ["php", "artisan", "serve", "--host", "0.0.0.0", "--port", "8000"]
