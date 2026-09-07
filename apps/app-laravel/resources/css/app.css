@@ -1,3 +1,8 @@
+/* SweetAlert2 — ต้องอยู่เหนือ Vuetify dialog (z-index 2400) */
+.swal2-container {
+  z-index: 3000 !important;
+}
+
 :root {
   --bg: #f6f4ef;
   --panel: #ffffff;
