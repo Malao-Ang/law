@@ -93,12 +93,19 @@ class EsignCallbackController
         ];
 
         if ($signStatus === 'Y') {
+            $signedFilename = $docFilename !== ''
+                ? $docFilename
+                : (string) ($current['esign_doc_filename'] ?? '');
             $patch['esign_signed_at'] = $event['at'];
             $patch['esign_confirmed_at'] = $event['at'];
             $patch['esign_rejected_at'] = null;
+            $patch['esign_signed_filename'] = $signedFilename !== '' ? $signedFilename : null;
+            $patch['esign_signed_bucket'] = (string) ($current['esign_bucket'] ?? config('buu.default_bucket'));
         } elseif ($signStatus === 'N') {
             $patch['esign_rejected_at'] = $event['at'];
             $patch['esign_confirmed_at'] = null;
+            $patch['esign_signed_filename'] = null;
+            $patch['esign_signed_bucket'] = null;
         }
 
         $reviewStore->setStatus($documentId, $patch);

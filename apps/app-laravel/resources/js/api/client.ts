@@ -312,6 +312,22 @@ export function reviewPdfPreviewUrl(documentId: string): string {
   return `/api/documents/${encodeURIComponent(documentId)}/export-pdf/preview`;
 }
 
+export function signedEsignPdfUrl(documentId: string, download = false): string {
+  const path = `/api/documents/${encodeURIComponent(documentId)}/esign/signed-pdf`;
+  return download ? `${path}?download=1` : path;
+}
+
+export type SignedEsignPdfLinks = {
+  status: string;
+  filename: string;
+  view: string;
+  download: string;
+};
+
+export function fetchSignedEsignPdfLinks(documentId: string): Promise<SignedEsignPdfLinks> {
+  return jsonRequest<SignedEsignPdfLinks>(`/api/documents/${encodeURIComponent(documentId)}/esign/signed-pdf`);
+}
+
 export async function downloadOriginalPdfExport(documentId: string): Promise<void> {
   return downloadBinaryExport(
     documentId,

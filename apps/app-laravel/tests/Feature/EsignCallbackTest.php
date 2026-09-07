@@ -55,6 +55,7 @@ class EsignCallbackTest extends TestCase
         $this->assertSame('1234567890123', $status['esign_last_signer_citizenid'] ?? null);
         $this->assertNotNull($status['esign_signed_at'] ?? null);
         $this->assertNotNull($status['esign_confirmed_at'] ?? null);
+        $this->assertSame('abc123.pdf', $status['esign_signed_filename'] ?? null);
         $this->assertCount(1, $status['esign_callbacks'] ?? []);
     }
 

@@ -204,6 +204,9 @@ class EsignSubmitService
             'esign_send_response' => $esign,
             'esign_sign_status' => null,
             'esign_rejected_at' => null,
+            'esign_signed_filename' => null,
+            'esign_signed_bucket' => null,
+            'esign_confirmed_at' => null,
         ]);
 
         return [
@@ -266,6 +269,8 @@ class EsignSubmitService
             'esign_send_response' => null,
             'esign_submitted_at' => null,
             'esign_confirmed_at' => null,
+            'esign_signed_filename' => null,
+            'esign_signed_bucket' => null,
             'workflow_completed_step' => 5,
             'workflow_current_step' => 6,
         ]);
@@ -274,6 +279,42 @@ class EsignSubmitService
             'document_id' => $documentId,
             'minio_filename' => $docFilename,
             'esign' => $response,
+        ];
+    }
+
+    /**
+     * MinIO object for a fully signed document (callback Y), or null if not signed yet.
+     *
+     * @return array{filename: string, bucket: string, name: string}|null
+     */
+    public function signedPdfObject(string $documentId): ?array
+    {
+        $documentId = basename($documentId);
+        $status = $this->reviewStore->getStatus($documentId);
+        if ($status === null) {
+            return null;
+        }
+
+        $code = strtoupper(trim((string) ($status['esign_sign_status'] ?? '')));
+        if ($code === 'N' || $code === 'C') {
+            return null;
+        }
+
+        $filename = trim((string) ($status['esign_signed_filename'] ?? ''));
+        if ($filename === '' && $code === 'Y') {
+            $filename = trim((string) ($status['esign_doc_filename'] ?? ''));
+        }
+
+        if ($filename === '') {
+            return null;
+        }
+
+        $bucket = trim((string) ($status['esign_signed_bucket'] ?? $status['esign_bucket'] ?? config('buu.default_bucket')));
+
+        return [
+            'filename' => $filename,
+            'bucket' => $bucket,
+            'name' => basename(str_replace('\\', '/', $filename)),
         ];
     }
 

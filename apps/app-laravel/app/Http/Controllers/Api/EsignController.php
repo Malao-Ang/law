@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Buu\BuuApiException;
+use App\Services\Buu\BuuMinioService;
 use App\Services\EsignSubmitService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -13,7 +15,10 @@ use Throwable;
 
 class EsignController extends Controller
 {
-    public function __construct(private readonly EsignSubmitService $esignSubmit) {}
+    public function __construct(
+        private readonly EsignSubmitService $esignSubmit,
+        private readonly BuuMinioService $minio,
+    ) {}
 
     public function upload(Request $request, string $documentId): JsonResponse
     {
@@ -120,6 +125,55 @@ class EsignController extends Controller
         return response()->json([
             'status' => 'cancelled',
             ...$result,
+        ]);
+    }
+
+    public function signedPdf(Request $request, string $documentId): JsonResponse|RedirectResponse
+    {
+        $object = $this->esignSubmit->signedPdfObject($documentId);
+        if ($object === null) {
+            abort(404, 'Signed e-sign PDF is not available yet.');
+        }
+
+        try {
+            $links = $this->minio->getPublicLinks(
+                ['file' => $object['filename']],
+                ['file' => $object['name']],
+                60,
+                'M',
+                $object['bucket'] !== '' ? $object['bucket'] : null,
+            );
+        } catch (BuuApiException $exception) {
+            Log::warning('e-sign signed PDF MinIO link failed', [
+                'document_id' => $documentId,
+                'filename' => $object['filename'],
+                'error' => $exception->getMessage(),
+            ]);
+
+            abort(502, 'Failed to resolve signed PDF from MinIO.');
+        }
+
+        $fileLinks = is_array($links['file'] ?? null) ? $links['file'] : [];
+        $view = is_string($fileLinks['view'] ?? null) ? $fileLinks['view'] : '';
+        $download = is_string($fileLinks['download'] ?? null) ? $fileLinks['download'] : '';
+
+        if ($view === '' && $download === '') {
+            abort(502, 'MinIO did not return a signed PDF URL.');
+        }
+
+        if ($request->boolean('download')) {
+            return redirect()->away($download !== '' ? $download : $view);
+        }
+
+        if ($request->boolean('redirect')) {
+            return redirect()->away($view !== '' ? $view : $download);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'filename' => $object['filename'],
+            'view' => $view,
+            'download' => $download,
         ]);
     }
 

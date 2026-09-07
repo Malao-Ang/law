@@ -7,7 +7,7 @@
   >
     <v-card class="scroll-preview">
       <div class="scroll-preview__toolbar">
-        <div class="text-body-2 font-weight-bold">ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว</div>
+        <div class="text-body-2 font-weight-bold">{{ signed ? 'เอกสาร PDF ที่ลงนามแล้ว' : 'ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว' }}</div>
         <div class="d-flex align-center ga-1">
           <v-chip
             size="x-small"
@@ -38,12 +38,13 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { downloadPdfExport, reviewPdfPreviewUrl } from '../../api/client';
+import { downloadPdfExport, reviewPdfPreviewUrl, signedEsignPdfUrl } from '../../api/client';
 
 const props = defineProps<{
   modelValue: boolean;
   documentId: string;
   signed?: boolean;
+  pdfSrc?: string;
 }>();
 
 const emit = defineEmits<{
@@ -52,7 +53,13 @@ const emit = defineEmits<{
 
 const previewKey = ref(0);
 const downloading = ref(false);
-const pdfUrl = computed(() => `${reviewPdfPreviewUrl(props.documentId)}?v=${previewKey.value}`);
+const pdfUrl = computed(() => {
+  if (props.pdfSrc) {
+    const joiner = props.pdfSrc.includes('?') ? '&' : '?';
+    return `${props.pdfSrc}${joiner}preview=${previewKey.value}`;
+  }
+  return `${reviewPdfPreviewUrl(props.documentId)}?v=${previewKey.value}`;
+});
 
 function refreshPreview(): void {
   previewKey.value += 1;
@@ -67,6 +74,10 @@ watch(() => props.modelValue, (open) => {
 async function downloadPdf(): Promise<void> {
   downloading.value = true;
   try {
+    if (props.signed || props.pdfSrc) {
+      window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
+      return;
+    }
     await downloadPdfExport(props.documentId);
   } finally {
     downloading.value = false;

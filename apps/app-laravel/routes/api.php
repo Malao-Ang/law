@@ -66,6 +66,7 @@ Route::post('/documents/{documentId}/retry-correction', [ExportController::class
 Route::post('/documents/{documentId}/esign/upload', [EsignController::class, 'upload']);
 Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send']);
 Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel']);
+Route::get('/documents/{documentId}/esign/signed-pdf', [EsignController::class, 'signedPdf']);
 Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);
 Route::get('/documents/{documentId}/related-download.zip', RelatedDocumentsZipController::class);
 Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentFileController::class, 'showRelated']);
