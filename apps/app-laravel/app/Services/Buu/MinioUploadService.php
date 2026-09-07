@@ -2,6 +2,7 @@
 
 namespace App\Services\Buu;
 
+use App\Services\ReviewStore;
 use Illuminate\Support\Facades\Log;
 
 class MinioUploadService
@@ -54,6 +55,46 @@ class MinioUploadService
         }
 
         return $filename;
+    }
+
+    /**
+     * Upload a document's source file (from its status source_path) to MinIO
+     * under folder /{documentId}, and persist minio_source_filename.
+     * Non-fatal + no-op when MinIO disabled, source_path empty, or file missing.
+     * Returns the stored MinIO object name, or null.
+     */
+    public function uploadSource(string $documentId, ReviewStore $reviewStore): ?string
+    {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
+        $status = $reviewStore->getStatus($documentId);
+        $relative = (string) ($status['source_path'] ?? '');
+        if ($relative === '') {
+            return null;
+        }
+
+        $sourcePath = $reviewStore->absolutePath($relative);
+        if (! is_file($sourcePath)) {
+            return null;
+        }
+
+        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+        $minioFilename = $this->uploadIfEnabled(
+            absolutePath: $sourcePath,
+            originalExtension: $ext,
+            documentId: $documentId,
+            folderPath: '/'.$documentId,
+        );
+
+        if ($minioFilename !== null) {
+            $reviewStore->setStatus($documentId, [
+                'minio_source_filename' => $minioFilename,
+            ]);
+        }
+
+        return $minioFilename;
     }
 
     public function isEnabled(): bool

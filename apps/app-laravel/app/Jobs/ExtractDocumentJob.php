@@ -114,7 +114,7 @@ class ExtractDocumentJob implements ShouldQueue
             'extraction_engine' => 'fast',
         ]);
 
-        $this->uploadSourceToMinio($store);
+        app(MinioUploadService::class)->uploadSource($this->documentId, $store);
 
         NormalizeDocumentJob::dispatch(
             documentId: $this->documentId,
@@ -138,38 +138,6 @@ class ExtractDocumentJob implements ShouldQueue
             callbackUrl: $callbackUrl,
             scanExtractionMode: $this->scanExtractionMode,
         );
-    }
-
-    /**
-     * Upload the source document to MinIO (non-fatal).
-     * Keeps the local file — never deletes on success.
-     */
-    private function uploadSourceToMinio(ReviewStore $store): void
-    {
-        $status = $store->getStatus($this->documentId);
-        $relative = (string) ($status['source_path'] ?? '');
-        if ($relative === '') {
-            return;
-        }
-
-        $sourcePath = $store->absolutePath($relative);
-        if (! is_file($sourcePath)) {
-            return;
-        }
-
-        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
-        $minioFilename = app(MinioUploadService::class)->uploadIfEnabled(
-            absolutePath: $sourcePath,
-            originalExtension: $ext,
-            documentId: $this->documentId,
-            folderPath: '/'.$this->documentId,
-        );
-
-        if ($minioFilename !== null) {
-            $store->setStatus($this->documentId, [
-                'minio_source_filename' => $minioFilename,
-            ]);
-        }
     }
 
     public function failed(Throwable $exception): void

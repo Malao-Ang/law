@@ -84,40 +84,8 @@ class PipelineCallbackController
         ]);
 
         // Upload source document to MinIO (non-fatal)
-        $this->uploadSourceToMinio($reviewStore, $documentId);
+        app(MinioUploadService::class)->uploadSource($documentId, $reviewStore);
 
         return response()->json(['status' => 'received']);
-    }
-
-    /**
-     * Upload the source document to MinIO after extraction completes.
-     * Non-fatal: errors are caught inside MinioUploadService.
-     */
-    private function uploadSourceToMinio(ReviewStore $reviewStore, string $documentId): void
-    {
-        $status = $reviewStore->getStatus($documentId);
-        $relative = (string) ($status['source_path'] ?? '');
-        if ($relative === '') {
-            return;
-        }
-
-        $sourcePath = $reviewStore->absolutePath($relative);
-        if (! is_file($sourcePath)) {
-            return;
-        }
-
-        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
-        $minioFilename = app(MinioUploadService::class)->uploadIfEnabled(
-            absolutePath: $sourcePath,
-            originalExtension: $ext,
-            documentId: $documentId,
-            folderPath: '/'.$documentId,
-        );
-
-        if ($minioFilename !== null) {
-            $reviewStore->setStatus($documentId, [
-                'minio_source_filename' => $minioFilename,
-            ]);
-        }
     }
 }
