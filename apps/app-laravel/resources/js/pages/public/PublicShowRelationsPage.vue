@@ -400,7 +400,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { documentFileDownloadUrl, downloadPdfExport, fetchReportSummary, fetchReview, relatedDocumentsZipUrl } from '../../api/client';
+import { downloadPublishedPdf, fetchReportSummary, fetchReview, relatedDocumentsZipUrl } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
 import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
@@ -666,17 +666,7 @@ function safeZipName(title: string): string {
 
 async function downloadRowPdf(row: ShowRelRow): Promise<void> {
   const fileName = safePdfName(row.title || row.id);
-  if (row.documentType === 'old') {
-    const anchor = document.createElement('a');
-    anchor.href = documentFileDownloadUrl(row.id);
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    return;
-  }
-
-  await downloadPdfExport(row.id, fileName);
+  downloadPublishedPdf(row.id, row.documentType, fileName);
 }
 
 async function downloadSingle(): Promise<void> {
