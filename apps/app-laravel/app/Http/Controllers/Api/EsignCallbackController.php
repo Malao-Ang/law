@@ -21,15 +21,27 @@ class EsignCallbackController
         $documentId = basename($documentId);
         $payload = $request->all();
 
+        $signStatus = strtoupper(trim((string) $request->input('sign_status', '')));
+
         Log::info('e-sign callback hit', [
             'document_id' => $documentId,
             'method' => $request->method(),
             'ip' => $request->ip(),
             'user_agent' => $request->userAgent(),
-            'sign_status' => $request->input('sign_status'),
+            'sign_status' => $signStatus !== '' ? $signStatus : $request->input('sign_status'),
             'payload_keys' => array_keys($payload),
             'has_sign_status' => $request->filled('sign_status'),
         ]);
+
+        if ($signStatus !== 'Y' && $signStatus !== 'N') {
+            Log::info('e-sign callback probe ignored', [
+                'document_id' => $documentId,
+                'method' => $request->method(),
+                'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+            ]);
+
+            return response()->json(['status' => 'success']);
+        }
 
         if ($reviewStore->getStatus($documentId) === null) {
             Log::warning('e-sign callback for unknown document', [
@@ -41,7 +53,6 @@ class EsignCallbackController
             return response()->json(['status' => 'success']);
         }
 
-        $signStatus = strtoupper((string) $request->input('sign_status', ''));
         $signMessage = (string) $request->input('sign_message', '');
         $docName = (string) $request->input('doc_name', '');
         $docFilename = (string) $request->input('doc_filename', '');
@@ -83,8 +94,11 @@ class EsignCallbackController
 
         if ($signStatus === 'Y') {
             $patch['esign_signed_at'] = $event['at'];
+            $patch['esign_confirmed_at'] = $event['at'];
+            $patch['esign_rejected_at'] = null;
         } elseif ($signStatus === 'N') {
             $patch['esign_rejected_at'] = $event['at'];
+            $patch['esign_confirmed_at'] = null;
         }
 
         $reviewStore->setStatus($documentId, $patch);

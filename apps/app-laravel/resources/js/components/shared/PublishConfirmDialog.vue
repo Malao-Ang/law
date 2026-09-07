@@ -77,6 +77,7 @@ import { computed, ref, watch } from 'vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { fetchStatus } from '../../api/client';
 import type { DocumentStatus } from '../../types/document';
+import { isEsignApproved } from '../../utils/esignStatus';
 
 type ChecklistLevel = 'required' | 'optional';
 
@@ -124,8 +125,8 @@ const checklist = computed<ChecklistItem[]>(() => {
     items.push({
       key: 'esign',
       label: 'ผ่านการลงนาม e-Sign',
-      ok: !!currentStatus?.esign_confirmed_at,
-      status: currentStatus?.esign_confirmed_at ? 'ยืนยันแล้ว' : 'ยังไม่ผ่าน e-Sign',
+      ok: isEsignApproved(currentStatus),
+      status: isEsignApproved(currentStatus) ? 'ยืนยันแล้ว' : 'ยังไม่ผ่าน e-Sign',
       level: 'required',
     });
 
