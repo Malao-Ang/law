@@ -39,9 +39,6 @@
     <v-alert v-if="flash" type="success" variant="tonal" density="compact" class="mb-3" closable @click:close="flash = ''">
       {{ flash }}
     </v-alert>
-    <v-alert v-if="errorFlash" type="error" variant="tonal" density="compact" class="mb-3" closable @click:close="errorFlash = ''">
-      {{ errorFlash }}
-    </v-alert>
 
     <div v-if="loading" class="d-flex align-center justify-center ga-3 pa-16 text-medium-emphasis flex-grow-1">
       <v-progress-circular indeterminate color="admin-primary" />
@@ -253,6 +250,7 @@ import {
   saveSession,
   saveSigners,
 } from '../../data/esignSession';
+import Swal from 'sweetalert2';
 import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
@@ -272,7 +270,6 @@ const sending = ref(false);
 const downloadingPdf = ref(false);
 const pdfPreviewKey = ref(0);
 const flash = ref('');
-const errorFlash = ref('');
 
 const loading = computed(() => previewStore.loading || documentStore.loading);
 const loadError = computed(() => previewStore.error || documentStore.error);
@@ -393,9 +390,8 @@ async function saveDraft(): Promise<void> {
 }
 
 async function sendToESign(): Promise<void> {
-  errorFlash.value = '';
   if (signers.value.length === 0) {
-    errorFlash.value = 'กรุณาเพิ่มผู้ลงนามก่อนส่งเข้าระบบ E-Sign';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'กรุณาเพิ่มผู้ลงนามก่อนส่งเข้าระบบ E-Sign' });
     return;
   }
   sending.value = true;
@@ -429,7 +425,7 @@ async function sendToESign(): Promise<void> {
     confirmSendOpen.value = false;
     await router.push(`/documents/${props.documentId}/esign/status`);
   } catch (error) {
-    errorFlash.value = error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ' });
   } finally {
     sending.value = false;
   }

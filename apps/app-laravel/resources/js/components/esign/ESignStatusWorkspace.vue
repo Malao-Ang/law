@@ -71,15 +71,6 @@
     <v-alert v-else-if="documentStore.error" type="error" variant="tonal">{{ documentStore.error }}</v-alert>
 
     <template v-else>
-    <v-alert
-      v-if="errorFlash"
-      type="error"
-      variant="tonal"
-      density="compact"
-      class="mb-3"
-      closable
-      @click:close="errorFlash = ''"
-    >{{ errorFlash }}</v-alert>
 
     <div class="status-layout">
       <div class="status-main">
@@ -378,6 +369,7 @@ import type { ESignSession, ESignSigner } from '../../types/esign';
 import type { DocumentStatus, LawMeta } from '../../types/document';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected, hasSignedEsignPdf } from '../../utils/esignStatus';
+import Swal from 'sweetalert2';
 import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
@@ -642,7 +634,7 @@ async function submitToESign(): Promise<void> {
     confirmSendOpen.value = false;
     startEsignPoll();
   } catch (error) {
-    errorFlash.value = error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ' });
   } finally {
     sending.value = false;
   }
@@ -664,7 +656,7 @@ async function cancelSubmit(): Promise<void> {
     persist();
     stopEsignPoll();
   } catch (error) {
-    errorFlash.value = error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ' });
   } finally {
     cancelling.value = false;
   }
@@ -713,9 +705,7 @@ function applyServerEsignStatus(status: DocumentStatus): void {
 
   if (isEsignRejected(status)) {
     stopEsignPoll();
-    errorFlash.value = status.esign_sign_message
-      ? `ไม่อนุมัติการลงนาม: ${status.esign_sign_message}`
-      : 'ไม่อนุมัติการลงนาม';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: status.esign_sign_message ? `ไม่อนุมัติการลงนาม: ${status.esign_sign_message}` : 'ไม่อนุมัติการลงนาม' });
   }
 }
 
@@ -733,7 +723,7 @@ async function loadSignedPdfLinks(status: DocumentStatus): Promise<void> {
   } catch (error) {
     signedViewUrl.value = '';
     signedDownloadUrl.value = '';
-    errorFlash.value = error instanceof Error ? error.message : 'ไม่สามารถดึงลิงก์ PDF ที่ลงนามแล้วได้';
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ไม่สามารถดึงลิงก์ PDF ที่ลงนามแล้วได้' });
   }
 }
 
@@ -781,7 +771,7 @@ async function publish(): Promise<void> {
   if (hasRequiredFail) {
     const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
     publishOpen.value = false;
-    errorFlash.value = `ไม่สามารถเผยแพร่ได้: ${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${failedGate?.status ?? ''}`;
+    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: `ไม่สามารถเผยแพร่ได้: ${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${failedGate?.status ?? ''}` });
     return;
   }
 
