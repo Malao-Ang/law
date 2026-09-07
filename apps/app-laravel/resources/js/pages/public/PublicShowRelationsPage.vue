@@ -360,64 +360,13 @@
       </v-card>
     </template>
 
-    <v-dialog v-model="downloadSelectionOpen" max-width="600" scrollable>
-      <v-card>
-        <v-card-title class="d-flex align-center ga-2">
-          <v-icon icon="mdi-download-multiple" color="primary" />
-          เลือกเอกสารที่ต้องการดาวน์โหลด
-        </v-card-title>
-        <v-divider />
-        <v-card-text style="max-height: 420px; overflow-y: auto" class="pa-0">
-          <v-list density="compact" select-strategy="multiple">
-            <v-list-item class="border-b">
-              <template #prepend>
-                <v-checkbox-btn
-                  :model-value="selectAllDownload"
-                  :indeterminate="selectedDownloadIds.length > 0 && selectedDownloadIds.length < allDownloadItems.length"
-                  color="primary"
-                  @update:model-value="selectAllDownload = $event"
-                />
-              </template>
-              <v-list-item-title class="font-weight-bold text-body-2">
-                เลือกทั้งหมด ({{ allDownloadItems.length }} เอกสาร)
-              </v-list-item-title>
-            </v-list-item>
-            <v-list-item
-              v-for="(item, idx) in allDownloadItems"
-              :key="item.id"
-              :class="idx === 0 ? 'bg-primary-lighten-5' : ''"
-            >
-              <template #prepend>
-                <v-checkbox-btn
-                  v-model="selectedDownloadIds"
-                  :value="item.id"
-                  color="primary"
-                />
-              </template>
-              <v-list-item-title class="text-body-2">
-                <span v-if="idx === 0" class="text-primary font-weight-bold">[กฎหมายหลัก] </span>
-                {{ item.title }}
-              </v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions class="pa-4">
-          <span class="text-caption text-medium-emphasis">เลือกแล้ว {{ selectedDownloadIds.length }} เอกสาร</span>
-          <v-spacer />
-          <v-btn class="text-none" @click="downloadSelectionOpen = false">ยกเลิก</v-btn>
-          <v-btn
-            color="primary"
-            class="text-none"
-            prepend-icon="mdi-download"
-            :disabled="selectedDownloadIds.length === 0"
-            @click="downloadSelected"
-          >
-            ดาวน์โหลด ({{ selectedDownloadIds.length }})
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <RelationDownloadDialog
+      v-model="downloadSelectionOpen"
+      :items="allDownloadItems"
+      v-model:selected-ids="selectedDownloadIds"
+      :loading="downloadAllLoading"
+      @confirm="downloadSelected"
+    />
 
     <v-dialog v-model="pickerOpen" max-width="640">
       <v-card>
@@ -458,11 +407,14 @@ import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import RelationTreeView from '../../components/shared/RelationTreeView.vue';
 import HierarchyList from '../../components/shared/HierarchyList.vue';
+import RelationDownloadDialog from '../../components/shared/RelationDownloadDialog.vue';
 import { lawTypeToBadge, type LawTypeBadge } from '../../components/shared/lawBadge';
 import {
   RELATION_FILTERS,
+  MAX_DEPTH,
   buildRelationTree,
   collectDescendantIds,
+  collectRelatedIds,
   displayLawDate,
   flattenTree,
   loadRecentIds,
@@ -640,25 +592,21 @@ const descendantCount = computed(() => flattenTree(filteredRootNode.value).lengt
 
 const allDownloadItems = computed(() => {
   const seen = new Set<string>();
-  const result: Array<{ id: string; title: string }> = [];
+  const result: Array<{ id: string; title: string; version?: string }> = [];
   if (selectedRow.value) {
     seen.add(selectedRow.value.id);
-    result.push({ id: selectedRow.value.id, title: selectedRow.value.title });
+    result.push({ id: selectedRow.value.id, title: selectedRow.value.title, version: undefined });
   }
   for (const node of flattenTree(rootNode.value)) {
     if (!seen.has(node.row.id)) {
       seen.add(node.row.id);
-      result.push({ id: node.row.id, title: node.row.title });
+      const chain = node.sameLevelVersions;
+      const idx = chain.findIndex((r) => r.id === node.row.id);
+      const version = chain.length > 1 && idx >= 0 ? String(idx + 1) : undefined;
+      result.push({ id: node.row.id, title: node.row.title, version });
     }
   }
   return result;
-});
-
-const selectAllDownload = computed({
-  get: () => allDownloadItems.value.length > 0 && selectedDownloadIds.value.length === allDownloadItems.value.length,
-  set: (val: boolean) => {
-    selectedDownloadIds.value = val ? allDownloadItems.value.map((i) => i.id) : [];
-  },
 });
 const treePageCount = computed(() => Math.max(1, Math.ceil((filteredRootNode.value?.children.length ?? 0) / PAGE_SIZE)));
 const pagedRootNode = computed(() => {
@@ -771,17 +719,43 @@ async function loadDetail(id: string): Promise<void> {
     const review = await fetchReview(id);
     rootMeta.value = review.law_meta ?? null;
     const bag: Record<string, LawRelation[]> = { [id]: review.relations ?? [] };
-    const extraIds = collectDescendantIds(id, rows.value);
-    const extras = await Promise.all(
-      extraIds.map((documentId) =>
+    const fetched = new Set<string>([id]);
+
+    // Seed with parentIds descendants
+    const seedIds = collectDescendantIds(id, rows.value);
+    const seedExtras = await Promise.all(
+      seedIds.map((documentId) =>
         fetchReview(documentId)
           .then((item) => [documentId, item.relations ?? []] as const)
           .catch(() => [documentId, []] as const),
       ),
     );
-    for (const [documentId, rels] of extras) {
+    for (const [documentId, rels] of seedExtras) {
       bag[documentId] = rels;
+      fetched.add(documentId);
     }
+
+    // Iteratively fetch relations for any target ids not yet fetched
+    for (let depth = 0; depth < MAX_DEPTH; depth += 1) {
+      const related = new Set([
+        ...collectRelatedIds(id, bag),
+        ...collectDescendantIds(id, rows.value),
+      ]);
+      const newIds = [...related].filter((rid) => !fetched.has(rid));
+      if (newIds.length === 0) break;
+      const newExtras = await Promise.all(
+        newIds.map((documentId) =>
+          fetchReview(documentId)
+            .then((item) => [documentId, item.relations ?? []] as const)
+            .catch(() => [documentId, []] as const),
+        ),
+      );
+      for (const [documentId, rels] of newExtras) {
+        bag[documentId] = rels;
+        fetched.add(documentId);
+      }
+    }
+
     rootRelations.value = bag;
     rememberRecentId(id);
   } catch {
