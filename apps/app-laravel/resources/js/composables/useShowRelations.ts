@@ -4,7 +4,7 @@ import { formatThaiDate } from '../utils/thaiDate';
 
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
-const MAX_DEPTH = 6;
+export const MAX_DEPTH = 6;
 
 export const TYPE_META: Record<string, { color: string; short: string }> = {
   กฎหมายภายนอก: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
@@ -428,6 +428,17 @@ export function collectDescendantIds(rootId: string, rows: ShowRelRow[]): string
     }
   }
   return out;
+}
+
+export function collectRelatedIds(rootId: string, bag: Record<string, LawRelation[]>): string[] {
+  const out = new Set<string>();
+  for (const rels of Object.values(bag)) {
+    for (const rel of rels) {
+      const t = rel.target_document_id?.trim();
+      if (t && t !== rootId) out.add(t);
+    }
+  }
+  return [...out];
 }
 
 export function sameLevelKeepId(rootId: string, chain: ShowRelRow[]): string {
