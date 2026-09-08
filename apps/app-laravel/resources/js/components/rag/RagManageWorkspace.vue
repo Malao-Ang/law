@@ -30,7 +30,7 @@
             prepend-icon="mdi-table-merge-cells"
             style="background:rgba(255,255,255,0.14);color:#fff"
             @click="mergeSelected">รวม</v-btn>
-          <v-btn size="small" :disabled="blockBusy"
+          <v-btn v-if="false" size="small" :disabled="blockBusy"
             prepend-icon="mdi-delete-outline"
             style="background:rgba(220,38,38,0.85);color:#fff"
             @click="deleteSelected">ลบ</v-btn>
