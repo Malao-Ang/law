@@ -1,6 +1,7 @@
 // This store exists solely to enforce the api-import boundary: components and pages
 // must not import from api/client directly. It has no reactive state by design.
 import { defineStore } from 'pinia';
+import Swal from 'sweetalert2';
 import {
   createBlock,
   deleteBlock,
@@ -16,16 +17,46 @@ import {
 import { invalidateReview } from './reviewCache';
 import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
 
-/** Retry fn once after 250 ms if the server responds 409 (optimistic-lock contention). */
+function isConflictError(err: unknown): err is Error {
+  return err instanceof Error && err.message.startsWith('HTTP 409');
+}
+
+async function promptConflictRetry<T>(fn: () => Promise<T>, err: Error): Promise<T> {
+  let lastError = err;
+  while (true) {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'บันทึกไม่สำเร็จ',
+      text: 'กำลังบันทึกอยู่ กรุณาลองใหม่อีกครั้ง',
+      showCancelButton: true,
+      confirmButtonText: 'ลองอีกครั้ง',
+      cancelButtonText: 'ปิด',
+      confirmButtonColor: '#1a3673',
+      cancelButtonColor: '#64748b',
+    });
+    if (!result.isConfirmed) throw lastError;
+    try {
+      return await fn();
+    } catch (nextErr: unknown) {
+      if (!isConflictError(nextErr)) throw nextErr;
+      lastError = nextErr;
+    }
+  }
+}
+
+/** Retry fn after 250 ms if the server responds 409; persistent contention asks the user to retry. */
 async function withConflictRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err: unknown) {
-    if (err instanceof Error && err.message.startsWith('HTTP 409')) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
-      return fn();
+    if (!isConflictError(err)) throw err;
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    try {
+      return await fn();
+    } catch (retryErr: unknown) {
+      if (!isConflictError(retryErr)) throw retryErr;
+      return promptConflictRetry(fn, retryErr);
     }
-    throw err;
   }
 }
 
