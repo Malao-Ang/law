@@ -6,10 +6,13 @@ use Illuminate\Support\Facades\Cache;
 use MongoDB\BSON\UTCDateTime;
 use MongoDB\Collection;
 use MongoDB\Driver\Exception\BulkWriteException;
+use App\Services\Storage\ConcurrencyException;
 use RuntimeException;
 
 final class MongoBlobStore
 {
+    private const MAX_ATTEMPTS = 6;
+
     public function __construct(private readonly Collection $collection) {}
 
     /** @return array<int|string, mixed>|null */
@@ -59,7 +62,7 @@ final class MongoBlobStore
     /** @param callable(array<int|string, mixed> &): void $cb */
     public function withLock(string $kind, string $id, callable $cb): void
     {
-        for ($attempt = 0; $attempt < 3; $attempt++) {
+        for ($attempt = 0; $attempt < self::MAX_ATTEMPTS; $attempt++) {
             $doc = $this->collection->findOne(['_id' => $id]);
             $version = $doc !== null ? (int) ($doc['_version'] ?? 0) : -1;
             $data = ($doc !== null && isset($doc[$kind])) ? (array) $doc[$kind] : [];
@@ -80,6 +83,7 @@ final class MongoBlobStore
 
                     return;
                 } catch (BulkWriteException) {
+                    $this->backoff($attempt);
                     continue;
                 }
             }
@@ -99,9 +103,19 @@ final class MongoBlobStore
 
                 return;
             }
+
+            $this->backoff($attempt);
         }
 
-        throw new RuntimeException("MongoBlobStore: failed to commit after 3 retries ({$kind}/{$id})");
+        throw new ConcurrencyException("MongoBlobStore: commit contention, retries exhausted ({$kind}/{$id})");
+    }
+
+    /** Jittered exponential backoff: ~5ms, 10ms, 20ms, 40ms … capped, + random jitter. */
+    private function backoff(int $attempt): void
+    {
+        $baseMicros = 5000 * (2 ** min($attempt, 5)); // 5ms → capped ~160ms
+        $jitter = random_int(0, 4000); // up to 4ms
+        usleep(min($baseMicros + $jitter, 200000)); // hard cap 200ms
     }
 
     /**
