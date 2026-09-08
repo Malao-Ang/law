@@ -816,9 +816,17 @@ async function publish(): Promise<void> {
 
   if (hasRequiredFail) {
     const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
-    publishOpen.value = false;
-    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: `ไม่สามารถเผยแพร่ได้: ${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${failedGate?.status ?? ''}` });
-    return;
+
+    // Special case: if the ONLY failing gate is status (ร่าง), fall through
+    // to the 3-option dialog below instead of showing a hard error.
+    const otherRequiredFails = gates.filter((g) => g.level === 'required' && !g.ok && g.key !== 'status');
+    if (otherRequiredFails.length > 0) {
+      publishOpen.value = false;
+      const firstFail = otherRequiredFails[0] ?? failedGate;
+      void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: `ไม่สามารถเผยแพร่ได้: ${firstFail?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${firstFail?.status ?? ''}` });
+      return;
+    }
+    // Only status gate fails → fall through to the ร่าง dialog below.
   }
 
   const payload: { status?: string; published_date: string } = {

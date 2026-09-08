@@ -527,15 +527,20 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
 
-    // Other required failures (status, metadata) — show generic block
-    await Swal.fire({
-      icon: 'warning',
-      title: 'ข้อมูลไม่ครบ',
-      html: `ไม่สามารถเผยแพร่ได้: <strong>${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'}</strong>`,
-      confirmButtonText: 'รับทราบ',
-      confirmButtonColor: '#1a3673',
-    });
-    return;
+    // Other required failures (status, metadata) — show generic block.
+    // But if the only failure is status (ร่าง), fall through to the 3-option dialog below.
+    const isOnlyStatusFail = failedGate?.key === 'status';
+    if (!isOnlyStatusFail) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'ข้อมูลไม่ครบ',
+        html: `ไม่สามารถเผยแพร่ได้: <strong>${failedGate?.label ?? 'ข้อมูลจำเป็นไม่ครบ'}</strong>`,
+        confirmButtonText: 'รับทราบ',
+        confirmButtonColor: '#1a3673',
+      });
+      return;
+    }
+    // isOnlyStatusFail → fall through to ร่าง dialog below.
   }
 
   // All required gates pass — special handling for ร่าง status (post-gate)
