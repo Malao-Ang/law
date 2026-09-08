@@ -270,9 +270,9 @@ async function saveAndPublish(): Promise<void> {
 
   if (isOld.value) {
     // Old docs are already-final PDFs: no RAG export, no eSign ceremony.
-    // Publishing marks them effective and records the publication date.
+    // Publishing records the publication date but keeps the legal status chosen
+    // on the metadata page, including cancelled/repealed statuses.
     const stamped = await documentStore.saveLawMeta({
-      status: 'มีผลบังคับใช้',
       published_date: new Date().toISOString().slice(0, 10),
     });
     if (!stamped) return;
