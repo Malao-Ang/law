@@ -283,16 +283,21 @@ async function goToLawInfo(): Promise<void> {
   if (toPersist.length > 0) {
     blockBusy.value = true;
     try {
-      await Promise.all(
-        toPersist.map((s) => {
-          const suggested = containerType(s)!;
-          s.headBlock.meta.chunk_type = suggested;
-          const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
-          return blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggested);
-        }),
-      );
+      // Sequential to avoid MongoDB optimistic-lock contention (409) from concurrent writes.
+      for (const s of toPersist) {
+        const suggested = containerType(s)!;
+        s.headBlock.meta.chunk_type = suggested;
+        const pageNo = blockPage.value.get(s.headBlock.block_id) ?? 1;
+        await blockStore.patchChunkType(props.documentId, s.headBlock, pageNo, suggested);
+      }
     } catch (e) {
-      documentStore.setSaveError(e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ');
+      void Swal.fire({
+        icon: 'error',
+        title: 'บันทึกไม่สำเร็จ',
+        text: e instanceof Error ? e.message : 'บันทึกประเภทไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+        confirmButtonText: 'รับทราบ',
+        confirmButtonColor: '#1a3673',
+      });
       return;
     } finally {
       blockBusy.value = false;
