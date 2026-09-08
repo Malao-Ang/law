@@ -41,9 +41,11 @@
                 {{ presetPerson.name }}
                 <span class="text-medium-emphasis font-weight-regular">• {{ presetPerson.position }}</span>
               </div>
-              <div class="text-caption text-medium-emphasis">
+              <div v-if="presetPerson.department || presetPerson.employeeId" class="text-caption text-medium-emphasis">
                 {{ presetPerson.department }}
-                <span v-if="presetPerson.employeeId">(รหัสพนักงาน: {{ presetPerson.employeeId }})</span>
+                <span v-if="presetPerson.employeeId">
+                  <span v-if="presetPerson.department"> </span>(รหัสพนักงาน: {{ presetPerson.employeeId }})
+                </span>
               </div>
             </div>
           </div>

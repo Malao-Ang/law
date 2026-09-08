@@ -2,19 +2,19 @@ import type { ESignPerson } from '../types/esign';
 
 export const PRESIDENT_PERSON: ESignPerson = {
   id: 'emp-president',
-  name: 'ศ.ดร.สมพร ประธาน',
+  name: 'รศ.ดร.วัชรินทร์ กาสลัก',
   position: 'อธิการบดี',
-  department: 'อธิการบดีมหาวิทยาลัย • สำนักงานอธิการบดี',
-  employeeId: 'EMP-2021-004',
+  department: '',
+  employeeId: '',
   citizenId: '',
 };
 
 export const COUNCIL_CHAIR_PERSON: ESignPerson = {
   id: 'emp-council',
-  name: 'ศ.ดร.วิชัย สภาธรรม',
+  name: 'รศ.ดร.สุมนต์ สกลไชย',
   position: 'นายกสภามหาวิทยาลัย',
-  department: 'สภามหาวิทยาลัย • สำนักงานสภา',
-  employeeId: 'EMP-2018-001',
+  department: '',
+  employeeId: '',
   citizenId: '',
 };
 

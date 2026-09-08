@@ -27,7 +27,6 @@
               <div class="text-body-2 font-weight-bold">{{ signer.name }}</div>
               <div class="text-caption text-medium-emphasis">
                 {{ signer.position || roleLabel }}
-                <span v-if="signer.employeeId"> • {{ signer.employeeId }}</span>
               </div>
             </div>
           </div>
