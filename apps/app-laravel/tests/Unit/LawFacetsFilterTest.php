@@ -30,4 +30,22 @@ class LawFacetsFilterTest extends TestCase
         $this->assertEquals('prakat', $lawTypes->first()['value']);
         $this->assertEquals(1, $lawTypes->first()['count']);
     }
+
+    public function test_facets_do_not_count_draft_docs_in_type_counts(): void
+    {
+        $store = Mockery::mock(ReviewStore::class);
+        $store->shouldReceive('listLawMeta')->andReturn([
+            ['document_id' => 'a', 'status' => 'ingested', 'access_scope' => 'public', 'law_type' => 'ประกาศ', 'meta_status' => 'มีผลบังคับใช้', 'change_status' => '', 'signer_group' => '', 'agencies' => [], 'law_groups' => [], 'promulgation_date' => '2565-01-01', 'published_date' => '2565-01-01'],
+            ['document_id' => 'b', 'status' => 'ingested', 'access_scope' => 'public', 'law_type' => 'ประกาศ', 'meta_status' => 'ร่าง', 'change_status' => '', 'signer_group' => '', 'agencies' => [], 'law_groups' => [], 'promulgation_date' => '2565-01-01', 'published_date' => '2565-01-01'],
+        ]);
+
+        $this->instance(ReviewStore::class, $store);
+
+        $response = $this->getJson('/api/laws/facets')->assertOk();
+        $announcement = collect($response->json('law_type'))->firstWhere('value', 'ประกาศ');
+
+        $this->assertSame(1, $announcement['count'] ?? null);
+        $this->assertSame(1, $response->json('stats.total_laws'));
+        $this->assertSame([['year' => 2022, 'count' => 1]], $response->json('years'));
+    }
 }

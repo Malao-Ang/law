@@ -2,19 +2,20 @@
 
 namespace Tests\Unit;
 
+use App\Services\ReviewStore;
 use App\Services\Search\ElasticClient;
 use App\Services\Search\LawIndexer;
-use App\Services\ReviewStore;
 use Tests\TestCase;
 
 class LawIndexerTest extends TestCase
 {
-    public function test_parse_year_extracts_four_digit_year(): void
+    public function test_parse_year_extracts_four_digit_year_as_gregorian(): void
     {
-        $this->assertSame(2565, LawIndexer::parseYear('๓ มกราคม 2565'));
-        $this->assertSame(2565, LawIndexer::parseYear('2565-01-03'));
+        $this->assertSame(2022, LawIndexer::parseYear('announced 2565'));
+        $this->assertSame(2022, LawIndexer::parseYear('2565-01-03'));
+        $this->assertSame(2022, LawIndexer::parseYear('2022-01-03'));
         $this->assertNull(LawIndexer::parseYear(null));
-        $this->assertNull(LawIndexer::parseYear('ไม่มีปี'));
+        $this->assertNull(LawIndexer::parseYear('no year'));
     }
 
     public function test_index_builds_chunk_docs_with_denormalized_meta(): void
@@ -22,23 +23,37 @@ class LawIndexerTest extends TestCase
         $store = app(ReviewStore::class);
         $id = 'law_idx_'.uniqid();
 
-        // Seed review doc with law_meta.
         $store->writeReviewDocument($id, [
-            'document_id' => $id, 'source_file' => 'x.pdf', 'source_type' => 'pdf',
-            'language' => 'th', 'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
-            'law_meta' => ['title' => 'พระราชบัญญัติทดสอบ', 'law_type' => 'phrb', 'status' => 'active',
-                'agency' => 'กระทรวงทดสอบ', 'published_date' => '2565-01-03', 'keywords' => ['ภาษี', ' ที่ดิน ', 'ภาษี']],
+            'document_id' => $id,
+            'source_file' => 'x.pdf',
+            'source_type' => 'pdf',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
+            'law_meta' => [
+                'title' => 'Test Act',
+                'law_type' => 'phrb',
+                'status' => 'active',
+                'agency' => 'Test Agency',
+                'published_date' => '2565-01-03',
+                'keywords' => ['tax', ' land ', 'tax'],
+            ],
             'pages' => [['page_no' => 1, 'blocks' => []]],
         ]);
 
-        // Seed export rag json directly (ReviewStore has no writeExport helper).
         $exportPath = $store->absolutePath($store->exportRelativePath($id));
         @mkdir(dirname($exportPath), 0775, true);
         file_put_contents($exportPath, json_encode([
-            'document_id' => $id, 'document_title' => 'พระราชบัญญัติทดสอบ',
+            'document_id' => $id,
+            'document_title' => 'Test Act',
             'chunks' => [
-                ['chunk_id' => "$id-c1", 'page_no' => 1, 'block_ids' => ['p1-b1'],
-                 'section_path' => 'มาตรา ๑', 'text' => 'ความในมาตราหนึ่ง', 'meta' => []],
+                [
+                    'chunk_id' => "$id-c1",
+                    'page_no' => 1,
+                    'block_ids' => ['p1-b1'],
+                    'section_path' => 'Section 1',
+                    'text' => 'Section one text',
+                    'meta' => [],
+                ],
             ],
         ], JSON_UNESCAPED_UNICODE));
 
@@ -57,13 +72,13 @@ class LawIndexerTest extends TestCase
         $doc = $captured[0];
         $this->assertSame($id, $doc['law_id']);
         $this->assertSame("$id-c1", $doc['chunk_id']);
-        $this->assertSame('พระราชบัญญัติทดสอบ', $doc['title']);
+        $this->assertSame('Test Act', $doc['title']);
         $this->assertSame('phrb', $doc['law_type']);
-        $this->assertSame('กระทรวงทดสอบ', $doc['agency']);
-        $this->assertSame(2565, $doc['published_year']);
-        $this->assertSame('มาตรา ๑', $doc['section_path']);
-        $this->assertSame(['ภาษี', 'ที่ดิน'], $doc['keywords']);
-        $this->assertSame('ภาษี ที่ดิน', $doc['keywords_text']);
-        $this->assertSame('ภาษี ที่ดิน', $doc['keywords_suggest']);
+        $this->assertSame('Test Agency', $doc['agency']);
+        $this->assertSame(2022, $doc['published_year']);
+        $this->assertSame('Section 1', $doc['section_path']);
+        $this->assertSame(['tax', 'land'], $doc['keywords']);
+        $this->assertSame('tax land', $doc['keywords_text']);
+        $this->assertSame('tax land', $doc['keywords_suggest']);
     }
 }

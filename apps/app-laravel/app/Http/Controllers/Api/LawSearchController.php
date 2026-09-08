@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
 use App\Services\ReviewStore;
+use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchQuery;
 use App\Services\Search\LawSearchService;
 use App\Services\Search\LawSuggestService;
@@ -64,11 +65,16 @@ class LawSearchController extends Controller
             return response()->json($this->withSearchSuggestions($fileBased, $params, $suggestService));
         }
 
-        // Published allowlist (ingested + has published_date + not draft) drops any
-        // unpublished or draft docs the ES index may still contain.
+        // Published allowlist (ingested + has published_date + not draft + current filters)
+        // drops unpublished, draft, or stale-filter docs the ES index may still contain.
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
-            if (($metaRow['status'] ?? '') === 'ingested' && ($metaRow['published_date'] ?? '') !== '' && ($metaRow['meta_status'] ?? '') !== 'ร่าง') {
+            if (
+                ($metaRow['status'] ?? '') === 'ingested'
+                && ($metaRow['published_date'] ?? '') !== ''
+                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+                && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])
+            ) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
             }
         }
@@ -314,6 +320,15 @@ class LawSearchController extends Controller
             }
         }
 
+        $wantStatus = $filters['status'] ?? null;
+        if (! empty($wantStatus) && ! in_array($row['meta_status'] ?? '', (array) $wantStatus, true)) {
+            return false;
+        }
+
+        if (! $this->rowMatchesYearFilter($row, $filters)) {
+            return false;
+        }
+
         $wantAgency = $filters['agency'] ?? null;
         if (! empty($wantAgency) && array_intersect((array) $wantAgency, $row['agencies'] ?? []) === []) {
             return false;
@@ -321,6 +336,37 @@ class LawSearchController extends Controller
 
         $wantGroup = $filters['law_group'] ?? null;
         if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<string,mixed>  $row
+     * @param  array<string,mixed>  $filters
+     */
+    private function rowMatchesYearFilter(array $row, array $filters): bool
+    {
+        $from = isset($filters['year_from']) ? (int) $filters['year_from'] : null;
+        $to = isset($filters['year_to']) ? (int) $filters['year_to'] : null;
+        if ($from === null && $to === null) {
+            return true;
+        }
+
+        if ($from !== null && $to !== null && $from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $year = LawIndexer::parseYear((string) ($row['promulgation_date'] ?? ''));
+        if ($year === null) {
+            return false;
+        }
+
+        if ($from !== null && $year < $from) {
+            return false;
+        }
+        if ($to !== null && $year > $to) {
             return false;
         }
 
@@ -903,6 +949,9 @@ class LawSearchController extends Controller
             if (($row['published_date'] ?? '') === '') {
                 continue;
             }
+            if (($row['meta_status'] ?? '') === 'ร่าง') {
+                continue;
+            }
 
             $publicCount++;
             $parentIdsList = LawMetaNormalizer::parentDocumentIds($row);
@@ -918,9 +967,7 @@ class LawSearchController extends Controller
             }
 
             $this->tally($termCounts['law_type'], $row['law_type'] ?? '');
-            if (($row['meta_status'] ?? '') !== 'ร่าง') {
-                $this->tally($termCounts['status'], $row['meta_status'] ?? '');
-            }
+            $this->tally($termCounts['status'], $row['meta_status'] ?? '');
             $this->tally($termCounts['change_status'], $row['change_status'] ?? '');
             $this->tally($termCounts['signer_group'], $row['signer_group'] ?? '');
 
@@ -931,8 +978,8 @@ class LawSearchController extends Controller
                 $this->tally($termCounts['law_group'], (string) $group);
             }
 
-            if (($row['promulgation_date'] ?? '') !== '' && preg_match('/\d{4}/', (string) $row['promulgation_date'], $m) === 1) {
-                $year = (int) $m[0];
+            $year = LawIndexer::parseYear((string) ($row['promulgation_date'] ?? ''));
+            if ($year !== null) {
                 $yearCounts[$year] = ($yearCounts[$year] ?? 0) + 1;
             }
         }

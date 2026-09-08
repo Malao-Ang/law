@@ -74,8 +74,10 @@ class LawSearchTest extends TestCase
             'document_id' => 'L1',
             'law_meta' => [
                 'title' => 'พ.ร.บ.',
+                'law_type' => 'phrb',
                 'access_scope' => 'public',
                 'published_date' => '2565-01-01',
+                'status' => 'มีผลบังคับใช้',
             ],
             'pages' => [],
         ]);
@@ -107,6 +109,7 @@ class LawSearchTest extends TestCase
                 'change_status' => 'กฎหมายล่าสุด',
                 'access_scope' => 'public',
                 'published_date' => '2565-01-01',
+                'status' => 'มีผลบังคับใช้',
             ],
             'pages' => [],
         ]);
@@ -186,7 +189,7 @@ class LawSearchTest extends TestCase
         $store->setStatus($documentId, ['status' => 'ingested']);
         $store->writeReviewDocument($documentId, [
             'document_id' => $documentId,
-            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public', 'published_date' => '2565-01-01'],
+            'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public', 'published_date' => '2565-01-01', 'status' => 'มีผลบังคับใช้'],
             'pages' => [[
                 'page_no' => 1,
                 'blocks' => [
@@ -247,6 +250,7 @@ class LawSearchTest extends TestCase
                 'title' => 'ระเบียบเก่า',
                 'access_scope' => 'public',
                 'published_date' => '2565-01-01',
+                'status' => 'มีผลบังคับใช้',
                 'keywords' => ['ภาษีป้าย'],
                 'gazette_reference' => 'เล่ม 140 ตอนที่ 5',
             ],
@@ -275,7 +279,7 @@ class LawSearchTest extends TestCase
         $store->writeReviewDocument('EXT1', [
             'document_id' => 'EXT1',
             'law_meta' => ['title' => 'ประกาศกระทรวงการคลัง', 'access_scope' => 'public',
-                'published_date' => '2565-01-01', 'law_type' => 'ประกาศกระทรวง'],
+                'published_date' => '2565-01-01', 'status' => 'มีผลบังคับใช้', 'law_type' => 'ประกาศกระทรวง'],
             'pages' => [],
         ]);
 
@@ -283,7 +287,7 @@ class LawSearchTest extends TestCase
         $store->writeReviewDocument('PRK1', [
             'document_id' => 'PRK1',
             'law_meta' => ['title' => 'ประกาศมหาวิทยาลัย', 'access_scope' => 'public',
-                'published_date' => '2565-01-01', 'law_type' => 'ประกาศ', 'issuer' => 'มหาวิทยาลัย'],
+                'published_date' => '2565-01-01', 'status' => 'มีผลบังคับใช้', 'law_type' => 'ประกาศ', 'issuer' => 'มหาวิทยาลัย'],
             'pages' => [],
         ]);
         cache()->forget('law-meta-list');
@@ -320,6 +324,7 @@ class LawSearchTest extends TestCase
                     'law_type' => $lawType,
                     'access_scope' => 'public',
                     'published_date' => '2565-01-01',
+                    'status' => 'มีผลบังคับใช้',
                 ],
                 'pages' => [],
             ]);
@@ -354,6 +359,7 @@ class LawSearchTest extends TestCase
                     'law_type' => $lawType,
                     'access_scope' => 'public',
                     'published_date' => '2565-01-01',
+                    'status' => 'มีผลบังคับใช้',
                 ],
                 'pages' => [],
             ]);
@@ -368,5 +374,78 @@ class LawSearchTest extends TestCase
         $ids = collect($response->json('results'))->pluck('law_id')->all();
         $this->assertContains("{$token}_decree", $ids);
         $this->assertNotContains("{$token}_act", $ids);
+    }
+
+    public function test_file_search_applies_use_status_filter(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->never());
+
+        $store = app(ReviewStore::class);
+        $token = 'status_filter_'.uniqid();
+        foreach ([
+            'active' => 'มีผลบังคับใช้',
+            'cancelled' => 'ยกเลิกการใช้งาน',
+        ] as $suffix => $status) {
+            $id = "{$token}_{$suffix}";
+            $store->setStatus($id, ['status' => 'ingested']);
+            $store->writeReviewDocument($id, [
+                'document_id' => $id,
+                'law_meta' => [
+                    'title' => "{$token} {$suffix}",
+                    'law_type' => 'ประกาศ',
+                    'status' => $status,
+                    'access_scope' => 'public',
+                    'published_date' => '2565-01-01',
+                    'promulgation_date' => '2565-01-01',
+                ],
+                'pages' => [],
+            ]);
+        }
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', [
+            'q' => $token,
+            'filters' => ['status' => ['มีผลบังคับใช้']],
+        ])->assertOk();
+
+        $ids = collect($response->json('results'))->pluck('law_id')->all();
+        $this->assertContains("{$token}_active", $ids);
+        $this->assertNotContains("{$token}_cancelled", $ids);
+    }
+
+    public function test_file_search_applies_promulgation_year_filter(): void
+    {
+        $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
+            ->shouldReceive('search')->never());
+
+        $store = app(ReviewStore::class);
+        $token = 'year_filter_'.uniqid();
+        foreach ([2022 => '2565-01-01', 2023 => '2566-01-01'] as $year => $date) {
+            $id = "{$token}_{$year}";
+            $store->setStatus($id, ['status' => 'ingested']);
+            $store->writeReviewDocument($id, [
+                'document_id' => $id,
+                'law_meta' => [
+                    'title' => "{$token} {$year}",
+                    'law_type' => 'ประกาศ',
+                    'status' => 'มีผลบังคับใช้',
+                    'access_scope' => 'public',
+                    'published_date' => '2567-01-01',
+                    'promulgation_date' => $date,
+                ],
+                'pages' => [],
+            ]);
+        }
+        cache()->forget('law-meta-list');
+
+        $response = $this->postJson('/api/laws/search', [
+            'q' => $token,
+            'filters' => ['year_from' => 2022, 'year_to' => 2022],
+        ])->assertOk();
+
+        $ids = collect($response->json('results'))->pluck('law_id')->all();
+        $this->assertContains("{$token}_2022", $ids);
+        $this->assertNotContains("{$token}_2023", $ids);
     }
 }

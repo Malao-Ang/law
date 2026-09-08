@@ -19,7 +19,9 @@ class LawIndexer
             return null;
         }
         if (preg_match('/\d{4}/', $date, $m) === 1) {
-            return (int) $m[0];
+            $year = (int) $m[0];
+
+            return $year >= 2400 ? $year - 543 : $year;
         }
         return null;
     }
