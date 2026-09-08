@@ -16,6 +16,19 @@ import {
 import { invalidateReview } from './reviewCache';
 import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
 
+/** Retry fn once after 250 ms if the server responds 409 (optimistic-lock contention). */
+async function withConflictRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.startsWith('HTTP 409')) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+      return fn();
+    }
+    throw err;
+  }
+}
+
 export const useBlockStore = defineStore('blocks', () => {
   function invalidate(documentId: string): void {
     invalidateReview(documentId);
@@ -26,7 +39,7 @@ export const useBlockStore = defineStore('blocks', () => {
     blockId: string,
     payload: Parameters<typeof patchBlock>[2],
   ): Promise<{ status: string }> {
-    const response = await patchBlock(documentId, blockId, payload);
+    const response = await withConflictRetry(() => patchBlock(documentId, blockId, payload));
     invalidate(documentId);
 
     return response;
@@ -46,7 +59,7 @@ export const useBlockStore = defineStore('blocks', () => {
     blockId: string,
     payload: LayoutPatch,
   ): Promise<{ status: string }> {
-    const response = await patchBlockLayout(documentId, blockId, payload);
+    const response = await withConflictRetry(() => patchBlockLayout(documentId, blockId, payload));
     invalidate(documentId);
 
     return response;
