@@ -30,7 +30,7 @@ export const STAGES: StageDef[] = [
   { key: 'info',       label: 'กรอกข้อมูลเอกสาร',  color: 'doc-kho-bangkhab', icon: 'mdi-information-outline',   action: { type: 'route', label: 'กรอกข้อมูล', to: (id) => `/documents/${id}/law-info` } },
   { key: 'relation',   label: 'เพิ่มความสัมพันธ์', color: 'doc-rabiap',       icon: 'mdi-graph-outline',        action: { type: 'route', label: 'เพิ่มความสัมพันธ์', to: (id) => `/documents/${id}/relations` } },
   { key: 'complete',   label: 'เสร็จสมบูรณ์',      color: 'success',          icon: 'mdi-check-decagram-outline', action: { type: 'route', label: 'กำหนดสิทธิ์', to: (id) => `/documents/${id}/permissions` } },
-  { key: 'wait_esign', label: 'รอลงนาม',          color: 'elaw-gold',        icon: 'mdi-draw-pen',             action: { type: 'route', label: 'เปิดหน้าลงนาม', to: (id) => `/documents/${id}/esign/status` } },
+  { key: 'wait_esign', label: 'รอลงนาม',          color: 'elaw-gold',        icon: 'mdi-draw-pen',             action: { type: 'route', label: 'เปิดหน้าลงนาม', to: (id) => `/documents/${id}/esign` } },
   { key: 'public',     label: 'เผยแพร่แล้ว',       color: 'success',          icon: 'mdi-earth',                action: { type: 'route', label: 'ดูหน้าเผยแพร่', to: (id) => `/law/${id}` } },
 ];
 
