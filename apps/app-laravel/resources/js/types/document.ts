@@ -261,6 +261,8 @@ export interface DocumentListItem {
   document_type?: DocumentType;
   source?: DocumentSource;
   source_file?: string | null;
+  esign_sign_status?: string | null;
+  esign_submitted_at?: string | null;
 }
 
 export interface LawCatalogSection {
@@ -428,6 +430,8 @@ export interface ReportDocument {
   parent_document_id: string | null;
   parent_document_ids?: string[];
   workflow_completed_step: number | null;
+  esign_sign_status?: string | null;
+  esign_submitted_at?: string | null;
 }
 
 export interface ReportSummary {

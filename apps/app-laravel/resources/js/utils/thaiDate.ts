@@ -49,3 +49,13 @@ export function formatThaiDateTime(value: DateInput): string {
 
   return `${formatThaiDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+export function formatThaiDateNumeric(value: DateInput): string {
+  const date = toDate(value);
+  if (!date) return '';
+
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear() > 2400 ? date.getFullYear() : date.getFullYear() + 543;
+  return `${day}/${month}/${year}`;
+}

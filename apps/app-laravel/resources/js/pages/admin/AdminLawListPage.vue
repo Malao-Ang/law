@@ -77,6 +77,18 @@
         style="max-width: 160px"
       />
       <v-select
+        v-model="filterEsign"
+        :items="esignFilterOptions"
+        item-title="label"
+        item-value="value"
+        label="สถานะ e-Sign"
+        variant="outlined"
+        density="compact"
+        hide-details
+        rounded="lg"
+        style="max-width: 170px"
+      />
+      <v-select
         v-model="sortOrder"
         :items="sortOptions"
         item-title="label"
@@ -98,14 +110,16 @@
             <th>#</th>
             <th>ชื่อกฎหมาย / เอกสารสาระบบ</th>
             <th>ประเภท</th>
-            <th>สถานะ</th>
+            <th>สถานะกฎหมาย</th>
+            <th>เผยแพร่</th>
+            <th>e-Sign</th>
             <th>แก้ไขล่าสุด</th>
             <th>จัดการ</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!loading && pagedLaws.length === 0">
-            <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
+            <td colspan="8" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
           </tr>
           <tr v-for="(law, idx) in pagedLaws" :key="law.id">
             <td class="text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
@@ -155,6 +169,16 @@
               >
                 <v-icon start icon="mdi-circle" size="8" />
                 {{ effectiveStatusLabel(law) }}
+              </v-chip>
+            </td>
+            <td>
+              <v-chip size="x-small" :color="law.publishStatus === 'เผยแพร่แล้ว' ? 'success' : 'grey'" variant="tonal" rounded="pill">
+                {{ law.publishStatus }}
+              </v-chip>
+            </td>
+            <td>
+              <v-chip size="x-small" :color="law.esignColor" variant="tonal" rounded="pill">
+                {{ law.esignLabel }}
               </v-chip>
             </td>
             <td class="text-caption">{{ law.editedAt }}</td>
@@ -216,7 +240,8 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
-import { formatThaiDate } from '../../utils/thaiDate';
+import { formatThaiDateNumeric } from '../../utils/thaiDate';
+import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
 import { useVersionStore } from '../../stores/versionStore';
@@ -236,6 +261,7 @@ const loading = ref(false);
 const search = ref('');
 const filterType = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
+const filterEsign = ref<string | null>(null);
 const sortOrder = ref('newest');
 const page = ref(1);
 
@@ -256,7 +282,7 @@ onMounted(async () => {
   }
 });
 
-watch([search, filterType, filterStatus, sortOrder], () => {
+watch([search, filterType, filterStatus, filterEsign, sortOrder], () => {
   page.value = 1;
 });
 
@@ -343,6 +369,10 @@ interface LawRow {
   sections: number | null;
   editedAt: string;
   rawDate: string;
+  publishStatus: string;
+  esignLabel: string;
+  esignColor: string;
+  esignBucket: string;
 }
 
 const laws = computed<LawRow[]>(() =>
@@ -360,8 +390,20 @@ const laws = computed<LawRow[]>(() =>
     group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
     pages: doc.page_count ?? 0,
     sections: doc.section_count ?? null,
-    editedAt: formatThaiDate(doc.date) || '-',
+    editedAt: formatThaiDateNumeric(doc.date) || '-',
     rawDate: doc.date ?? '',
+    publishStatus: doc.published_date ? 'เผยแพร่แล้ว' : 'ยังไม่เผยแพร่',
+    esignLabel: esignStatusLabel(doc),
+    esignColor: esignStatusColor(doc),
+    esignBucket: (() => {
+      if (doc.document_type === 'old') return 'old';
+      const code = String(doc.esign_sign_status ?? '').trim().toUpperCase();
+      if (code === 'Y') return 'signed';
+      if (code === 'N') return 'rejected';
+      if (code === 'C') return 'cancelled';
+      if (doc.esign_submitted_at) return 'waiting';
+      return 'not_sent';
+    })(),
   })),
 );
 
@@ -391,6 +433,15 @@ const statusOptions = [
   { label: 'ยกเลิก', value: 'ยกเลิก' },
 ];
 
+const esignFilterOptions = [
+  { label: 'ทุกสถานะ e-Sign', value: null },
+  { label: 'ลงนามแล้ว', value: 'signed' },
+  { label: 'รอลงนาม', value: 'waiting' },
+  { label: 'ยังไม่ส่งลงนาม', value: 'not_sent' },
+  { label: 'ยกเลิกการส่ง', value: 'cancelled' },
+  { label: 'ถูกปฏิเสธ', value: 'rejected' },
+];
+
 const sortOptions = [
   { label: 'ล่าสุด', value: 'newest' },
   { label: 'เก่าสุด', value: 'oldest' },
@@ -401,6 +452,7 @@ const filteredLaws = computed(() => {
   let result = laws.value;
   if (filterType.value) result = result.filter((l) => l.lawType === filterType.value);
   if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
+  if (filterEsign.value) result = result.filter((l) => l.esignBucket === filterEsign.value);
   if (search.value.trim()) {
     const q = search.value.trim().toLowerCase();
     result = result.filter(
