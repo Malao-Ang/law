@@ -261,7 +261,8 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import {
   RELATION_TYPE_ICONS,
 } from '../../types/lawRelation';
-import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport } from '../../api/client';
+import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, fetchStatus, signedEsignPdfUrl } from '../../api/client';
+import { hasSignedEsignPdf } from '../../utils/esignStatus';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
 import LawInfoPanel from './LawInfoPanel.vue';
@@ -458,17 +459,29 @@ async function downloadPdf(): Promise<void> {
   exportingPdf.value = true;
   pdfExportError.value = '';
   try {
-    if (usesOriginalPdfLayout.value) {
-      const anchor = document.createElement('a');
-      anchor.href = downloadUrl.value;
-      anchor.download = safeFileName.value;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-    } else {
+    // New docs: prefer the signed e-Sign PDF if available.
+    if (!usesOriginalPdfLayout.value) {
+      try {
+        const status = await fetchStatus(props.documentId);
+        if (hasSignedEsignPdf(status)) {
+          window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
+          return;
+        }
+      } catch {
+        // non-fatal — fall through to regular export
+      }
       await downloadPdfExport(props.documentId, safeFileName.value);
       await documentStore.fetch(props.documentId, true);
+      return;
     }
+
+    // Old/PDF-source docs: download original file.
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl.value;
+    anchor.download = safeFileName.value;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   } catch (error) {
     pdfExportError.value = error instanceof Error ? error.message : 'ดาวน์โหลดไม่สำเร็จ';
   } finally {
