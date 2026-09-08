@@ -4,9 +4,9 @@ function assert(cond: boolean, msg: string): void {
   if (!cond) throw new Error(`cardChangeState check failed: ${msg}`);
 }
 
-// cancelled by enforcement status wins over everything
-assert(cardChangeState('ปรับปรุงรายมาตรา', 'ยกเลิกการใช้งาน').variant === 'cancelled', 'status cancel wins');
-assert(cardChangeState('', 'ยกเลิกการใช้งาน').label === 'ยกเลิกแล้ว', 'cancelled label');
+// whole-document cancellation is already represented by use status, so no change badge
+assert(cardChangeState('ปรับปรุงรายมาตรา', 'ยกเลิกการใช้งาน').variant === 'new', 'status cancel is not duplicated');
+assert(cardChangeState('', 'ยกเลิกการใช้งาน').label === '', 'whole cancel label hidden');
 
 // partial cancel from change_status
 assert(cardChangeState('ยกเลิกรายมาตรา', 'มีผลบังคับใช้').variant === 'partial', 'partial variant');

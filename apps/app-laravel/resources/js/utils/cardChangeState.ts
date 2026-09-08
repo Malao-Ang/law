@@ -13,7 +13,7 @@ export function cardChangeState(changeStatus?: string | null, status?: string | 
   const change = (changeStatus ?? '').trim();
   const use = (status ?? '').trim();
 
-  if (use === 'ยกเลิกการใช้งาน') return { variant: 'cancelled', label: 'ยกเลิกแล้ว' };
+  if (use === 'ยกเลิกการใช้งาน') return { variant: 'new', label: '' };
   if (change.startsWith('ยกเลิก')) return { variant: 'partial', label: 'ยกเลิกบางส่วน' };
   if (change.startsWith('ปรับปรุง')) return { variant: 'revise', label: change };
   return { variant: 'new', label: '' };

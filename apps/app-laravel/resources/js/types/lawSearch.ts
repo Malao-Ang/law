@@ -63,6 +63,7 @@ export interface LawSearchResult {
   requires_permission?: boolean;
   child_types?: Record<string, number>;
   related_laws?: RelatedLawSummary[];
+  affected_sections?: string[];
   confidence?: number;
   match_mode?: string;
   snippets: string[];

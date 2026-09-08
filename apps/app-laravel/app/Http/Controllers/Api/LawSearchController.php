@@ -156,6 +156,7 @@ class LawSearchController extends Controller
         $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
         $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
         $row['related_laws'] = $fileRow['related_laws'] ?? [];
+        $row['affected_sections'] = $fileRow['affected_sections'] ?? [];
         if ($row['restricted']) {
             $row['snippets'] = [];
         }
@@ -265,6 +266,7 @@ class LawSearchController extends Controller
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
                 'related_laws' => $includeHeavyDetails ? $this->relatedLawSummaries($id, $store, $metaById) : [],
+                'affected_sections' => $this->affectedSections($id, $store),
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
                 'snippets' => ($includeHeavyDetails && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
@@ -780,6 +782,36 @@ class LawSearchController extends Controller
         }
 
         return array_slice(array_values($items), 0, 3);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function affectedSections(string $documentId, ReviewStore $store): array
+    {
+        try {
+            $review = $store->getReviewDocument($documentId);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $items = [];
+        $relations = is_array($review['relations'] ?? null) ? $review['relations'] : [];
+        foreach ($relations as $rel) {
+            if (! is_array($rel) || (($rel['scope'] ?? 'document') !== 'section')) {
+                continue;
+            }
+
+            $label = trim((string) ($rel['target_section'] ?? ''));
+            if ($label === '') {
+                $label = trim((string) ($rel['change_detail'] ?? ''));
+            }
+            if ($label !== '') {
+                $items[$label] = true;
+            }
+        }
+
+        return array_keys($items);
     }
 
     /**

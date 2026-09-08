@@ -351,7 +351,11 @@
                       <span class="mdi mdi-calendar" />
                       นับบังคับตั้งแต่ {{ formatThaiDate(law.published_date) || law.published_date }}
                     </span>
-                    <span v-if="law.agency">
+                    <span v-if="affectedSectionLabel(law)">
+                      <v-icon size="13" icon="mdi-format-list-numbered" />
+                      {{ affectedSectionLabel(law) }}
+                    </span>
+                    <span v-else-if="law.agency">
                       <v-icon size="13" icon="mdi-domain" />
                       {{ law.agency }}
                     </span>
@@ -1066,6 +1070,15 @@ function referencedLawChips(law: LawSearchResult): Array<{ document_id: string; 
   return (law.related_laws ?? [])
     .filter((item) => item.title?.trim())
     .slice(0, 3);
+}
+
+function affectedSectionLabel(law: LawSearchResult): string {
+  const sections = law.affected_sections ?? [];
+  if (sections.length === 0) return '';
+  const state = cardChangeState(law.change_status, law.status);
+  if (state.variant === 'partial') return `ยกเลิก${sections.join(', ')}`;
+  if (state.variant === 'revise') return `ปรับปรุง${sections.join(', ')}`;
+  return '';
 }
 
 function highlightKeyword(kw: string): string {

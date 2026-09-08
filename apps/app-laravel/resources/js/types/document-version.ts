@@ -30,6 +30,7 @@ export interface DocumentVersion {
     issuer?: string;
     changeStatus?: string;
     useStatus?: string;
+    affectedSections?: string[];
     keywords: string[];
   };
   changeSummary?: string;

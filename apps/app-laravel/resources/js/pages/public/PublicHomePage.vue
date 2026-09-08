@@ -33,6 +33,7 @@
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
+                :amended-sections="doc.metadata.affectedSections"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -55,6 +56,7 @@
               :description="doc.metadata.summary"
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
+              :amended-sections="doc.metadata.affectedSections"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -91,6 +93,7 @@
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
+                :amended-sections="doc.metadata.affectedSections"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -114,6 +117,7 @@
               :description="doc.metadata.summary"
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
+              :amended-sections="doc.metadata.affectedSections"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -150,6 +154,7 @@
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
+                :amended-sections="doc.metadata.affectedSections"
                 :issuer="doc.metadata.issuer"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
@@ -174,6 +179,7 @@
               :description="doc.metadata.summary"
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
+              :amended-sections="doc.metadata.affectedSections"
               :issuer="doc.metadata.issuer"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
@@ -211,6 +217,7 @@
                 :description="doc.metadata.summary"
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
+                :amended-sections="doc.metadata.affectedSections"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -234,6 +241,7 @@
               :description="doc.metadata.summary"
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
+              :amended-sections="doc.metadata.affectedSections"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -390,6 +398,7 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     issuer: law.issuer ?? '',
     changeStatus: law.change_status ?? '',
     useStatus: law.status ?? '',
+    affectedSections: law.affected_sections ?? [],
     lawTypeName: law.law_type ?? '',
   });
 }
@@ -431,6 +440,7 @@ function buildDocumentVersion(input: {
   issuer?: string;
   changeStatus?: string;
   useStatus?: string;
+  affectedSections?: string[];
   lawTypeName?: string;
 }): DocumentVersion {
   const publishedDate = typeof input.publishedDate === 'string' ? new Date(input.publishedDate) : input.publishedDate;
@@ -452,6 +462,7 @@ function buildDocumentVersion(input: {
       issuer: input.issuer ?? '',
       changeStatus: input.changeStatus ?? '',
       useStatus: input.useStatus ?? '',
+      affectedSections: input.affectedSections ?? [],
       lawTypeName: input.lawTypeName ?? '',
       keywords: [],
     },

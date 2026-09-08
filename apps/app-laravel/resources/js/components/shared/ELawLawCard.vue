@@ -39,9 +39,9 @@
     </div>
 
     <!-- Agency strip (LawInfoStrip style) -->
-    <div v-if="department" class="elaw-agency-strip">
-      <div class="elaw-agency-strip__label">หน่วยงานที่รับผิดชอบ</div>
-      <div class="elaw-agency-strip__value">{{ department }}</div>
+    <div v-if="departmentLabel" class="elaw-agency-strip">
+      <div class="elaw-agency-strip__label">{{ departmentHeading }}</div>
+      <div class="elaw-agency-strip__value">{{ departmentLabel }}</div>
     </div>
 
     <div class="elaw-card__divider" />
@@ -110,6 +110,15 @@ const typeLabels: Record<DocType, string> = {
 };
 
 const changeState = computed(() => cardChangeState(props.changeStatusText, props.useStatus));
+const affectedSectionLabel = computed(() => {
+  const sections = props.amendedSections ?? [];
+  if (sections.length === 0) return '';
+  if (changeState.value.variant === 'partial') return `ยกเลิก${sections.join(', ')}`;
+  if (changeState.value.variant === 'revise') return `ปรับปรุง${sections.join(', ')}`;
+  return '';
+});
+const departmentLabel = computed(() => affectedSectionLabel.value || props.department || '');
+const departmentHeading = computed(() => affectedSectionLabel.value ? 'ข้อ/มาตราที่เกี่ยวข้อง' : 'หน่วยงานที่รับผิดชอบ');
 
 const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
 const typeBadge = computed<LawTypeBadge | null>(() => {
