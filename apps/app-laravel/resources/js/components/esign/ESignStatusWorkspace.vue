@@ -853,6 +853,8 @@ async function publish(): Promise<void> {
   try {
     const saved = await documentStore.saveLawMeta(payload);
     if (!saved) return;
+    const progressed = await documentStore.completeWorkflowStep(6);
+    if (!progressed) return;
     writeStage(props.documentId, 'public');
     publishOpen.value = false;
     await router.push(`/law/${props.documentId}`);

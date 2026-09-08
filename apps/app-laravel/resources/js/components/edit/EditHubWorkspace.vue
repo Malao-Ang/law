@@ -570,9 +570,14 @@ async function confirmPublishChange(): Promise<void> {
   const next = publishDialogNext.value;
   publishToggleSaving.value = true;
   try {
-    await documentStore.saveLawMeta({
+    const saved = await documentStore.saveLawMeta({
       published_date: next ? new Date().toISOString().slice(0, 10) : '',
     });
+    if (!saved) return;
+    if (next) {
+      const progressed = await documentStore.completeWorkflowStep(6);
+      if (!progressed) return;
+    }
   } finally {
     publishToggleSaving.value = false;
     publishDialogOpen.value = false;
