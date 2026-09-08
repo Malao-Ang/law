@@ -372,6 +372,22 @@ function refreshPdfPreview(): void {
   pdfPreviewKey.value += 1;
 }
 
+async function ensurePreviewReady(attempts = 3): Promise<void> {
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const response = await fetch(reviewPdfPreviewUrl(props.documentId), { method: 'HEAD' });
+      if (response.ok || response.status !== 503) {
+        refreshPdfPreview();
+        return;
+      }
+    } catch {
+      // Treat transient network errors like a warming PDF renderer and retry.
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+  }
+  refreshPdfPreview();
+}
+
 async function refreshServerStatus(): Promise<void> {
   try {
     serverStatus.value = await fetchStatus(props.documentId);
@@ -466,7 +482,7 @@ onMounted(async () => {
   ]);
   hydrateSigners();
   await refreshServerStatus();
-  refreshPdfPreview();
+  await ensurePreviewReady();
   writeStage(props.documentId, 'wait_esign');
 });
 
