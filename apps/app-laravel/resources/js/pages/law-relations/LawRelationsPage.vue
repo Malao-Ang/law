@@ -41,7 +41,7 @@
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-2">
             <v-icon icon="mdi-file-tree" color="admin-primary" size="20" />
-            <span class="text-subtitle-1 font-weight-bold">ความสัมพันธ์กฎหมาย</span>
+            <span class="text-subtitle-1 font-weight-bold">ลำดับชั้นเอกสาร</span>
           </div>
           <p class="text-caption text-medium-emphasis mb-4">
             {{ parentPickerHint }}
