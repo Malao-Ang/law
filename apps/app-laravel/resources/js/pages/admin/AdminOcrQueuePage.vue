@@ -126,23 +126,27 @@
         </template>
 
         <template #item.actions="{ item }">
-          <v-btn
-            v-if="item.status === 'done' || item.status === 'exported' || item.status === 'ingested'"
-            icon="mdi-pencil-outline"
-            size="x-small"
-            variant="text"
-            color="admin-primary"
-            :to="`/documents/${item.id}/review`"
-          />
-          <v-btn
-            v-if="item.status === 'failed'"
-            icon="mdi-refresh"
-            size="x-small"
-            variant="text"
-            color="warning"
-            title="ประมวลผลใหม่"
-            disabled
-          />
+          <div class="d-flex align-center justify-end ga-1">
+            <v-btn
+              v-if="item.status === 'done' || item.status === 'exported' || item.status === 'ingested'"
+              icon="mdi-pencil-outline"
+              size="x-small"
+              variant="text"
+              color="admin-primary"
+              :to="`/documents/${item.id}/review`"
+            />
+            <v-btn
+              v-if="item.status === 'failed'"
+              prepend-icon="mdi-delete-outline"
+              size="small"
+              variant="tonal"
+              color="error"
+              title="ลบเอกสารที่ล้มเหลว"
+              :loading="deletingId === item.id"
+              :disabled="deletingId !== null && deletingId !== item.id"
+              @click="confirmDelete(item)"
+            >ลบ</v-btn>
+          </div>
         </template>
 
         <template #no-data>
@@ -155,10 +159,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { listDocuments } from '../../api/client';
+import Swal from 'sweetalert2';
+import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import { formatThaiDateTime } from '../../utils/thaiDate';
 import AppShell from '../../components/shared/AppShell.vue';
+import { useSnackbarStore } from '../../stores/snackbarStore';
 
 interface QueueRow {
   id: string;
@@ -172,7 +178,9 @@ interface QueueRow {
 }
 
 const docs = ref<DocumentListItem[]>([]);
+const snackbar = useSnackbarStore();
 const loading = ref(false);
+const deletingId = ref<string | null>(null);
 const search = ref('');
 const filterStatus = ref<string | null>(null);
 const filterEngine = ref<string | null>(null);
@@ -263,6 +271,31 @@ function statusLabel(status: string): string {
 
 function hasActive(): boolean {
   return docs.value.some((doc) => ['queued', 'processing', 'ingesting'].includes(doc.status));
+}
+
+async function confirmDelete(row: QueueRow): Promise<void> {
+  const confirmed = await Swal.fire({
+    icon: 'warning',
+    title: 'ลบเอกสารที่ล้มเหลว?',
+    text: row.title,
+    showCancelButton: true,
+    confirmButtonText: 'ลบ',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318',
+    cancelButtonColor: '#64748b',
+  });
+  if (!confirmed.isConfirmed) return;
+
+  deletingId.value = row.id;
+  try {
+    await deleteDocument(row.id);
+    await load();
+    snackbar.success('ลบเอกสารที่ล้มเหลวแล้ว');
+  } catch (err) {
+    snackbar.error(err instanceof Error ? err.message : 'ลบเอกสารไม่สำเร็จ');
+  } finally {
+    deletingId.value = null;
+  }
 }
 
 async function load(): Promise<void> {

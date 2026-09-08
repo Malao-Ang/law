@@ -142,6 +142,19 @@
           >{{ rowActionLabel(item) || 'ดูเอกสาร' }}</v-btn>
 
           <v-btn
+            v-if="item.stage === 'failed'"
+            prepend-icon="mdi-delete-outline"
+            size="small"
+            variant="tonal"
+            color="error"
+            title="ลบประวัติอัปโหลด"
+            :loading="deletingId === item.documentId"
+            :disabled="deletingId !== null && deletingId !== item.documentId"
+            @click="confirmDelete(item)"
+          >ลบ</v-btn>
+
+          <v-btn
+            v-else
             icon="mdi-delete-outline"
             size="small"
             variant="text"
@@ -259,7 +272,7 @@ const headers = [
   { title: 'e-Sign', key: 'esign', sortable: false, align: 'center' as const, width: 130 },
   { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const, width: 140 },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
-  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 140 },
+  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 170 },
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
