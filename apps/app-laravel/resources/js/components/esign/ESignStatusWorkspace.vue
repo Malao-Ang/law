@@ -821,12 +821,37 @@ async function publish(): Promise<void> {
     return;
   }
 
+  const payload: { status?: string; published_date: string } = {
+    published_date: new Date().toISOString().slice(0, 10),
+  };
+  if (!meta?.status || meta.status === 'ร่าง') {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: 'เอกสารยังเป็นร่าง',
+      html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>ต้องการเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> ก่อนเผยแพร่หรือไม่?',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'เผยแพร่และเปลี่ยนสถานะ',
+      denyButtonText: 'ไปแก้ไขสถานะเอง',
+      cancelButtonText: 'ยกเลิก',
+      denyButtonColor: '#6b7280',
+      confirmButtonColor: '#1a3673',
+    });
+
+    if (result.isDenied) {
+      publishOpen.value = false;
+      router.push(`/documents/${props.documentId}/law-info?mode=edit`);
+      return;
+    }
+    if (!result.isConfirmed) {
+      return;
+    }
+    payload.status = 'มีผลบังคับใช้';
+  }
+
   publishing.value = true;
   try {
-    const saved = await documentStore.saveLawMeta({
-      status: 'มีผลบังคับใช้',
-      published_date: new Date().toISOString().slice(0, 10),
-    });
+    const saved = await documentStore.saveLawMeta(payload);
     if (!saved) return;
     writeStage(props.documentId, 'public');
     publishOpen.value = false;
