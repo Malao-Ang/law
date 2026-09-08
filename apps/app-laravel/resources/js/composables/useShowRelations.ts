@@ -151,7 +151,7 @@ export function displayLawDate(value: string | null | undefined): string {
 }
 
 export function mapShowRelRows(documents: ReportDocument[]): ShowRelRow[] {
-  const completed = documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4 && isPublishedLaw(doc));
+  const completed = documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4);
   const childCountMap: Record<string, number> = {};
   for (const doc of completed) {
     for (const parentId of parentIdsOf(doc)) {
