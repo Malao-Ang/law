@@ -269,9 +269,17 @@ async function saveAndPublish(): Promise<void> {
   if (!saved) return;
 
   if (isOld.value) {
-    // Old docs are already-final PDFs: no RAG export, no eSign ceremony.
-    // Publishing records the publication date but keeps the legal status chosen
-    // on the metadata page, including cancelled/repealed statuses.
+    // Old docs: if status is still ร่าง/empty, just save permissions and go to edit page.
+    // User can then set the status and click publish from there with proper gate checks.
+    const meta = documentStore.review?.law_meta;
+    if (!meta?.status || meta.status === 'ร่าง') {
+      snackbar.success('บันทึกสิทธิ์แล้ว');
+      await new Promise(r => setTimeout(r, 600));
+      router.push(`/documents/${props.documentId}/edit`);
+      return;
+    }
+
+    // Status is set (not draft) → publish now.
     const stamped = await documentStore.saveLawMeta({
       published_date: new Date().toISOString().slice(0, 10),
     });
