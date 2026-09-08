@@ -16,12 +16,12 @@
       <v-btn
         color="admin-primary"
         size="small"
-        prepend-icon="mdi-send-outline"
+        :prepend-icon="stage === 'draft' ? 'mdi-send-outline' : 'mdi-file-search-outline'"
         class="text-none"
-        :disabled="!canSend"
+        :disabled="stage === 'draft' && !canSend"
         :loading="sending"
-        @click="confirmSendOpen = true"
-      >ส่งไปยังระบบ E-Sign</v-btn>
+        @click="handlePrimaryAction"
+      >{{ stage === 'draft' ? 'ส่งไปยังระบบ E-Sign' : 'ดูสถานะการลงนาม' }}</v-btn>
 
     </template>
 
@@ -233,14 +233,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { downloadPdfExport, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
+import { downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { usePreviewStore } from '../../stores/previewStore';
 import { documentRelations } from '../../composables/useLawSections';
+import { deriveEsignStage } from '../../composables/useEsignStage';
 import { writeStage } from '../../data/documentPipeline';
+import type { DocumentStatus } from '../../types/document';
 import type { ESignSigner, ESignSignerRole } from '../../types/esign';
 import {
   ROLE_LABELS,
@@ -270,6 +272,7 @@ const sending = ref(false);
 const downloadingPdf = ref(false);
 const pdfPreviewKey = ref(0);
 const flash = ref('');
+const serverStatus = ref<DocumentStatus | null>(null);
 
 const loading = computed(() => previewStore.loading || documentStore.loading);
 const loadError = computed(() => previewStore.error || documentStore.error);
@@ -282,6 +285,7 @@ const docTitle = computed(() =>
 );
 
 const meta = computed(() => documentStore.review?.law_meta);
+const stage = computed(() => deriveEsignStage(serverStatus.value, meta.value));
 const docRelations = computed(() => documentRelations(documentStore.review?.relations));
 
 const metaOk = computed(() => {
@@ -368,6 +372,22 @@ function refreshPdfPreview(): void {
   pdfPreviewKey.value += 1;
 }
 
+async function refreshServerStatus(): Promise<void> {
+  try {
+    serverStatus.value = await fetchStatus(props.documentId);
+  } catch {
+    serverStatus.value = null;
+  }
+}
+
+function handlePrimaryAction(): void {
+  if (stage.value !== 'draft') {
+    void router.push(`/documents/${props.documentId}/esign/status`);
+    return;
+  }
+  confirmSendOpen.value = true;
+}
+
 async function downloadPdf(): Promise<void> {
   downloadingPdf.value = true;
   try {
@@ -390,6 +410,12 @@ async function saveDraft(): Promise<void> {
 }
 
 async function sendToESign(): Promise<void> {
+  await refreshServerStatus();
+  if (stage.value !== 'draft') {
+    confirmSendOpen.value = false;
+    await router.push(`/documents/${props.documentId}/esign/status`);
+    return;
+  }
   if (signers.value.length === 0) {
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'กรุณาเพิ่มผู้ลงนามก่อนส่งเข้าระบบ E-Sign' });
     return;
@@ -404,7 +430,7 @@ async function sendToESign(): Promise<void> {
       signers: signers.value.map((signer) => ({
         citizen_id: signer.citizenId,
         name: signer.name,
-        note: signer.note,
+        note: ROLE_LABELS[signer.roleType] || signer.position || signer.note,
       })),
     });
     const now = new Date().toISOString();
@@ -439,6 +465,7 @@ onMounted(async () => {
       : documentStore.fetch(props.documentId),
   ]);
   hydrateSigners();
+  await refreshServerStatus();
   refreshPdfPreview();
   writeStage(props.documentId, 'wait_esign');
 });

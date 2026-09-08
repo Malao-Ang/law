@@ -342,6 +342,7 @@ export interface DocumentStatus {
   esign_signed_bucket?: string | null;
   esign_doc_filename?: string | null;
   esign_send_response?: { status?: string; message?: string } | null;
+  esign_signers?: Array<{ psn_citizenid?: string; name?: string; position?: string; docs_comment?: string }> | null;
   source_file?: string;
   review_path?: string;
   export_path?: string;

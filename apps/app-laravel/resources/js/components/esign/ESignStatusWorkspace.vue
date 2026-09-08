@@ -6,7 +6,7 @@
     show-bell
   >
     <template #actions>
-      <template v-if="session.status === 'draft'">
+      <template v-if="stage === 'draft'">
         <v-btn variant="outlined" size="small" class="text-none" @click="saveDraft">บันทึกฉบับร่าง</v-btn>
         <v-btn
           color="warning"
@@ -17,7 +17,7 @@
           @click="confirmSendOpen = true"
         >ส่งไปยังระบบ E-Sign</v-btn>
       </template>
-      <template v-else-if="session.status === 'waiting'">
+      <template v-else-if="stage === 'waiting'">
         <v-btn
           color="error"
           size="small"
@@ -37,6 +37,7 @@
           @click="openDocPreview"
         >ดูตัวอย่าง</v-btn>
         <v-btn
+          v-if="stage === 'signed'"
           color="success"
           size="small"
           prepend-icon="mdi-earth"
@@ -53,7 +54,7 @@
         size="small"
         prepend-icon="mdi-arrow-left"
         class="text-none px-1"
-        @click="router.push(session.status === 'draft' ? `/documents/${documentId}/esign/preview` : `/documents/${documentId}/esign`)"
+        @click="router.push(stage === 'draft' ? `/documents/${documentId}/esign/preview` : `/documents/${documentId}/esign`)"
       >ย้อนกลับ</v-btn>
     </div>
 
@@ -168,9 +169,9 @@
 
         <section class="status-card">
           <div class="text-subtitle-2 font-weight-bold mb-3">ประวัติและกิจกรรม</div>
-          <v-timeline v-if="session.activities.length" density="compact" side="end" truncate-line="both">
+          <v-timeline v-if="timelineItems.length" density="compact" side="end" truncate-line="both">
             <v-timeline-item
-              v-for="item in session.activities"
+              v-for="item in timelineItems"
               :key="item.id"
               size="x-small"
               :dot-color="activityColor(item.title)"
@@ -199,7 +200,7 @@
         >
           <div class="font-weight-bold mb-1">{{ sideAlert.title }}</div>
           <div class="text-caption" style="white-space: pre-line">{{ sideAlert.body }}</div>
-          <div v-if="session.status === 'signed'" class="d-flex flex-column ga-2 mt-3">
+          <div v-if="stage === 'signed'" class="d-flex flex-column ga-2 mt-3">
             <v-btn color="success" class="text-none" prepend-icon="mdi-earth" @click="publishOpen = true">เผยแพร่กฎหมาย</v-btn>
             <v-btn
               variant="outlined"
@@ -207,12 +208,16 @@
               @click="openDocPreview"
             >ดูตัวอย่าง</v-btn>
           </div>
+          <div v-if="stage === 'published'" class="d-flex flex-column ga-2 mt-3">
+            <v-btn color="success" variant="outlined" class="text-none" :to="`/law/${documentId}`" prepend-icon="mdi-earth">ดูหน้าเผยแพร่</v-btn>
+            <v-btn color="error" variant="text" class="text-none" :loading="publishing" @click="setPublished(false)">ยกเลิกการเผยแพร่</v-btn>
+          </div>
         </v-alert>
 
         <v-card flat border rounded="lg" class="pa-4 mb-3">
           <div class="d-flex align-center justify-space-between mb-3">
             <div class="text-subtitle-2 font-weight-bold">ข้อมูลผู้ลงนาม</div>
-            <div v-if="session.status === 'draft'" class="d-flex ga-1">
+            <div v-if="stage === 'draft'" class="d-flex ga-1">
               <v-btn size="x-small" variant="text" class="text-none" @click="openSignerDialog">เปลี่ยนแปลง</v-btn>
               <v-btn
                 size="x-small"
@@ -241,7 +246,7 @@
           </div>
           <div v-else class="text-caption text-medium-emphasis text-center py-4">
             ยังไม่มีผู้ลงนาม
-            <div class="mt-2">
+            <div v-if="stage === 'draft'" class="mt-2">
               <v-btn size="small" color="admin-primary" class="text-none" @click="openSignerDialog">เลือกผู้ลงนาม</v-btn>
             </div>
           </div>
@@ -349,6 +354,7 @@ import PublishConfirmDialog from '../shared/PublishConfirmDialog.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { documentRelations } from '../../composables/useLawSections';
 import { evaluatePublishGates } from '../../composables/usePublishGates';
+import { deriveEsignStage, ESIGN_STAGE_LABEL, ESIGN_STAGE_COLOR } from '../../composables/useEsignStage';
 import { writeStage } from '../../data/documentPipeline';
 import {
   ROLE_LABELS,
@@ -416,9 +422,25 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed(() => documentStore.review?.law_meta ?? EMPTY_META);
+const stage = computed(() => deriveEsignStage(serverStatus.value, meta.value));
 const docTitle = computed(() => meta.value.title || documentStore.review?.source_file || props.documentId);
 const docRelations = computed(() => documentRelations(documentStore.review?.relations));
-const primarySigner = computed(() => signers.value[0] ?? null);
+const primarySigner = computed<ESignSigner | null>(() => {
+  const serverSigners = serverStatus.value?.esign_signers ?? [];
+  if (serverSigners.length > 0) {
+    const signer = serverSigners[0];
+    return {
+      id: signer.psn_citizenid || 'server-signer',
+      roleType: 'delegate',
+      name: signer.name || signer.psn_citizenid || 'ผู้ลงนาม',
+      position: signer.position || '',
+      employeeId: signer.psn_citizenid || '',
+      citizenId: signer.psn_citizenid || '',
+      note: signer.docs_comment || '',
+    };
+  }
+  return signers.value[0] ?? null;
+});
 
 const agencyLabel = computed(() => {
   if (meta.value.agencies?.length) return meta.value.agencies.join(', ');
@@ -459,18 +481,14 @@ const checklist = computed(() => [
   {
     key: 'esign',
     label: 'ระบบ E-SIGN',
-    ok: session.value.status === 'signed',
-    status: session.value.status === 'signed'
-      ? 'เสร็จสิ้น'
-      : session.value.status === 'waiting'
-        ? 'รอลงนาม'
-        : signers.value.length ? 'พร้อมส่ง' : 'รอดำเนินการ',
+    ok: stage.value === 'signed' || stage.value === 'published',
+    status: stage.value === 'draft' && signers.value.length ? 'พร้อมส่ง' : ESIGN_STAGE_LABEL[stage.value],
   },
 ]);
 
 const completenessPct = computed(() => {
   const base = [metaOk.value, structureOk.value, relationsOk.value, previewOk.value];
-  const passed = base.filter(Boolean).length + (session.value.status === 'signed' ? 1 : 0);
+  const passed = base.filter(Boolean).length + (stage.value === 'signed' || stage.value === 'published' ? 1 : 0);
   const total = base.length + 1;
   return Math.round((passed / total) * 100);
 });
@@ -486,38 +504,58 @@ const flowSteps = [
 ];
 
 const activeStepIndex = computed(() => {
-  if (session.value.status === 'signed') return 5;
-  if (session.value.status === 'waiting') return 4;
+  if (stage.value === 'published') return 6;
+  if (stage.value === 'signed') return 5;
+  if (stage.value === 'waiting') return 4;
   return 3;
 });
 
 const currentStepLabel = computed(() => flowSteps[activeStepIndex.value]?.label ?? '—');
 
 const etaLabel = computed(() => {
-  if (session.value.status === 'signed') return 'ดำเนินการเสร็จสิ้น';
-  if (session.value.status === 'waiting') return 'ประมาณ 1-2 วันทำการ';
+  if (stage.value === 'published' || stage.value === 'signed') return 'ดำเนินการเสร็จสิ้น';
+  if (stage.value === 'waiting') return 'ประมาณ 1-2 วันทำการ';
   return 'รอส่งเข้าระบบ';
 });
 
 const statusChip = computed(() => {
-  if (session.value.status === 'signed') return { label: 'มีผลบังคับใช้', color: 'success' };
-  if (session.value.status === 'waiting') return { label: 'รอการลงนาม', color: 'warning' };
-  return { label: 'เตรียมส่งลงนาม', color: 'admin-primary' };
+  return { label: ESIGN_STAGE_LABEL[stage.value], color: ESIGN_STAGE_COLOR[stage.value] };
 });
 
 const sideAlert = computed(() => {
-  if (session.value.status === 'signed') {
+  if (stage.value === 'published') {
+    return {
+      type: 'success' as const,
+      title: 'เผยแพร่แล้ว',
+      body: 'เอกสารเผยแพร่ในฐานข้อมูลกฎหมายแล้ว สามารถดูหน้าสาธารณะหรือยกเลิกการเผยแพร่ได้จากหน้านี้',
+    };
+  }
+  if (stage.value === 'signed') {
     return {
       type: 'success' as const,
       title: 'ลงนามเสร็จสิ้น',
       body: 'เอกสารผ่านการลงนามอิเล็กทรอนิกส์แล้ว พร้อมเผยแพร่สู่ระบบฐานข้อมูลกฎหมาย',
     };
   }
-  if (session.value.status === 'waiting') {
+  if (stage.value === 'waiting') {
     return {
       type: 'error' as const,
       title: 'เอกสารอยู่ระหว่างรอลงนาม',
       body: 'ไม่สามารถแก้ไขเนื้อหาได้ในระหว่างรอผู้ลงนามตรวจสอบและลงนาม',
+    };
+  }
+  if (stage.value === 'rejected') {
+    return {
+      type: 'error' as const,
+      title: 'ถูกปฏิเสธการลงนาม',
+      body: serverStatus.value?.esign_sign_message || 'ผู้ลงนามปฏิเสธเอกสารนี้',
+    };
+  }
+  if (stage.value === 'cancelled') {
+    return {
+      type: 'warning' as const,
+      title: 'ยกเลิกการส่งลงนาม',
+      body: 'เอกสารถูกยกเลิกจากกระบวนการลงนาม สามารถตรวจสอบและส่งใหม่ได้',
     };
   }
   return {
@@ -525,6 +563,30 @@ const sideAlert = computed(() => {
     title: 'โปรดตรวจสอบก่อนส่ง',
     body: '• ตรวจสอบผู้ลงนามก่อนส่ง\n• ความสัมพันธ์กฎหมายเพิ่มได้ภายหลัง\n• หลังส่งแล้วจะแก้ไขเอกสารไม่ได้\n• สถานะจะเปลี่ยนเป็นรอลงนาม',
   };
+});
+
+const timelineItems = computed(() => {
+  const status = serverStatus.value;
+  const items: Array<{ id: string; title: string; detail?: string; at: string; actor?: string }> = [];
+  if (status?.esign_submitted_at) {
+    items.push({ id: 'server-submitted', title: 'ส่งเอกสารเข้าสู่ระบบ e-Sign', at: status.esign_submitted_at });
+  }
+  if (status?.esign_signed_at || status?.esign_confirmed_at) {
+    items.push({
+      id: 'server-signed',
+      title: 'ลงนามเสร็จสิ้น',
+      at: (status.esign_signed_at || status.esign_confirmed_at) as string,
+      actor: status.esign_last_signer_username || status.esign_last_signer_citizenid || undefined,
+    });
+  }
+  if (meta.value.published_date) {
+    items.push({ id: 'server-published', title: 'เผยแพร่กฎหมาย', at: meta.value.published_date });
+  }
+  const represented = new Set(items.map((item) => item.id));
+  for (const activity of session.value.activities) {
+    if (!represented.has(activity.id)) items.push(activity);
+  }
+  return items.sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
 });
 
 function persist(): void {
@@ -607,7 +669,7 @@ async function submitToESign(): Promise<void> {
       signers: signers.value.map((signer) => ({
         citizen_id: signer.citizenId,
         name: signer.name,
-        note: signer.note,
+        note: ROLE_LABELS[signer.roleType] || signer.position || signer.note,
       })),
     });
     const now = new Date().toISOString();
@@ -663,7 +725,7 @@ function stopEsignPoll(): void {
 }
 
 function startEsignPoll(): void {
-  if (esignPollTimer !== null || session.value.status !== 'waiting') {
+  if (esignPollTimer !== null || stage.value !== 'waiting') {
     return;
   }
   esignPollTimer = setInterval(() => {
@@ -724,11 +786,21 @@ async function refreshEsignFromServer(): Promise<void> {
   try {
     const status = await fetchStatus(props.documentId);
     applyServerEsignStatus(status);
-    if (session.value.status === 'waiting' && !isEsignApproved(status) && !isEsignRejected(status)) {
+    if (stage.value === 'waiting' && !isEsignApproved(status) && !isEsignRejected(status)) {
       startEsignPoll();
     }
   } catch {
     /* keep waiting; next poll retries */
+  }
+}
+
+async function setPublished(next: boolean): Promise<void> {
+  publishing.value = true;
+  try {
+    await documentStore.saveLawMeta({ published_date: next ? new Date().toISOString().slice(0, 10) : '' });
+    await refreshEsignFromServer();
+  } finally {
+    publishing.value = false;
   }
 }
 

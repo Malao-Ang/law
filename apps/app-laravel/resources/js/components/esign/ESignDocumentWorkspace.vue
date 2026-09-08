@@ -112,8 +112,8 @@
             <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
               {{ meta.law_type || 'เอกสาร' }}
             </v-chip>
-            <v-chip size="small" color="warning" variant="flat" class="font-weight-bold">
-              รอลงนาม
+            <v-chip size="small" :color="ESIGN_STAGE_COLOR[stage]" variant="flat" class="font-weight-bold">
+              {{ ESIGN_STAGE_LABEL[stage] }}
             </v-chip>
             <v-chip size="small" variant="tonal" class="font-weight-medium">
               # {{ documentId }}
@@ -223,16 +223,16 @@
         <div v-show="sideTab === 'info'" class="d-flex flex-column ga-3">
           <div v-if="!isEdit" class="esign-wait-box">
             <div class="d-flex align-start ga-2 mb-2">
-              <v-icon icon="mdi-clock-outline" color="warning" />
+              <v-icon :icon="stage === 'signed' || stage === 'published' ? 'mdi-check-circle' : 'mdi-clock-outline'" :color="ESIGN_STAGE_COLOR[stage]" />
               <div>
-                <div class="text-subtitle-2 font-weight-bold">รอลงนามอิเล็กทรอนิกส์</div>
+                <div class="text-subtitle-2 font-weight-bold">{{ ESIGN_STAGE_LABEL[stage] }}</div>
                 <div class="text-caption text-medium-emphasis">
-                  Document Soft Final
-                  <span v-if="updatedAtLabel"> — ตั้งแต่ {{ updatedAtLabel }}</span>
+                  <span v-if="updatedAtLabel">ตั้งแต่ {{ updatedAtLabel }}</span>
                 </div>
               </div>
             </div>
             <v-btn
+              v-if="stage === 'draft'"
               block
               color="warning"
               class="text-none font-weight-bold"
@@ -241,6 +241,23 @@
               @click="confirmSign"
             >ส่งลงนามทันที</v-btn>
             <v-btn
+              v-else-if="stage === 'published'"
+              block
+              color="success"
+              class="text-none font-weight-bold"
+              prepend-icon="mdi-earth"
+              @click="router.push(`/law/${documentId}`)"
+            >ดูหน้าเผยแพร่</v-btn>
+            <v-btn
+              v-else
+              block
+              color="admin-primary"
+              class="text-none font-weight-bold"
+              prepend-icon="mdi-file-search-outline"
+              @click="router.push(`/documents/${documentId}/esign/status`)"
+            >ดูสถานะการลงนาม</v-btn>
+            <v-btn
+              v-if="stage === 'draft'"
               block
               variant="text"
               size="small"
@@ -285,7 +302,7 @@
                 @update:model-value="togglePublished"
               />
               <strong v-else :class="isPublished ? 'text-success' : 'text-warning'">
-                {{ isPublished ? formatThaiDate(meta.published_date) || 'เผยแพร่' : 'รอลงนาม' }}
+                {{ isPublished ? formatThaiDate(meta.published_date) || 'เผยแพร่' : ESIGN_STAGE_LABEL[stage] }}
               </strong>
             </div>
             <div class="esign-kv">
@@ -370,8 +387,9 @@ import AppShell from '../shared/AppShell.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { buildSections, buildTocGroups } from '../../composables/useLawSections';
+import { deriveEsignStage, ESIGN_STAGE_LABEL, ESIGN_STAGE_COLOR } from '../../composables/useEsignStage';
 import { writeStage } from '../../data/documentPipeline';
-import type { LawMeta } from '../../types/document';
+import type { DocumentStatus, LawMeta } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { documentFileUrl, fetchStatus } from '../../api/client';
 import Swal from 'sweetalert2';
@@ -395,6 +413,7 @@ const collapsed = ref<Set<string>>(new Set());
 const activeId = ref('');
 const sectionEls = ref<Record<string, HTMLElement>>({});
 const docScrollEl = ref<HTMLElement | null>(null);
+const serverStatus = ref<DocumentStatus | null>(null);
 let observer: IntersectionObserver | null = null;
 
 const EMPTY_META: LawMeta = {
@@ -424,6 +443,7 @@ const EMPTY_META: LawMeta = {
 };
 
 const meta = computed<LawMeta>(() => documentStore.review?.law_meta ?? EMPTY_META);
+const stage = computed(() => deriveEsignStage(serverStatus.value, meta.value));
 const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
 
@@ -602,10 +622,22 @@ function setupObserver(): void {
 async function confirmSign(): Promise<void> {
   confirming.value = true;
   try {
+    if (stage.value !== 'draft') {
+      await router.push(`/documents/${props.documentId}/esign/status`);
+      return;
+    }
     writeStage(props.documentId, 'wait_esign');
     await router.push(`/documents/${props.documentId}/esign/preview`);
   } finally {
     confirming.value = false;
+  }
+}
+
+async function refreshServerStatus(id = props.documentId): Promise<void> {
+  try {
+    serverStatus.value = await fetchStatus(id);
+  } catch {
+    serverStatus.value = null;
   }
 }
 
@@ -614,6 +646,7 @@ onMounted(() => {
     void documentStore.fetch(props.documentId);
   }
   void versionStore.fetch(props.documentId);
+  void refreshServerStatus();
   if (!isEdit.value) {
     writeStage(props.documentId, 'wait_esign');
   }
@@ -624,6 +657,7 @@ onMounted(() => {
 watch(() => props.documentId, (id) => {
   void documentStore.fetch(id);
   void versionStore.fetch(id);
+  void refreshServerStatus(id);
 });
 
 watch(sections, async (value) => {

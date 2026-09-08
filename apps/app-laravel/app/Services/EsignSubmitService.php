@@ -21,7 +21,7 @@ class EsignSubmitService
     /**
      * Export review PDF and PutFile only. Does not call SendDocumentSign.
      *
-     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string}>  $signers
+     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string, position?: string}>  $signers
      * @param  'L'|'A'  $returnType
      * @return array{
      *     document_id: string,
@@ -115,7 +115,7 @@ class EsignSubmitService
     /**
      * Call SendDocumentSign for a document already uploaded to MinIO.
      *
-     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string}>  $signers
+     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string, position?: string}>  $signers
      * @param  'L'|'A'  $returnType
      * @return array{
      *     document_id: string,
@@ -339,8 +339,8 @@ class EsignSubmitService
     }
 
     /**
-     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string}>  $signers
-     * @return list<array{psn_citizenid: string, docs_comment?: string}>
+     * @param  list<array{citizen_id?: string, psn_citizenid?: string, docs_comment?: string, note?: string, name?: string, position?: string}>  $signers
+     * @return list<array{psn_citizenid: string, docs_comment?: string, name?: string, position?: string}>
      */
     private function normalizeSigners(array $signers): array
     {
@@ -368,6 +368,14 @@ class EsignSubmitService
             $comment = trim((string) ($signer['docs_comment'] ?? $signer['note'] ?? ''));
             if ($comment !== '') {
                 $entry['docs_comment'] = $comment;
+            }
+            $name = trim((string) ($signer['name'] ?? ''));
+            if ($name !== '') {
+                $entry['name'] = $name;
+            }
+            $position = trim((string) ($signer['position'] ?? $signer['note'] ?? ''));
+            if ($position !== '') {
+                $entry['position'] = $position;
             }
 
             $normalized[] = $entry;
