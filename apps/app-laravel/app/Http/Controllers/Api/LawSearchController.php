@@ -886,7 +886,9 @@ class LawSearchController extends Controller
             }
 
             $this->tally($termCounts['law_type'], $row['law_type'] ?? '');
-            $this->tally($termCounts['status'], $row['meta_status'] ?? '');
+            if (($row['meta_status'] ?? '') !== 'ร่าง') {
+                $this->tally($termCounts['status'], $row['meta_status'] ?? '');
+            }
             $this->tally($termCounts['change_status'], $row['change_status'] ?? '');
             $this->tally($termCounts['signer_group'], $row['signer_group'] ?? '');
 

@@ -533,6 +533,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 };
 
 const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
+const DRAFT_EXCLUDED_STATUSES = ['มีผลบังคับใช้', 'ยกเลิก'];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
   academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
@@ -605,6 +606,10 @@ function effectiveFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[
   return mergeFacetBuckets(lookupFacets.value?.[key] ?? [], counted);
 }
 
+function stableFacet(key: keyof Omit<LawSearchFacets, 'years'>): FacetBucket[] {
+  return mergeFacetBuckets(lookupFacets.value?.[key] ?? [], baseFacets.value?.[key] ?? []);
+}
+
 // Build filter options from the REAL facet buckets (values actually present in
 // the data), merged by a canonical key so aliases (e.g. 'phrb' / 'พ.ร.บ.' /
 // 'พระราชบัญญัติ') collapse into one option with the summed count. When a
@@ -616,9 +621,10 @@ function canonicalFacetOptions(
   canonicalize: (value: string) => string,
   labelResolver: (value: string | null) => string,
   whitelist?: string[],
+  stable = false,
 ): Array<{ label: string; value: string; count: number }> {
   const counts = new Map<string, number>();
-  for (const bucket of effectiveFacet(key)) {
+  for (const bucket of (stable ? stableFacet(key) : effectiveFacet(key))) {
     const canonical = canonicalize(bucket.value);
     if (!canonical || (whitelist && !whitelist.includes(canonical))) continue;
     counts.set(canonical, (counts.get(canonical) ?? 0) + bucket.count);
@@ -627,12 +633,12 @@ function canonicalFacetOptions(
   return values.map((value) => ({ label: labelResolver(value), value, count: counts.get(value) ?? 0 }));
 }
 
-const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER));
-const groupFilters = computed(() => mapFacetOptions(effectiveFacet('law_group')));
-const agencyFilters = computed(() => mapFacetOptions(effectiveFacet('agency')));
-const keeperGroupFilters = computed(() => mapFacetOptions(effectiveFacet('signer_group')));
-const changeStatusFilters = computed(() => canonicalFacetOptions('change_status', (value) => value, changeStatusLabel));
-const useStatusFilters = computed(() => canonicalFacetOptions('status', (value) => value, statusLabel));
+const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER, true));
+const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
+const agencyFilters = computed(() => mapFacetOptions(stableFacet('agency')));
+const keeperGroupFilters = computed(() => mapFacetOptions(stableFacet('signer_group')));
+const changeStatusFilters = computed(() => canonicalFacetOptions('change_status', (value) => value, changeStatusLabel, undefined, true));
+const useStatusFilters = computed(() => canonicalFacetOptions('status', (value) => value, statusLabel, DRAFT_EXCLUDED_STATUSES, true));
 const years = computed(() => {
   const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
   // Convert CE years from facets to Buddhist Era (พ.ศ. = ค.ศ. + 543)
