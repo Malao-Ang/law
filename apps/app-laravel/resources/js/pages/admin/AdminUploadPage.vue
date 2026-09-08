@@ -23,9 +23,9 @@
             <v-icon start icon="mdi-check" size="14" />ลงนามเสร็จสิ้น
           </v-chip>
           <v-icon size="32" color="success" class="mb-2">mdi-file-check-outline</v-icon>
-          <h3 class="text-h6">เอกสารเก่า (Historical Document)</h3>
+          <h3 class="text-h6">เอกสารเก่า และกฏหมายภายนอก</h3>
           <p class="text-body-2 text-medium-emphasis">
-            PDF เอกสารที่ผ่านการลงนามแล้ว ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบต้นฉบับ
+            PDF เอกสารที่ผ่านการลงนามแล้วหรือเอกสารภายนอกหน่อยงาน ระบบจะข้ามขั้นตอนตรวจทานและจัดลำดับเนื้อหา เพื่อคงรูปแบบต้นฉบับ
           </p>
           <v-btn block color="success" variant="flat" @click="pickFiles({ key: 'old-external', documentType: 'old', source: 'external' })">ดำเนินการต่อ</v-btn>
         </v-card>
