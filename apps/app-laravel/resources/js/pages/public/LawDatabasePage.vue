@@ -499,8 +499,9 @@ const STATUS_LABELS: Record<string, string> = {
   มีผลใช้บังคับ: 'มีผลบังคับใช้',
   ใช้บังคับ: 'มีผลบังคับใช้',
   บังคับใช้: 'มีผลบังคับใช้',
-  cancelled: 'ยกเลิก',
-  ยกเลิก: 'ยกเลิก',
+  cancelled: 'ยกเลิกการใช้งาน',
+  ยกเลิก: 'ยกเลิกการใช้งาน',
+  ยกเลิกการใช้งาน: 'ยกเลิกการใช้งาน',
   draft: 'ร่าง',
   ร่าง: 'ร่าง',
 };
@@ -553,7 +554,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 };
 
 const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
-const DRAFT_EXCLUDED_STATUSES = ['มีผลบังคับใช้', 'ยกเลิก'];
+const DRAFT_EXCLUDED_STATUSES = ['มีผลบังคับใช้', 'ยกเลิกการใช้งาน'];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
   academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
@@ -658,7 +659,7 @@ const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
 const agencyFilters = computed(() => mapFacetOptions(stableFacet('agency')));
 const keeperGroupFilters = computed(() => mapFacetOptions(stableFacet('signer_group')));
 const changeStatusFilters = computed(() => canonicalFacetOptions('change_status', (value) => value, changeStatusLabel, undefined, true));
-const useStatusFilters = computed(() => canonicalFacetOptions('status', (value) => value, statusLabel, DRAFT_EXCLUDED_STATUSES, true));
+const useStatusFilters = computed(() => canonicalFacetOptions('status', canonicalUseStatusValue, statusLabel, DRAFT_EXCLUDED_STATUSES, true));
 const years = computed(() => {
   const yearBuckets = searchStore.facets.years.length > 0 ? searchStore.facets.years : (baseFacets.value?.years ?? []);
   // Convert CE years from facets to Buddhist Era (พ.ศ. = ค.ศ. + 543)
@@ -751,9 +752,11 @@ watch(sortBy, () => {
 });
 
 function currentFilters(): LawSearchFilters {
+  const useStatuses = uniqueStrings(selectedUseStatuses.value.map(canonicalUseStatusValue));
+
   return {
     law_type: currentTypes.value.length > 0 ? expandLawTypeFilterValues(currentTypes.value) : undefined,
-    status: selectedUseStatuses.value.length > 0 ? selectedUseStatuses.value : undefined,
+    status: useStatuses.length > 0 ? useStatuses : undefined,
     change_status: selectedStatuses.value.length > 0 ? selectedStatuses.value : undefined,
     agency: selectedAgencies.value.length > 0 ? selectedAgencies.value : undefined,
     law_group: selectedGroups.value.length > 0 ? selectedGroups.value : undefined,
@@ -885,7 +888,7 @@ async function replaceRoute(): Promise<void> {
   if (currentTypes.value.length > 0) nextQuery.type = currentTypes.value;
   if (selectedGroups.value.length > 0) nextQuery.group = selectedGroups.value;
   if (selectedStatuses.value.length > 0) nextQuery.change_status = selectedStatuses.value;
-  if (selectedUseStatuses.value.length > 0) nextQuery.status = selectedUseStatuses.value;
+  if (selectedUseStatuses.value.length > 0) nextQuery.status = uniqueStrings(selectedUseStatuses.value.map(canonicalUseStatusValue));
   if (selectedAgencies.value.length > 0) nextQuery.agency = selectedAgencies.value;
   if (selectedKeeperGroups.value.length > 0) nextQuery.signer_group = selectedKeeperGroups.value;
   if (yearFrom.value) nextQuery.year_from = yearFrom.value;
@@ -916,7 +919,7 @@ function syncFromRoute(): void {
   selectedTypes.value = readTypeArray(route.query.type);
   selectedGroups.value = uniqueStrings(readStringArray(route.query.group).map(normalizeLawGroupValue));
   selectedStatuses.value = readStringArray(route.query.change_status);
-  selectedUseStatuses.value = readStringArray(route.query.status);
+  selectedUseStatuses.value = uniqueStrings(readStringArray(route.query.status).map(canonicalUseStatusValue));
   selectedAgencies.value = readStringArray(route.query.agency);
   selectedKeeperGroups.value = readStringArray(route.query.signer_group);
   yearFrom.value = readNullableString(route.query.year_from);
@@ -1060,6 +1063,10 @@ function statusLabel(value: string | null): string {
   return STATUS_LABELS[value] ?? value;
 }
 
+function canonicalUseStatusValue(value: string): string {
+  return STATUS_LABELS[value] ?? value;
+}
+
 function extractYear(item: LawSearchResult): number {
   const match = item.published_date?.match(/\d{4}/);
   return match ? Number(match[0]) : 0;
@@ -1127,7 +1134,7 @@ function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | nul
 
 function useStatusClass(status: string | null | undefined): string {
   if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'law-use-status--active';
-  if (status === 'cancelled' || status === 'ยกเลิก') return 'law-use-status--cancelled';
+  if (status === 'cancelled' || status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'law-use-status--cancelled';
   return 'law-use-status--draft';
 }
 
