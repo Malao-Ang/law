@@ -292,8 +292,6 @@ async function saveAndPublish(): Promise<void> {
     return;
   }
 
-  const progressed = await documentStore.completeWorkflowStep(6);
-  if (!progressed) return;
   writeStage(props.documentId, 'wait_esign');
   router.push(`/documents/${props.documentId}/esign`);
 }
