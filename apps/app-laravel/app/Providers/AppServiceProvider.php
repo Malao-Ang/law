@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\DocumentExportService;
+use App\Services\DocumentHtmlService;
+use App\Services\Fast\LibreOfficeConverter;
 use App\Services\Permissions\PermissionStore;
+use App\Services\ReviewStore;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Foundation\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -52,6 +56,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->when(PermissionStore::class)
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.permissions'));
+
+        $this->app->bind(DocumentExportService::class, fn (): DocumentExportService => new DocumentExportService(
+            $this->app->make(DocumentHtmlService::class),
+            $this->app->make(LibreOfficeConverter::class),
+            $this->app->make(ReviewStore::class),
+        ));
     }
 
     /**

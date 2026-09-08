@@ -324,7 +324,13 @@ class DocumentExportService
         }
 
         $relative = $source;
+        $urlPath = parse_url($source, PHP_URL_PATH);
+        if (is_string($urlPath) && $urlPath !== '') {
+            $relative = $urlPath;
+        }
         if (preg_match('~^/api/documents/([^/]+)/images/([^/?#]+)~', $source, $matches) === 1) {
+            $relative = 'images/'.rawurldecode($matches[1]).'/'.rawurldecode($matches[2]);
+        } elseif (preg_match('~^/api/documents/([^/]+)/images/([^/?#]+)~', $relative, $matches) === 1) {
             $relative = 'images/'.rawurldecode($matches[1]).'/'.rawurldecode($matches[2]);
         }
 
@@ -506,6 +512,13 @@ class DocumentExportService
                 continue;
             }
 
+            $imageNodes = $this->imageNodesFromHtmlElement($element);
+            if ($imageNodes !== []) {
+                array_push($nodes, ...$imageNodes);
+
+                continue;
+            }
+
             // No block id and no visible text/media → a blank line the reviewer added.
             // TipTap serializes empty paragraphs as <p><br></p>; textContent is "\n" not "".
             $childNodes = iterator_to_array($element->childNodes);
@@ -523,6 +536,119 @@ class DocumentExportService
         }
 
         return $nodes;
+    }
+
+    /**
+     * Recover images that are visible in draft_html but no longer have a matching
+     * review block id. This keeps editor-visible images in the generated DOCX/PDF.
+     *
+     * @return array<int, array{type:string, block:array<string,mixed>}>
+     */
+    private function imageNodesFromHtmlElement(DOMElement $element): array
+    {
+        $nodes = [];
+        foreach ($element->getElementsByTagName('img') as $index => $img) {
+            if (! $img instanceof DOMElement) {
+                continue;
+            }
+
+            $src = trim((string) $img->getAttribute('src'));
+            if ($src === '') {
+                continue;
+            }
+
+            $imgMeta = $this->htmlImageMeta($img, $element, $src);
+            $nodes[] = [
+                'type' => 'block',
+                'block' => [
+                    'block_id' => 'html-img-'.sha1($src.'|'.$index),
+                    'type' => 'image',
+                    'reading_order' => 0,
+                    'meta' => [
+                        'image' => $imgMeta,
+                        'layout' => [
+                            'alignment' => $imgMeta['alignment'] ?? null,
+                        ],
+                    ],
+                ],
+            ];
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function htmlImageMeta(DOMElement $img, DOMElement $container, string $src): array
+    {
+        $meta = [
+            'src_path' => null,
+            'src_url' => null,
+            'data_uri' => null,
+            'width' => null,
+            'height' => null,
+            'caption' => null,
+            'alignment' => $this->htmlImageAlignment($img, $container),
+        ];
+
+        if (str_starts_with($src, 'data:image/')) {
+            $meta['data_uri'] = $src;
+        } else {
+            $meta['src_url'] = $src;
+        }
+
+        $this->applyHtmlImageWidth($meta, trim((string) $img->getAttribute('width')));
+        foreach ($this->parseInlineStyle((string) $img->getAttribute('style')) as $property => $value) {
+            if ($property === 'width') {
+                $this->applyHtmlImageWidth($meta, $value);
+            }
+        }
+
+        return $meta;
+    }
+
+    private function htmlImageAlignment(DOMElement $img, DOMElement $container): string
+    {
+        foreach ([$img, $container] as $element) {
+            $style = $this->parseInlineStyle((string) $element->getAttribute('style'));
+            $align = strtolower(trim((string) ($style['text-align'] ?? '')));
+            if (in_array($align, ['left', 'center', 'right'], true)) {
+                return $align;
+            }
+        }
+
+        return 'center';
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function applyHtmlImageWidth(array &$meta, string $rawWidth): void
+    {
+        $rawWidth = strtolower(trim($rawWidth));
+        if ($rawWidth === '') {
+            return;
+        }
+
+        if (is_numeric($rawWidth)) {
+            $meta['display_width_px'] = (float) $rawWidth;
+
+            return;
+        }
+
+        if (preg_match('/^([0-9]*\.?[0-9]+)\s*(px|cm|mm|in|pt)$/i', $rawWidth, $matches) !== 1) {
+            return;
+        }
+
+        $amount = (float) $matches[1];
+        match (strtolower($matches[2])) {
+            'px' => $meta['display_width_px'] = $amount,
+            'cm' => $meta['display_width_cm'] = $amount,
+            'mm' => $meta['display_width_cm'] = $amount / 10,
+            'in' => $meta['display_width_cm'] = $amount * 2.54,
+            'pt' => $meta['display_width_cm'] = $amount / self::CM_TO_PT,
+        };
     }
 
     private function renderBlockHtml(array $block): string

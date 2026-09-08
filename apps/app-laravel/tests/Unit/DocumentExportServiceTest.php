@@ -767,6 +767,39 @@ class DocumentExportServiceTest extends TestCase
         @rmdir($basePath);
     }
 
+    public function test_docx_embeds_image_from_draft_html_src_without_block_id(): void
+    {
+        $documentId = 'doc-draft-html-image';
+        $basePath = sys_get_temp_dir().'/doc-export-html-img-'.uniqid('', true);
+        $imageDir = $basePath.'/images/'.$documentId;
+        mkdir($imageDir, 0777, true);
+        file_put_contents($imageDir.'/logo.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='));
+
+        $document = [
+            'document_id' => $documentId,
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [],
+            ]],
+            'document_review' => [
+                'draft_html' => '<p style="text-align:center"><img src="http://localhost:8500/api/documents/'.$documentId.'/images/logo.png?v=1" style="width:2.99cm"></p>',
+            ],
+        ];
+
+        $bytes = $this->makeService(basePath: $basePath)->toDocx($document);
+        $documentXml = $this->readDocxXml($bytes, 'word/document.xml');
+        $relationsXml = $this->readDocxXml($bytes, 'word/_rels/document.xml.rels');
+
+        $this->assertStringContainsString('media/', $relationsXml);
+        $this->assertStringContainsString('style="width:84.755905533pt;', $documentXml);
+        $this->assertStringContainsString('w:jc w:val="center"', $documentXml);
+
+        @unlink($imageDir.'/logo.png');
+        @rmdir($imageDir);
+        @rmdir(dirname($imageDir));
+        @rmdir($basePath);
+    }
+
     public function test_to_pdf_renders_docx_via_libreoffice(): void
     {
         $converter = new LibreOfficeConverter(
