@@ -17,8 +17,8 @@ import {
 import { invalidateReview } from './reviewCache';
 import type { DocumentBlock, LayoutPatch, ScanExtractionMode } from '../types/document';
 
-function isConflictError(err: unknown): err is Error {
-  return err instanceof Error && err.message.startsWith('HTTP 409');
+function isRetryableSaveConflictError(err: unknown): err is Error {
+  return err instanceof Error && (err.message.startsWith('HTTP 409') || err.message.startsWith('HTTP 404'));
 }
 
 async function promptConflictRetry<T>(fn: () => Promise<T>, err: Error): Promise<T> {
@@ -38,23 +38,23 @@ async function promptConflictRetry<T>(fn: () => Promise<T>, err: Error): Promise
     try {
       return await fn();
     } catch (nextErr: unknown) {
-      if (!isConflictError(nextErr)) throw nextErr;
+      if (!isRetryableSaveConflictError(nextErr)) throw nextErr;
       lastError = nextErr;
     }
   }
 }
 
-/** Retry fn after 250 ms if the server responds 409; persistent contention asks the user to retry. */
+/** Retry fn after 250 ms if the server responds with a transient save conflict. */
 async function withConflictRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (err: unknown) {
-    if (!isConflictError(err)) throw err;
+    if (!isRetryableSaveConflictError(err)) throw err;
     await new Promise<void>((resolve) => setTimeout(resolve, 250));
     try {
       return await fn();
     } catch (retryErr: unknown) {
-      if (!isConflictError(retryErr)) throw retryErr;
+      if (!isRetryableSaveConflictError(retryErr)) throw retryErr;
       return promptConflictRetry(fn, retryErr);
     }
   }
