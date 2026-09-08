@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use App\Services\Storage\ConcurrencyException;
 use RuntimeException;
 use Throwable;
 
@@ -150,6 +151,8 @@ class ReviewController extends Controller
                 blockId: $blockId,
                 patch: $request->validated(),
             );
+        } catch (ConcurrencyException $exception) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -175,6 +178,8 @@ class ReviewController extends Controller
             $payload = $this->reviewStore->updateDocumentReview($documentId, $payload);
         } catch (ValidationException $exception) {
             throw $exception;
+        } catch (ConcurrencyException $exception) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -279,6 +284,8 @@ class ReviewController extends Controller
                 blockId: $blockId,
                 patch: $request->validated(),
             );
+        } catch (ConcurrencyException $exception) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -300,6 +307,8 @@ class ReviewController extends Controller
                 blockId: $blockId,
                 patch: $request->validated(),
             );
+        } catch (ConcurrencyException $exception) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -364,6 +373,8 @@ class ReviewController extends Controller
 
         try {
             $this->reviewStore->reorderBlocks($documentId, $blockIds);
+        } catch (ConcurrencyException $exception) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -404,6 +415,8 @@ class ReviewController extends Controller
 
         try {
             $this->reviewStore->deleteBlock($documentId, $pageNo, $blockId);
+        } catch (ConcurrencyException $e) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -425,6 +438,8 @@ class ReviewController extends Controller
 
         try {
             $merged = $this->reviewStore->mergeBlocks($documentId, $blockIds);
+        } catch (ConcurrencyException $e) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -443,6 +458,8 @@ class ReviewController extends Controller
 
         try {
             $this->reviewStore->restoreBlocks($documentId, $validated['pages']);
+        } catch (ConcurrencyException $e) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -473,6 +490,8 @@ class ReviewController extends Controller
                 (string) ($validated['after_text'] ?? ''),
                 (string) ($validated['after_html'] ?? ''),
             );
+        } catch (ConcurrencyException $e) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
@@ -523,10 +542,17 @@ class ReviewController extends Controller
                 $validated['after_block_id'] ?? null,
                 $validated,
             );
+        } catch (ConcurrencyException $e) {
+            return $this->concurrencyResponse();
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
         return response()->json(['document_id' => $documentId, 'status' => 'created', 'block' => $newBlock]);
+    }
+
+    private function concurrencyResponse(): JsonResponse
+    {
+        return response()->json(['message' => 'กำลังบันทึกอยู่ กรุณาลองใหม่อีกครั้ง'], 409);
     }
 }
