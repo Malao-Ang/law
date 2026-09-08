@@ -489,12 +489,25 @@ async function downloadPdf(): Promise<void> {
   }
 }
 
-function printPage(): void {
+async function printPage(): Promise<void> {
   if (usesOriginalPdfLayout.value) {
+    // Old/PDF-source: open original file in new tab for printing.
     window.open(fileUrl.value, '_blank');
-  } else {
-    window.print();
+    return;
   }
+  // New docs: open PDF in new tab so user prints the PDF, not the screen.
+  try {
+    const status = await fetchStatus(props.documentId);
+    if (hasSignedEsignPdf(status)) {
+      window.open(signedEsignPdfUrl(props.documentId, false), '_blank', 'noopener');
+      return;
+    }
+  } catch {
+    // non-fatal
+  }
+  // No signed PDF yet — open the review export PDF.
+  const url = `/api/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
+  window.open(url, '_blank', 'noopener');
 }
 
 const sectionEls = ref<Record<string, HTMLElement>>({});
