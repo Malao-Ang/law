@@ -308,6 +308,31 @@ export async function downloadPdfExport(documentId: string, fallbackName = `docu
   );
 }
 
+/**
+ * Download the correct PDF for a published/public law row.
+ *  - old doc             -> original uploaded file
+ *  - new doc (published) -> the signed e-Sign PDF from MinIO (never the regenerated one)
+ * Public rows are only ever visible after publish, so a new doc here is always signed.
+ */
+export function downloadPublishedPdf(
+  documentId: string,
+  documentType: string,
+  fallbackName: string,
+): void {
+  if (documentType === 'old') {
+    const anchor = document.createElement('a');
+    anchor.href = documentFileDownloadUrl(documentId);
+    anchor.download = fallbackName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    return;
+  }
+
+  // New doc: redirect to the signed MinIO PDF (opens/downloads the signed file).
+  window.open(signedEsignPdfUrl(documentId, true), '_blank', 'noopener');
+}
+
 export function reviewPdfPreviewUrl(documentId: string): string {
   return `/api/documents/${encodeURIComponent(documentId)}/export-pdf/preview`;
 }

@@ -20,11 +20,7 @@ export function isEsignApproved(status: EsignFields | null | undefined): boolean
   }
 
   const code = esignSignCode(status);
-  if (code === 'C') {
-    return false;
-  }
-
-  return code === 'Y' || Boolean(status.esign_signed_at) || Boolean(status.esign_confirmed_at);
+  return code === 'Y';
 }
 
 export function hasSignedEsignPdf(status: Pick<DocumentStatus, 'esign_sign_status' | 'esign_signed_filename' | 'esign_doc_filename'> | null | undefined): boolean {
@@ -34,7 +30,7 @@ export function hasSignedEsignPdf(status: Pick<DocumentStatus, 'esign_sign_statu
 
   const signedName = String(status.esign_signed_filename ?? '').trim();
   if (signedName !== '') {
-    return !isEsignRejected(status) && esignSignCode(status) !== 'C';
+    return isEsignApproved(status);
   }
 
   return isEsignApproved(status) && String(status.esign_doc_filename ?? '').trim() !== '';

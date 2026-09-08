@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ReprocessBlockRequest;
 use App\Http\Requests\UpdateBlockLayoutRequest;
-use App\Http\Requests\UpdateBlockSizeRequest;
 use App\Http\Requests\UpdateBlockRequest;
+use App\Http\Requests\UpdateBlockSizeRequest;
 use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
 use App\Services\DocumentHtmlService;
@@ -227,6 +227,7 @@ class ReviewController extends Controller
 
         if ($scope === 'public') {
             $lawMeta['permission_group_ids'] = [];
+
             return $lawMeta;
         }
 
@@ -237,6 +238,17 @@ class ReviewController extends Controller
         }
 
         return $lawMeta;
+    }
+
+    private function isOldDocument(string $documentId): bool
+    {
+        try {
+            $meta = $this->reviewStore->getReviewDocument($documentId)['law_meta'] ?? [];
+        } catch (Throwable) {
+            $meta = [];
+        }
+
+        return ($meta['document_type'] ?? 'new') === 'old';
     }
 
     public function updateWorkflowProgress(Request $request, string $documentId): JsonResponse
@@ -258,11 +270,23 @@ class ReviewController extends Controller
             'workflow_updated_at' => now()->toIso8601String(),
         ];
 
-        // Step 6 = e-Sign confirmed → mark published immediately so the document
-        // appears in the law list without waiting for the async IngestRagJob.
+        // New documents require the e-Sign callback to return Y.
+        // Old documents never go through e-Sign, so they publish on metadata alone.
         if ($completedStep >= 6) {
+            $current = $this->reviewStore->getStatus($documentId) ?? [];
+            $signCode = strtoupper(trim((string) ($current['esign_sign_status'] ?? '')));
+
+            if (! $this->isOldDocument($documentId) && $signCode !== 'Y') {
+                return response()->json([
+                    'message' => 'เอกสารยังไม่ได้รับการลงนาม e-Sign (sign_status ต้องเป็น Y) จึงยังเผยแพร่ไม่ได้',
+                    'esign_sign_status' => $current['esign_sign_status'] ?? null,
+                ], 422);
+            }
+
             $patch['status'] = 'ingested';
-            $patch['esign_confirmed_at'] = now()->toIso8601String();
+            // Only stamp confirmed_at from the real signed timestamp; never forge now().
+            $patch['esign_confirmed_at'] = $current['esign_confirmed_at']
+                ?? ($signCode === 'Y' ? now()->toIso8601String() : null);
         }
 
         $this->reviewStore->setStatus($documentId, $patch);

@@ -96,6 +96,7 @@ class EsignSubmitControllerTest extends TestCase
 
         $buu = Mockery::mock(BuuEsignService::class);
         $buu->shouldReceive('uploadPdf')->never();
+        $buu->shouldReceive('callbackUrl')->andReturn("https://example.test/api/esign/callback/{$documentId}");
         $buu->shouldReceive('sendDocumentSign')
             ->once()
             ->andReturn(['status' => 'ok', 'result' => 'queued']);

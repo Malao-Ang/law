@@ -255,9 +255,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { confirmEsign, downloadOriginalPdfExport, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus } from '../../api/client';
+import { confirmEsign, downloadOriginalPdfExport, downloadPdfExport, downloadWordExport, fetchReview, fetchStatus, signedEsignPdfUrl } from '../../api/client';
 import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/document';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { isEsignApproved } from '../../utils/esignStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const props = defineProps<{ documentId: string }>();
@@ -319,8 +320,13 @@ async function handlePdfExport(): Promise<void> {
   exportingPdf.value = true;
   pdfExportError.value = '';
   try {
-    await downloadPdfExport(props.documentId);
-    docStatus.value = await fetchStatus(props.documentId);
+    if (isEsignApproved(docStatus.value)) {
+      // Signed: serve the signed MinIO PDF, not a regenerated one.
+      window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
+    } else {
+      await downloadPdfExport(props.documentId);
+      docStatus.value = await fetchStatus(props.documentId);
+    }
   } catch (error) {
     pdfExportError.value = error instanceof Error ? error.message : 'ส่งออก PDF ไม่สำเร็จ';
   } finally {
