@@ -467,7 +467,10 @@ const PER_PAGE = 20;
 const LAW_TYPE_LABELS: Record<string, string> = {
   phrb: 'กฎหมายภายนอก',
   'พ.ร.บ.': 'กฎหมายภายนอก',
+  พระราชกำหนด: 'กฎหมายภายนอก',
   พระราชบัญญัติ: 'กฎหมายภายนอก',
+  กฎกระทรวง: 'กฎหมายภายนอก',
+  ประกาศกระทรวง: 'กฎหมายภายนอก',
   'kotmai-krung': 'กฎหมายภายนอก',
   'kotmai-phaainok': 'กฎหมายภายนอก',
   กฎหมายภายนอก: 'กฎหมายภายนอก',
@@ -505,7 +508,10 @@ const STATUS_LABELS: Record<string, string> = {
 const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
   phrb: 'kotmai-phaainok',
   'พ.ร.บ.': 'kotmai-phaainok',
+  พระราชกำหนด: 'kotmai-phaainok',
   พระราชบัญญัติ: 'kotmai-phaainok',
+  กฎกระทรวง: 'kotmai-phaainok',
+  ประกาศกระทรวง: 'kotmai-phaainok',
   'kotmai-krung': 'kotmai-phaainok',
   'kotmai-phaainok': 'kotmai-phaainok',
   กฎหมายภายนอก: 'kotmai-phaainok',
@@ -522,7 +528,17 @@ const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
 };
 
 const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
-  'kotmai-phaainok': ['kotmai-phaainok', 'kotmai-krung', 'phrb', 'พ.ร.บ.', 'พระราชบัญญัติ', 'กฎหมายภายนอก'],
+  'kotmai-phaainok': [
+    'kotmai-phaainok',
+    'kotmai-krung',
+    'phrb',
+    'พ.ร.บ.',
+    'พระราชกำหนด',
+    'พระราชบัญญัติ',
+    'กฎกระทรวง',
+    'ประกาศกระทรวง',
+    'กฎหมายภายนอก',
+  ],
   'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
   rabiap: ['rabiap', 'ระเบียบ'],
   prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ', 'ประกาศที่ออกโดยมหาวิทยาลัย', 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],

@@ -308,7 +308,6 @@ const isOld = computed(() => documentStore.review?.law_meta?.document_type === '
 const { documentTypes, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
-  [/(พระราชบัญญัติ|พ\.?\s*ร\.?\s*บ\.?)/u, 'พระราชบัญญัติ'],
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
   [/ระเบียบ/u, 'ระเบียบ'],
   [/สภามหาวิทยาลัย/u, 'ประกาศ'],
@@ -326,6 +325,7 @@ const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
   ประกาศที่ออกโดยมหาวิทยาลัย: 'มหาวิทยาลัย',
   ประกาศที่ออกโดยสภามหาวิทยาลัย: 'สภามหาวิทยาลัย',
 };
+const EXTERNAL_LAW_TYPES = new Set(['พระราชกำหนด', 'พระราชบัญญัติ', 'กฎกระทรวง', 'ประกาศกระทรวง']);
 
 const EMPTY: LawMeta = {
   status: 'ร่าง', source: '', law_type: '', law_group: '', law_groups: [],
@@ -344,6 +344,14 @@ const validationFailed = ref(false);
 
 function normalizeSavedLawType(saved: string): string {
   return ANNOUNCEMENT_ISSUER_LAW_TYPES[saved] ? 'ประกาศ' : saved;
+}
+
+function normalizeLawTypeForDocument(saved: string, oldDocument: boolean, title: string): string {
+  const normalized = normalizeSavedLawType(saved);
+  if (oldDocument) return normalized;
+  if (EXTERNAL_LAW_TYPES.has(normalized)) return '';
+
+  return normalized || inferLawType(title);
 }
 
 function inferAnnouncementIssuer(text: string, selectedAgencies: string[]): string | null {
@@ -410,7 +418,8 @@ const documentTypePlaceholder = computed(() =>
   documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
 );
 
-// Old docs restrict law_type to the chosen source; new docs keep the full list.
+// New documents are authored internally. Historical uploads choose source first,
+// then see only document types from that source.
 const selectableDocumentTypes = computed(() =>
   documentTypes.value.filter((t) => !ANNOUNCEMENT_ISSUER_LAW_TYPES[t.value]),
 );
@@ -418,9 +427,9 @@ const selectableDocumentTypes = computed(() =>
 const filteredDocumentTypes = computed(() => {
   const items = isOld.value
     ? selectableDocumentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
-    : selectableDocumentTypes.value;
+    : selectableDocumentTypes.value.filter((t) => t.source !== 'external');
   const current = form.value.law_type?.trim() ?? '';
-  if (current && !items.some((item) => item.value === current)) {
+  if (isOld.value && current && !items.some((item) => item.value === current)) {
     return [{ title: current, value: current }, ...items];
   }
   return items;
@@ -434,7 +443,7 @@ const documentTypeRules = [
   () => !isOld.value || hasText(form.value.source) || 'กรุณาเลือกแหล่งที่มาของเอกสารก่อน',
   (v: unknown) => hasText(v) || 'กรุณาเลือกประเภทเอกสาร',
   (v: unknown) => {
-    if (!isOld.value || !hasText(v)) return true;
+    if (!hasText(v)) return true;
     return filteredDocumentTypes.value.some((type) => type.value === v)
       || 'ประเภทเอกสารไม่ตรงกับแหล่งที่มา';
   },
@@ -499,7 +508,7 @@ watch(() => documentStore.review, (review) => {
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
   const savedLawType = meta?.law_type?.trim() ?? '';
   const oldDocument = meta?.document_type === 'old';
-  const normalizedLawType = normalizeSavedLawType(savedLawType) || (oldDocument ? '' : inferLawType(documentTitle));
+  const normalizedLawType = normalizeLawTypeForDocument(savedLawType, oldDocument, documentTitle);
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
