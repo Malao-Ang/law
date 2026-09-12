@@ -62,7 +62,7 @@ class DocumentFileController extends Controller
                     );
                     $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
                     if (is_string($url) && $url !== '') {
-                        return redirect($url);
+                        return redirect()->away($url);
                     }
                 } catch (\Throwable) {
                     // Fall through to local streaming.

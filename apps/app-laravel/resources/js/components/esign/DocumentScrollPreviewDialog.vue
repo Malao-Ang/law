@@ -22,15 +22,7 @@
       </div>
 
       <div class="scroll-preview__viewport">
-        <object :key="previewKey" class="scroll-preview__pdf" :data="pdfUrl" type="application/pdf">
-          <div class="scroll-preview__fallback">
-            <v-icon icon="mdi-file-pdf-box" size="42" color="error" />
-            <div class="text-body-2 font-weight-bold mt-2">เบราว์เซอร์ไม่สามารถแสดง PDF ในหน้านี้ได้</div>
-            <v-btn class="mt-3" color="admin-primary" :href="pdfUrl" target="_blank" rel="noopener">
-              เปิด PDF ในแท็บใหม่
-            </v-btn>
-          </div>
-        </object>
+        <iframe :key="previewKey" class="scroll-preview__pdf" :src="pdfUrl" title="ตัวอย่าง PDF" />
       </div>
     </v-card>
   </v-dialog>
@@ -44,7 +36,6 @@ const props = defineProps<{
   modelValue: boolean;
   documentId: string;
   signed?: boolean;
-  pdfSrc?: string;
 }>();
 
 const emit = defineEmits<{
@@ -54,9 +45,8 @@ const emit = defineEmits<{
 const previewKey = ref(0);
 const downloading = ref(false);
 const pdfUrl = computed(() => {
-  if (props.pdfSrc) {
-    const joiner = props.pdfSrc.includes('?') ? '&' : '?';
-    return `${props.pdfSrc}${joiner}preview=${previewKey.value}`;
+  if (props.signed) {
+    return `${signedEsignPdfUrl(props.documentId)}&v=${previewKey.value}`;
   }
   return `${reviewPdfPreviewUrl(props.documentId)}?v=${previewKey.value}`;
 });
@@ -74,7 +64,7 @@ watch(() => props.modelValue, (open) => {
 async function downloadPdf(): Promise<void> {
   downloading.value = true;
   try {
-    if (props.signed || props.pdfSrc) {
+    if (props.signed) {
       window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
       return;
     }
@@ -115,19 +105,10 @@ async function downloadPdf(): Promise<void> {
 }
 
 .scroll-preview__pdf {
+  display: block;
   width: 100%;
   height: calc(100vh - 57px);
   border: 0;
   background: #fff;
-}
-
-.scroll-preview__fallback {
-  width: 100%;
-  height: calc(100vh - 57px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #e2e8f0;
 }
 </style>

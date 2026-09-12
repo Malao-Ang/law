@@ -339,7 +339,7 @@ export function reviewPdfPreviewUrl(documentId: string): string {
 
 export function signedEsignPdfUrl(documentId: string, download = false): string {
   const path = `/api/documents/${encodeURIComponent(documentId)}/esign/signed-pdf`;
-  return download ? `${path}?download=1` : path;
+  return download ? `${path}?download=1` : `${path}?redirect=1`;
 }
 
 export type SignedEsignPdfLinks = {

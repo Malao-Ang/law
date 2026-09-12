@@ -148,18 +148,7 @@
             </div>
           </div>
           <div class="status-pdf">
-            <object :key="pdfPreviewUrl" class="status-pdf__frame" :data="pdfPreviewUrl" type="application/pdf">
-              <div class="status-pdf__fallback">
-                <v-icon icon="mdi-file-pdf-box" size="40" color="error" />
-                <div class="text-body-2 font-weight-bold mt-2">{{ packageName }}</div>
-                <div class="text-caption text-medium-emphasis mt-1">
-                  เบราว์เซอร์ไม่สามารถแสดง PDF ในหน้านี้ได้
-                </div>
-                <v-btn class="mt-3" color="admin-primary" :href="pdfPreviewUrl" target="_blank" rel="noopener">
-                  เปิด PDF
-                </v-btn>
-              </div>
-            </object>
+            <iframe :key="pdfPreviewUrl" class="status-pdf__frame" :src="pdfPreviewUrl" title="ตัวอย่าง PDF" />
             <div v-if="showingSignedPdf" class="status-pdf__signed">
               <v-icon icon="mdi-shield-check" size="14" />
               Digital Signature Verified
@@ -330,7 +319,6 @@
       v-model="docPreviewOpen"
       :document-id="documentId"
       :signed="showingSignedPdf"
-      :pdf-src="showingSignedPdf ? signedPdfPreviewUrl : undefined"
     />
 
     <PublishConfirmDialog
@@ -345,7 +333,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { cancelDocumentESign, downloadPdfExport, fetchSignedEsignPdfLinks, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, signedEsignPdfUrl } from '../../api/client';
+import { cancelDocumentESign, downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, signedEsignPdfUrl } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -392,8 +380,6 @@ const pdfPreviewKey = ref(0);
 const errorFlash = ref('');
 let esignPollTimer: ReturnType<typeof setInterval> | null = null;
 const serverStatus = ref<DocumentStatus | null>(null);
-const signedViewUrl = ref('');
-const signedDownloadUrl = ref('');
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -458,13 +444,13 @@ const packageName = computed(() => {
   return `${base}_v1.0.pdf`;
 });
 
-const showingSignedPdf = computed(() => hasSignedEsignPdf(serverStatus.value) && signedViewUrl.value !== '');
+const showingSignedPdf = computed(() => hasSignedEsignPdf(serverStatus.value));
 
-const signedPdfPreviewUrl = computed(() => signedViewUrl.value);
+const signedPdfPreviewUrl = computed(() => signedEsignPdfUrl(props.documentId));
 
 const pdfPreviewUrl = computed(() => {
   if (showingSignedPdf.value) {
-    return signedPdfPreviewUrl.value;
+    return `${signedPdfPreviewUrl.value}&v=${pdfPreviewKey.value}`;
   }
   return `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`;
 });
@@ -642,7 +628,7 @@ async function downloadPdf(): Promise<void> {
   downloadingPdf.value = true;
   try {
     if (showingSignedPdf.value) {
-      window.open(signedDownloadUrl.value || signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
+      window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
       return;
     }
     await downloadPdfExport(props.documentId);
@@ -735,7 +721,6 @@ function startEsignPoll(): void {
 
 function applyServerEsignStatus(status: DocumentStatus): void {
   serverStatus.value = status;
-  void loadSignedPdfLinks(status);
   if (isEsignApproved(status)) {
     stopEsignPoll();
     if (session.value.status === 'signed') {
@@ -761,24 +746,6 @@ function applyServerEsignStatus(status: DocumentStatus): void {
   if (isEsignRejected(status)) {
     stopEsignPoll();
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: status.esign_sign_message ? `ไม่อนุมัติการลงนาม: ${status.esign_sign_message}` : 'ไม่อนุมัติการลงนาม' });
-  }
-}
-
-async function loadSignedPdfLinks(status: DocumentStatus): Promise<void> {
-  if (!hasSignedEsignPdf(status)) {
-    signedViewUrl.value = '';
-    signedDownloadUrl.value = '';
-    return;
-  }
-
-  try {
-    const links = await fetchSignedEsignPdfLinks(props.documentId);
-    signedViewUrl.value = links.view || links.download || '';
-    signedDownloadUrl.value = links.download || links.view || '';
-  } catch (error) {
-    signedViewUrl.value = '';
-    signedDownloadUrl.value = '';
-    void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ไม่สามารถดึงลิงก์ PDF ที่ลงนามแล้วได้' });
   }
 }
 
@@ -1038,18 +1005,6 @@ onBeforeUnmount(() => {
   min-height: 460px;
   border: 0;
   background: #fff;
-}
-
-.status-pdf__fallback {
-  width: 100%;
-  min-height: 460px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  text-align: center;
 }
 
 .status-pdf__signed {

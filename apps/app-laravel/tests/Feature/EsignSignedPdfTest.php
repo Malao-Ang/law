@@ -94,6 +94,33 @@ class EsignSignedPdfTest extends TestCase
             ->assertRedirect('https://minio.test/signed-abc.pdf?download');
     }
 
+    public function test_signed_pdf_redirect_query_redirects_to_minio_view_link(): void
+    {
+        $store = app(ReviewStore::class);
+        $docId = 'test-esign-pdf-redirect-'.uniqid();
+        $store->setStatus($docId, [
+            'status' => 'done',
+            'document_id' => $docId,
+            'esign_sign_status' => 'Y',
+            'esign_signed_filename' => 'signed-abc.pdf',
+            'esign_signed_bucket' => 'library.elaw.storage',
+        ]);
+
+        $mock = Mockery::mock(BuuMinioService::class);
+        $mock->shouldReceive('getPublicLinks')
+            ->once()
+            ->andReturn([
+                'file' => [
+                    'view' => 'https://minio.test/signed-abc.pdf?view',
+                    'download' => 'https://minio.test/signed-abc.pdf?download',
+                ],
+            ]);
+        $this->app->instance(BuuMinioService::class, $mock);
+
+        $this->get("/api/documents/{$docId}/esign/signed-pdf?redirect=1&v=3")
+            ->assertRedirect('https://minio.test/signed-abc.pdf?view');
+    }
+
     public function test_signed_pdf_falls_back_to_doc_filename_when_status_is_y(): void
     {
         $store = app(ReviewStore::class);
