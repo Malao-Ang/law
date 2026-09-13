@@ -1,7 +1,10 @@
 # Development override for docker-compose.yml.
 #
-# Usage:
+# Without HMR (built assets, default):
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+# With Vite HMR:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile hmr up -d --build
 
 services:
   laravel-app:
@@ -22,6 +25,7 @@ services:
       - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
 
   laravel-vite:
+    profiles: [hmr]
     image: node:20-bookworm-slim
     container_name: thai-ocr-laravel-vite
     working_dir: /var/www/html
