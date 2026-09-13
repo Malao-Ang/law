@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 
 class DocumentFileController extends Controller
@@ -62,7 +63,24 @@ class DocumentFileController extends Controller
                     );
                     $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
                     if (is_string($url) && $url !== '') {
-                        return redirect()->away($url);
+                        // Proxy through Laravel — MinIO hostname (minio-cluster-dev) is not
+                        // publicly resolvable; browser cannot reach it directly from the internet.
+                        $disposition = $isDownload ? HeaderUtils::DISPOSITION_ATTACHMENT : HeaderUtils::DISPOSITION_INLINE;
+                        $filename = basename((string) ($status['source_file'] ?? $relative));
+                        $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $filename)) ?: 'document';
+                        $dispositionHeader = HeaderUtils::makeDisposition($disposition, $filename, $asciiFallback);
+                        try {
+                            $minioResponse = Http::timeout(120)->get($url);
+                            if ($minioResponse->successful()) {
+                                return response($minioResponse->body(), 200, [
+                                    'Content-Type' => $mime,
+                                    'Content-Disposition' => $dispositionHeader,
+                                    'Cache-Control' => 'private, max-age=3600',
+                                ]);
+                            }
+                        } catch (\Throwable) {
+                            // Fall through to local streaming.
+                        }
                     }
                 } catch (\Throwable) {
                     // Fall through to local streaming.
