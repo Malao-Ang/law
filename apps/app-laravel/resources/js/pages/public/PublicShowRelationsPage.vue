@@ -205,16 +205,6 @@
           >
             ดาวน์โหลด PDF
           </v-btn>
-          <v-btn
-            size="small"
-            variant="outlined"
-            prepend-icon="mdi-download-multiple"
-            class="text-none"
-            :loading="downloadAllLoading"
-            @click="downloadAll"
-          >
-            ดาวน์โหลดทั้งหมด
-          </v-btn>
           <v-btn size="small" variant="text" class="text-none" prepend-icon="mdi-swap-horizontal" @click="pickerOpen = true">
             เปลี่ยนกฎหมาย
           </v-btn>
@@ -263,6 +253,17 @@
             @click="toggleTypeFilter(filter.value)"
           >{{ filter.label }}</v-chip>
           <v-spacer />
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="primary"
+            class="text-none"
+            prepend-icon="mdi-download-multiple"
+            :loading="downloadAllLoading"
+            @click="downloadAll"
+          >
+            ดาวน์โหลดทั้งหมด
+          </v-btn>
           <v-btn-toggle v-model="viewMode" mandatory density="compact" color="primary" rounded="lg" divided>
             <v-btn value="hierarchy" class="text-none px-3" size="small" prepend-icon="mdi-graph-outline">Hierarchy</v-btn>
             <v-btn value="tree" class="text-none px-3" size="small" prepend-icon="mdi-file-tree-outline">Tree</v-btn>
