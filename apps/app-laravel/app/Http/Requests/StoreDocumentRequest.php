@@ -21,7 +21,7 @@ class StoreDocumentRequest extends FormRequest
         return [
             'file' => array_filter([
                 'required', 'file', 'max:51200',
-                $isOld ? 'mimes:pdf' : 'mimes:pdf,doc,docx',
+                $isOld ? 'mimes:pdf' : 'mimes:doc,docx',
             ]),
             'scan_extraction_mode' => ['nullable', 'in:local,gemini,landingai'],
             'extraction_engine' => ['nullable', 'in:standard,fast'],
