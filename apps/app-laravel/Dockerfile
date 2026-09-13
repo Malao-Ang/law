@@ -49,7 +49,8 @@ WORKDIR /var/www/html
 
 # Copy application code first
 COPY . .
-RUN rm -f public/hot
+RUN rm -f public/hot \
+    && mkdir -p storage/framework/views storage/framework/cache/data storage/framework/sessions storage/logs
 
 COPY --from=frontend /var/www/html/public/build ./public/build
 
