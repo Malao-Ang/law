@@ -131,4 +131,35 @@ class LawRelationsRequirementsTest extends TestCase
         $this->assertContains('Linked Law.pdf', $names);
         $this->assertNotContains('Unrelated Law.pdf', $names);
     }
+
+    public function test_incoming_relations_find_same_level_amends(): void
+    {
+        $store = app(ReviewStore::class);
+        $originalId = 'doc_incoming_original';
+        $amendmentId = 'doc_incoming_amendment';
+        $unrelatedId = 'doc_incoming_unrelated';
+
+        $this->seedLaw($store, $originalId, 'Original Law');
+        $this->seedLaw($store, $amendmentId, 'Amendment Law', ['change_status' => 'ปรับปรุงทั้งฉบับ'], [
+            [
+                'id' => 'rel-amends-original',
+                'scope' => 'document',
+                'block_id' => null,
+                'type' => 'amends',
+                'target_document_id' => $originalId,
+                'target_title' => 'Original Law',
+                'target_section' => null,
+                'target_block_id' => null,
+                'note' => null,
+                'url' => null,
+            ],
+        ]);
+        $this->seedLaw($store, $unrelatedId, 'Unrelated Law');
+
+        $this->getJson("/api/documents/{$originalId}/incoming-relations")
+            ->assertOk()
+            ->assertJsonPath('document_id', $originalId)
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('document_ids.0', $amendmentId);
+    }
 }

@@ -400,7 +400,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { downloadPublishedPdf, fetchReportSummary, fetchReview, relatedDocumentsZipUrl } from '../../api/client';
+import { downloadPublishedPdf, fetchReportSummary, fetchReview, fetchIncomingRelationDocumentIds, relatedDocumentsZipUrl } from '../../api/client';
 import type { LawMeta, LawRelation, RelationType, ReportSummary } from '../../types/document';
 import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
@@ -413,8 +413,7 @@ import {
   RELATION_FILTERS,
   MAX_DEPTH,
   buildRelationTree,
-  collectDescendantIds,
-  collectRelatedIds,
+  collectGraphNeighborIds,
   displayLawDate,
   flattenTree,
   loadRecentIds,
@@ -710,9 +709,10 @@ async function loadDetail(id: string): Promise<void> {
     rootMeta.value = review.law_meta ?? null;
     const bag: Record<string, LawRelation[]> = { [id]: review.relations ?? [] };
     const fetched = new Set<string>([id]);
+    const incomingIds = await fetchIncomingRelationDocumentIds(id).catch(() => [] as string[]);
 
-    // Seed with parentIds descendants
-    const seedIds = collectDescendantIds(id, rows.value);
+    const seedIds = collectGraphNeighborIds(id, rows.value, bag, incomingIds)
+      .filter((documentId) => !fetched.has(documentId));
     const seedExtras = await Promise.all(
       seedIds.map((documentId) =>
         fetchReview(documentId)
@@ -725,13 +725,9 @@ async function loadDetail(id: string): Promise<void> {
       fetched.add(documentId);
     }
 
-    // Iteratively fetch relations for any target ids not yet fetched
     for (let depth = 0; depth < MAX_DEPTH; depth += 1) {
-      const related = new Set([
-        ...collectRelatedIds(id, bag),
-        ...collectDescendantIds(id, rows.value),
-      ]);
-      const newIds = [...related].filter((rid) => !fetched.has(rid));
+      const newIds = collectGraphNeighborIds(id, rows.value, bag, incomingIds)
+        .filter((rid) => !fetched.has(rid));
       if (newIds.length === 0) break;
       const newExtras = await Promise.all(
         newIds.map((documentId) =>

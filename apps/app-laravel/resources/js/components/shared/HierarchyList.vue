@@ -87,11 +87,10 @@ const props = defineProps<{ node: RelTreeNode; themeColor?: string }>();
 
 const expanded = ref(true);
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
-const isLeaf = computed(() => props.node.children.length === 0);
 const peers = computed(() =>
   (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
 );
-const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
+const canTogglePeers = computed(() => peers.value.length > 0);
 const versionLabel = computed(() =>
   sameLevelVersionLabel(props.node.sameLevelVersions ?? [], props.node.row.id),
 );

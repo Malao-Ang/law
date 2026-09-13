@@ -2,10 +2,13 @@
 //   cd apps/app-laravel && npx tsx resources/js/composables/useShowRelations.check.ts
 import {
   buildRelationTree,
+  collectGraphNeighborIds,
   collectMixedSameLevelChains,
+  collectRelatedIds,
   collectSameLevelChains,
   currentFamilyTitle,
   regulationFamilyKey,
+  sameLevelPeerCandidateIds,
   sameLevelTreeSkipIds,
   sameLevelVersionLabel,
   sameLevelVersionNumber,
@@ -388,5 +391,73 @@ const original = row({
 assert(shouldUnionSameLevelFamily(sectionPatch, original, ['amends']), 'section-level amends still links documents');
 const fromSection = collectMixedSameLevelChains([sectionPatch, original], sectionAmends, 'patch');
 assert(fromSection[0].map((item) => item.id).join(',') === 'orig,patch', 'section amends appear as a same-level document chain');
+
+const lawAWhole = row({
+  id: 'law-a',
+  title: 'กฎหมาย A',
+  lawType: 'ประกาศ',
+  typeShort: 'ประกาศ',
+  changeStatus: 'กฎหมายใหม่',
+  metaStatus: 'ยกเลิก',
+  rawDate: '2023-01-01',
+});
+const lawBWhole = row({
+  id: 'law-b',
+  title: 'กฎหมาย B',
+  lawType: 'ประกาศ',
+  typeShort: 'ประกาศ',
+  changeStatus: 'ปรับปรุงทั้งฉบับ',
+  metaStatus: 'มีผลบังคับใช้',
+  rawDate: '2025-01-01',
+});
+const lawCUnderB = row({
+  id: 'law-c',
+  title: 'กฎหมาย C',
+  lawType: 'ประกาศ',
+  typeShort: 'ประกาศ',
+  changeStatus: 'กฎหมายใหม่',
+  metaStatus: 'มีผลบังคับใช้',
+  parentIds: ['law-b'],
+});
+const treeFromB = buildRelationTree('law-b', [lawAWhole, lawBWhole, lawCUnderB], {
+  'law-b': [{
+    id: 'b-amends-a',
+    scope: 'document',
+    block_id: null,
+    type: 'amends',
+    target_document_id: 'law-a',
+    target_title: 'กฎหมาย A',
+    target_section: null,
+    target_block_id: null,
+    note: null,
+    url: null,
+  }],
+});
+assert(treeFromB?.children.some((c) => c.row.id === 'law-c') === true, 'C stays issued-under B');
+assert(treeFromB?.children.some((c) => c.row.id === 'law-a') !== true, 'A is not a vertical child of B');
+assert(treeFromB?.sameLevelVersions.some((item) => item.id === 'law-a') === true, 'A stays on B as a same-level version even when B has children');
+assert((treeFromB?.children.length ?? 0) > 0 && (treeFromB?.sameLevelVersions.length ?? 0) >= 2, 'B can have both descendants and a same-level version chain');
+
+const bAmendsABag = {
+  'law-b': [{
+    id: 'b-amends-a',
+    scope: 'document' as const,
+    block_id: null,
+    type: 'amends' as const,
+    target_document_id: 'law-a',
+    target_title: 'กฎหมาย A',
+    target_section: null,
+    target_block_id: null,
+    note: null,
+    url: null,
+  }],
+};
+assert(collectRelatedIds('law-a', bAmendsABag).includes('law-b'), 'incoming amends from B is discovered when viewing A');
+assert(sameLevelPeerCandidateIds('law-a', [lawAWhole, lawBWhole, lawCUnderB]).includes('law-b'), 'whole-edition B is a peer candidate of A');
+assert(collectGraphNeighborIds('law-a', [lawAWhole, lawBWhole, lawCUnderB], { 'law-a': [] }, ['law-b']).includes('law-b'), 'graph neighbors include incoming same-level B');
+const treeFromA = buildRelationTree('law-a', [lawAWhole, lawBWhole, lawCUnderB], bAmendsABag);
+assert(treeFromA?.sameLevelVersions.some((item) => item.id === 'law-b') === true, 'opening A still shows B as a same-level version');
+assert(treeFromA?.children.some((c) => c.row.id === 'law-b') !== true, 'B is not a vertical child under A');
+assert(treeFromA?.children.some((c) => c.row.id === 'law-c') !== true, 'C stays under B, not under A');
 
 console.log('useShowRelations.check.ts: all passed');

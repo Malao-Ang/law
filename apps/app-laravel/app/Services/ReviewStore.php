@@ -323,6 +323,50 @@ class ReviewStore
         return $children;
     }
 
+    /**
+     * Documents whose stored relations point at $documentId (same-level amends/supersedes/repeals).
+     *
+     * @param  list<string>|null  $types
+     * @return list<string>
+     */
+    public function documentIdsLinkingTo(string $documentId, ?array $types = null): array
+    {
+        $target = trim($documentId);
+        if ($target === '') {
+            return [];
+        }
+
+        $wanted = $types ?? ['amends', 'supersedes', 'repeals'];
+        $ids = [];
+        foreach ($this->blob->allStatuses() as $status) {
+            $id = (string) ($status['document_id'] ?? '');
+            if ($id === '' || $id === $target) {
+                continue;
+            }
+            $review = $this->blob->read('review', $id);
+            if (! is_array($review)) {
+                continue;
+            }
+            foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $rel) {
+                if (! is_array($rel)) {
+                    continue;
+                }
+                $relTarget = trim((string) ($rel['target_document_id'] ?? ''));
+                if ($relTarget !== $target) {
+                    continue;
+                }
+                $type = (string) ($rel['type'] ?? '');
+                if ($wanted !== [] && ! in_array($type, $wanted, true)) {
+                    continue;
+                }
+                $ids[] = $id;
+                break;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     public function isActiveLawMetaStatus(?string $status): bool
     {
         $normalized = mb_strtolower(trim((string) $status), 'UTF-8');

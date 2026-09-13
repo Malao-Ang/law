@@ -141,6 +141,12 @@ export function fetchReview(documentId: string): Promise<ReviewDocument> {
   return jsonRequest<ReviewDocument>(`/api/documents/${documentId}/review`);
 }
 
+export function fetchIncomingRelationDocumentIds(documentId: string): Promise<string[]> {
+  return jsonRequest<{ document_ids?: string[] }>(
+    `/api/documents/${encodeURIComponent(documentId)}/incoming-relations`,
+  ).then((payload) => (payload.document_ids ?? []).map((id) => id.trim()).filter(Boolean));
+}
+
 export function fetchPreview(documentId: string): Promise<PreviewData> {
   return jsonRequest<PreviewData>(`/api/documents/${documentId}/preview`);
 }

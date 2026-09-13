@@ -1,65 +1,68 @@
 <template>
   <div class="rel-tree">
-    <div v-if="node.level > 0" class="rel-tree__edge">{{ relationTypeLabel(node.edgeType) }}</div>
-
     <div class="rel-tree__same-row">
-      <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
-        <div class="rel-tree__card" :class="{ 'is-current': isCurrent }">
-          <div class="d-flex align-center ga-2 mb-2">
-            <DocBadge v-if="typeBadge" :type="typeBadge" />
-            <v-chip
-              v-if="versionLabel"
-              size="x-small"
-              :color="themeColor"
-              variant="tonal"
-            >{{ versionLabel }}</v-chip>
-            <v-spacer />
-            <v-chip v-if="node.level === 0" size="x-small" :color="themeColor" variant="flat">
-              เอกสารปัจจุบัน
-            </v-chip>
+      <div class="rel-tree__branch">
+        <div v-if="node.level > 0" class="rel-tree__edge">{{ relationTypeLabel(node.edgeType) }}</div>
+
+        <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
+          <div class="rel-tree__card" :class="{ 'is-current': isCurrent }">
+            <div class="d-flex align-center ga-2 mb-2">
+              <DocBadge v-if="typeBadge" :type="typeBadge" />
+              <v-chip
+                v-if="versionLabel"
+                size="x-small"
+                :color="themeColor"
+                variant="tonal"
+              >{{ versionLabel }}</v-chip>
+              <v-spacer />
+              <v-chip v-if="node.level === 0" size="x-small" :color="themeColor" variant="flat">
+                เอกสารปัจจุบัน
+              </v-chip>
+            </div>
+            <div class="rel-tree__title">{{ node.row.title }}</div>
+            <div class="rel-tree__meta">
+              <span v-if="node.row.rawDate"><v-icon icon="mdi-calendar-outline" size="12" /> {{ node.row.editedAt }}</span>
+              <span v-if="node.row.org"><v-icon icon="mdi-office-building-outline" size="12" /> {{ node.row.org }}</span>
+            </div>
+            <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
+              สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
+            </div>
           </div>
-          <div class="rel-tree__title">{{ node.row.title }}</div>
-          <div class="rel-tree__meta">
-            <span v-if="node.row.rawDate"><v-icon icon="mdi-calendar-outline" size="12" /> {{ node.row.editedAt }}</span>
-            <span v-if="node.row.org"><v-icon icon="mdi-office-building-outline" size="12" /> {{ node.row.org }}</span>
+        </div>
+
+        <div v-if="node.children.length" class="rel-tree__children">
+          <div class="rel-tree__level-label">
+            {{ node.level === 0 ? 'ระดับลำดับรองที่ 1' : `ระดับที่ ${node.level + 1}` }}
           </div>
-          <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
-            สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
+          <div class="rel-tree__row">
+            <RelationTreeView
+              v-for="child in node.children"
+              :key="child.row.id"
+              :node="child"
+              :current-id="currentId"
+              :theme-color="themeColor"
+              @select="$emit('select', $event)"
+            />
           </div>
         </div>
       </div>
 
-      <button
-        v-if="canTogglePeers"
-        type="button"
-        class="rel-tree__toggle"
-        :aria-expanded="expanded"
-        @click.stop="expanded = !expanded"
-      >
-        <v-icon :icon="expanded ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="18" />
-        <span>{{ expanded ? 'ย่อ' : 'แก้ไขการปรับปรุง' }}</span>
-      </button>
+      <div v-if="canTogglePeers" class="rel-tree__peers" :class="{ 'has-edge': node.level > 0 }">
+        <button
+          type="button"
+          class="rel-tree__toggle"
+          :aria-expanded="expanded"
+          @click.stop="expanded = !expanded"
+        >
+          <v-icon :icon="expanded ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="18" />
+          <span>{{ expanded ? 'ย่อ' : 'แก้ไขการปรับปรุง' }}</span>
+        </button>
 
-      <SameLevelInlineChain
-        v-if="canTogglePeers && expanded"
-        :versions="peers"
-        :chain="node.sameLevelVersions"
-        :current-id="currentId ?? node.row.id"
-        :theme-color="themeColor"
-        @select="$emit('select', $event)"
-      />
-    </div>
-
-    <div v-if="node.children.length" class="rel-tree__children">
-      <div class="rel-tree__level-label">
-        {{ node.level === 0 ? 'ระดับลำดับรองที่ 1' : `ระดับที่ ${node.level + 1}` }}
-      </div>
-      <div class="rel-tree__row">
-        <RelationTreeView
-          v-for="child in node.children"
-          :key="child.row.id"
-          :node="child"
-          :current-id="currentId"
+        <SameLevelInlineChain
+          v-if="expanded"
+          :versions="peers"
+          :chain="node.sameLevelVersions"
+          :current-id="currentId ?? node.row.id"
           :theme-color="themeColor"
           @select="$emit('select', $event)"
         />
@@ -91,8 +94,6 @@ const isCurrent = computed(() =>
   props.node.level === 0 || props.node.row.id === props.currentId,
 );
 
-const isLeaf = computed(() => props.node.children.length === 0);
-
 const versionChain = computed(() => props.node.sameLevelVersions ?? []);
 
 const peers = computed(() =>
@@ -104,7 +105,7 @@ const versionLabel = computed(() =>
 );
 const typeBadge = computed(() => lawTypeToBadge(props.node.row.lawType));
 
-const canTogglePeers = computed(() => isLeaf.value && peers.value.length > 0);
+const canTogglePeers = computed(() => peers.value.length > 0);
 
 function statusClass(status: string): string {
   if (status.includes('ยกเลิก')) return 'text-error';
@@ -126,11 +127,30 @@ function statusClass(status: string): string {
 .rel-tree__same-row {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 12px;
   width: max-content;
   max-width: 100%;
+}
+
+.rel-tree__branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 280px;
+}
+
+.rel-tree__peers {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.rel-tree__peers.has-edge {
+  padding-top: 42px;
 }
 
 .rel-tree__node {

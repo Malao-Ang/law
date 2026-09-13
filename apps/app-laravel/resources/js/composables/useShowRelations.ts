@@ -448,13 +448,41 @@ export function collectDescendantIds(rootId: string, rows: ShowRelRow[]): string
 
 export function collectRelatedIds(rootId: string, bag: Record<string, LawRelation[]>): string[] {
   const out = new Set<string>();
-  for (const rels of Object.values(bag)) {
+  for (const [sourceId, rels] of Object.entries(bag)) {
     for (const rel of rels) {
       const t = rel.target_document_id?.trim();
-      if (t && t !== rootId) out.add(t);
+      if (!t) continue;
+      if (t !== rootId) out.add(t);
+      if (t === rootId && sourceId !== rootId) out.add(sourceId);
     }
   }
   return [...out];
+}
+
+export function sameLevelPeerCandidateIds(rootId: string, rows: ShowRelRow[]): string[] {
+  const root = rows.find((row) => row.id === rootId);
+  if (!root) return [];
+  return rows
+    .filter((row) => {
+      if (row.id === rootId) return false;
+      if ((row.lawType || '') !== (root.lawType || '')) return false;
+      return isAmendmentChange(row.changeStatus);
+    })
+    .map((row) => row.id);
+}
+
+export function collectGraphNeighborIds(
+  rootId: string,
+  rows: ShowRelRow[],
+  bag: Record<string, LawRelation[]>,
+  incomingIds: string[] = [],
+): string[] {
+  return [...new Set([
+    ...incomingIds,
+    ...sameLevelPeerCandidateIds(rootId, rows),
+    ...collectDescendantIds(rootId, rows),
+    ...collectRelatedIds(rootId, bag),
+  ])];
 }
 
 export function sameLevelKeepId(rootId: string, chain: ShowRelRow[]): string {

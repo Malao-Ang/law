@@ -43,6 +43,7 @@ Route::get('/documents/{documentId}/review', [ReviewController::class, 'show']);
 Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions']);
 Route::get('/documents/{documentId}/preview', [ReviewController::class, 'preview']);
 Route::get('/documents/{documentId}/active-children', [ReviewController::class, 'activeChildren']);
+Route::get('/documents/{documentId}/incoming-relations', [ReviewController::class, 'incomingRelations']);
 Route::put('/documents/{documentId}/document-review', [ReviewController::class, 'updateDocumentReview']);
 Route::patch('/documents/{documentId}/workflow-progress', [ReviewController::class, 'updateWorkflowProgress']);
 Route::patch('/documents/{documentId}/rag-skip', [ReviewController::class, 'updateRagSkipped']);

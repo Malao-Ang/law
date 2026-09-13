@@ -67,6 +67,17 @@ class ReviewController extends Controller
         ]);
     }
 
+    public function incomingRelations(string $documentId): JsonResponse
+    {
+        $documentIds = $this->reviewStore->documentIdsLinkingTo($documentId);
+
+        return response()->json([
+            'document_id' => $documentId,
+            'count' => count($documentIds),
+            'document_ids' => $documentIds,
+        ]);
+    }
+
     /**
      * Tag the response with a content ETag and force revalidation. The browser then
      * sends If-None-Match on reload / new tab; if the document is unchanged we return
