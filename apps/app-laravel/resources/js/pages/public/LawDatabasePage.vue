@@ -656,7 +656,12 @@ function canonicalFacetOptions(
 
 const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER, true));
 const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
-const agencyFilters = computed(() => mapFacetOptions(stableFacet('agency')));
+const agencyFilters = computed(() => {
+  const allowed = new Set((lookupFacets.value?.agency ?? []).map((b) => b.value));
+  // ponytail: whitelist by current lookups so removed agencies don't bleed in from old documents
+  const buckets = allowed.size ? stableFacet('agency').filter((b) => allowed.has(b.value)) : stableFacet('agency');
+  return mapFacetOptions(buckets);
+});
 const keeperGroupFilters = computed(() => mapFacetOptions(stableFacet('signer_group')));
 const changeStatusFilters = computed(() => canonicalFacetOptions('change_status', (value) => value, changeStatusLabel, undefined, true));
 const useStatusFilters = computed(() => canonicalFacetOptions('status', canonicalUseStatusValue, statusLabel, DRAFT_EXCLUDED_STATUSES, true));
