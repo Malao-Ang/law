@@ -418,6 +418,18 @@
                   </button>
                 </div>
                 <div v-else class="law-list-card__arrow">
+                  <v-tooltip text="ดูความสัมพันธ์" location="top">
+                    <template #activator="{ props: relProps }">
+                      <v-btn
+                        v-bind="relProps"
+                        icon="mdi-graph-outline"
+                        variant="tonal"
+                        color="primary"
+                        size="small"
+                        @click.stop="openRelations(law)"
+                      />
+                    </template>
+                  </v-tooltip>
                   <v-icon icon="mdi-chevron-right" color="#b68d40" size="22" />
                 </div>
               </div>
@@ -1127,6 +1139,16 @@ function openLaw(law: LawSearchResult): void {
   router.push(lawPath);
 }
 
+function openRelations(law: LawSearchResult): void {
+  const relPath = `/law/relations/${encodeURIComponent(law.law_id)}`;
+  if (law.restricted && !auth.isAuthenticated) {
+    router.push({ path: '/login', query: { redirect: relPath } });
+    return;
+  }
+
+  router.push(relPath);
+}
+
 function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined {
   if (cs === 'new' || cs === 'amended' || cs === 'repealed') return cs;
   return undefined;
@@ -1704,6 +1726,7 @@ onBeforeUnmount(() => {
 .law-list-card__arrow {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 18px;
   flex-shrink: 0;
 }
