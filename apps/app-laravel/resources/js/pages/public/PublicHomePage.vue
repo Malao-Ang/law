@@ -67,25 +67,25 @@
           </div>
         </section>
 
-        <!-- Section: ระเบียบ -->
-        <section v-if="rabiapDocs.length" class="elaw-home-section">
+        <!-- Type sections: rendered from typeSections in priority order -->
+        <section v-for="section in typeSections" :key="section.type" class="elaw-home-section">
           <div class="elaw-section-header">
             <div class="elaw-section-header__left">
               <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar elaw-section-heading__bar--rabiap" />
-                <h2 class="elaw-section-heading__text">ระเบียบ</h2>
+                <span class="elaw-section-heading__bar" :class="section.barClass" />
+                <h2 class="elaw-section-heading__text">{{ section.title }}</h2>
               </div>
             </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase('rabiap')">ดูทั้งหมด →</a>
+            <a class="elaw-section-link" @click.prevent="goToDatabase(section.type)">ดูทั้งหมด →</a>
           </div>
           <!-- carousel when >3 items -->
-          <div v-if="rabiapDocs.length > 3" class="elaw-carousel mt-2">
+          <div v-if="section.docs.length > 3" class="elaw-carousel mt-2">
             <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
               <v-icon icon="mdi-chevron-left" />
             </button>
             <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
               <ELawLawCard
-                v-for="doc in rabiapDocs"
+                v-for="doc in section.docs"
                 :key="doc._id"
                 :title="doc.metadata.title"
                 :doc-type="toDocType(doc.metadata.documentType)"
@@ -94,6 +94,7 @@
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
                 :amended-sections="doc.metadata.affectedSections"
+                :issuer="section.showIssuer ? doc.metadata.issuer : undefined"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -109,7 +110,7 @@
           <!-- equal-width grid when ≤3 items -->
           <div v-else class="elaw-grid mt-2">
             <ELawLawCard
-              v-for="doc in rabiapDocs"
+              v-for="doc in section.docs"
               :key="doc._id"
               :title="doc.metadata.title"
               :doc-type="toDocType(doc.metadata.documentType)"
@@ -118,130 +119,7 @@
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
               :amended-sections="doc.metadata.affectedSections"
-              :department="doc.metadata.ownerAgencyId"
-              :law-group="doc.metadata.documentGroupId"
-              :date="formatThaiDate(doc.metadata.publishedDate)"
-              :visibility="doc.metadata.publicationScope"
-              class="elaw-grid__card"
-              @click="openLaw(doc)"
-            />
-          </div>
-        </section>
-
-        <!-- Section: ประกาศ (sorted: มหาวิทยาลัย first, then สภามหาวิทยาลัย) -->
-        <section v-if="sortedPrakatDocs.length" class="elaw-home-section">
-          <div class="elaw-section-header">
-            <div class="elaw-section-header__left">
-              <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar elaw-section-heading__bar--prakat" />
-                <h2 class="elaw-section-heading__text">ประกาศ</h2>
-              </div>
-            </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase('prakat')">ดูทั้งหมด →</a>
-          </div>
-          <!-- carousel when >3 items -->
-          <div v-if="sortedPrakatDocs.length > 3" class="elaw-carousel mt-2">
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
-              <v-icon icon="mdi-chevron-left" />
-            </button>
-            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
-              <ELawLawCard
-                v-for="doc in sortedPrakatDocs"
-                :key="doc._id"
-                :title="doc.metadata.title"
-                :doc-type="toDocType(doc.metadata.documentType)"
-                :law-type="doc.metadata.lawTypeName"
-                :description="doc.metadata.summary"
-                :change-status-text="doc.metadata.changeStatus"
-                :use-status="doc.metadata.useStatus"
-                :amended-sections="doc.metadata.affectedSections"
-                :issuer="doc.metadata.issuer"
-                :department="doc.metadata.ownerAgencyId"
-                :law-group="doc.metadata.documentGroupId"
-                :date="formatThaiDate(doc.metadata.publishedDate)"
-                :visibility="doc.metadata.publicationScope"
-                class="elaw-carousel__card"
-                @click="openLaw(doc)"
-              />
-            </div>
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
-              <v-icon icon="mdi-chevron-right" />
-            </button>
-          </div>
-          <!-- equal-width grid when ≤3 items -->
-          <div v-else class="elaw-grid mt-2">
-            <ELawLawCard
-              v-for="doc in sortedPrakatDocs"
-              :key="doc._id"
-              :title="doc.metadata.title"
-              :doc-type="toDocType(doc.metadata.documentType)"
-              :law-type="doc.metadata.lawTypeName"
-              :description="doc.metadata.summary"
-              :change-status-text="doc.metadata.changeStatus"
-              :use-status="doc.metadata.useStatus"
-              :amended-sections="doc.metadata.affectedSections"
-              :issuer="doc.metadata.issuer"
-              :department="doc.metadata.ownerAgencyId"
-              :law-group="doc.metadata.documentGroupId"
-              :date="formatThaiDate(doc.metadata.publishedDate)"
-              :visibility="doc.metadata.publicationScope"
-              class="elaw-grid__card"
-              @click="openLaw(doc)"
-            />
-          </div>
-        </section>
-
-        <!-- Section: ข้อบังคับ -->
-        <section v-if="khoBangkhabDocs.length" class="elaw-home-section">
-          <div class="elaw-section-header">
-            <div class="elaw-section-header__left">
-              <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar elaw-section-heading__bar--kho-bangkhab" />
-                <h2 class="elaw-section-heading__text">ข้อบังคับ</h2>
-              </div>
-            </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase('kho-bangkhab')">ดูทั้งหมด →</a>
-          </div>
-          <!-- carousel when >3 items -->
-          <div v-if="khoBangkhabDocs.length > 3" class="elaw-carousel mt-2">
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--left" @click="scrollCarousel($event, -1)">
-              <v-icon icon="mdi-chevron-left" />
-            </button>
-            <div class="elaw-carousel__track" @wheel.prevent="handleWheelScroll">
-              <ELawLawCard
-                v-for="doc in khoBangkhabDocs"
-                :key="doc._id"
-                :title="doc.metadata.title"
-                :doc-type="toDocType(doc.metadata.documentType)"
-                :law-type="doc.metadata.lawTypeName"
-                :description="doc.metadata.summary"
-                :change-status-text="doc.metadata.changeStatus"
-                :use-status="doc.metadata.useStatus"
-                :amended-sections="doc.metadata.affectedSections"
-                :department="doc.metadata.ownerAgencyId"
-                :law-group="doc.metadata.documentGroupId"
-                :date="formatThaiDate(doc.metadata.publishedDate)"
-                :visibility="doc.metadata.publicationScope"
-                class="elaw-carousel__card"
-                @click="openLaw(doc)"
-              />
-            </div>
-            <button type="button" class="elaw-carousel__arrow elaw-carousel__arrow--right" @click="scrollCarousel($event, 1)">
-              <v-icon icon="mdi-chevron-right" />
-            </button>
-          </div>
-          <!-- equal-width grid when ≤3 items -->
-          <div v-else class="elaw-grid mt-2">
-            <ELawLawCard
-              v-for="doc in khoBangkhabDocs"
-              :key="doc._id"
-              :title="doc.metadata.title"
-              :doc-type="toDocType(doc.metadata.documentType)"
-              :law-type="doc.metadata.lawTypeName"
-              :description="doc.metadata.summary"
-              :change-status-text="doc.metadata.changeStatus"
-              :use-status="doc.metadata.useStatus"
-              :amended-sections="doc.metadata.affectedSections"
+              :issuer="section.showIssuer ? doc.metadata.issuer : undefined"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -266,7 +144,7 @@ import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawHeroSearch from '../../components/shared/ELawHeroSearch.vue';
 import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
-import type { DocType } from '../../components/shared/lawBadge';
+import { docTypeToBadge, type DocType } from '../../components/shared/lawBadge';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
 import type { LawSearchResult } from '../../types/lawSearch';
 import { formatThaiDate } from '../../utils/thaiDate';
@@ -328,10 +206,27 @@ function openLaw(doc: DocumentVersion): void {
   router.push(lawPath);
 }
 
+// Type-section order (controls order only); types present but not listed are
+// appended automatically, so a new document type needs no edit here.
+const TYPE_PRIORITY: DocumentType[] = ['rabiap', 'prakat', 'kho-bangkhab', 'kotmai-phaainok'];
+
+const BAR_CLASS: Partial<Record<DocumentType, string>> = {
+  rabiap: 'elaw-section-heading__bar--rabiap',
+  prakat: 'elaw-section-heading__bar--prakat',
+  'kho-bangkhab': 'elaw-section-heading__bar--kho-bangkhab',
+  'kotmai-phaainok': 'elaw-section-heading__bar--external',
+};
+
+interface TypeSection {
+  type: DocumentType;
+  title: string;
+  barClass: string;
+  docs: DocumentVersion[];
+  showIssuer: boolean;
+}
+
 const latestDocs = ref<DocumentVersion[]>([]);
-const rabiapDocs = ref<DocumentVersion[]>([]);
-const khoBangkhabDocs = ref<DocumentVersion[]>([]);
-const prakatDocs = ref<DocumentVersion[]>([]);
+const allDocs = ref<DocumentVersion[]>([]);
 
 onMounted(async () => {
   try {
@@ -340,20 +235,35 @@ onMounted(async () => {
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
       .map(mapSearchResultToDocumentVersion);
 
+    allDocs.value = databaseDocs;
     latestDocs.value = databaseDocs.slice(0, HOME_SECTION_LIMIT);
-    rabiapDocs.value = docsByType(databaseDocs, 'rabiap');
-    khoBangkhabDocs.value = docsByType(databaseDocs, 'kho-bangkhab');
-    prakatDocs.value = docsByType(databaseDocs, 'prakat');
   } catch {
+    allDocs.value = [];
     latestDocs.value = [];
-    rabiapDocs.value = [];
-    khoBangkhabDocs.value = [];
-    prakatDocs.value = [];
   }
 });
 
-function docsByType(docs: DocumentVersion[], type: DocumentType): DocumentVersion[] {
-  return docs.filter((doc) => doc.metadata.documentType === type).slice(0, HOME_SECTION_LIMIT);
+const typeSections = computed<TypeSection[]>(() => {
+  const present = Array.from(new Set(allDocs.value.map((doc) => doc.metadata.documentType)))
+    .filter((type) => type !== 'other')
+    .sort((a, b) => priorityIndex(a) - priorityIndex(b));
+
+  return present.map((type) => ({
+    type,
+    title: docTypeToBadge(type) ?? type,
+    barClass: BAR_CLASS[type] ?? '',
+    docs: type === 'prakat' ? sortPrakat(docsByType(type)) : docsByType(type),
+    showIssuer: type === 'prakat',
+  }));
+});
+
+function priorityIndex(type: DocumentType): number {
+  const index = TYPE_PRIORITY.indexOf(type);
+  return index === -1 ? TYPE_PRIORITY.length : index;
+}
+
+function docsByType(type: DocumentType): DocumentVersion[] {
+  return allDocs.value.filter((doc) => doc.metadata.documentType === type).slice(0, HOME_SECTION_LIMIT);
 }
 
 function issuerRank(doc: DocumentVersion): number {
@@ -368,13 +278,14 @@ function issuerRank(doc: DocumentVersion): number {
   return 2;
 }
 
-const sortedPrakatDocs = computed(() =>
-  [...prakatDocs.value].sort((a, b) => {
+// ประกาศ: มหาวิทยาลัย first, then สภามหาวิทยาลัย, then newest within each rank.
+function sortPrakat(docs: DocumentVersion[]): DocumentVersion[] {
+  return [...docs].sort((a, b) => {
     const rank = issuerRank(a) - issuerRank(b);
     if (rank !== 0) return rank;
     return (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0);
-  })
-);
+  });
+}
 
 function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion {
   const docType = docTypeFromSource(law);
