@@ -31,28 +31,16 @@
           label="ประเภท: ทั้งหมด"
         />
         <v-select
-          v-model="filterStatus"
+          v-model="filterLifecycle"
           class="pipeline-filter-select"
-          :items="statusOptions"
+          :items="lifecycleOptions"
           item-title="title"
           item-value="value"
           clearable
           density="compact"
           variant="outlined"
           hide-details
-          label="สถานะ: ทั้งหมด"
-        />
-        <v-select
-          v-model="filterEsign"
-          class="pipeline-filter-select"
-          :items="esignOptions"
-          item-title="title"
-          item-value="value"
-          clearable
-          density="compact"
-          variant="outlined"
-          hide-details
-          label="e-Sign: ทั้งหมด"
+          label="ความคืบหน้า: ทั้งหมด"
         />
       </div>
     </div>
@@ -98,24 +86,26 @@
         <v-chip v-else size="small" color="warning" variant="tonal">ร่าง</v-chip>
       </template>
 
-      <template #item.publishedDate="{ item }">
+      <template #item.lifecycle="{ item }">
         <v-chip
           size="small"
-          :color="item.publishedDate ? 'success' : 'grey'"
+          :color="item.lifecycle.color"
+          :prepend-icon="item.lifecycle.icon"
+          variant="tonal"
+          rounded="pill"
+        >
+          {{ item.lifecycle.label }}
+        </v-chip>
+      </template>
+
+      <template #item.access="{ item }">
+        <v-chip
+          size="small"
+          :color="item.accessScope === 'public' ? 'success' : 'grey'"
           variant="tonal"
         >
-          {{ item.publishedDate ? 'เผยแพร่แล้ว' : 'ยังไม่เผยแพร่' }}
+          {{ item.accessScope === 'public' ? 'สาธารณะ' : 'ส่วนตัว' }}
         </v-chip>
-      </template>
-
-      <template #item.esign="{ item }">
-        <v-chip size="small" :color="item.esignColor" variant="tonal" rounded="pill">
-          {{ item.esignLabel }}
-        </v-chip>
-      </template>
-
-      <template #item.stage="{ item }">
-        <PipelineStageChip :stage="item.stage" />
       </template>
 
       <template #item.updatedAt="{ item }">
@@ -183,8 +173,7 @@ import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
-import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
-import PipelineStageChip from './PipelineStageChip.vue';
+import { lifecycleStatus, type LifecycleStatus } from '../../utils/lifecycleStatus';
 import {
   deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
@@ -195,13 +184,12 @@ interface Row {
   documentId: string;
   title: string;
   updatedAt: string;
-  stage: StageKey;
+  stage: StageKey;            // still drives the action button column
   lawType: string;
   lawStatus: string;
-  publishedDate: string;
   documentType: 'new' | 'old';
-  esignLabel: string;
-  esignColor: string;
+  lifecycle: LifecycleStatus;
+  accessScope: 'public' | 'private';
 }
 
 const router = useRouter();
@@ -214,37 +202,16 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const filterText = ref<string | null>('');
 const filterType = ref<string | null>(null);
-const filterStatus = ref<string | null>(null);
-const filterEsign = ref<string | null>(null);
+const filterLifecycle = ref<string | null>(null);
 
-const statusOptions = [
-  { title: 'รออัปโหลด/รอประมวลผล', value: 'queued' },
-  { title: 'กำลังประมวลผล', value: 'processing' },
-  { title: 'ประมวลผลแล้ว', value: 'done' },
-  { title: 'กำลังนำเข้าระบบ', value: 'ingesting' },
-  { title: 'เผยแพร่แล้ว', value: 'exported' },
-  { title: 'นำเข้าระบบแล้ว', value: 'ingested' },
-  { title: 'ล้มเหลว', value: 'failed' },
-  { title: 'ยกเลิก', value: 'cancelled' },
-];
-
-const esignOptions = [
-  { title: 'ลงนามแล้ว', value: 'signed' },
+const lifecycleOptions = [
+  { title: 'ร่าง (กำลังดำเนินการ)', value: 'draft' },
   { title: 'รอลงนาม', value: 'waiting' },
-  { title: 'ยังไม่ส่งลงนาม', value: 'not_sent' },
-  { title: 'ยกเลิกการส่ง', value: 'cancelled' },
-  { title: 'ถูกปฏิเสธ', value: 'rejected' },
+  { title: 'ลงนามสำเร็จ', value: 'signed' },
+  { title: 'เผยแพร่แล้ว', value: 'published' },
+  { title: 'ถูกปฏิเสธ / ยกเลิก', value: 'rejected_cancelled' },
+  { title: 'ล้มเหลว', value: 'failed' },
 ];
-
-function esignBucket(doc: DocumentListItem): string {
-  if (doc.document_type === 'old') return 'old';
-  const code = String(doc.esign_sign_status ?? '').trim().toUpperCase();
-  if (code === 'Y') return 'signed';
-  if (code === 'N') return 'rejected';
-  if (code === 'C') return 'cancelled';
-  if (doc.esign_submitted_at) return 'waiting';
-  return 'not_sent';
-}
 
 const filteredDocs = computed(() => {
   const needle = (filterText.value ?? '').trim().toLowerCase();
@@ -253,8 +220,7 @@ const filteredDocs = computed(() => {
     const searchableTitle = (d.title || d.document_id || d.source_file || '').toLowerCase();
     return (!needle || searchableTitle.includes(needle)) &&
     (!filterType.value || d.law_type === filterType.value) &&
-    (!filterStatus.value || d.status === filterStatus.value) &&
-    (!filterEsign.value || esignBucket(d) === filterEsign.value);
+    (!filterLifecycle.value || lifecycleStatus(d, effectiveStage(d)).bucket === filterLifecycle.value);
   });
 });
 
@@ -267,10 +233,9 @@ const headers = [
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
   { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
-  { title: 'สถานะกฎหมาย', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
-  { title: 'สถานะเผยแพร่', key: 'publishedDate', sortable: false, align: 'center' as const, width: 120 },
-  { title: 'e-Sign', key: 'esign', sortable: false, align: 'center' as const, width: 130 },
-  { title: 'ขั้นตอน', key: 'stage', sortable: false, align: 'center' as const, width: 140 },
+  { title: 'ความคืบหน้า', key: 'lifecycle', sortable: false, align: 'center' as const, width: 200 },
+  { title: 'สถานะบังคับใช้', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
+  { title: 'การเข้าถึง', key: 'access', sortable: false, align: 'center' as const, width: 100 },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
   { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 170 },
 ];
@@ -296,19 +261,21 @@ function effectiveStage(doc: DocumentListItem): StageKey {
 }
 
 const rows = computed<Row[]>(() =>
-  filteredDocs.value.map((doc, index) => ({
-    no: index + 1,
-    documentId: doc.document_id,
-    title: doc.title || doc.document_id,
-    updatedAt: formatDate(doc.updated_at),
-    stage: effectiveStage(doc),
-    lawType: doc.law_type ?? '',
-    lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
-    publishedDate: doc.published_date ?? '',
-    documentType: doc.document_type ?? 'new',
-    esignLabel: esignStatusLabel(doc),
-    esignColor: esignStatusColor(doc),
-  })),
+  filteredDocs.value.map((doc, index) => {
+    const stage = effectiveStage(doc);
+    return {
+      no: index + 1,
+      documentId: doc.document_id,
+      title: doc.title || doc.document_id,
+      updatedAt: formatDate(doc.updated_at),
+      stage,
+      lawType: doc.law_type ?? '',
+      lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
+      documentType: doc.document_type ?? 'new',
+      lifecycle: lifecycleStatus(doc, stage),
+      accessScope: doc.access_scope === 'public' ? 'public' : 'private',
+    };
+  }),
 );
 
 function stageDef(stage: StageKey) {
