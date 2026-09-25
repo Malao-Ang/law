@@ -110,7 +110,7 @@
                 :key="rel.id"
                 class="lawx-relrow lawx-relrow--compact"
                 :class="`is-${group.type}`"
-                :href="rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : (rel.url ?? undefined)"
+                :href="relHref(rel)"
                 :target="rel.url ? '_blank' : undefined"
                 rel="noopener"
               >
@@ -184,7 +184,17 @@ const props = defineProps<{
   parentNames?: Array<{ id: string; title: string }>;
   sectionRelationSummaries?: SectionRelationSummary[];
   unitWord?: string;
+  adminContext?: boolean;
 }>();
+
+// Admin context routes relation blocks to the target's edit page; users to the read-only view.
+function relHref(rel: LawRelation): string | undefined {
+  if (rel.target_document_id) {
+    const id = encodeURIComponent(rel.target_document_id);
+    return props.adminContext ? `/documents/${id}/edit` : `/law/${id}`;
+  }
+  return rel.url ?? undefined;
+}
 
 const parentNames = computed(() => props.parentNames ?? []);
 const sectionRelationSummaries = computed(() => props.sectionRelationSummaries ?? []);

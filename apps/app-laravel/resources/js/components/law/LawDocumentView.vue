@@ -199,7 +199,7 @@
             <div>
               <div class="text-caption font-weight-bold text-medium-emphasis">กฎหมายแม่</div>
               <a class="text-body-2 font-weight-bold d-block lawx-parent-law-card__link"
-                @click="router.push(`/law/${parentLawRelation.target_document_id}`)">
+                @click="router.push(documentTarget(parentLawRelation.target_document_id))">
                 {{ parentLawRelation.target_title }}
               </a>
               <div v-if="parentLawRelation.target_section" class="text-caption text-medium-emphasis mt-1">
@@ -238,7 +238,7 @@
             </a>
           </div>
         </section>
-        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" :section-relation-summaries="sectionRelationSummaries" :unit-word="unitWord" />
+        <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" :section-relation-summaries="sectionRelationSummaries" :unit-word="unitWord" :admin-context="isAdminContext" />
       </aside>
       </div>
       </template>
@@ -252,7 +252,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useVersionStore } from '../../stores/versionStore';
 import { buildSections, buildTocGroups, relationsForSection, documentRelations, sourceOf } from '../../composables/useLawSections';
@@ -273,6 +273,17 @@ import { formatThaiDate } from '../../utils/thaiDate';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
+const route = useRoute();
+
+// TODO: when a real login/role system lands, replace this ?from=admin query flag
+// with the authenticated user's role (e.g. authStore.isAdmin).
+const isAdminContext = computed(() => route.query.from === 'admin');
+
+// Admin viewing a law jumps to the target's edit page; users go to the read-only view.
+function documentTarget(targetDocumentId: string | null | undefined): string {
+  const id = encodeURIComponent(targetDocumentId ?? '');
+  return isAdminContext.value ? `/documents/${id}/edit` : `/law/${id}`;
+}
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
 const { documentTypes, load: loadLookups } = useLookups();
@@ -449,7 +460,7 @@ function safeUrl(url: string | null): string | null {
 function relationHref(rel: LawRelation): string | null {
   const external = safeUrl(rel.url);
   if (external) return external;
-  return rel.target_document_id ? `/law/${encodeURIComponent(rel.target_document_id)}` : null;
+  return rel.target_document_id ? documentTarget(rel.target_document_id) : null;
 }
 
 

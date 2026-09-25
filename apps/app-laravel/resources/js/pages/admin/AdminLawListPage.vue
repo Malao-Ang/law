@@ -185,7 +185,7 @@
             <td>
               <div class="d-flex align-center ga-1">
                 <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="admin-primary" :to="`/documents/${law.id}/edit`" />
-                <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}`" />
+                <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}?from=admin`" />
                 <v-menu>
                   <template #activator="{ props: menuProps }">
                     <v-btn icon="mdi-dots-vertical" size="x-small" variant="text" color="grey" v-bind="menuProps" />
