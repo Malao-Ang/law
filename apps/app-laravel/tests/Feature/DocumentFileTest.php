@@ -28,6 +28,25 @@ class DocumentFileTest extends TestCase
         $this->get('/api/documents/doc_nope/file')->assertNotFound();
     }
 
+    public function test_private_document_file_is_served_without_backend_auth(): void
+    {
+        // No backend auth exists yet (mock login is client-only), so $request->user()
+        // is always null. A private document must still serve its file — the previous
+        // `! $request->user()` gate 403'd every private doc for everyone.
+        $store = app(ReviewStore::class);
+        $id = $store->generateDocumentId();
+        $stored = $store->storeUpload(UploadedFile::fake()->create('private.pdf', 10, 'application/pdf'), $id);
+        $store->createHistoricalStub($id, $stored['source_file'], ['source' => 'internal', 'law_type' => 'ประกาศ']);
+        $store->setStatus($id, ['status' => 'done', 'document_type' => 'old', 'source_path' => $stored['relative_path']]);
+        $store->patchLawMeta($id, ['access_scope' => 'private', 'permission_group_ids' => []]);
+
+        $this->get("/api/documents/{$id}/file")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+
+        $store->deleteDocument($id);
+    }
+
     public function test_download_param_returns_attachment_disposition(): void
     {
         $store = app(ReviewStore::class);

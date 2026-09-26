@@ -26,15 +26,13 @@ class DocumentFileController extends Controller
             abort(404, 'Document not found.');
         }
 
-        // Access check: private documents require an authorised session.
-        try {
-            $meta = $this->reviewStore->getReviewDocument($documentId)['law_meta'] ?? [];
-        } catch (\Throwable) {
-            $meta = [];
-        }
-        if (($meta['access_scope'] ?? 'public') === 'private' && ! $request->user()) {
-            abort(403, 'This document is private.');
-        }
+        // NOTE: no server-side visibility gate here yet. Backend auth is not wired
+        // (mock login is client-only, so $request->user() is always null). A
+        // `! $request->user()` check would 403 every private document for everyone,
+        // including logged-in users. Visibility is enforced client-side for now
+        // (canDisplayLawResult); the real server-side gate lands with the auth/RBAC
+        // work (see docs/superpowers/specs/2026-09-26-auth-rbac-api-middleware-design.md,
+        // LawVisibility service).
 
         $relative = (string) ($status['source_path'] ?? '');
         if ($relative === '') {
