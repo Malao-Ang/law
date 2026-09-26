@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\CorrectDocumentJob;
 use App\Services\ExportService;
 use App\Services\RagIngestService;
 use App\Services\ReviewStore;
@@ -86,36 +85,4 @@ class ExportController extends Controller
         return response()->json($response);
     }
 
-    public function retryCorrection(string $documentId): JsonResponse
-    {
-        $status = $this->reviewStore->getStatus($documentId) ?? [];
-
-        if (empty($status)) {
-            return response()->json(['message' => 'Document not found.'], 404);
-        }
-
-        $correctionStatus = $status['correction_status'] ?? 'not_required';
-
-        if (in_array($correctionStatus, ['pending', 'in_progress'], true)) {
-            return response()->json([
-                'message' => 'AI correction is already running.',
-                'correction_status' => $correctionStatus,
-            ], 409);
-        }
-
-        $this->reviewStore->setStatus($documentId, [
-            'correction_status' => 'pending',
-            'current_step' => 'correction_retry_queued',
-        ]);
-
-        CorrectDocumentJob::dispatch(
-            documentId: $documentId,
-            enableAiCorrection: true,
-        );
-
-        return response()->json([
-            'message' => 'AI correction queued.',
-            'correction_status' => 'pending',
-        ]);
-    }
 }

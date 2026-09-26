@@ -63,7 +63,6 @@ Route::get('/documents/{documentId}/export-pdf/preview', [PdfExportController::c
 Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store']);
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store']);
-Route::post('/documents/{documentId}/retry-correction', [ExportController::class, 'retryCorrection']);
 Route::post('/documents/{documentId}/esign/upload', [EsignController::class, 'upload']);
 Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send']);
 Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel']);
@@ -74,11 +73,13 @@ Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentF
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
 
-// MinIO test endpoints (dev/debug only)
-Route::get('/test/minio/bucket', [MinioTestController::class, 'bucket']);
-Route::get('/test/minio', [MinioTestController::class, 'index']);
-Route::post('/test/minio/upload', [MinioTestController::class, 'upload']);
-Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
+// MinIO test endpoints (dev/debug only) — not registered in production.
+if (app()->environment('local')) {
+    Route::get('/test/minio/bucket', [MinioTestController::class, 'bucket']);
+    Route::get('/test/minio', [MinioTestController::class, 'index']);
+    Route::post('/test/minio/upload', [MinioTestController::class, 'upload']);
+    Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
+}
 
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');

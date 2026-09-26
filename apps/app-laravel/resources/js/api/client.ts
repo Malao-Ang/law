@@ -129,10 +129,6 @@ export function relatedDocumentsZipUrl(documentId: string): string {
   return `/api/documents/${encodeURIComponent(documentId)}/related-download.zip`;
 }
 
-export function fetchDocumentList(): Promise<{ documents: DocumentListItem[] }> {
-  return jsonRequest<{ documents: DocumentListItem[] }>('/api/documents');
-}
-
 export function fetchStatus(documentId: string): Promise<DocumentStatus> {
   return jsonRequest<DocumentStatus>(`/api/documents/${documentId}`);
 }
