@@ -38,6 +38,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                :can-open="doc.metadata.publicationScope !== 'private' || auth.isAuthenticated"
                 class="elaw-carousel__card"
                 @click="openLaw(doc)"
               />
@@ -61,6 +62,7 @@
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
               :visibility="doc.metadata.publicationScope"
+              :can-open="doc.metadata.publicationScope !== 'private' || auth.isAuthenticated"
               class="elaw-grid__card"
               @click="openLaw(doc)"
             />
@@ -99,6 +101,7 @@
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
                 :visibility="doc.metadata.publicationScope"
+                :can-open="doc.metadata.publicationScope !== 'private' || auth.isAuthenticated"
                 class="elaw-carousel__card"
                 @click="openLaw(doc)"
               />
@@ -124,6 +127,7 @@
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
               :visibility="doc.metadata.publicationScope"
+              :can-open="doc.metadata.publicationScope !== 'private' || auth.isAuthenticated"
               class="elaw-grid__card"
               @click="openLaw(doc)"
             />

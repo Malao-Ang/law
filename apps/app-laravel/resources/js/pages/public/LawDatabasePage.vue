@@ -409,7 +409,7 @@
                     />
                   </div>
                 </div>
-                <div v-if="law.restricted" class="law-list-card__restricted">
+                <div v-if="law.restricted && !auth.isAuthenticated" class="law-list-card__restricted">
                   <v-icon icon="mdi-lock-outline" size="16" />
                   <span class="law-list-card__restricted-label">Private · เฉพาะผู้ได้รับสิทธิ์</span>
                   <button type="button" class="law-restricted-btn" @click.stop="openLaw(law)">

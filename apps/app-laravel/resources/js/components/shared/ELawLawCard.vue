@@ -59,7 +59,7 @@
         เผยแพร่เมื่อ {{ date }}
       </div>
       <button type="button" class="elaw-card__read-btn">
-        {{ visibility === 'private' ? 'เข้าสู่ระบบ' : 'เปิดอ่าน' }}
+        {{ visibility === 'private' && !canOpen ? 'เข้าสู่ระบบ' : 'เปิดอ่าน' }}
         <v-icon icon="mdi-arrow-right" size="14" />
       </button>
     </div>
@@ -97,6 +97,9 @@ const props = defineProps<{
   visibility?: Visibility;
   changeStatus?: ChangeStatus;
   amendedSections?: string[];
+  // When true (or non-private), the viewer can open the doc directly — button reads "เปิดอ่าน".
+  // Private + cannot open (guest) → "เข้าสู่ระบบ".
+  canOpen?: boolean;
 }>();
 
 defineEmits<{ click: [] }>();
