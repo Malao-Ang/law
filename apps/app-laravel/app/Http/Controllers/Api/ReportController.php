@@ -171,6 +171,7 @@ class ReportController extends Controller
             'published_date' => trim((string) ($r['published_date'] ?? '')),
             'source' => trim((string) ($r['source'] ?? '')),
             'document_type' => trim((string) ($r['document_type'] ?? 'new')),
+            'access_scope' => $r['access_scope'] ?? 'public',
             'date' => $r['updated_at'],
             'section_count' => isset($r['section_count']) ? (int) $r['section_count'] : null,
             'page_count' => (int) ($r['page_count'] ?? 0),
