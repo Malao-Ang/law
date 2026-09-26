@@ -1,7 +1,7 @@
 <template>
   <div class="h-node" :class="{ 'is-root': node.level === 0 }">
     <div v-if="node.level > 0" class="h-edge">{{ relationTypeLabel(node.edgeType) }}</div>
-    <div class="h-row">
+    <div class="h-row" @click="$emit('open', node.row.id)">
       <v-icon :icon="rowIcon" size="20" class="h-icon" :color="node.level === 0 ? themeColor : undefined" />
       <span class="h-title">{{ node.row.title }}</span>
       <span v-if="node.row.rawDate" class="h-meta">
@@ -62,7 +62,7 @@
     </div>
     <ul v-if="node.children.length" class="h-list">
       <li v-for="child in node.children" :key="child.row.id" class="h-item">
-        <HierarchyList :node="child" :theme-color="themeColor" />
+        <HierarchyList :node="child" :theme-color="themeColor" @open="$emit('open', $event)" />
       </li>
     </ul>
   </div>
@@ -84,6 +84,7 @@ import SameLevelInlineChain from './SameLevelInlineChain.vue';
 defineOptions({ name: 'HierarchyList' });
 
 const props = defineProps<{ node: RelTreeNode; themeColor?: string }>();
+defineEmits<{ open: [id: string] }>();
 
 const expanded = ref(true);
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
@@ -129,6 +130,15 @@ const statusChipColor = computed(() =>
   flex-wrap: wrap;
   gap: 8px;
   min-height: 32px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  transition: background 0.15s;
+}
+
+.h-row:hover {
+  background: #f1f5f9;
 }
 
 .h-icon {

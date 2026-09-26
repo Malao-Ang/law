@@ -300,6 +300,7 @@
               :node="pagedRootNode"
               :current-id="selectedId"
               @select="openDetail"
+              @open="openEdit"
             />
             <div v-else class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
@@ -309,7 +310,7 @@
             <div v-if="!pagedRootNode && !filteredRootNode" class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
             </div>
-            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" />
+            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" @open="openEdit" />
           </div>
         </template>
 
@@ -608,6 +609,10 @@ function toggleTypeFilter(type: RelationType): void {
 function openDetail(id: string): void {
   rememberRecentId(id);
   router.push(`/admin/show-relations/${id}`);
+}
+
+function openEdit(id: string): void {
+  router.push(`/documents/${encodeURIComponent(id)}/edit`);
 }
 
 function goList(): void {

@@ -5,7 +5,7 @@
         <div v-if="node.level > 0" class="rel-tree__edge">{{ relationTypeLabel(node.edgeType) }}</div>
 
         <div class="rel-tree__node" :class="{ 'is-root': node.level === 0 }">
-          <div class="rel-tree__card" :class="{ 'is-current': isCurrent }">
+          <div class="rel-tree__card" :class="{ 'is-current': isCurrent }" @click="$emit('open', node.row.id)">
             <div class="d-flex align-center ga-2 mb-2">
               <DocBadge v-if="typeBadge" :type="typeBadge" />
               <v-chip
@@ -42,6 +42,7 @@
               :current-id="currentId"
               :theme-color="themeColor"
               @select="$emit('select', $event)"
+              @open="$emit('open', $event)"
             />
           </div>
         </div>
@@ -85,7 +86,7 @@ const props = defineProps<{
   currentId?: string;
   themeColor?: string;
 }>();
-defineEmits<{ select: [id: string] }>();
+defineEmits<{ select: [id: string]; open: [id: string] }>();
 
 const expanded = ref(true);
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
@@ -186,6 +187,13 @@ function statusClass(status: string): string {
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.rel-tree__card:hover {
+  border-color: #1e3a8a;
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.12);
 }
 
 .rel-tree__card.is-current {
