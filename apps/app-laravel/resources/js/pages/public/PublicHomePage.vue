@@ -239,12 +239,14 @@ onMounted(async () => {
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
       .map(mapSearchResultToDocumentVersion);
 
-    allDocs.value = databaseDocs;
-    // "อัพเดทล่าสุด" = newest by published date; the search API returns
-    // match_all in arbitrary order, so sort here before taking the top N.
-    latestDocs.value = [...databaseDocs]
-      .sort((a, b) => (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0))
-      .slice(0, HOME_SECTION_LIMIT);
+    // Search API returns match_all in arbitrary order — sort newest-first once
+    // so every section (latest + each type) shows the most recent laws.
+    // ponytail: only the first HOME_SEARCH_PAGE_SIZE docs are fetched; if the
+    // catalog outgrows that, add a server-side date sort to the search query.
+    allDocs.value = [...databaseDocs].sort(
+      (a, b) => (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0),
+    );
+    latestDocs.value = allDocs.value.slice(0, HOME_SECTION_LIMIT);
   } catch {
     allDocs.value = [];
     latestDocs.value = [];
