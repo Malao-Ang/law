@@ -296,8 +296,8 @@
         <template v-else>
           <div v-if="viewMode === 'tree'" class="rel-tree-wrap">
             <RelationTreeView
-              v-if="pagedRootNode"
-              :node="pagedRootNode"
+              v-if="filteredRootNode"
+              :node="filteredRootNode"
               :current-id="selectedId"
               @select="openDetail"
               @open="openEdit"
@@ -307,27 +307,18 @@
             </div>
           </div>
           <div v-else class="hierarchy-wrap pa-2">
-            <div v-if="!pagedRootNode && !filteredRootNode" class="text-body-2 text-medium-emphasis text-center pa-8">
+            <HierarchyList v-if="filteredRootNode" :node="filteredRootNode" @open="openEdit" />
+            <div v-else class="text-body-2 text-medium-emphasis text-center pa-8">
               ไม่พบกฎหมายลำดับรองภายใต้กฎหมายแม่ที่เลือก
             </div>
-            <HierarchyList v-if="pagedRootNode || filteredRootNode" :node="(pagedRootNode ?? filteredRootNode)!" @open="openEdit" />
           </div>
         </template>
 
         <v-divider class="mt-4" />
-        <div class="d-flex justify-space-between align-center pa-3 px-0">
+        <div class="d-flex align-center pa-3 px-0">
           <span class="text-caption text-medium-emphasis">
-            กำลังแสดงผล {{ treeRangeStart.toLocaleString('th-TH') }} - {{ treeRangeEnd.toLocaleString('th-TH') }}
-            จากทั้งหมด {{ descendantCount.toLocaleString('th-TH') }} รายการ
+            กฎหมายลำดับรองทั้งหมด {{ descendantCount.toLocaleString('th-TH') }} รายการ
           </span>
-          <v-pagination
-            v-if="treePageCount > 1"
-            v-model="treePage"
-            :length="treePageCount"
-            :total-visible="5"
-            rounded="circle"
-            density="compact"
-          />
         </div>
       </v-card>
     </template>
@@ -431,7 +422,6 @@ const treeSearch = ref('');
 const treeStatus = ref<string | null>(null);
 const treeType = ref<string | null>(null);
 const treeSort = ref('newest');
-const treePage = ref(1);
 
 const selectedId = computed(() => props.documentId || (typeof route.params.documentId === 'string' ? route.params.documentId : ''));
 
@@ -554,19 +544,6 @@ const filteredRootNode = computed(() => {
 });
 
 const descendantCount = computed(() => flattenTree(filteredRootNode.value).length);
-const treePageCount = computed(() => Math.max(1, Math.ceil((filteredRootNode.value?.children.length ?? 0) / PAGE_SIZE)));
-const pagedRootNode = computed(() => {
-  const root = filteredRootNode.value;
-  if (!root) return null;
-  const start = (treePage.value - 1) * PAGE_SIZE;
-  return { ...root, children: root.children.slice(start, start + PAGE_SIZE) };
-});
-const treeRangeStart = computed(() => (descendantCount.value === 0 ? 0 : (treePage.value - 1) * PAGE_SIZE + 1));
-const treeRangeEnd = computed(() => {
-  const shown = flattenTree(pagedRootNode.value).length;
-  if (shown === 0) return 0;
-  return treeRangeStart.value + shown - 1;
-});
 
 const stats = computed(() => {
   const nodes = flattenTree(rootNode.value);
@@ -725,7 +702,6 @@ onMounted(async () => {
 
 watch(selectedId, async (id) => {
   pickerId.value = id || null;
-  treePage.value = 1;
   if (id) await loadDetail(id);
   else {
     rootMeta.value = null;
@@ -734,7 +710,6 @@ watch(selectedId, async (id) => {
 });
 
 watch([listSearch, listStatus, listType, listSort], () => { listPage.value = 1; });
-watch([treeSearch, treeStatus, treeType, treeSort, typeFilters, viewMode], () => { treePage.value = 1; });
 </script>
 
 <style scoped>

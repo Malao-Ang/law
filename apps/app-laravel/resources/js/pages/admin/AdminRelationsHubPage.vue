@@ -247,7 +247,7 @@
             <!-- Document-level relations -->
             <div class="rh-section-title mb-3">
               <v-icon icon="mdi-link-variant" color="admin-primary" size="16" />
-              ความสัมพันธ์ระดับเอกสาร
+              กฎหมายที่เกี่ยวข้อง
               <v-spacer />
               <v-btn size="x-small" variant="outlined" prepend-icon="mdi-plus" :disabled="documentStore.saving" @click="openDocumentRelation()">
                 เพิ่ม
@@ -264,7 +264,7 @@
                 </v-btn>
               </div>
             </div>
-            <div v-else class="text-body-2 text-medium-emphasis mb-4">ยังไม่มีความสัมพันธ์ระดับเอกสาร</div>
+            <div v-else class="text-body-2 text-medium-emphasis mb-4">ยังไม่มีกฎหมายที่เกี่ยวข้อง</div>
 
             <!-- Section-level relations -->
             <template v-if="showSectionRelations">
@@ -343,7 +343,7 @@
         <div class="rh-confirm-box mb-5">
           <div class="text-body-2 font-weight-bold text-truncate">{{ documentStore.review?.law_meta?.title || quickEditTitle }}</div>
           <div class="text-caption text-medium-emphasis mt-1">
-            {{ documentLevelRelations.length }} ความสัมพันธ์ระดับเอกสาร ·
+            {{ documentLevelRelations.length }} กฎหมายที่เกี่ยวข้อง ·
             {{ sectionRelationEntries.filter(e => e.relations.length).length }} ข้อที่มีความสัมพันธ์
           </div>
         </div>

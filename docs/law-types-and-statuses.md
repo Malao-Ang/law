@@ -230,7 +230,7 @@
 | 2 | ตรวจทาน = **แก้ไขเอกสาร** | `/documents/:id/review` (ReviewPage) | แก้เนื้อหาทั้งเอกสารใน editor |
 | 3 | จัดลำดับเนื้อหา | `/documents/:id/rag` (RagManageWorkspace) | เลือก/รวม/ลบ/จัดลำดับบล็อกก่อนทำ RAG |
 | 4 (old 2) | ข้อมูล | `/documents/:id/law-info` (LawInfoPage) | กรอก metadata (law_type / สถานะ / หน่วยงาน …) — `completeWorkflowStep(4)` |
-| 5 (old 3) | เอกสารที่เกี่ยวข้อง = **ความสัมพันธ์เอกสาร** | `/documents/:id/relations` (LawRelationsPage) | เพิ่มความสัมพันธ์ระดับเอกสาร/ระดับข้อ (ดู §12) — `completeWorkflowStep(5)` |
+| 5 (old 3) | เอกสารที่เกี่ยวข้อง = **ความสัมพันธ์เอกสาร** | `/documents/:id/relations` (LawRelationsPage) | เพิ่มกฎหมายที่เกี่ยวข้อง/ระดับข้อ (ดู §12) — `completeWorkflowStep(5)` |
 | 6 (old 4) | กำหนดสิทธิ์ | `/documents/:id/permissions` (PermissionAccessPage) | ตั้ง `access_scope` + กลุ่มสิทธิ์ — `completeWorkflowStep(6)` |
 | — | ลงนาม (E-Sign) | `/documents/:id/esign` (+ `/esign/preview`, `/esign/status`) | ส่งลงนามอิเล็กทรอนิกส์ |
 | — | เผยแพร่ | (หลัง e-sign) | set `status='มีผลบังคับใช้'` + `published_date` (ดู §7–8) |

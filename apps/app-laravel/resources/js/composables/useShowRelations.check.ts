@@ -15,6 +15,8 @@ import {
   shouldNestAsSectionPatch,
   shouldUnionSameLevel,
   shouldUnionSameLevelFamily,
+  previewSameLevelItems,
+  SAME_LEVEL_PREVIEW_COUNT,
   versionNodeSize,
   type ShowRelRow,
 } from './useShowRelations';
@@ -459,5 +461,13 @@ const treeFromA = buildRelationTree('law-a', [lawAWhole, lawBWhole, lawCUnderB],
 assert(treeFromA?.sameLevelVersions.some((item) => item.id === 'law-b') === true, 'opening A still shows B as a same-level version');
 assert(treeFromA?.children.some((c) => c.row.id === 'law-b') !== true, 'B is not a vertical child under A');
 assert(treeFromA?.children.some((c) => c.row.id === 'law-c') !== true, 'C stays under B, not under A');
+
+const previewSource = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+assert(
+  previewSameLevelItems(previewSource, false).join(',') === previewSource.slice(0, SAME_LEVEL_PREVIEW_COUNT).join(','),
+  'collapsed same-level list keeps only the closest items',
+);
+assert(previewSameLevelItems(previewSource, true).join(',') === previewSource.join(','), 'expanded same-level list shows every item');
+assert(previewSameLevelItems(previewSource.slice(0, SAME_LEVEL_PREVIEW_COUNT), false).length === SAME_LEVEL_PREVIEW_COUNT, 'short same-level list stays intact');
 
 console.log('useShowRelations.check.ts: all passed');
