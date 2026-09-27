@@ -212,7 +212,7 @@ function openLaw(doc: DocumentVersion): void {
 
 // Type-section order (controls order only); types present but not listed are
 // appended automatically, so a new document type needs no edit here.
-const TYPE_PRIORITY: DocumentType[] = ['rabiap', 'prakat', 'kho-bangkhab', 'kotmai-phaainok'];
+const TYPE_PRIORITY: DocumentType[] = ['kho-bangkhab', 'rabiap', 'prakat', 'kotmai-phaainok'];
 
 const BAR_CLASS: Partial<Record<DocumentType, string>> = {
   rabiap: 'elaw-section-heading__bar--rabiap',
