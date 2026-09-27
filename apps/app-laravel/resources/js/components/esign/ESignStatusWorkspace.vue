@@ -132,24 +132,54 @@
               <div class="text-caption text-medium-emphasis">
                 {{ showingSignedPdf
                   ? 'ดึงจากไฟล์บน MinIO หลังลงนามครบ (มีลายน้ำท้ายกระดาษ)'
-                  : 'Generate จากข้อมูล review ล่าสุด ไม่ใช้ไฟล์ต้นฉบับ' }}
+                  : 'ดึงไฟล์ที่อัปโหลดขึ้น MinIO มาก่อน จนกว่าสถานะลงนามจะเป็น Y' }}
               </div>
             </div>
             <div class="d-flex ga-1">
-              <v-btn icon="mdi-refresh" size="small" variant="text" title="สร้าง PDF ใหม่" @click="refreshPdfPreview" />
+              <v-btn
+                icon="mdi-refresh"
+                size="small"
+                variant="text"
+                title="ตรวจสถานะการลงนาม"
+                :loading="checkingStatus"
+                @click="checkSignStatus"
+              />
               <v-btn
                 icon="mdi-download"
                 size="small"
                 variant="text"
                 title="ดาวน์โหลด PDF"
+                :disabled="!canDownloadEsignPdf"
                 :loading="downloadingPdf"
                 @click="downloadPdf"
               />
             </div>
           </div>
           <div class="status-pdf">
-            <iframe :key="pdfPreviewUrl" class="status-pdf__frame" :src="pdfPreviewUrl" title="ตัวอย่าง PDF" />
-            <div v-if="showingSignedPdf" class="status-pdf__signed">
+            <iframe
+              v-if="pdfObjectUrl"
+              :key="pdfObjectUrl"
+              class="status-pdf__frame"
+              :src="pdfObjectUrl"
+              title="ตัวอย่าง PDF"
+              @load="onPdfFrameLoad"
+            />
+            <div v-if="pdfPhase !== 'ready'" class="status-pdf__pending">
+              <template v-if="pdfPhase === 'error'">
+                <v-icon icon="mdi-file-document-alert-outline" size="36" color="medium-emphasis" />
+                <div class="text-body-2">{{ pdfError }}</div>
+                <v-btn size="small" variant="tonal" class="text-none" :loading="checkingStatus" @click="checkSignStatus">ตรวจอีกครั้ง</v-btn>
+              </template>
+              <template v-else-if="pdfPhase === 'idle'">
+                <v-icon icon="mdi-file-refresh-outline" size="36" color="medium-emphasis" />
+                <div class="text-body-2">{{ pdfNotice }}</div>
+              </template>
+              <template v-else>
+                <v-progress-circular indeterminate color="admin-primary" size="32" />
+                <div class="text-body-2">กำลังโหลดเอกสาร PDF</div>
+              </template>
+            </div>
+            <div v-if="showingSignedPdf && pdfPhase === 'ready'" class="status-pdf__signed">
               <v-icon icon="mdi-shield-check" size="14" />
               Digital Signature Verified
             </div>
@@ -331,9 +361,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { cancelDocumentESign, downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign, signedEsignPdfUrl } from '../../api/client';
+import { cancelDocumentESign, esignPreviewPdfUrl, fetchStatus, sendDocumentESign } from '../../api/client';
 import AppShell from '../shared/AppShell.vue';
 import SignerRightsDialog from './SignerRightsDialog.vue';
 import ConfirmSendESignDialog from './ConfirmSendESignDialog.vue';
@@ -376,9 +406,14 @@ const sending = ref(false);
 const cancelling = ref(false);
 const publishing = ref(false);
 const downloadingPdf = ref(false);
+const checkingStatus = ref(false);
 const pdfPreviewKey = ref(0);
+const pdfPhase = ref<'idle' | 'loading' | 'framing' | 'ready' | 'error'>('idle');
+const pdfNotice = ref('กดรีเฟรชเพื่อตรวจว่าลงนามครบหรือยัง');
+const pdfError = ref('');
+const pdfObjectUrl = ref('');
+let pdfRequest: AbortController | null = null;
 const errorFlash = ref('');
-let esignPollTimer: ReturnType<typeof setInterval> | null = null;
 const serverStatus = ref<DocumentStatus | null>(null);
 
 const EMPTY_META: LawMeta = {
@@ -446,14 +481,72 @@ const packageName = computed(() => {
 
 const showingSignedPdf = computed(() => hasSignedEsignPdf(serverStatus.value));
 
-const signedPdfPreviewUrl = computed(() => signedEsignPdfUrl(props.documentId));
-
-const pdfPreviewUrl = computed(() => {
-  if (showingSignedPdf.value) {
-    return `${signedPdfPreviewUrl.value}&v=${pdfPreviewKey.value}`;
-  }
-  return `${reviewPdfPreviewUrl(props.documentId)}?v=${pdfPreviewKey.value}`;
+const canDownloadEsignPdf = computed(() => {
+  if (showingSignedPdf.value) return true;
+  return String(serverStatus.value?.esign_doc_filename ?? '').trim() !== '';
 });
+
+function revokePdfObjectUrl(): void {
+  if (!pdfObjectUrl.value) return;
+  URL.revokeObjectURL(pdfObjectUrl.value);
+  pdfObjectUrl.value = '';
+}
+
+function pdfLoadErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    if (message && !/failed to fetch|networkerror|load failed/i.test(message)) {
+      return message;
+    }
+  }
+  return fallback;
+}
+
+async function loadPdfPreview(url: string): Promise<void> {
+  pdfRequest?.abort();
+  const controller = new AbortController();
+  pdfRequest = controller;
+  pdfPhase.value = 'loading';
+  pdfError.value = '';
+  if (pdfObjectUrl.value) {
+    await nextTick();
+    if (controller.signal.aborted || pdfRequest !== controller) return;
+    revokePdfObjectUrl();
+  }
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      credentials: 'same-origin',
+      headers: { Accept: 'application/pdf' },
+    });
+    if (controller.signal.aborted || pdfRequest !== controller) return;
+    if (!response.ok) {
+      const text = (await response.text()).trim();
+      throw new Error(text && text.length < 180 ? text : 'โหลดเอกสารไม่สำเร็จ');
+    }
+    const blob = await response.blob();
+    if (controller.signal.aborted || pdfRequest !== controller) return;
+    const header = await blob.slice(0, 5).text();
+    if (!header.startsWith('%PDF')) {
+      throw new Error('ไฟล์ที่ได้รับไม่ใช่เอกสาร PDF');
+    }
+    pdfObjectUrl.value = URL.createObjectURL(
+      blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' }),
+    );
+    pdfPhase.value = 'framing';
+  } catch (error) {
+    if (controller.signal.aborted || pdfRequest !== controller) return;
+    pdfPhase.value = 'error';
+    pdfError.value = pdfLoadErrorMessage(error, 'โหลดเอกสารไม่สำเร็จ');
+  }
+}
+
+function onPdfFrameLoad(): void {
+  if (pdfPhase.value === 'framing') {
+    pdfPhase.value = 'ready';
+  }
+}
 
 const metaOk = computed(() => Boolean(meta.value.title && meta.value.law_type && (meta.value.promulgation_date || meta.value.effective_date)));
 const structureOk = computed(() => (documentStore.review?.summary.block_count ?? 0) > 0);
@@ -620,18 +713,50 @@ function openDocPreview(): void {
   docPreviewOpen.value = true;
 }
 
-function refreshPdfPreview(): void {
+function releasePdfPreview(): void {
+  pdfRequest?.abort();
+  pdfRequest = null;
+  revokePdfObjectUrl();
+}
+
+async function checkSignStatus(): Promise<void> {
+  if (checkingStatus.value) return;
+  checkingStatus.value = true;
+  pdfError.value = '';
+  pdfPhase.value = 'loading';
+  await nextTick();
+  releasePdfPreview();
+  try {
+    const status = await fetchStatus(props.documentId);
+    applyServerEsignStatus(status);
+    await showStoredEsignPdf(status);
+  } catch (error) {
+    pdfPhase.value = 'error';
+    pdfError.value = pdfLoadErrorMessage(error, 'ตรวจสถานะการลงนามไม่สำเร็จ');
+    releasePdfPreview();
+  } finally {
+    checkingStatus.value = false;
+  }
+}
+
+async function showStoredEsignPdf(status: DocumentStatus): Promise<void> {
+  const uploaded = String(status.esign_doc_filename ?? '').trim() !== '';
+  if (!hasSignedEsignPdf(status) && !uploaded) {
+    pdfPhase.value = 'idle';
+    pdfNotice.value = 'ยังไม่มีไฟล์บน MinIO';
+    await nextTick();
+    releasePdfPreview();
+    return;
+  }
   pdfPreviewKey.value += 1;
+  await loadPdfPreview(`${esignPreviewPdfUrl(props.documentId)}?v=${pdfPreviewKey.value}`);
 }
 
 async function downloadPdf(): Promise<void> {
+  if (!canDownloadEsignPdf.value) return;
   downloadingPdf.value = true;
   try {
-    if (showingSignedPdf.value) {
-      window.open(signedEsignPdfUrl(props.documentId, true), '_blank', 'noopener');
-      return;
-    }
-    await downloadPdfExport(props.documentId);
+    window.open(esignPreviewPdfUrl(props.documentId, true), '_blank', 'noopener');
   } finally {
     downloadingPdf.value = false;
   }
@@ -673,7 +798,12 @@ async function submitToESign(): Promise<void> {
     writeStage(props.documentId, 'wait_esign');
     persist();
     confirmSendOpen.value = false;
-    startEsignPoll();
+    try {
+      await refreshEsignFromServer();
+    } catch (previewError) {
+      pdfPhase.value = 'error';
+      pdfError.value = pdfLoadErrorMessage(previewError, 'โหลดเอกสารจาก MinIO ไม่สำเร็จ');
+    }
   } catch (error) {
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ' });
   } finally {
@@ -695,7 +825,9 @@ async function cancelSubmit(): Promise<void> {
       actor: meta.value.imported_by || undefined,
     });
     persist();
-    stopEsignPoll();
+    releasePdfPreview();
+    pdfPhase.value = 'idle';
+    pdfNotice.value = 'กดรีเฟรชเพื่อตรวจว่าลงนามครบหรือยัง';
   } catch (error) {
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ' });
   } finally {
@@ -703,26 +835,9 @@ async function cancelSubmit(): Promise<void> {
   }
 }
 
-function stopEsignPoll(): void {
-  if (esignPollTimer !== null) {
-    clearInterval(esignPollTimer);
-    esignPollTimer = null;
-  }
-}
-
-function startEsignPoll(): void {
-  if (esignPollTimer !== null || stage.value !== 'waiting') {
-    return;
-  }
-  esignPollTimer = setInterval(() => {
-    void refreshEsignFromServer();
-  }, 5000);
-}
-
 function applyServerEsignStatus(status: DocumentStatus): void {
   serverStatus.value = status;
   if (isEsignApproved(status)) {
-    stopEsignPoll();
     if (session.value.status === 'signed') {
       return;
     }
@@ -744,21 +859,14 @@ function applyServerEsignStatus(status: DocumentStatus): void {
   }
 
   if (isEsignRejected(status)) {
-    stopEsignPoll();
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: status.esign_sign_message ? `ไม่อนุมัติการลงนาม: ${status.esign_sign_message}` : 'ไม่อนุมัติการลงนาม' });
   }
 }
 
 async function refreshEsignFromServer(): Promise<void> {
-  try {
-    const status = await fetchStatus(props.documentId);
-    applyServerEsignStatus(status);
-    if (stage.value === 'waiting' && !isEsignApproved(status) && !isEsignRejected(status)) {
-      startEsignPoll();
-    }
-  } catch {
-    /* keep waiting; next poll retries */
-  }
+  const status = await fetchStatus(props.documentId);
+  applyServerEsignStatus(status);
+  await showStoredEsignPdf(status);
 }
 
 async function setPublished(next: boolean): Promise<void> {
@@ -844,15 +952,16 @@ onMounted(() => {
   }
   session.value = loadSession(props.documentId);
   signers.value = loadSigners(props.documentId);
-  refreshPdfPreview();
   if (session.value.status !== 'signed') {
     writeStage(props.documentId, 'wait_esign');
   }
-  void refreshEsignFromServer();
+  void refreshEsignFromServer().catch(() => {
+    /* stage stays on the local session until the user checks again */
+  });
 });
 
 onBeforeUnmount(() => {
-  stopEsignPoll();
+  releasePdfPreview();
   documentStore.reset();
 });
 </script>
@@ -993,9 +1102,26 @@ onBeforeUnmount(() => {
 .status-pdf {
   position: relative;
   overflow: hidden;
+  min-height: 460px;
   border: 1px solid #d7dee7;
   border-radius: 14px;
-  background: #eef2f7;
+  background: #fff;
+}
+
+.status-pdf__pending {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 460px;
+  padding: 24px;
+  background: #fff;
+  color: #64748b;
+  text-align: center;
 }
 
 .status-pdf__frame {

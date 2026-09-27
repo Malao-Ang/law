@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\Buu\BuuMinioService;
 use App\Services\ReviewStore;
+use Illuminate\Support\Facades\Http;
 use Mockery;
 use Tests\TestCase;
 
@@ -154,5 +155,86 @@ class EsignSignedPdfTest extends TestCase
         $this->getJson("/api/documents/{$docId}/esign/signed-pdf")
             ->assertOk()
             ->assertJsonPath('view', 'https://minio.test/fallback.pdf?view');
+    }
+
+    public function test_preview_pdf_proxies_uploaded_minio_file_before_status_y(): void
+    {
+        Http::fake([
+            'https://minio.test/*' => Http::response('%PDF-1.4 uploaded', 200, ['Content-Type' => 'application/pdf']),
+        ]);
+
+        $store = app(ReviewStore::class);
+        $docId = 'test-esign-pdf-preview-wait-'.uniqid();
+        $store->setStatus($docId, [
+            'status' => 'done',
+            'document_id' => $docId,
+            'esign_sign_status' => null,
+            'esign_doc_filename' => 'waiting.pdf',
+            'esign_bucket' => 'library.elaw.storage',
+        ]);
+
+        $mock = Mockery::mock(BuuMinioService::class);
+        $mock->shouldReceive('getPublicLinks')
+            ->once()
+            ->with(
+                Mockery::on(fn ($fp) => ($fp['file'] ?? '') === 'waiting.pdf'),
+                Mockery::any(),
+                60,
+                'M',
+                'library.elaw.storage',
+            )
+            ->andReturn([
+                'file' => [
+                    'view' => 'https://minio.test/waiting.pdf?view',
+                    'download' => 'https://minio.test/waiting.pdf?download',
+                ],
+            ]);
+        $this->app->instance(BuuMinioService::class, $mock);
+
+        $this->get("/api/documents/{$docId}/esign/preview-pdf")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertSee('%PDF-1.4 uploaded', false);
+    }
+
+    public function test_preview_pdf_proxies_signed_file_when_status_is_y(): void
+    {
+        Http::fake([
+            'https://minio.test/*' => Http::response('%PDF-1.4 signed', 200, ['Content-Type' => 'application/pdf']),
+        ]);
+
+        $store = app(ReviewStore::class);
+        $docId = 'test-esign-pdf-preview-signed-'.uniqid();
+        $store->setStatus($docId, [
+            'status' => 'done',
+            'document_id' => $docId,
+            'esign_sign_status' => 'Y',
+            'esign_doc_filename' => 'waiting.pdf',
+            'esign_signed_filename' => 'signed-abc.pdf',
+            'esign_signed_bucket' => 'library.elaw.storage',
+        ]);
+
+        $mock = Mockery::mock(BuuMinioService::class);
+        $mock->shouldReceive('getPublicLinks')
+            ->once()
+            ->with(
+                Mockery::on(fn ($fp) => ($fp['file'] ?? '') === 'signed-abc.pdf'),
+                Mockery::any(),
+                60,
+                'M',
+                'library.elaw.storage',
+            )
+            ->andReturn([
+                'file' => [
+                    'view' => 'https://minio.test/signed-abc.pdf?view',
+                    'download' => 'https://minio.test/signed-abc.pdf?download',
+                ],
+            ]);
+        $this->app->instance(BuuMinioService::class, $mock);
+
+        $this->get("/api/documents/{$docId}/esign/preview-pdf")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertSee('%PDF-1.4 signed', false);
     }
 }

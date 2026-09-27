@@ -9,8 +9,11 @@ use App\Services\EsignSubmitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Throwable;
 
 class EsignController extends Controller
@@ -174,6 +177,70 @@ class EsignController extends Controller
             'filename' => $object['filename'],
             'view' => $view,
             'download' => $download,
+        ]);
+    }
+
+    public function previewPdf(Request $request, string $documentId): Response
+    {
+        $object = $this->esignSubmit->signedPdfObject($documentId)
+            ?? $this->esignSubmit->uploadedPdfObject($documentId);
+        if ($object === null) {
+            abort(404, 'e-sign PDF is not on MinIO yet.');
+        }
+
+        try {
+            $links = $this->minio->getPublicLinks(
+                ['file' => $object['filename']],
+                ['file' => $object['name']],
+                60,
+                'M',
+                $object['bucket'] !== '' ? $object['bucket'] : null,
+            );
+        } catch (BuuApiException $exception) {
+            Log::warning('e-sign preview PDF MinIO link failed', [
+                'document_id' => $documentId,
+                'filename' => $object['filename'],
+                'error' => $exception->getMessage(),
+            ]);
+
+            abort(502, 'Failed to resolve e-sign PDF from MinIO.');
+        }
+
+        $fileLinks = is_array($links['file'] ?? null) ? $links['file'] : [];
+        $view = is_string($fileLinks['view'] ?? null) ? $fileLinks['view'] : '';
+        $download = is_string($fileLinks['download'] ?? null) ? $fileLinks['download'] : '';
+        $source = $request->boolean('download')
+            ? ($download !== '' ? $download : $view)
+            : ($view !== '' ? $view : $download);
+        if ($source === '') {
+            abort(502, 'MinIO did not return an e-sign PDF URL.');
+        }
+
+        try {
+            $minioResponse = Http::timeout(120)->get($source);
+        } catch (Throwable $exception) {
+            Log::warning('e-sign preview PDF MinIO fetch failed', [
+                'document_id' => $documentId,
+                'filename' => $object['filename'],
+                'error' => $exception->getMessage(),
+            ]);
+
+            abort(502, 'Failed to fetch e-sign PDF from MinIO.');
+        }
+
+        if (! $minioResponse->successful() || $minioResponse->body() === '') {
+            abort(502, 'MinIO did not return an e-sign PDF.');
+        }
+
+        $disposition = $request->boolean('download')
+            ? HeaderUtils::DISPOSITION_ATTACHMENT
+            : HeaderUtils::DISPOSITION_INLINE;
+        $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $object['name'])) ?: 'document.pdf';
+
+        return response($minioResponse->body(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => HeaderUtils::makeDisposition($disposition, $object['name'], $asciiFallback),
+            'Cache-Control' => 'private, max-age=60',
         ]);
     }
 

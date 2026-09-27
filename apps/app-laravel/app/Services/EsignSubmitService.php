@@ -318,6 +318,33 @@ class EsignSubmitService
         ];
     }
 
+    /**
+     * MinIO object uploaded for e-sign, before callback Y.
+     *
+     * @return array{filename: string, bucket: string, name: string}|null
+     */
+    public function uploadedPdfObject(string $documentId): ?array
+    {
+        $documentId = basename($documentId);
+        $status = $this->reviewStore->getStatus($documentId);
+        if ($status === null) {
+            return null;
+        }
+
+        $filename = trim((string) ($status['esign_doc_filename'] ?? ''));
+        if ($filename === '') {
+            return null;
+        }
+
+        $bucket = trim((string) ($status['esign_bucket'] ?? config('buu.default_bucket')));
+
+        return [
+            'filename' => $filename,
+            'bucket' => $bucket,
+            'name' => basename(str_replace('\\', '/', $filename)),
+        ];
+    }
+
     private function resolveOwnerCitizenId(?string $ownerCitizenId, ?string $fallbackFromSigner = null): string
     {
         $owner = trim((string) ($ownerCitizenId ?? ''));

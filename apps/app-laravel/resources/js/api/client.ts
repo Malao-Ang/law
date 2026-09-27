@@ -344,6 +344,12 @@ export function signedEsignPdfUrl(documentId: string, download = false): string 
   return download ? `${path}?download=1` : `${path}?redirect=1`;
 }
 
+/** Same-origin PDF bytes: signed file when status is Y, otherwise the uploaded MinIO file. */
+export function esignPreviewPdfUrl(documentId: string, download = false): string {
+  const path = `/api/documents/${encodeURIComponent(documentId)}/esign/preview-pdf`;
+  return download ? `${path}?download=1` : path;
+}
+
 export type SignedEsignPdfLinks = {
   status: string;
   filename: string;
