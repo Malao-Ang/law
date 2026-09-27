@@ -246,7 +246,11 @@ onMounted(async () => {
     allDocs.value = [...databaseDocs].sort(
       (a, b) => (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0),
     );
-    latestDocs.value = allDocs.value.slice(0, HOME_SECTION_LIMIT);
+    // Latest section groups by the same type priority, newest-first within each
+    // type (stable sort keeps the date order already applied to allDocs).
+    latestDocs.value = [...allDocs.value]
+      .sort((a, b) => priorityIndex(a.metadata.documentType) - priorityIndex(b.metadata.documentType))
+      .slice(0, HOME_SECTION_LIMIT);
   } catch {
     allDocs.value = [];
     latestDocs.value = [];
