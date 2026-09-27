@@ -449,13 +449,13 @@ export async function sendDocumentESign(
   documentId: string,
   payload: ESignSendPayload,
 ): Promise<ESignSendResponse> {
-  const uploaded = await uploadDocumentESign(documentId, payload);
+  await uploadDocumentESign(documentId, payload);
 
   try {
     return await submitDocumentESign(documentId, payload);
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'ส่ง e-sign ไม่สำเร็จ';
-    throw new Error(`${reason} (อัปโหลด MinIO แล้ว: ${uploaded.minio_filename})`);
+    throw new Error(reason);
   }
 }
 

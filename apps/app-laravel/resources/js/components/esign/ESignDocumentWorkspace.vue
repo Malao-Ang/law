@@ -232,14 +232,14 @@
               </div>
             </div>
             <v-btn
-              v-if="stage === 'draft'"
+              v-if="stage === 'draft' || stage === 'cancelled'"
               block
               color="warning"
               class="text-none font-weight-bold"
               prepend-icon="mdi-send-outline"
               :loading="confirming"
               @click="confirmSign"
-            >ส่งลงนามทันที</v-btn>
+            >{{ stage === 'cancelled' ? 'ส่งอีกครั้ง' : 'ส่งลงนามทันที' }}</v-btn>
             <v-btn
               v-else-if="stage === 'published'"
               block
@@ -257,7 +257,7 @@
               @click="router.push(`/documents/${documentId}/esign/status`)"
             >ดูสถานะการลงนาม</v-btn>
             <v-btn
-              v-if="stage === 'draft'"
+              v-if="stage === 'draft' || stage === 'cancelled'"
               block
               variant="text"
               size="small"
@@ -622,7 +622,7 @@ function setupObserver(): void {
 async function confirmSign(): Promise<void> {
   confirming.value = true;
   try {
-    if (stage.value !== 'draft') {
+    if (stage.value !== 'draft' && stage.value !== 'cancelled') {
       await router.push(`/documents/${props.documentId}/esign/status`);
       return;
     }

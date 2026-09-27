@@ -170,6 +170,7 @@ class EsignSubmitControllerTest extends TestCase
             'esign_doc_filename' => 'stored-abc.pdf',
             'esign_owner_citizenid' => '1111111111111',
             'esign_bucket' => 'buu-contract',
+            'esign_signers' => [['psn_citizenid' => '1111111111111', 'name' => 'ผู้ลงนามเดิม']],
         ]);
 
         $buu = Mockery::mock(BuuEsignService::class);
@@ -187,6 +188,7 @@ class EsignSubmitControllerTest extends TestCase
         $status = $store->getStatus($documentId);
         $this->assertSame('C', $status['esign_sign_status'] ?? null);
         $this->assertNotNull($status['esign_cancelled_at'] ?? null);
+        $this->assertSame([], $status['esign_signers'] ?? null);
     }
 
     public function test_cancel_without_prior_submit_returns_422(): void

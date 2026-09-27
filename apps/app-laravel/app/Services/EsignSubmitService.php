@@ -271,6 +271,7 @@ class EsignSubmitService
             'esign_confirmed_at' => null,
             'esign_signed_filename' => null,
             'esign_signed_bucket' => null,
+            'esign_signers' => [],
             'workflow_completed_step' => 5,
             'workflow_current_step' => 6,
         ]);

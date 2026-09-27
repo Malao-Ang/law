@@ -29,6 +29,16 @@
           ยกเลิกการส่งลงนาม
         </v-btn>
       </template>
+      <template v-else-if="stage === 'cancelled'">
+        <v-btn
+          color="warning"
+          size="small"
+          prepend-icon="mdi-send-outline"
+          class="text-none"
+          :disabled="signers.length === 0"
+          @click="confirmSendOpen = true"
+        >ส่งอีกครั้ง</v-btn>
+      </template>
       <template v-else>
         <v-btn
           variant="outlined"
@@ -76,7 +86,7 @@
               variant="flat"
               class="font-weight-bold"
             >{{ statusChip.label }}</v-chip>
-            <span class="text-caption text-medium-emphasis">{{ session.trackingId }}</span>
+            <span v-if="publicTrackingId" class="text-caption text-medium-emphasis">{{ publicTrackingId }}</span>
             <span v-if="updatedAtLabel" class="text-caption text-medium-emphasis">• แก้ไขล่าสุด {{ updatedAtLabel }}</span>
           </div>
           <h1 class="status-hero__title">{{ docTitle }}</h1>
@@ -128,11 +138,6 @@
             <div>
               <div class="text-subtitle-2 font-weight-bold">
                 {{ showingSignedPdf ? 'เอกสาร PDF ที่ลงนามแล้ว' : 'ตัวอย่าง PDF จากเอกสารที่ตรวจทานแล้ว' }}
-              </div>
-              <div class="text-caption text-medium-emphasis">
-                {{ showingSignedPdf
-                  ? 'ดึงจากไฟล์บน MinIO หลังลงนามครบ (มีลายน้ำท้ายกระดาษ)'
-                  : 'ดึงไฟล์ที่อัปโหลดขึ้น MinIO มาก่อน จนกว่าสถานะลงนามจะเป็น Y' }}
               </div>
             </div>
             <div class="d-flex ga-1">
@@ -196,7 +201,7 @@
               :dot-color="activityColor(item.title)"
             >
               <div class="text-body-2 font-weight-medium">{{ item.title }}</div>
-              <div v-if="item.detail" class="text-caption text-medium-emphasis">{{ item.detail }}</div>
+              <div v-if="publicActivityDetail(item.detail)" class="text-caption text-medium-emphasis">{{ publicActivityDetail(item.detail) }}</div>
               <div class="text-caption text-medium-emphasis">
                 {{ formatWhen(item.at) }}
                 <span v-if="item.actor"> • {{ item.actor }}</span>
@@ -219,6 +224,15 @@
         >
           <div class="font-weight-bold mb-1">{{ sideAlert.title }}</div>
           <div class="text-caption" style="white-space: pre-line">{{ sideAlert.body }}</div>
+          <div v-if="stage === 'cancelled'" class="d-flex flex-column ga-2 mt-3">
+            <v-btn
+              color="warning"
+              class="text-none"
+              prepend-icon="mdi-send-outline"
+              :disabled="signers.length === 0"
+              @click="confirmSendOpen = true"
+            >ส่งอีกครั้ง</v-btn>
+          </div>
           <div v-if="stage === 'signed'" class="d-flex flex-column ga-2 mt-3">
             <v-btn color="success" class="text-none" prepend-icon="mdi-earth" @click="publishOpen = true">เผยแพร่กฎหมาย</v-btn>
             <v-btn
@@ -236,7 +250,7 @@
         <v-card flat border rounded="lg" class="pa-4 mb-3">
           <div class="d-flex align-center justify-space-between mb-3">
             <div class="text-subtitle-2 font-weight-bold">ข้อมูลผู้ลงนาม</div>
-            <div v-if="stage === 'draft'" class="d-flex ga-1">
+            <div v-if="stage === 'draft' || stage === 'cancelled'" class="d-flex ga-1">
               <v-btn size="x-small" variant="text" class="text-none" @click="openSignerDialog">เปลี่ยนแปลง</v-btn>
               <v-btn
                 size="x-small"
@@ -265,7 +279,7 @@
           </div>
           <div v-else class="text-caption text-medium-emphasis text-center py-4">
             ยังไม่มีผู้ลงนาม
-            <div v-if="stage === 'draft'" class="mt-2">
+            <div v-if="stage === 'draft' || stage === 'cancelled'" class="mt-2">
               <v-btn size="small" color="admin-primary" class="text-none" @click="openSignerDialog">เลือกผู้ลงนาม</v-btn>
             </div>
           </div>
@@ -445,9 +459,14 @@ const EMPTY_META: LawMeta = {
 const meta = computed(() => documentStore.review?.law_meta ?? EMPTY_META);
 const stage = computed(() => deriveEsignStage(serverStatus.value, meta.value));
 const docTitle = computed(() => meta.value.title || documentStore.review?.source_file || props.documentId);
+const publicTrackingId = computed(() => {
+  const id = session.value.trackingId.trim();
+  if (!id || /minio/i.test(id) || /\.pdf$/i.test(id)) return '';
+  return id;
+});
 const docRelations = computed(() => documentRelations(documentStore.review?.relations));
 const primarySigner = computed<ESignSigner | null>(() => {
-  const serverSigners = serverStatus.value?.esign_signers ?? [];
+  const serverSigners = stage.value === 'cancelled' ? [] : (serverStatus.value?.esign_signers ?? []);
   if (serverSigners.length > 0) {
     const signer = serverSigners[0];
     return {
@@ -634,7 +653,7 @@ const sideAlert = computed(() => {
     return {
       type: 'warning' as const,
       title: 'ยกเลิกการส่งลงนาม',
-      body: 'เอกสารถูกยกเลิกจากกระบวนการลงนาม สามารถตรวจสอบและส่งใหม่ได้',
+      body: 'เอกสารถูกยกเลิกจากกระบวนการลงนาม ต้องเลือกผู้ลงนามใหม่ก่อนส่งอีกครั้ง',
     };
   }
   return {
@@ -679,6 +698,12 @@ function initials(name: string): string {
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2);
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`;
+}
+
+function publicActivityDetail(detail?: string): string {
+  const text = detail?.trim() ?? '';
+  if (!text || /minio/i.test(text) || /\.pdf$/i.test(text)) return '';
+  return text;
 }
 
 function formatWhen(iso: string): string {
@@ -743,7 +768,7 @@ async function showStoredEsignPdf(status: DocumentStatus): Promise<void> {
   const uploaded = String(status.esign_doc_filename ?? '').trim() !== '';
   if (!hasSignedEsignPdf(status) && !uploaded) {
     pdfPhase.value = 'idle';
-    pdfNotice.value = 'ยังไม่มีไฟล์บน MinIO';
+    pdfNotice.value = 'ยังไม่มีไฟล์เอกสาร';
     await nextTick();
     releasePdfPreview();
     return;
@@ -774,7 +799,7 @@ async function submitToESign(): Promise<void> {
   try {
     persist();
     const primaryCitizenId = signers.value[0]?.citizenId;
-    const result = await sendDocumentESign(props.documentId, {
+    await sendDocumentESign(props.documentId, {
       // Sandbox mock: owner = first signer until real owner mapping exists
       owner_citizen_id: primaryCitizenId,
       signers: signers.value.map((signer) => ({
@@ -788,10 +813,8 @@ async function submitToESign(): Promise<void> {
       ...session.value,
       status: 'waiting',
       submittedAt: now,
-      trackingId: result.minio_filename || session.value.trackingId,
     }, {
       title: 'ส่งเอกสารเข้าสู่ระบบ e-Sign',
-      detail: `MinIO ${result.minio_filename}`,
       actor: meta.value.imported_by || undefined,
       at: now,
     });
@@ -802,7 +825,7 @@ async function submitToESign(): Promise<void> {
       await refreshEsignFromServer();
     } catch (previewError) {
       pdfPhase.value = 'error';
-      pdfError.value = pdfLoadErrorMessage(previewError, 'โหลดเอกสารจาก MinIO ไม่สำเร็จ');
+      pdfError.value = pdfLoadErrorMessage(previewError, 'โหลดเอกสารไม่สำเร็จ');
     }
   } catch (error) {
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ส่งเข้า e-Sign ไม่สำเร็จ' });
@@ -824,10 +847,27 @@ async function cancelSubmit(): Promise<void> {
       title: 'ยกเลิกการส่งลงนาม',
       actor: meta.value.imported_by || undefined,
     });
+    signers.value = [];
     persist();
+    try {
+      const status = await fetchStatus(props.documentId);
+      applyServerEsignStatus(status);
+    } catch {
+      if (serverStatus.value) {
+        serverStatus.value = {
+          ...serverStatus.value,
+          esign_sign_status: 'C',
+          esign_submitted_at: null,
+          esign_confirmed_at: null,
+          esign_signed_at: null,
+          esign_signed_filename: null,
+          esign_signers: [],
+        };
+      }
+    }
     releasePdfPreview();
     pdfPhase.value = 'idle';
-    pdfNotice.value = 'กดรีเฟรชเพื่อตรวจว่าลงนามครบหรือยัง';
+    pdfNotice.value = 'ยกเลิกแล้ว กดส่งอีกครั้งเมื่อพร้อม';
   } catch (error) {
     void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: error instanceof Error ? error.message : 'ยกเลิกการส่งลงนามไม่สำเร็จ' });
   } finally {
