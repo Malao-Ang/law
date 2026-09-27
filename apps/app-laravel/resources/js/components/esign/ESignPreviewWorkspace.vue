@@ -16,12 +16,12 @@
       <v-btn
         color="admin-primary"
         size="small"
-        :prepend-icon="stage === 'draft' ? 'mdi-send-outline' : 'mdi-file-search-outline'"
+        :prepend-icon="canPrepareSend ? 'mdi-send-outline' : 'mdi-file-search-outline'"
         class="text-none"
-        :disabled="stage === 'draft' && !canSend"
+        :disabled="canPrepareSend && !canSend"
         :loading="sending"
         @click="handlePrimaryAction"
-      >{{ stage === 'draft' ? 'ส่งไปยังระบบ E-Sign' : 'ดูสถานะการลงนาม' }}</v-btn>
+      >{{ stage === 'cancelled' ? 'ส่งอีกครั้ง' : (stage === 'draft' ? 'ส่งไปยังระบบ E-Sign' : 'ดูสถานะการลงนาม') }}</v-btn>
 
     </template>
 
@@ -313,6 +313,7 @@ const completenessPct = computed(() => {
 });
 
 const canSend = computed(() => signers.value.length > 0 && metaOk.value && structureOk.value);
+const canPrepareSend = computed(() => stage.value === 'draft' || stage.value === 'cancelled');
 
 const packageName = computed(() => {
   const base = (documentStore.review?.source_file || previewStore.data?.source_file || 'Draft_Regulation')
@@ -397,7 +398,7 @@ async function refreshServerStatus(): Promise<void> {
 }
 
 function handlePrimaryAction(): void {
-  if (stage.value !== 'draft') {
+  if (!canPrepareSend.value) {
     void router.push(`/documents/${props.documentId}/esign/status`);
     return;
   }
@@ -427,7 +428,7 @@ async function saveDraft(): Promise<void> {
 
 async function sendToESign(): Promise<void> {
   await refreshServerStatus();
-  if (stage.value !== 'draft') {
+  if (stage.value !== 'draft' && stage.value !== 'cancelled') {
     confirmSendOpen.value = false;
     await router.push(`/documents/${props.documentId}/esign/status`);
     return;
@@ -440,7 +441,7 @@ async function sendToESign(): Promise<void> {
   try {
     persistSigners();
     const primaryCitizenId = signers.value[0]?.citizenId;
-    const result = await sendDocumentESign(props.documentId, {
+    await sendDocumentESign(props.documentId, {
       // Sandbox mock: owner = first signer until real owner mapping exists
       owner_citizen_id: primaryCitizenId,
       signers: signers.value.map((signer) => ({
@@ -455,10 +456,8 @@ async function sendToESign(): Promise<void> {
       ...current,
       status: 'waiting',
       submittedAt: now,
-      trackingId: result.minio_filename || current.trackingId,
     }, {
       title: 'ส่งเอกสารเข้าสู่ระบบ e-Sign',
-      detail: `MinIO ${result.minio_filename}`,
       actor: documentStore.review?.law_meta?.imported_by || undefined,
       at: now,
     });

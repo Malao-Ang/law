@@ -271,6 +271,7 @@ class EsignSubmitService
             'esign_confirmed_at' => null,
             'esign_signed_filename' => null,
             'esign_signed_bucket' => null,
+            'esign_signers' => [],
             'workflow_completed_step' => 5,
             'workflow_current_step' => 6,
         ]);
@@ -310,6 +311,33 @@ class EsignSubmitService
         }
 
         $bucket = trim((string) ($status['esign_signed_bucket'] ?? $status['esign_bucket'] ?? config('buu.default_bucket')));
+
+        return [
+            'filename' => $filename,
+            'bucket' => $bucket,
+            'name' => basename(str_replace('\\', '/', $filename)),
+        ];
+    }
+
+    /**
+     * MinIO object uploaded for e-sign, before callback Y.
+     *
+     * @return array{filename: string, bucket: string, name: string}|null
+     */
+    public function uploadedPdfObject(string $documentId): ?array
+    {
+        $documentId = basename($documentId);
+        $status = $this->reviewStore->getStatus($documentId);
+        if ($status === null) {
+            return null;
+        }
+
+        $filename = trim((string) ($status['esign_doc_filename'] ?? ''));
+        if ($filename === '') {
+            return null;
+        }
+
+        $bucket = trim((string) ($status['esign_bucket'] ?? config('buu.default_bucket')));
 
         return [
             'filename' => $filename,
