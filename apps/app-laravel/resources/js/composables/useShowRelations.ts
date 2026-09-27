@@ -5,6 +5,7 @@ import { formatThaiDate } from '../utils/thaiDate';
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
 export const MAX_DEPTH = 6;
+export const SAME_LEVEL_PREVIEW_COUNT = 5;
 
 export const TYPE_META: Record<string, { color: string; short: string }> = {
   กฎหมายภายนอก: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
@@ -643,6 +644,11 @@ export function buildRelationTree(
   }
 
   return walk(rootId, 0, 'related', new Set());
+}
+
+export function previewSameLevelItems<T>(items: readonly T[], expanded: boolean): T[] {
+  if (expanded || items.length <= SAME_LEVEL_PREVIEW_COUNT) return [...items];
+  return items.slice(0, SAME_LEVEL_PREVIEW_COUNT);
 }
 
 export function flattenTree(node: RelTreeNode | null): RelTreeNode[] {

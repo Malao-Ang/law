@@ -61,18 +61,27 @@
       />
     </div>
     <ul v-if="node.children.length" class="h-list">
-      <li v-for="child in node.children" :key="child.row.id" class="h-item">
+      <li v-for="child in visibleChildren" :key="child.row.id" class="h-item">
         <HierarchyList :node="child" :theme-color="themeColor" @open="$emit('open', $event)" />
+      </li>
+      <li v-if="hasHiddenChildren" class="h-item">
+        <button
+          type="button"
+          class="h-more"
+          aria-label="แสดงกฎหมายที่เหลือในระดับเดียวกัน"
+          @click="showAllChildren = true"
+        >…</button>
       </li>
     </ul>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
 import {
   metaStatusColor,
+  previewSameLevelItems,
   sameLevelVersionLabel,
   typeColor,
   typeIcon,
@@ -87,7 +96,14 @@ const props = defineProps<{ node: RelTreeNode; themeColor?: string }>();
 defineEmits<{ open: [id: string] }>();
 
 const expanded = ref(true);
+const showAllChildren = ref(false);
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
+const childSetKey = computed(() =>
+  `${props.node.row.id}|${props.node.children.map((child) => child.row.id).sort().join('\0')}`,
+);
+watch(childSetKey, () => { showAllChildren.value = false; });
+const visibleChildren = computed(() => previewSameLevelItems(props.node.children, showAllChildren.value));
+const hasHiddenChildren = computed(() => visibleChildren.value.length < props.node.children.length);
 const peers = computed(() =>
   (props.node.sameLevelVersions ?? []).filter((row) => row.id !== props.node.row.id),
 );
@@ -227,5 +243,31 @@ const statusChipColor = computed(() =>
   position: absolute;
   top: 23px;
   width: 3px;
+}
+
+.h-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed #94a3b8;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.h-more:hover,
+.h-more:focus-visible {
+  border-color: #1e3a8a;
+  color: #1e3a8a;
+  background: #f8fafc;
+  outline: none;
 }
 </style>

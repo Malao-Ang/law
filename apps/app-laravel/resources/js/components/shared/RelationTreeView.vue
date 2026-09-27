@@ -36,7 +36,7 @@
           </div>
           <div class="rel-tree__row">
             <RelationTreeView
-              v-for="child in node.children"
+              v-for="child in visibleChildren"
               :key="child.row.id"
               :node="child"
               :current-id="currentId"
@@ -44,6 +44,13 @@
               @select="$emit('select', $event)"
               @open="$emit('open', $event)"
             />
+            <button
+              v-if="hasHiddenChildren"
+              type="button"
+              class="rel-tree__more"
+              aria-label="แสดงกฎหมายที่เหลือในระดับเดียวกัน"
+              @click="showAllChildren = true"
+            >…</button>
           </div>
         </div>
       </div>
@@ -73,9 +80,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { relationTypeLabel } from '../../types/lawRelation';
-import { sameLevelVersionLabel, type RelTreeNode } from '../../composables/useShowRelations';
+import { previewSameLevelItems, sameLevelVersionLabel, type RelTreeNode } from '../../composables/useShowRelations';
 import DocBadge from './DocBadge.vue';
 import { lawTypeToBadge } from './lawBadge';
 import SameLevelInlineChain from './SameLevelInlineChain.vue';
@@ -89,7 +96,14 @@ const props = defineProps<{
 defineEmits<{ select: [id: string]; open: [id: string] }>();
 
 const expanded = ref(true);
+const showAllChildren = ref(false);
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
+const childSetKey = computed(() =>
+  `${props.node.row.id}|${props.node.children.map((child) => child.row.id).sort().join('\0')}`,
+);
+watch(childSetKey, () => { showAllChildren.value = false; });
+const visibleChildren = computed(() => previewSameLevelItems(props.node.children, showAllChildren.value));
+const hasHiddenChildren = computed(() => visibleChildren.value.length < props.node.children.length);
 
 const isCurrent = computed(() =>
   props.node.level === 0 || props.node.row.id === props.currentId,
@@ -272,7 +286,31 @@ function statusClass(status: string): string {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: flex-start;
   gap: 20px 24px;
   width: 100%;
+}
+
+.rel-tree__more {
+  align-self: flex-start;
+  margin-top: 42px;
+  width: 72px;
+  min-height: 88px;
+  border: 1px dashed #94a3b8;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+
+.rel-tree__more:hover,
+.rel-tree__more:focus-visible {
+  border-color: #1e3a8a;
+  color: #1e3a8a;
+  background: #f8fafc;
+  outline: none;
 }
 </style>
