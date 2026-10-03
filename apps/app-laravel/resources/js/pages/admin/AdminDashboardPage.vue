@@ -137,7 +137,7 @@
               </td>
               <td>
                 <v-chip size="small" :color="statusChipColor(doc.status)" rounded="pill" variant="tonal">
-                  {{ doc.meta_status || doc.status }}
+                  {{ doc.meta_status ? statusLabel(doc.meta_status) : doc.status }}
                 </v-chip>
               </td>
               <td class="text-body-2">{{ complexityLabel(doc.section_count) }}</td>
@@ -171,7 +171,7 @@ import AppShell from '../../components/shared/AppShell.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 
 const router = useRouter();
-const { statusColor } = useLawStatus();
+const { statusColor, statusLabel } = useLawStatus();
 
 const STATUS_CHIP: Record<string, string> = {
   active: 'success',

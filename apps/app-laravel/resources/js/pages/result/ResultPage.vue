@@ -22,7 +22,7 @@
             </div>
           </div>
           <div class="d-flex flex-wrap ga-2">
-            <v-chip v-if="meta?.status" size="small" color="primary" variant="tonal">{{ meta.status }}</v-chip>
+            <v-chip v-if="meta?.status" size="small" color="primary" variant="tonal">{{ statusLabel(meta.status) }}</v-chip>
             <v-chip v-if="meta?.promulgation_date" size="small" variant="outlined">ประกาศ {{ formatThaiDate(meta.promulgation_date) }}</v-chip>
             <v-chip
               v-if="meta?.access_scope === 'private'"
@@ -260,9 +260,11 @@ import type { DocumentStatus, LawMeta, ReviewDocument } from '../../types/docume
 import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved } from '../../utils/esignStatus';
 import AppShell from '../../components/shared/AppShell.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
+const { statusLabel } = useLawStatus();
 
 const loading = ref(true);
 const review = ref<ReviewDocument | null>(null);
