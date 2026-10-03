@@ -29,6 +29,11 @@ type ApiErrorPayload = {
   errors?: Record<string, string[]>;
 };
 
+export type ApiRequestError = Error & {
+  status?: number;
+  errors?: Record<string, string[]>;
+};
+
 export type SelectableOption = {
   title: string;
   value: string;
@@ -75,7 +80,10 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
       ? Object.values(payload.errors).flat()[0]
       : undefined;
 
-    throw new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback);
+    const error = new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback) as ApiRequestError;
+    error.status = response.status;
+    error.errors = payload?.errors;
+    throw error;
   }
 
   return (await response.json()) as T;

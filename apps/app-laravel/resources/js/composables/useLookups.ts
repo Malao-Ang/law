@@ -32,6 +32,11 @@ async function load(): Promise<void> {
   await inFlight;
 }
 
+async function reload(): Promise<void> {
+  loaded = false;
+  await load();
+}
+
 export function useLookups() {
-  return { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load };
+  return { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load, reload };
 }
