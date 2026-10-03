@@ -91,6 +91,11 @@ class MasterDataStoreTest extends TestCase
 
         $store->seedIfEmpty(MasterDataKind::EnforcementStatus);
 
-        $this->assertSame('STA99', $store->all(MasterDataKind::EnforcementStatus)[0]['code']);
+        $codes = array_column($store->all(MasterDataKind::EnforcementStatus), 'code');
+        $this->assertContains('STA99', $codes);
+        $this->assertSame('Existing', $store->find(MasterDataKind::EnforcementStatus, 'STA99')['name']);
+        foreach (['STA01', 'STA02', 'STA03'] as $systemCode) {
+            $this->assertContains($systemCode, $codes);
+        }
     }
 }

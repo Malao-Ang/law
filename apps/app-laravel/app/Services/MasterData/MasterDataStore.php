@@ -249,13 +249,27 @@ class MasterDataStore
 
     public function seedIfEmpty(MasterDataKind $kind): void
     {
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind): void {
-            if (isset($data['items']) && is_array($data['items']) && $data['items'] !== []) {
-                return;
-            }
+        if ($this->missingSeeds($kind, $this->readItems($kind)) === []
+            && $this->blob->read(self::BLOB_KIND, $kind->value) !== null) {
+            return;
+        }
 
-            $data = ['items' => $this->normalizeSeedItems($kind, $kind->seed())];
+        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind): void {
+            $items = $this->itemsFromData($data);
+            $data = ['items' => $this->sortItems([...$items, ...$this->missingSeeds($kind, $items)])];
         });
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function missingSeeds(MasterDataKind $kind, array $items): array
+    {
+        return array_values(array_filter(
+            $this->normalizeSeedItems($kind, $kind->seed()),
+            fn (array $seed): bool => $this->itemIndex($items, (string) $seed['code']) === null,
+        ));
     }
 
     public function reseed(MasterDataKind $kind, bool $force = false): int
