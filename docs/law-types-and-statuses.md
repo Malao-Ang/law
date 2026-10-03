@@ -108,13 +108,16 @@
 
 ## 7. สถานะการบังคับใช้ — `status` (สถานะทางกฎหมาย)
 
-**นี่คือ "สถานะ" ที่แสดงบนหน้าเว็บ** (ร่าง / มีผลบังคับใช้ / ยกเลิก)
+**นี่คือ "สถานะ" ที่แสดงบนหน้าเว็บ** แต่ค่าที่เก็บใน `LawMeta.status` เป็นรหัสจาก master data `enforcement_status`
+ไม่ใช่ข้อความภาษาไทยโดยตรง
 
-| value | ความหมาย |
-|---|---|
-| `ร่าง` | ยังเป็นร่าง ยังไม่มีผล |
-| `มีผลบังคับใช้` | บังคับใช้อยู่ |
-| `ยกเลิกการใช้งาน` | ถูกยกเลิก ไม่บังคับใช้แล้ว |
+| code | label | role | color |
+|---|---|---|---|
+| `STA01` | มีผลบังคับใช้ | `in_force` | `success` |
+| `STA02` | ยกเลิกการใช้งาน | `repealed` | `error` |
+| `STA03` | ร่าง | `draft` | `grey` |
+
+ชื่อ/alias เก่าถูก normalize เป็น code ผ่าน master data service; โค้ดใหม่ควรอ่าน/เขียนเป็น `STA01`–`STA03`.
 
 > ⚠️ อย่าสับสนกับ `DocumentStatus.status` (สถานะ pipeline OCR — ดูข้อ 11) คนละ object กัน
 
@@ -129,7 +132,7 @@
 | ว่าง (empty/null) | **ไม่เผยแพร่** (สาธารณะมองไม่เห็น) |
 | มีวันที่ | **เผยแพร่แล้ว** |
 
-- ตอน publish (หลัง e-sign) จะ set `status = 'มีผลบังคับใช้'` **พร้อม** `published_date = ตอนนี้` (เป็นที่เดียวที่ 2 แกนขยับพร้อมกัน)
+- ตอน publish (หลัง e-sign) จะ set `status = 'STA01'` **พร้อม** `published_date = ตอนนี้` (เป็นที่เดียวที่ 2 แกนขยับพร้อมกัน)
 
 ---
 
@@ -233,7 +236,7 @@
 | 5 (old 3) | เอกสารที่เกี่ยวข้อง = **ความสัมพันธ์เอกสาร** | `/documents/:id/relations` (LawRelationsPage) | เพิ่มกฎหมายที่เกี่ยวข้อง/ระดับข้อ (ดู §12) — `completeWorkflowStep(5)` |
 | 6 (old 4) | กำหนดสิทธิ์ | `/documents/:id/permissions` (PermissionAccessPage) | ตั้ง `access_scope` + กลุ่มสิทธิ์ — `completeWorkflowStep(6)` |
 | — | ลงนาม (E-Sign) | `/documents/:id/esign` (+ `/esign/preview`, `/esign/status`) | ส่งลงนามอิเล็กทรอนิกส์ |
-| — | เผยแพร่ | (หลัง e-sign) | set `status='มีผลบังคับใช้'` + `published_date` (ดู §7–8) |
+| — | เผยแพร่ | (หลัง e-sign) | set `status='STA01'` + `published_date` (ดู §7–8) |
 
 **map ศัพท์ที่มักถาม → อยู่ตรงไหน**
 - **แก้ไขเอกสาร** = ขั้น 2 ตรวจทาน → `/documents/:id/review`
@@ -251,7 +254,7 @@
   "law_type": "พระราชบัญญัติ",   // → source = external → ใช้คำ "มาตรา"
   "document_type": "old",         // นำเข้า PDF เก่า
   "title": "พระราชบัญญัติมหาวิทยาลัยบูรพา พ.ศ. 2550",
-  "status": "มีผลบังคับใช้",
+  "status": "STA01",
   "published_date": "2026-01-19", // มีวันที่ = เผยแพร่แล้ว
   "access_scope": "public",
   "change_status": "กฎหมายใหม่",
@@ -269,7 +272,7 @@
   "law_type": "ประกาศที่ออกโดยสภามหาวิทยาลัย", // → source = internal → ใช้คำ "ข้อ"
   "document_type": "new",                       // สร้างในระบบ
   "title": "ประกาศ เรื่อง อัตราค่าตอบแทนผู้ทรงคุณวุฒิ",
-  "status": "ร่าง",                             // ยังเป็นร่าง
+  "status": "STA03",                            // ยังเป็นร่าง
   "published_date": "",                          // ว่าง = ยังไม่เผยแพร่
   "access_scope": "private",
   "permission_group_ids": ["hr-team"],
@@ -287,7 +290,7 @@
 
 - **ชนิดเอกสาร** = `law_type` (9 ค่า) → กำหนด `source` (internal/external) → กำหนดคำ **ข้อ/มาตรา**
 - **ออกโดย** = `issuer` (2 ค่า: มหาวิทยาลัย / สภามหาวิทยาลัย, เฉพาะกลุ่มประกาศ)
-- **สถานะกฎหมาย** = `status` (ร่าง / มีผลบังคับใช้ / ยกเลิกการใช้งาน)
+- **สถานะกฎหมาย** = `status` (`STA03` / `STA01` / `STA02`)
 - **เผยแพร่หรือไม่** = ดู `published_date` (ว่าง = ไม่เผยแพร่)
 - **ใครเห็น** = `access_scope` (public / private)
 - **แก้อะไรจากเวอร์ชันก่อน** = `change_status` (+ `change_details`)
