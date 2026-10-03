@@ -29,7 +29,9 @@ class LookupApiTest extends TestCase
         $this->assertContains('ประกาศที่ออกโดยมหาวิทยาลัย', array_column($data['document_types'], 'value'));
         $this->assertContains('ประกาศที่ออกโดยสภามหาวิทยาลัย', array_column($data['document_types'], 'value'));
         $this->assertContains('มหาวิทยาลัยบูรพา', array_column($data['agencies'], 'value'));
-        $this->assertContains('มีผลบังคับใช้', array_column($data['statuses'], 'value'));
+        $this->assertContains('STA01', array_column($data['statuses'], 'value'));
+        $this->assertSame('success', $data['statuses'][0]['color']);
+        $this->assertSame('in_force', $data['statuses'][0]['role']);
         $this->assertContains('กฎหมายใหม่', array_column($data['change_status_types'], 'value'));
         $this->assertContains('ยกเลิกข้อ', array_column($data['change_status_details'], 'value'));
         $this->assertContains('ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', array_column($data['law_groups'], 'value'));

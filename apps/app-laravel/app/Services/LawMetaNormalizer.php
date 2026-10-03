@@ -2,17 +2,21 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\EnforcementStatuses;
+
 class LawMetaNormalizer
 {
+    public static function statusCode(mixed $value): string
+    {
+        $statuses = app(EnforcementStatuses::class);
+        $item = $statuses->resolve($value);
+
+        return $item === null ? trim((string) $value) : (string) $item['code'];
+    }
+
     public static function legacyStatus(mixed $value): string
     {
-        $status = trim((string) $value);
-
-        if ($status === '') {
-            return 'ร่าง';
-        }
-
-        return $status === 'ยกเลิก' ? 'ยกเลิกการใช้งาน' : $status;
+        return self::statusCode($value);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\EnforcementStatuses;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +17,7 @@ class ReviewStore
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly MongoBlobStore $blob,
         ?string $basePath = null,
+        private ?EnforcementStatuses $enforcementStatuses = null,
     ) {
         $this->basePath = $basePath ?? $this->configuredBasePath();
         $this->ensureDirectories();
@@ -245,7 +247,7 @@ class ReviewStore
                     'source' => trim((string) ($meta['source'] ?? '')),
                     'document_type' => trim((string) ($meta['document_type'] ?? 'new')),
                     'law_type' => trim((string) ($meta['law_type'] ?? '')),
-                    'meta_status' => LawMetaNormalizer::legacyStatus($meta['status'] ?? ''),
+                    'meta_status' => LawMetaNormalizer::statusCode($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
                     'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
                     'law_groups' => $groups,
@@ -369,19 +371,11 @@ class ReviewStore
 
     public function isActiveLawMetaStatus(?string $status): bool
     {
-        $normalized = mb_strtolower(trim((string) $status), 'UTF-8');
-        if ($normalized === '') {
+        if (trim((string) $status) === '') {
             return true;
         }
 
-        foreach (['ยกเลิก', 'สิ้นผล', 'หมดอายุ', 'repeal', 'cancel', 'expired'] as $inactive) {
-            if (str_contains($normalized, $inactive)) {
-                return false;
-            }
-        }
-
-        return in_array($normalized, ['มีผลบังคับใช้', 'ใช้งาน', 'active', 'published'], true)
-            || str_contains($normalized, 'เผยแพร่');
+        return ! $this->enforcementStatuses()->isRepealed($status);
     }
 
     /**
@@ -944,11 +938,11 @@ class ReviewStore
             if ($id === $documentId) {
                 continue;
             }
-            $this->patchLawMeta($id, ['status' => 'ยกเลิกการใช้งาน']);
+            $this->patchLawMeta($id, ['status' => $this->enforcementStatuses()->codeForRole('repealed')]);
             $revoked[] = $id;
         }
 
-        $this->patchLawMeta($documentId, ['status' => 'มีผลบังคับใช้']);
+        $this->patchLawMeta($documentId, ['status' => $this->enforcementStatuses()->codeForRole('in_force')]);
 
         return $revoked;
     }
@@ -2003,7 +1997,7 @@ class ReviewStore
         $document['law_meta'] = array_merge([
             'document_type' => 'new',
             'source' => '',
-            'status' => 'ร่าง',
+            'status' => $this->enforcementStatuses()->codeForRole('draft'),
             'law_type' => '',
             'law_group' => '',
             'change_status' => null,
@@ -2034,6 +2028,15 @@ class ReviewStore
             'access_scope' => $accessScope,
             'permission_group_ids' => $accessScope === 'public' ? [] : $permissionGroupIds,
         ]);
+    }
+
+    private function enforcementStatuses(): EnforcementStatuses
+    {
+        if ($this->enforcementStatuses === null) {
+            $this->enforcementStatuses = app(EnforcementStatuses::class);
+        }
+
+        return $this->enforcementStatuses;
     }
 
     private function countLawSections(array $document): int

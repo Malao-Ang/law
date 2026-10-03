@@ -165,8 +165,8 @@ class RelationsTest extends TestCase
             ]],
         ])->assertOk();
 
-        $this->assertSame('ยกเลิกการใช้งาน', $store->getReviewDocument($v1)['law_meta']['status']);
-        $this->assertSame('ยกเลิกการใช้งาน', $store->getReviewDocument($v2)['law_meta']['status']);
-        $this->assertSame('มีผลบังคับใช้', $store->getReviewDocument($v4)['law_meta']['status']);
+        $this->assertSame('STA02', $store->getReviewDocument($v1)['law_meta']['status']);
+        $this->assertSame('STA02', $store->getReviewDocument($v2)['law_meta']['status']);
+        $this->assertSame('STA01', $store->getReviewDocument($v4)['law_meta']['status']);
     }
 }

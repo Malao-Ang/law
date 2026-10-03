@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\EnforcementStatuses;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchQuery;
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
 {
+    public function __construct(private readonly EnforcementStatuses $enforcementStatuses) {}
+
     private const EXTERNAL_LAW_TYPE_ALIASES = [
         'กฎหมายภายนอก',
         'พระราชบัญญัติ',
@@ -72,7 +75,7 @@ class LawSearchController extends Controller
             if (
                 ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
-                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+                && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
                 && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])
             ) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
@@ -199,7 +202,7 @@ class LawSearchController extends Controller
             if (($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if (($row['meta_status'] ?? '') === 'ร่าง') {
+            if ($this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue; // Hide draft documents from public search
             }
 
@@ -949,7 +952,7 @@ class LawSearchController extends Controller
             if (($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if (($row['meta_status'] ?? '') === 'ร่าง') {
+            if ($this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue;
             }
 

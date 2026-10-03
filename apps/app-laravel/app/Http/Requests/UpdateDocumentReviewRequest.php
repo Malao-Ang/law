@@ -2,7 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\MasterDataKind;
+use App\Services\MasterData\MasterDataStore;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateDocumentReviewRequest extends FormRequest
 {
@@ -13,9 +17,19 @@ class UpdateDocumentReviewRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $lawMeta = $this->input('law_meta');
+        if (is_array($lawMeta) && array_key_exists('status', $lawMeta)) {
+            $lawMeta['status'] = app(EnforcementStatuses::class)->resolve($lawMeta['status'])['code'] ?? trim((string) $lawMeta['status']);
+        }
+
+        $payload = [
             'reset_to_generated' => filter_var($this->input('reset_to_generated', false), FILTER_VALIDATE_BOOL),
-        ]);
+        ];
+        if (is_array($lawMeta)) {
+            $payload['law_meta'] = $lawMeta;
+        }
+
+        $this->merge($payload);
     }
 
     /**
@@ -48,7 +62,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'metadata.signatory_name' => ['nullable', 'string', 'max:255'],
             'metadata.signatory_position' => ['nullable', 'string', 'max:255'],
             'law_meta' => ['nullable', 'array'],
-            'law_meta.status' => ['nullable', 'string', 'max:120'],
+            'law_meta.status' => ['nullable', 'string', 'max:120', Rule::in($this->activeEnforcementStatusCodes())],
             'law_meta.law_type' => ['nullable', 'string', 'max:120'],
             'law_meta.source' => ['nullable', 'string', 'in:internal,external'],
             'law_meta.law_group' => ['nullable', 'string', 'max:120'],
@@ -94,5 +108,22 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.url' => ['nullable', 'url', 'max:500'],
             'relations.*.change_detail' => ['nullable', 'string', 'max:120'],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function activeEnforcementStatusCodes(): array
+    {
+        /** @var MasterDataStore $store */
+        $store = app(MasterDataStore::class);
+
+        return array_values(array_map(
+            static fn (array $item): string => (string) $item['code'],
+            array_filter(
+                $store->all(MasterDataKind::EnforcementStatus),
+                static fn (array $item): bool => (bool) ($item['is_active'] ?? false),
+            ),
+        ));
     }
 }
