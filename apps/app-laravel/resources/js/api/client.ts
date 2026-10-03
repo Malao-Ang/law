@@ -40,9 +40,18 @@ export type SelectableOption = {
   subtitle?: string;
 };
 
+export type LawStatusRole = 'in_force' | 'repealed' | 'draft' | null;
+
+export type LawStatusOption = SelectableOption & {
+  code: string;
+  color: 'success' | 'error' | 'grey' | 'info' | 'warning' | null;
+  role: LawStatusRole;
+};
+
 export type LookupData = {
   document_types: (SelectableOption & { source?: string })[];
-  statuses: SelectableOption[];
+  statuses: LawStatusOption[];
+  statuses_all?: LawStatusOption[];
   change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];
   change_status_details: (SelectableOption & { source?: string })[];
   agencies: SelectableOption[];
