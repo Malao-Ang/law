@@ -20,8 +20,8 @@ class MasterDataStoreTest extends TestCase
     {
         $store = app(MasterDataStore::class);
 
-        $this->assertSame('STA01', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'One'])['code']);
-        $this->assertSame('STA02', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'Two'])['code']);
+        $this->assertSame('STA04', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'One'])['code']);
+        $this->assertSame('STA05', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'Two'])['code']);
         $store->create(MasterDataKind::EnforcementStatus, ['code' => 'STA09', 'name' => 'Nine']);
 
         $this->assertSame('STA10', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'Ten'])['code']);
@@ -37,12 +37,12 @@ class MasterDataStoreTest extends TestCase
 
         $store->setActive(MasterDataKind::EnforcementStatus, $created['code'], false);
 
-        $this->assertSame($created['code'], $store->resolve(MasterDataKind::EnforcementStatus, 'sta01')['code']);
+        $this->assertSame($created['code'], $store->resolve(MasterDataKind::EnforcementStatus, $created['code'])['code']);
         $this->assertSame($created['code'], $store->resolve(MasterDataKind::EnforcementStatus, ' live ')['code']);
         $this->assertSame($created['code'], $store->resolve(MasterDataKind::EnforcementStatus, 'published')['code']);
     }
 
-    public function test_seed_if_empty_is_idempotent(): void
+    public function test_seed_if_empty_creates_exact_system_enforcement_statuses_and_is_idempotent(): void
     {
         $store = app(MasterDataStore::class);
 
@@ -51,7 +51,17 @@ class MasterDataStoreTest extends TestCase
         $store->seedIfEmpty(MasterDataKind::EnforcementStatus);
         $second = $store->all(MasterDataKind::EnforcementStatus);
 
-        $this->assertSame([], $first);
+        $this->assertCount(3, $first);
+        $this->assertSame(['STA01', 'STA02', 'STA03'], array_column($first, 'code'));
+        $this->assertSame(['in_force', 'repealed', 'draft'], array_map(
+            static fn (array $item): ?string => $item['attrs']['role'] ?? null,
+            $first,
+        ));
+        $this->assertSame(['success', 'error', 'grey'], array_map(
+            static fn (array $item): ?string => $item['attrs']['color'] ?? null,
+            $first,
+        ));
+        $this->assertSame(['ร่าง', ''], $first[2]['aliases']);
         $this->assertSame($first, $second);
     }
 

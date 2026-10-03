@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Services\MasterData\MasterDataKind;
-use App\Services\Storage\MongoBlobStore;
 use Tests\TestCase;
 
 class MasterDataApiTest extends TestCase
@@ -29,7 +27,7 @@ class MasterDataApiTest extends TestCase
             'description' => 'First',
         ])
             ->assertCreated()
-            ->assertJsonPath('code', 'STA01')
+            ->assertJsonPath('code', 'STA04')
             ->assertJsonPath('is_system', false);
 
         $this->postJson('/api/master-data/enforcement_status', [
@@ -37,7 +35,7 @@ class MasterDataApiTest extends TestCase
             'description' => 'Second',
         ])
             ->assertCreated()
-            ->assertJsonPath('code', 'STA02');
+            ->assertJsonPath('code', 'STA05');
 
         $this->postJson('/api/master-data/enforcement_status', [
             'code' => 'custom-1',
@@ -61,22 +59,22 @@ class MasterDataApiTest extends TestCase
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Active One'])->assertCreated();
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Inactive Two'])->assertCreated();
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Active Three'])->assertCreated();
-        $this->patchJson('/api/master-data/enforcement_status/STA02/active', ['is_active' => false])->assertOk();
+        $this->patchJson('/api/master-data/enforcement_status/STA05/active', ['is_active' => false])->assertOk();
 
         $this->getJson('/api/master-data/enforcement_status?q=active&active=1&page=1&per_page=1')
             ->assertOk()
             ->assertJsonPath('total', 2)
-            ->assertJsonPath('stats.total', 3)
-            ->assertJsonPath('stats.active', 2)
+            ->assertJsonPath('stats.total', 6)
+            ->assertJsonPath('stats.active', 5)
             ->assertJsonPath('stats.inactive', 1)
             ->assertJsonCount(1, 'items')
-            ->assertJsonPath('items.0.code', 'STA01')
+            ->assertJsonPath('items.0.code', 'STA04')
             ->assertJsonPath('items.0.usage_count', 0);
 
         $this->getJson('/api/master-data/enforcement_status?active=0')
             ->assertOk()
             ->assertJsonPath('total', 1)
-            ->assertJsonPath('items.0.code', 'STA02');
+            ->assertJsonPath('items.0.code', 'STA05');
     }
 
     public function test_show_returns_usage_count_and_missing_returns_404(): void
@@ -96,13 +94,13 @@ class MasterDataApiTest extends TestCase
     {
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Before'])->assertCreated();
 
-        $this->putJson('/api/master-data/enforcement_status/STA01', [
+        $this->putJson('/api/master-data/enforcement_status/STA04', [
             'code' => 'NEWCODE',
             'name' => 'After',
             'description' => 'Updated',
         ])
             ->assertOk()
-            ->assertJsonPath('code', 'STA01')
+            ->assertJsonPath('code', 'STA04')
             ->assertJsonPath('name', 'After')
             ->assertJsonPath('description', 'Updated');
     }
@@ -111,17 +109,15 @@ class MasterDataApiTest extends TestCase
     {
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Toggle'])->assertCreated();
 
-        $this->patchJson('/api/master-data/enforcement_status/STA01/active', ['is_active' => false])
+        $this->patchJson('/api/master-data/enforcement_status/STA04/active', ['is_active' => false])
             ->assertOk()
             ->assertJsonPath('is_active', false);
 
-        $this->patchJson('/api/master-data/enforcement_status/STA01/active', ['is_active' => true])
+        $this->patchJson('/api/master-data/enforcement_status/STA04/active', ['is_active' => true])
             ->assertOk()
             ->assertJsonPath('is_active', true);
 
-        $this->insertSystemItem();
-
-        $this->patchJson('/api/master-data/enforcement_status/SYS01/active', ['is_active' => false])
+        $this->patchJson('/api/master-data/enforcement_status/STA01/active', ['is_active' => false])
             ->assertStatus(409);
     }
 
@@ -129,7 +125,7 @@ class MasterDataApiTest extends TestCase
     {
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'No Delete'])->assertCreated();
 
-        $this->deleteJson('/api/master-data/enforcement_status/STA01')
+        $this->deleteJson('/api/master-data/enforcement_status/STA04')
             ->assertStatus(409);
     }
 
@@ -140,37 +136,13 @@ class MasterDataApiTest extends TestCase
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Three'])->assertCreated();
 
         $this->patchJson('/api/master-data/enforcement_status/reorder', [
-            'codes' => ['STA03', 'STA01', 'STA02'],
+            'codes' => ['STA06', 'STA04', 'STA05'],
         ])->assertOk();
 
         $this->getJson('/api/master-data/enforcement_status?per_page=10')
             ->assertOk()
-            ->assertJsonPath('items.0.code', 'STA03')
-            ->assertJsonPath('items.1.code', 'STA01')
-            ->assertJsonPath('items.2.code', 'STA02');
-    }
-
-    private function insertSystemItem(): void
-    {
-        /** @var MongoBlobStore $blob */
-        $blob = app('mongo.blob.master');
-        $timestamp = now()->toIso8601String();
-
-        $blob->withLock('data', MasterDataKind::EnforcementStatus->value, function (array &$data) use ($timestamp): void {
-            $data = [
-                'items' => [[
-                    'code' => 'SYS01',
-                    'name' => 'System',
-                    'description' => '',
-                    'is_active' => true,
-                    'is_system' => true,
-                    'sort_order' => 1,
-                    'aliases' => [],
-                    'attrs' => ['role' => 'system'],
-                    'created_at' => $timestamp,
-                    'updated_at' => $timestamp,
-                ]],
-            ];
-        });
+            ->assertJsonPath('items.0.code', 'STA06')
+            ->assertJsonPath('items.1.code', 'STA04')
+            ->assertJsonPath('items.2.code', 'STA05');
     }
 }

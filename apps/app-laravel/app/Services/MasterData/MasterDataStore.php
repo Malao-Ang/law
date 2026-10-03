@@ -76,6 +76,8 @@ class MasterDataStore
      */
     public function create(MasterDataKind $kind, array $payload): array
     {
+        $this->seedIfEmpty($kind);
+
         $created = null;
 
         $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $payload, &$created): void {
@@ -113,6 +115,8 @@ class MasterDataStore
      */
     public function update(MasterDataKind $kind, string $code, array $payload): ?array
     {
+        $this->seedIfEmpty($kind);
+
         $updated = null;
         $normalizedCode = $this->normalizeCode($code);
 
@@ -153,6 +157,8 @@ class MasterDataStore
      */
     public function setActive(MasterDataKind $kind, string $code, bool $active): ?array
     {
+        $this->seedIfEmpty($kind);
+
         $updated = null;
         $normalizedCode = $this->normalizeCode($code);
 
@@ -178,6 +184,8 @@ class MasterDataStore
 
     public function delete(MasterDataKind $kind, string $code): bool
     {
+        $this->seedIfEmpty($kind);
+
         if (! $kind->deletable()) {
             throw new MasterDataConflict('delete not allowed');
         }
@@ -209,6 +217,8 @@ class MasterDataStore
      */
     public function reorder(MasterDataKind $kind, array $codes): void
     {
+        $this->seedIfEmpty($kind);
+
         $orderedCodes = array_values(array_unique(array_map(fn (string $code): string => $this->normalizeCode($code), $codes)));
 
         $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($orderedCodes): void {
@@ -425,10 +435,27 @@ class MasterDataStore
                 ? (int) $payload['sort_order']
                 : (int) ($existing['sort_order'] ?? $this->nextSortOrder($items)),
             'aliases' => $this->normalizeStringList($payload['aliases'] ?? $existing['aliases'] ?? []),
-            'attrs' => is_array($payload['attrs'] ?? null) ? $payload['attrs'] : (array) ($existing['attrs'] ?? []),
+            'attrs' => $this->normalizeAttrs($kind, $payload, $existing, (bool) $defaults['is_system']),
             'created_at' => (string) $defaults['created_at'],
             'updated_at' => (string) $defaults['updated_at'],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $existing
+     * @return array<string, mixed>
+     */
+    private function normalizeAttrs(MasterDataKind $kind, array $payload, array $existing, bool $isSystem): array
+    {
+        $attrs = is_array($payload['attrs'] ?? null) ? $payload['attrs'] : (array) ($existing['attrs'] ?? []);
+
+        return match ($kind) {
+            MasterDataKind::EnforcementStatus => [
+                'role' => $isSystem ? ($attrs['role'] ?? $existing['attrs']['role'] ?? null) : null,
+                'color' => $attrs['color'] ?? $existing['attrs']['color'] ?? null,
+            ],
+        };
     }
 
     /**
@@ -473,10 +500,10 @@ class MasterDataStore
             return [];
         }
 
-        return array_values(array_unique(array_filter(array_map(
+        return array_values(array_unique(array_map(
             static fn (mixed $value): string => trim((string) $value),
             $values,
-        ), static fn (string $value): bool => $value !== '')));
+        )));
     }
 
     private function normalizeCode(string $code): string

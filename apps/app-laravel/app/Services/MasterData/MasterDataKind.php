@@ -40,7 +40,29 @@ enum MasterDataKind: string
     public function seed(): array
     {
         return match ($this) {
-            self::EnforcementStatus => [],
+            self::EnforcementStatus => [
+                [
+                    'code' => 'STA01',
+                    'name' => 'มีผลบังคับใช้',
+                    'description' => '',
+                    'aliases' => ['มีผลบังคับใช้'],
+                    'attrs' => ['role' => 'in_force', 'color' => 'success'],
+                ],
+                [
+                    'code' => 'STA02',
+                    'name' => 'ยกเลิกการใช้งาน',
+                    'description' => '',
+                    'aliases' => ['ยกเลิกการใช้งาน'],
+                    'attrs' => ['role' => 'repealed', 'color' => 'error'],
+                ],
+                [
+                    'code' => 'STA03',
+                    'name' => 'ร่าง',
+                    'description' => '',
+                    'aliases' => ['ร่าง', ''],
+                    'attrs' => ['role' => 'draft', 'color' => 'grey'],
+                ],
+            ],
         };
     }
 
