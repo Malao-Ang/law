@@ -56,7 +56,19 @@
                 เปิดใช้งานเพื่อแสดงเป็นตัวเลือกในระบบ
               </div>
             </div>
-            <v-switch v-model="form.is_active" color="success" inset hide-details />
+            <v-tooltip :disabled="!item?.is_system" text="สถานะของระบบ" location="top">
+              <template #activator="{ props: tipProps }">
+                <div v-bind="tipProps">
+                  <v-switch
+                    v-model="form.is_active"
+                    :disabled="item?.is_system"
+                    color="success"
+                    inset
+                    hide-details
+                  />
+                </div>
+              </template>
+            </v-tooltip>
           </div>
         </section>
       </v-card-text>
