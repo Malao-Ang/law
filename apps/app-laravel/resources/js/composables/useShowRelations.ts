@@ -1,6 +1,7 @@
 import type { LawRelation, RelationType, ReportDocument } from '../types/document';
 import { parentIdsOf } from './useLawCatalog';
 import { formatThaiDate } from '../utils/thaiDate';
+import { useLawStatus } from './useLawStatus';
 
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
@@ -104,13 +105,9 @@ export function workflowStageColor(stage: string): string {
 }
 
 export function metaStatusColor(status: string): string {
-  if (
-    status === 'active'
-    || status === 'มีผลบังคับใช้'
-    || status === 'มีผลใช้บังคับ'
-    || status === 'ใช้บังคับ'
-    || status === 'บังคับใช้'
-  ) return 'success';
+  const { isInForce, isRepealed } = useLawStatus();
+  if (isInForce(status)) return 'success';
+  if (isRepealed(status)) return 'error';
   if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
@@ -121,7 +118,8 @@ export function isActiveStatus(status: string): boolean {
 }
 
 export function isCancelledStatus(status: string): boolean {
-  return status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน' || status.includes('ยกเลิก');
+  const { isRepealed } = useLawStatus();
+  return isRepealed(status) || status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status.includes('ยกเลิก');
 }
 
 /**
@@ -137,7 +135,8 @@ export function isPublishedLaw(doc: {
   const status = (doc.status ?? '').trim();
   const publishedDate = (doc.published_date ?? '').trim();
   const metaStatus = (doc.meta_status ?? '').trim();
-  return status === 'ingested' && publishedDate !== '' && metaStatus !== 'ร่าง';
+  const { isDraft } = useLawStatus();
+  return status === 'ingested' && publishedDate !== '' && !isDraft(metaStatus);
 }
 
 export function isKeptInRelationGraph(row: Pick<ShowRelRow, 'metaStatus' | 'workflowStage'>): boolean {

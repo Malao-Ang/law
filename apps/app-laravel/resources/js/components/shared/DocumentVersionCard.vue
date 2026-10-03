@@ -23,7 +23,7 @@
               {{ publicationScopeLabel }}
             </v-chip>
             <v-chip v-if="version.isCurrent" size="x-small" color="success" variant="tonal" rounded="pill">
-              มีผลบังคับใช้
+              {{ statusLabel(inForceCode) }}
             </v-chip>
           </div>
 
@@ -50,6 +50,7 @@
 import { computed } from 'vue';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{
   version: DocumentVersion;
@@ -59,6 +60,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ click: [] }>();
+const { inForceCode, statusLabel } = useLawStatus();
 
 const documentTypeLabelMap: Record<DocumentType, string> = {
   'kotmai-phaainok': 'กฎหมายภายนอก',

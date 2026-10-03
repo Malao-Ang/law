@@ -5,20 +5,20 @@ function assert(cond: boolean, msg: string): void {
 }
 
 // whole-document cancellation is already represented by use status, so no change badge
-assert(cardChangeState('ปรับปรุงรายมาตรา', 'ยกเลิกการใช้งาน').variant === 'new', 'status cancel is not duplicated');
-assert(cardChangeState('', 'ยกเลิกการใช้งาน').label === '', 'whole cancel label hidden');
+assert(cardChangeState('ปรับปรุงรายมาตรา', 'STA02').variant === 'new', 'status cancel is not duplicated');
+assert(cardChangeState('', 'STA02').label === '', 'whole cancel label hidden');
 
 // partial cancel from change_status
-assert(cardChangeState('ยกเลิกรายมาตรา', 'มีผลบังคับใช้').variant === 'partial', 'partial variant');
+assert(cardChangeState('ยกเลิกรายมาตรา', 'STA01').variant === 'partial', 'partial variant');
 assert(cardChangeState('ยกเลิกรายมาตรา', '').label === 'ยกเลิกบางส่วน', 'partial label');
 
 // revise passes the change_status through as the label
-const revise = cardChangeState('ปรับปรุงรายมาตรา', 'มีผลบังคับใช้');
+const revise = cardChangeState('ปรับปรุงรายมาตรา', 'STA01');
 assert(revise.variant === 'revise', 'revise variant');
 assert(revise.label === 'ปรับปรุงรายมาตรา', 'revise label passthrough');
 
 // default / unknown → new
-assert(cardChangeState('กฎหมายใหม่', 'มีผลบังคับใช้').variant === 'new', 'new default');
+assert(cardChangeState('กฎหมายใหม่', 'STA01').variant === 'new', 'new default');
 assert(cardChangeState('', '').variant === 'new', 'empty → new');
 assert(cardChangeState(null, null).variant === 'new', 'null → new');
 

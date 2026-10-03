@@ -1,4 +1,5 @@
 import type { DocumentStatus, LawMeta, LawRelation } from '../types/document';
+import { useLawStatus } from './useLawStatus';
 
 export interface PublishGate {
   key: string;
@@ -32,6 +33,7 @@ export function evaluatePublishGates(
   relations: LawRelation[],
   isOldDoc: boolean,
 ): PublishGateResult {
+  const { isDraft, statusLabel } = useLawStatus();
   const gates: PublishGate[] = [];
 
   if (!isOldDoc) {
@@ -104,13 +106,13 @@ export function evaluatePublishGates(
     level: 'optional',
   });
 
-  // Gate 5: Status (must exist and not be ร่าง)
-  const statusOk = !!meta?.status && meta.status !== 'ร่าง';
+  // Gate 5: Status (must exist and not be draft)
+  const statusOk = !!meta?.status && !isDraft(meta.status);
   gates.push({
     key: 'status',
     label: 'สถานะการบังคับใช้',
     ok: statusOk,
-    status: statusOk ? meta!.status : 'ยังเป็นร่าง',
+    status: statusOk ? statusLabel(meta!.status) : 'ยังเป็นร่าง',
     level: 'required',
   });
 

@@ -64,7 +64,7 @@ const v1 = row({
 const v2 = row({
   id: 'v2',
   title: 'ระเบียบว่าด้วยเอกสาร พ.ศ. ๒๕๖๗',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'ปรับปรุงรายข้อ',
   rawDate: '2024-01-01',
   parentIds: [],
@@ -72,7 +72,7 @@ const v2 = row({
 const v3 = row({
   id: 'v3',
   title: 'ระเบียบว่าด้วยเอกสาร พ.ศ. ๒๕๖๘',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'ปรับปรุงรายข้อ',
   rawDate: '2025-01-01',
   parentIds: [],
@@ -80,7 +80,7 @@ const v3 = row({
 const v4 = row({
   id: 'v4',
   title: 'ระเบียบว่าด้วยเอกสาร พ.ศ. ๒๕๖๙',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'ปรับปรุงทั้งฉบับ',
   rawDate: '2026-01-01',
   parentIds: [],
@@ -90,7 +90,7 @@ const announcement = row({
   title: 'ประกาศเรื่องอื่น',
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['v3'],
 });
 
@@ -126,7 +126,7 @@ const actRoot = row({
   title: 'พ.ร.บ. แม่',
   lawType: 'พระราชบัญญัติ',
   typeShort: 'พ.ร.บ.',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'กฎหมายใหม่',
 });
 const v1UnderAct = { ...v1, parentIds: ['act-root'] };
@@ -137,7 +137,7 @@ const prakat = row({
   title: 'ประกาศลูก',
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['act-root'],
 });
 const actRows = [actRoot, v1UnderAct, v2UnderAct, v4UnderAct, prakat];
@@ -152,14 +152,14 @@ const childNewLaw = row({
   id: 'child-new',
   title: 'ระเบียบลูกที่ออกใหม่',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['b-parent'],
 });
 const parentReg = row({
   id: 'b-parent',
   title: 'ระเบียบแม่',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
 });
 assert(!shouldUnionSameLevelFamily(parentReg, childNewLaw), 'new law under a parent is hierarchy, not same-level');
 const treeHierarchy = buildRelationTree('b-parent', [parentReg, childNewLaw], [], null);
@@ -172,20 +172,20 @@ const lawB = row({
   lawType: 'พระราชบัญญัติ',
   typeShort: 'พ.ร.บ.',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
 });
 const lawA = row({
   id: 'A',
   title: 'ระเบียบ ก',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['B'],
 });
 const lawC = row({
   id: 'C',
   title: 'ระเบียบ ก แก้ไขรายข้อ',
   changeStatus: 'ปรับปรุงรายข้อ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['A'],
 });
 assert(!shouldUnionSameLevelFamily(lawA, lawC), 'parent pointer alone does not make a section patch same-level');
@@ -223,7 +223,7 @@ const secondLaw = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['first'],
 });
 const torPatch = row({
@@ -232,7 +232,7 @@ const torPatch = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'ปรับปรุงรายข้อ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['second'],
 });
 assert(!shouldUnionSameLevelFamily(firstLaw, secondLaw), 'issued-under child stays below its parent');
@@ -264,7 +264,7 @@ const revokedStep = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'ยกเลิกการใช้งาน',
+  metaStatus: 'STA02',
   parentIds: ['first'],
 });
 const cancelPatch = row({
@@ -273,7 +273,7 @@ const cancelPatch = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'ปรับปรุงรายข้อ',
-  metaStatus: 'ร่าง',
+  metaStatus: 'STA03',
   parentIds: ['first'],
 });
 const treeCancel = buildRelationTree('first', [firstLaw, revokedStep, cancelPatch], {
@@ -305,7 +305,7 @@ const parent = row({
   title: 'พ.ร.บ. มหาวิทยาลัย',
   lawType: 'พระราชบัญญัติ',
   typeShort: 'พ.ร.บ.',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
 });
 const sib1 = row({
   id: 's1',
@@ -326,7 +326,7 @@ const otherChild = row({
   title: 'ประกาศกำหนดหลักเกณฑ์',
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['act'],
 });
 
@@ -349,7 +349,7 @@ const amends: LawRelation[] = [{
 const newer = row({
   id: 'new',
   title: 'ระเบียบเรื่อง ก พ.ศ. ๒๕๖๘',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'ปรับปรุงทั้งฉบับ',
   rawDate: '2025-01-01',
 });
@@ -379,14 +379,14 @@ const sectionAmends: LawRelation[] = [{
 const sectionPatch = row({
   id: 'patch',
   title: 'ระเบียบแก้ไขรายข้อ พ.ศ. ๒๕๖๘',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'ปรับปรุงรายข้อ',
   rawDate: '2025-06-01',
 });
 const original = row({
   id: 'orig',
   title: 'ระเบียบตั้งต้นคนละชื่อ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   changeStatus: 'กฎหมายใหม่',
   rawDate: '2023-06-01',
 });
@@ -409,7 +409,7 @@ const lawBWhole = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'ปรับปรุงทั้งฉบับ',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   rawDate: '2025-01-01',
 });
 const lawCUnderB = row({
@@ -418,7 +418,7 @@ const lawCUnderB = row({
   lawType: 'ประกาศ',
   typeShort: 'ประกาศ',
   changeStatus: 'กฎหมายใหม่',
-  metaStatus: 'มีผลบังคับใช้',
+  metaStatus: 'STA01',
   parentIds: ['law-b'],
 });
 const treeFromB = buildRelationTree('law-b', [lawAWhole, lawBWhole, lawCUnderB], {

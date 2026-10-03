@@ -172,10 +172,12 @@ import AccessScopeCard from '../../components/permissions/AccessScopeCard.vue';
 import PermissionGroupCard from '../../components/permissions/PermissionGroupCard.vue';
 import PermissionGroupDetailDialog from '../../components/permissions/PermissionGroupDetailDialog.vue';
 import PermissionGroupFormDialog from '../../components/permissions/PermissionGroupFormDialog.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const { isDraft } = useLawStatus();
 
 const scope = ref<'public' | 'private'>('public');
 const selectedGroupIds = ref<string[]>([]);
@@ -272,7 +274,7 @@ async function saveAndPublish(): Promise<void> {
     // Old docs: if status is still ร่าง/empty, just save permissions and go to edit page.
     // User can then set the status and click publish from there with proper gate checks.
     const meta = documentStore.review?.law_meta;
-    if (!meta?.status || meta.status === 'ร่าง') {
+    if (!meta?.status || isDraft(meta.status)) {
       snackbar.success('บันทึกสิทธิ์แล้ว');
       await new Promise(r => setTimeout(r, 600));
       router.push(`/documents/${props.documentId}/edit`);

@@ -227,6 +227,7 @@ import { parentIdsOf } from '../../composables/useLawCatalog';
 import AppShell from '../../components/shared/AppShell.vue';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const PAGE_SIZE = 20;
 
@@ -246,6 +247,7 @@ const sortOrder = ref('newest');
 const page = ref(1);
 
 const versionStore = useVersionStore();
+const { draftCode, inForceCode, isRepealed, statusColor, statusLabel } = useLawStatus();
 const versionDialogOpen = ref(false);
 
 function openVersions(id: string): void {
@@ -312,7 +314,7 @@ const childCountMap = computed<Record<string, number>>(() => {
 });
 
 function workflowStageLabel(doc: { status: string; meta_status: string; published_date?: string; workflow_completed_step: number | null }): string {
-  if (doc.meta_status === 'ยกเลิก' || doc.meta_status === 'ยกเลิกการใช้งาน') return 'ยกเลิก';
+  if (isRepealed(doc.meta_status)) return 'ยกเลิก';
   // เผยแพร่ = ต้องมี published_date จริง ๆ ไม่ใช่ดูจาก pipeline status
   if (doc.published_date) return 'เผยแพร่';
   const step = doc.workflow_completed_step ?? 0;
@@ -430,17 +432,17 @@ function typeColor(type: string): string {
 }
 
 function metaStatusColor(status: string): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
-  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'error';
+  const color = statusColor(status);
+  if (color) return color;
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
 }
 
 // สถานะกฎหมายที่แสดง: ยังไม่เผยแพร่ = "ร่าง" เสมอ; เผยแพร่แล้ว = ตาม meta_status จริง
 function effectiveStatusLabel(law: LawRow): string {
-  if (!law.publishedDate) return 'ร่าง';
-  if (law.metaStatus) return law.metaStatus;
-  return 'มีผลบังคับใช้';
+  if (!law.publishedDate) return statusLabel(draftCode.value);
+  if (law.metaStatus) return statusLabel(law.metaStatus);
+  return statusLabel(inForceCode.value);
 }
 
 function effectiveStatusColor(law: LawRow): string {
