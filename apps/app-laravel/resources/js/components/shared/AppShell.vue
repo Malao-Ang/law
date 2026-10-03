@@ -31,16 +31,22 @@
           {{ group.label }}
         </v-list-subheader>
         <v-divider v-else class="my-1 mx-2" />
-        <v-list-item
-          v-for="item in group.items"
-          :key="item.label"
-          :prepend-icon="item.icon"
-          :title="item.label"
-          :active="isActive(item)"
-          color="admin-primary"
-          rounded="lg"
-          @click="item.to ? router.push(item.to) : undefined"
-        />
+        <template v-for="(item, index) in group.items" :key="item.label">
+          <v-list-subheader
+            v-if="showSectionHeader(item, index, group.items)"
+            class="app-drawer__section text-caption"
+          >
+            {{ item.section }}
+          </v-list-subheader>
+          <v-list-item
+            :prepend-icon="item.icon"
+            :title="item.label"
+            :active="isActive(item)"
+            color="admin-primary"
+            rounded="lg"
+            @click="item.to ? router.push(item.to) : undefined"
+          />
+        </template>
       </template>
     </v-list>
 
@@ -123,7 +129,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 const RAIL_KEY = 'lawspace.nav.rail';
 
-interface NavItem { label: string; icon: string; to?: string; exact?: boolean; }
+interface NavItem { label: string; icon: string; to?: string; exact?: boolean; section?: string; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 const props = defineProps<{
@@ -161,6 +167,12 @@ const defaultNavGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'จัดการข้อมูลระบบ (META DATA)',
+    items: [
+      { label: 'สถานะการบังคับใช้', icon: 'mdi-shield-check-outline', to: '/admin/master/enforcement-status', section: 'สถานะกฎหมาย' },
+    ],
+  },
+  {
     label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
       { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
@@ -182,6 +194,11 @@ function isActive(item: NavItem): boolean {
   if (item.exact) return route.path === item.to;
   if (item.to === '/admin') return route.path === item.to;
   return route.path === item.to || route.path.startsWith(`${item.to}/`);
+}
+
+function showSectionHeader(item: NavItem, index: number, items: NavItem[]): boolean {
+  if (rail.value || !item.section) return false;
+  return index === 0 || item.section !== items[index - 1]?.section;
 }
 </script>
 
@@ -247,6 +264,13 @@ function isActive(item: NavItem): boolean {
 .app-drawer__user--rail {
   justify-content: center;
   padding: 12px 0;
+}
+
+.app-drawer__section {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-weight: 700;
+  min-height: 28px;
+  padding-inline-start: 20px !important;
 }
 
 /* ─── Main ───────────────────────────────────────────────── */
