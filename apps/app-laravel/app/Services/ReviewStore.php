@@ -247,6 +247,7 @@ class ReviewStore
                     'source' => trim((string) ($meta['source'] ?? '')),
                     'document_type' => trim((string) ($meta['document_type'] ?? 'new')),
                     'law_type' => trim((string) ($meta['law_type'] ?? '')),
+                    'raw_meta_status' => (string) ($meta['status'] ?? ''),
                     'meta_status' => LawMetaNormalizer::statusCode($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
                     'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
