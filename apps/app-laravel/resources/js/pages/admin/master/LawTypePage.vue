@@ -22,6 +22,7 @@
       <v-card flat border rounded="lg" class="law-type-tree-page__filters">
         <v-text-field
           v-model="query"
+          :disabled="reorderMode"
           placeholder="ค้นหาชื่อหรือรหัส"
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
@@ -31,6 +32,7 @@
         />
         <v-select
           v-model="sourceFilter"
+          :disabled="reorderMode"
           :items="sourceOptions"
           variant="outlined"
           density="comfortable"
@@ -38,31 +40,56 @@
         />
         <v-select
           v-model="activeFilter"
+          :disabled="reorderMode"
           :items="activeOptions"
           variant="outlined"
           density="comfortable"
           hide-details
         />
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" class="text-none" @click="resetFilters">
+        <v-btn variant="outlined" prepend-icon="mdi-refresh" class="text-none" :disabled="reorderMode" @click="resetFilters">
           ล้างตัวกรอง
         </v-btn>
+        <v-btn
+          v-if="!reorderMode"
+          variant="outlined"
+          prepend-icon="mdi-swap-vertical"
+          class="text-none law-type-tree-page__reorder-button"
+          @click="startReorder"
+        >
+          จัดลำดับ
+        </v-btn>
       </v-card>
+
+      <v-alert v-if="reorderMode" type="info" variant="tonal" density="compact" icon="mdi-swap-vertical">
+        <div class="law-type-tree-page__reorder-bar">
+          <span>โหมดจัดลำดับ — ลากหรือกดลูกศรเพื่อเรียงใหม่</span>
+          <span class="law-type-tree-page__reorder-actions">
+            <v-btn variant="outlined" size="small" class="text-none" :disabled="saving" @click="cancelReorder">ยกเลิก</v-btn>
+            <v-btn color="admin-primary" size="small" class="text-none" :loading="saving" @click="saveReorder">บันทึกลำดับ</v-btn>
+          </span>
+        </div>
+      </v-alert>
 
       <v-alert v-if="familyMaster.error.value || typeMaster.error.value" type="error" variant="tonal" density="compact">
         {{ familyMaster.error.value || typeMaster.error.value }}
       </v-alert>
 
       <MasterTreeTable
-        :rows="filteredRows"
+        :rows="tableRows"
         :expanded-codes="[...expandedCodes]"
         :loading="familyMaster.loading.value || typeMaster.loading.value"
         :toggling-code="togglingCode"
+        :reorder-mode="reorderMode"
         @toggle-expand="toggleExpand"
         @add-type="openCreateType"
         @edit-family="openEditFamily"
         @edit-type="openEditType"
         @toggle-family="handleToggleFamily"
         @toggle-type="handleToggleType"
+        @move-family="moveFamily"
+        @move-type="moveType"
+        @drag-family="dragFamily"
+        @drag-type="dragType"
       />
     </div>
 
@@ -110,13 +137,6 @@
             variant="outlined"
             :error-messages="fieldErrors['attrs.color']"
           />
-          <v-text-field
-            v-model.number="familyForm.sort_order"
-            label="ลำดับ"
-            type="number"
-            min="0"
-            variant="outlined"
-          />
         </v-card-text>
         <v-divider />
         <v-card-actions class="justify-end pa-4">
@@ -162,13 +182,6 @@
             :error-messages="fieldErrors.name"
             variant="outlined"
           />
-          <v-text-field
-            v-model.number="typeForm.sort_order"
-            label="ลำดับในกลุ่ม"
-            type="number"
-            min="0"
-            variant="outlined"
-          />
           <v-alert type="info" variant="tonal" density="compact" icon="mdi-source-branch">
             ที่มา/หน่วยนับตามกลุ่ม: {{ selectedTypeFamily ? sourceLabel(familySource(selectedTypeFamily)) : '-' }} · {{ selectedTypeFamily ? unitLabel(familySource(selectedTypeFamily)) : '-' }}
           </v-alert>
@@ -188,9 +201,12 @@
 <script setup lang="ts">
 import Swal from 'sweetalert2';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { onBeforeRouteLeave } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterTreeTable from '../../../components/master/MasterTreeTable.vue';
 import { useMasterData } from '../../../composables/useMasterData';
+import { useSnackbarStore } from '../../../stores/snackbarStore';
+import { flattenTypeOrder, moveByDrag, moveWithin } from '../../../utils/treeOrder';
 import type { ApiRequestError, LawSource } from '../../../api/client';
 import type { MasterActiveFilter, MasterItem, UpsertMasterItemPayload } from '../../../types/masterData';
 
@@ -205,6 +221,7 @@ interface MasterTreeRow {
 
 const familyMaster = useMasterData('law_family');
 const typeMaster = useMasterData('law_type');
+const snackbar = useSnackbarStore();
 
 const query = ref('');
 const sourceFilter = ref<'all' | LawSource>('all');
@@ -213,6 +230,10 @@ const expandedCodes = ref<Set<string>>(new Set());
 const togglingCode = ref<string | null>(null);
 const saving = ref(false);
 const fieldErrors = ref<Record<string, string[]>>({});
+const reorderMode = ref(false);
+const familyOrder = ref<string[]>([]);
+const typeOrderByFamily = ref<Record<string, string[]>>({});
+const reorderSnapshot = ref('');
 
 const familyDialogOpen = ref(false);
 const typeDialogOpen = ref(false);
@@ -223,13 +244,11 @@ const familyForm = reactive({
   name: '',
   source: 'internal' as LawSource,
   color: '#6B7280',
-  sort_order: 0,
 });
 
 const typeForm = reactive({
   family_code: '',
   name: '',
-  sort_order: 0,
 });
 
 const requiredRule = (value: unknown) => typeof value === 'string' ? !!value.trim() || 'กรุณากรอกข้อมูล' : !!value || 'กรุณากรอกข้อมูล';
@@ -282,6 +301,37 @@ const filteredRows = computed(() => {
 
   return result;
 });
+
+const reorderRows = computed<MasterTreeRow[]>(() => {
+  const familyByCode = new Map(familyMaster.items.value.map((family) => [family.code, family]));
+  const typeByCode = new Map(typeMaster.items.value.map((type) => [type.code, type]));
+  return familyOrder.value
+    .map((familyCode) => {
+      const family = familyByCode.get(familyCode);
+      if (!family) return null;
+      const types = (typeOrderByFamily.value[familyCode] ?? [])
+        .map((typeCode) => typeByCode.get(typeCode))
+        .filter((type): type is MasterItem => !!type);
+      return {
+        family,
+        types,
+        source: familySource(family),
+        color: String(family.attrs.color || '#6B7280'),
+        usage: types.reduce((sum, type) => sum + (type.usage_count ?? 0), 0),
+        locked: isSystemFamily(family),
+      };
+    })
+    .filter((row): row is MasterTreeRow => row !== null);
+});
+
+const tableRows = computed(() => reorderMode.value ? reorderRows.value : filteredRows.value);
+
+const reorderState = computed(() => JSON.stringify({
+  families: familyOrder.value,
+  types: typeOrderByFamily.value,
+}));
+
+const reorderDirty = computed(() => reorderMode.value && reorderState.value !== reorderSnapshot.value);
 
 // Auto-expand groups that match the search (kept out of the computed to avoid side effects).
 watch(filteredRows, (result) => {
@@ -376,7 +426,6 @@ function openCreateFamily(): void {
   familyForm.name = '';
   familyForm.source = 'internal';
   familyForm.color = '#6B7280';
-  familyForm.sort_order = nextSort(familyMaster.items.value);
   familyDialogOpen.value = true;
 }
 
@@ -386,7 +435,6 @@ function openEditFamily(family: MasterItem): void {
   familyForm.name = family.name;
   familyForm.source = familySource(family);
   familyForm.color = String(family.attrs.color || '#6B7280');
-  familyForm.sort_order = family.sort_order ?? 0;
   familyDialogOpen.value = true;
 }
 
@@ -395,7 +443,6 @@ function openCreateType(family?: MasterItem): void {
   fieldErrors.value = {};
   typeForm.family_code = family?.code ?? familyMaster.items.value[0]?.code ?? '';
   typeForm.name = '';
-  typeForm.sort_order = nextSort(typeMaster.items.value.filter((type) => type.attrs.family_code === typeForm.family_code));
   typeDialogOpen.value = true;
 }
 
@@ -404,18 +451,12 @@ function openEditType(type: MasterItem): void {
   fieldErrors.value = {};
   typeForm.family_code = String(type.attrs.family_code || '');
   typeForm.name = type.name;
-  typeForm.sort_order = type.sort_order ?? 0;
   typeDialogOpen.value = true;
-}
-
-function nextSort(items: MasterItem[]): number {
-  return Math.max(0, ...items.map((item) => item.sort_order ?? 0)) + 1;
 }
 
 function familyPayload(): UpsertMasterItemPayload {
   return {
     name: familyForm.name,
-    sort_order: familyForm.sort_order,
     attrs: {
       source: familyForm.source,
       color: familyForm.color,
@@ -426,7 +467,6 @@ function familyPayload(): UpsertMasterItemPayload {
 function typePayload(): UpsertMasterItemPayload {
   return {
     name: typeForm.name,
-    sort_order: typeForm.sort_order,
     attrs: {
       family_code: typeForm.family_code,
     },
@@ -450,8 +490,12 @@ async function saveFamily(): Promise<void> {
 async function saveType(): Promise<void> {
   saving.value = true;
   fieldErrors.value = {};
+  const previousFamilyCode = editingType.value ? String(editingType.value.attrs.family_code || '') : '';
   try {
-    await typeMaster.save(typePayload(), editingType.value?.code);
+    const saved = await typeMaster.save(typePayload(), editingType.value?.code);
+    if (editingType.value && previousFamilyCode !== typeForm.family_code) {
+      await moveSavedTypeToFamilyEnd(saved.code, typeForm.family_code);
+    }
     typeDialogOpen.value = false;
     expandedCodes.value = new Set([...expandedCodes.value, typeForm.family_code]);
   } catch (err) {
@@ -460,6 +504,88 @@ async function saveType(): Promise<void> {
     saving.value = false;
   }
 }
+
+function currentOrder(): { families: string[]; types: Record<string, string[]> } {
+  const orderedRows = rows.value;
+  return {
+    families: orderedRows.map((row) => row.family.code),
+    types: Object.fromEntries(orderedRows.map((row) => [row.family.code, row.types.map((type) => type.code)])),
+  };
+}
+
+function setDraftOrder(order: { families: string[]; types: Record<string, string[]> }): void {
+  familyOrder.value = [...order.families];
+  typeOrderByFamily.value = Object.fromEntries(
+    order.families.map((familyCode) => [familyCode, [...(order.types[familyCode] ?? [])]]),
+  );
+}
+
+function startReorder(): void {
+  resetFilters();
+  const order = currentOrder();
+  setDraftOrder(order);
+  reorderSnapshot.value = JSON.stringify(order);
+  reorderMode.value = true;
+  expandedCodes.value = new Set(order.families);
+}
+
+function cancelReorder(): void {
+  if (reorderSnapshot.value) {
+    setDraftOrder(JSON.parse(reorderSnapshot.value) as { families: string[]; types: Record<string, string[]> });
+  }
+  reorderMode.value = false;
+}
+
+async function saveReorder(): Promise<void> {
+  saving.value = true;
+  try {
+    await familyMaster.reorder(familyOrder.value);
+    await typeMaster.reorder(flattenTypeOrder(familyOrder.value, typeOrderByFamily.value));
+    snackbar.success('บันทึกลำดับแล้ว');
+    await Promise.all([familyMaster.fetch(), typeMaster.fetch()]);
+    reorderMode.value = false;
+  } catch (err) {
+    snackbar.error(err instanceof Error ? err.message : 'บันทึกลำดับไม่สำเร็จ');
+  } finally {
+    saving.value = false;
+  }
+}
+
+function moveFamily(code: string, dir: 'up' | 'down'): void {
+  familyOrder.value = moveWithin(familyOrder.value.map((item) => ({ code: item })), code, dir).map((item) => item.code);
+}
+
+function moveType(familyCode: string, code: string, dir: 'up' | 'down'): void {
+  typeOrderByFamily.value = {
+    ...typeOrderByFamily.value,
+    [familyCode]: moveWithin((typeOrderByFamily.value[familyCode] ?? []).map((item) => ({ code: item })), code, dir).map((item) => item.code),
+  };
+}
+
+function dragFamily(fromCode: string, toCode: string): void {
+  familyOrder.value = moveByDrag(familyOrder.value.map((item) => ({ code: item })), fromCode, toCode).map((item) => item.code);
+}
+
+function dragType(familyCode: string, fromCode: string, toCode: string): void {
+  typeOrderByFamily.value = {
+    ...typeOrderByFamily.value,
+    [familyCode]: moveByDrag((typeOrderByFamily.value[familyCode] ?? []).map((item) => ({ code: item })), fromCode, toCode).map((item) => item.code),
+  };
+}
+
+async function moveSavedTypeToFamilyEnd(typeCode: string, familyCode: string): Promise<void> {
+  const order = currentOrder();
+  const nextTypes = Object.fromEntries(
+    order.families.map((code) => [code, (order.types[code] ?? []).filter((item) => item !== typeCode)]),
+  );
+  nextTypes[familyCode] = [...(nextTypes[familyCode] ?? []), typeCode];
+  await typeMaster.reorder(flattenTypeOrder(order.families, nextTypes));
+}
+
+onBeforeRouteLeave(() => {
+  if (!reorderDirty.value) return true;
+  return window.confirm('ยังไม่ได้บันทึกลำดับ ต้องการออกจากหน้านี้หรือไม่');
+});
 
 async function confirmDeactivate(item: MasterItem): Promise<boolean> {
   const result = await Swal.fire({

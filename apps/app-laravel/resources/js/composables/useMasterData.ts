@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue';
 import {
   createMaster,
   listMaster,
+  reorderMaster,
   setMasterActive,
   updateMaster,
 } from '../api/masterData';
@@ -104,6 +105,12 @@ export function useMasterData(kind: MasterKind) {
     }
   }
 
+  async function reorder(codes: string[]): Promise<void> {
+    await reorderMaster(kind, codes);
+    await fetch();
+    await lookups.reload();
+  }
+
   return {
     items,
     total,
@@ -120,5 +127,6 @@ export function useMasterData(kind: MasterKind) {
     resetFilters,
     save,
     toggleActive,
+    reorder,
   };
 }
