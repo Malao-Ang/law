@@ -49,7 +49,16 @@
             <v-icon icon="mdi-eye-outline" size="18" color="admin-primary" />
             <span>สถานะการใช้งาน</span>
           </div>
-          <div class="master-dialog__active-card">
+          <v-alert
+            v-if="!editing"
+            type="info"
+            variant="tonal"
+            density="compact"
+            icon="mdi-power"
+          >
+            รายการใหม่จะถูกสร้างในสถานะ <strong>ปิดใช้งาน</strong> เปิดใช้งานได้ภายหลังจากตาราง
+          </v-alert>
+          <div v-else class="master-dialog__active-card">
             <div>
               <div class="text-body-2 font-weight-bold">เปิดใช้งาน</div>
               <div class="text-caption text-medium-emphasis">
@@ -115,7 +124,7 @@ const emit = defineEmits<{
 const form = reactive<UpsertMasterItemPayload>({
   name: '',
   description: '',
-  is_active: true,
+  is_active: false,
   attrs: {},
 });
 
@@ -126,7 +135,7 @@ watch(() => [props.modelValue, props.item] as const, () => {
   if (!props.modelValue) return;
   form.name = props.item?.name ?? '';
   form.description = props.item?.description ?? '';
-  form.is_active = props.item?.is_active ?? true;
+  form.is_active = props.item?.is_active ?? false;
   form.attrs = { ...(props.item?.attrs ?? {}) };
 }, { immediate: true });
 
@@ -138,7 +147,7 @@ function submit(): void {
   emit('save', {
     name: form.name,
     description: form.description,
-    is_active: form.is_active,
+    ...(props.item ? { is_active: form.is_active } : {}),
     attrs: form.attrs ?? {},
   });
 }

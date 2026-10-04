@@ -28,25 +28,33 @@ class MasterDataApiTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('code', 'STA04')
-            ->assertJsonPath('is_system', false);
+            ->assertJsonPath('is_system', false)
+            ->assertJsonPath('is_active', false);
+
+        $this->postJson('/api/master-data/enforcement_status', [
+            'name' => 'Forced Active',
+            'is_active' => true,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('is_active', false);
 
         $this->postJson('/api/master-data/enforcement_status', [
             'name' => 'Beta',
             'description' => 'Second',
         ])
             ->assertCreated()
-            ->assertJsonPath('code', 'STA05');
+            ->assertJsonPath('code', 'STA06');
 
         $this->postJson('/api/master-data/enforcement_status', [
             'code' => 'custom-1',
             'name' => 'Gamma',
         ])
             ->assertCreated()
-            ->assertJsonPath('code', 'STA06');
+            ->assertJsonPath('code', 'STA07');
 
         $this->getJson('/api/master-data/enforcement_status')
             ->assertOk()
-            ->assertJsonPath('next_code', 'STA07');
+            ->assertJsonPath('next_code', 'STA08');
 
         $this->postJson('/api/master-data/enforcement_status', [
             'name' => '  alpha  ',
@@ -58,7 +66,8 @@ class MasterDataApiTest extends TestCase
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Active One'])->assertCreated();
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Inactive Two'])->assertCreated();
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'Active Three'])->assertCreated();
-        $this->patchJson('/api/master-data/enforcement_status/STA05/active', ['is_active' => false])->assertOk();
+        $this->patchJson('/api/master-data/enforcement_status/STA04/active', ['is_active' => true])->assertOk();
+        $this->patchJson('/api/master-data/enforcement_status/STA06/active', ['is_active' => true])->assertOk();
 
         $this->getJson('/api/master-data/enforcement_status?q=active&active=1&page=1&per_page=1')
             ->assertOk()
@@ -106,7 +115,13 @@ class MasterDataApiTest extends TestCase
 
     public function test_set_active_toggles_and_system_item_cannot_be_deactivated(): void
     {
-        $this->postJson('/api/master-data/enforcement_status', ['name' => 'Toggle'])->assertCreated();
+        $this->postJson('/api/master-data/enforcement_status', ['name' => 'Toggle'])
+            ->assertCreated()
+            ->assertJsonPath('is_active', false);
+
+        $this->patchJson('/api/master-data/enforcement_status/STA04/active', ['is_active' => true])
+            ->assertOk()
+            ->assertJsonPath('is_active', true);
 
         $this->patchJson('/api/master-data/enforcement_status/STA04/active', ['is_active' => false])
             ->assertOk()

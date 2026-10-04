@@ -87,6 +87,7 @@ class MasterDataStore
             $this->assertUniqueName($items, (string) ($payload['name'] ?? ''));
 
             $timestamp = now()->toIso8601String();
+            $payload['is_active'] = false;
             $created = $this->normalizeItem($kind, $payload, $items, [
                 'code' => $code,
                 'is_system' => false,
