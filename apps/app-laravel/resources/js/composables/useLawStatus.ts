@@ -43,7 +43,9 @@ function codeForRole(role: Exclude<LawStatusRole, null>, items: LawStatusOption[
 }
 
 export function useLawStatus() {
-  const { statuses, statusesAll } = useLookups();
+  const { statuses, statusesAll, load } = useLookups();
+  // Statuses added by admins (e.g. STA04) only exist in /api/lookups, not in the fallback list.
+  void load().catch(() => { /* fallback list stays in use */ });
   const allStatuses = computed(() => (statusesAll.value.length > 0 ? statusesAll.value : statuses.value));
 
   const statusItem = (value: unknown): LawStatusOption | null => resolveStatus(value, allStatuses.value);
