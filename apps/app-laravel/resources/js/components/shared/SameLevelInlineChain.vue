@@ -48,6 +48,7 @@ import {
   versionStatusKind,
   type ShowRelRow,
 } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{
   versions: ShowRelRow[];
@@ -58,6 +59,7 @@ const props = defineProps<{
 
 defineEmits<{ select: [id: string] }>();
 const themeColor = computed(() => props.themeColor ?? 'admin-primary');
+const { inForceCode, repealedCode, statusLabel } = useLawStatus();
 
 function peerEdgeLabel(row: ShowRelRow): string {
   if (isWholeEditionChange(row.changeStatus)) return relationTypeLabel('supersedes');
@@ -74,7 +76,9 @@ const items = computed(() => {
       size: versionNodeSize(row.changeStatus),
       kindLabel: editionKindLabel(row.typeShort || row.lawType),
       versionLabel: sameLevelVersionLabel(chain, row.id),
-      statusLabel: row.metaStatus || (kind === 'revoked' ? 'ยกเลิก' : kind === 'active' ? 'มีผลบังคับใช้' : '—'),
+      statusLabel: row.metaStatus
+        ? statusLabel(row.metaStatus)
+        : (kind === 'revoked' ? statusLabel(repealedCode.value) : kind === 'active' ? statusLabel(inForceCode.value) : '—'),
     };
   });
 });

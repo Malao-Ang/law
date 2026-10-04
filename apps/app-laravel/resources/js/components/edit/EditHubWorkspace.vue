@@ -38,7 +38,7 @@
                 variant="flat"
                 class="font-weight-bold"
               >
-                {{ meta.status || 'ร่าง' }}
+                {{ statusLabel(meta.status || draftCode.value) }}
               </v-chip>
               <v-chip
                 size="small"
@@ -254,12 +254,14 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
 
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
+const { draftCode, inForceCode, isDraft, statusColor, statusLabel } = useLawStatus();
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -443,9 +445,7 @@ const actions = computed(() => {
 });
 
 function metaStatusColor(status: string): string {
-  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'success';
-  if (status === 'ยกเลิกการใช้งาน' || status === 'ยกเลิก') return 'error';
-  return 'warning'; // ร่าง or empty
+  return statusColor(status) || 'warning';
 }
 
 function relationTypeLabel(type: RelationType): string {
@@ -543,7 +543,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   }
 
   // All required gates pass — special handling for ร่าง status (post-gate)
-  if (!meta.value.status || meta.value.status === 'ร่าง') {
+  if (!meta.value.status || isDraft(meta.value.status)) {
     const r = await Swal.fire({
       icon: 'question',
       title: 'เอกสารยังเป็นร่าง',
@@ -557,7 +557,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       confirmButtonColor: '#1a3673',
     });
     if (r.isConfirmed) {
-      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+      await documentStore.saveLawMeta({ status: inForceCode.value });
     } else if (r.isDenied) {
       router.push(`/documents/${props.documentId}/law-info?mode=edit`);
       return;

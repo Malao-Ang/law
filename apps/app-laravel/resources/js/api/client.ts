@@ -29,15 +29,29 @@ type ApiErrorPayload = {
   errors?: Record<string, string[]>;
 };
 
+export type ApiRequestError = Error & {
+  status?: number;
+  errors?: Record<string, string[]>;
+};
+
 export type SelectableOption = {
   title: string;
   value: string;
   subtitle?: string;
 };
 
+export type LawStatusRole = 'in_force' | 'repealed' | 'draft' | null;
+
+export type LawStatusOption = SelectableOption & {
+  code: string;
+  color: 'success' | 'error' | 'grey' | 'info' | 'warning' | null;
+  role: LawStatusRole;
+};
+
 export type LookupData = {
   document_types: (SelectableOption & { source?: string })[];
-  statuses: SelectableOption[];
+  statuses: LawStatusOption[];
+  statuses_all?: LawStatusOption[];
   change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];
   change_status_details: (SelectableOption & { source?: string })[];
   agencies: SelectableOption[];
@@ -75,7 +89,10 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
       ? Object.values(payload.errors).flat()[0]
       : undefined;
 
-    throw new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback);
+    const error = new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback) as ApiRequestError;
+    error.status = response.status;
+    error.errors = payload?.errors;
+    throw error;
   }
 
   return (await response.json()) as T;

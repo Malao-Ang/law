@@ -78,12 +78,12 @@
         <v-chip
           v-if="item.lawStatus"
           size="small"
-          :color="item.lawStatus === 'มีผลบังคับใช้' ? 'success' : item.lawStatus === 'ยกเลิกการใช้งาน' ? 'error' : 'warning'"
+          :color="statusColor(item.lawStatus) || 'warning'"
           variant="tonal"
         >
-          {{ item.lawStatus }}
+          {{ statusLabel(item.lawStatus) }}
         </v-chip>
-        <v-chip v-else size="small" color="warning" variant="tonal">ร่าง</v-chip>
+        <v-chip v-else size="small" color="warning" variant="tonal">{{ statusLabel(draftCode) }}</v-chip>
       </template>
 
       <template #item.lifecycle="{ item }">
@@ -174,6 +174,7 @@ import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
 import { lifecycleStatus, type LifecycleStatus } from '../../utils/lifecycleStatus';
+import { useLawStatus } from '../../composables/useLawStatus';
 import {
   deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
@@ -194,6 +195,7 @@ interface Row {
 
 const router = useRouter();
 const snackbar = useSnackbarStore();
+const { draftCode, statusColor, statusLabel } = useLawStatus();
 const docs = ref<DocumentListItem[]>([]);
 const localStages = ref<Record<string, StageKey>>(readStages());
 const loading = ref(false);
@@ -270,7 +272,7 @@ const rows = computed<Row[]>(() =>
       updatedAt: formatDate(doc.updated_at),
       stage,
       lawType: doc.law_type ?? '',
-      lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
+      lawStatus: doc.law_status || (!doc.published_date ? draftCode.value : ''),
       documentType: doc.document_type ?? 'new',
       lifecycle: lifecycleStatus(doc, stage),
       accessScope: doc.access_scope === 'public' ? 'public' : 'private',

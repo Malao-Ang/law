@@ -10,7 +10,7 @@
           <span class="law-info-row__label text-medium-emphasis">สถานะ</span>
           <span class="law-info-row__value font-weight-semibold d-flex align-center justify-end ga-1" :class="statusClass(meta.status)">
             <v-icon icon="mdi-circle" size="x-small" />
-            {{ meta.status }}
+            {{ statusLabel(meta.status) }}
           </span>
         </div>
         <div v-if="showChangeStatus" class="law-info-row py-1">
@@ -161,6 +161,7 @@ import { computed } from 'vue';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 interface SectionRelationGroup {
   type: RelationType;
@@ -198,6 +199,7 @@ function relHref(rel: LawRelation): string | undefined {
 
 const parentNames = computed(() => props.parentNames ?? []);
 const sectionRelationSummaries = computed(() => props.sectionRelationSummaries ?? []);
+const { isInForce, isRepealed, statusLabel } = useLawStatus();
 
 const showChangeStatus = computed(() => {
   const changeStatus = props.meta.change_status?.trim();
@@ -209,8 +211,8 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 function statusClass(status: string): string {
-  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'text-success';
-  if (status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'text-error';
+  if (isInForce(status)) return 'text-success';
+  if (isRepealed(status)) return 'text-error';
   return 'text-warning';
 }
 </script>

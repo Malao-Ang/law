@@ -57,7 +57,7 @@
                   <span class="font-weight-bold text-body-2">{{ v.version_label }}</span>
                   <div class="d-flex ga-1">
                     <v-chip size="x-small" :color="v.is_current ? 'success' : 'default'" variant="tonal" rounded="pill">
-                      {{ v.is_current ? (v.status || 'มีผลบังคับใช้') : 'ถูกแทนที่' }}
+                      {{ v.is_current ? statusLabel(v.status || inForceCode.value) : 'ถูกแทนที่' }}
                     </v-chip>
                     <v-chip
                       v-if="v.document_id === props.documentId"
@@ -192,11 +192,13 @@ import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const versionStore = useVersionStore();
 const documentStore = useDocumentStore();
+const { inForceCode, statusLabel } = useLawStatus();
 
 watch(() => props.documentId, (id) => {
   void versionStore.fetch(id);

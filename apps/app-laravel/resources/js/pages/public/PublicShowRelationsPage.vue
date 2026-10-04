@@ -422,12 +422,14 @@ import {
   isCancelledStatus,
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const PAGE_SIZE = 20;
 
 const props = defineProps<{ documentId?: string }>();
 const route = useRoute();
 const router = useRouter();
+const { inForceCode, statusLabel } = useLawStatus();
 
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -603,7 +605,7 @@ const stats = computed(() => {
   const nodes = flattenTree(rootNode.value);
   return [
     { label: 'กฎหมายลำดับรองทั้งหมด', value: `${nodes.length} ฉบับ`, tone: '', icon: 'mdi-layers-outline' },
-    { label: 'มีผลบังคับใช้', value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
+    { label: statusLabel(inForceCode.value), value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
     { label: 'ถูกยกเลิก', value: String(nodes.filter((n) => isCancelledStatus(n.row.metaStatus)).length), tone: 'is-muted', icon: '' },
     { label: 'ต้องตรวจสอบ', value: String(nodes.filter((n) => !n.row.metaStatus).length), tone: 'is-warning', icon: '' },
     { label: 'ระดับสูงสุด', value: String(maxTreeLevel(rootNode.value)), tone: 'is-primary', icon: '' },

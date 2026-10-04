@@ -22,6 +22,12 @@ class LawSuggestTest extends TestCase
         ];
 
         $this->mock(LawSuggestService::class, fn ($mock) => $mock->shouldReceive('suggest')->once()->andReturn($fake));
+        $this->mock(ReviewStore::class, fn ($mock) => $mock->shouldReceive('listLawMeta')->once()->andReturn([[
+            'document_id' => 'L1',
+            'status' => 'ingested',
+            'published_date' => '2562-01-01',
+            'meta_status' => 'STA01',
+        ]]));
 
         $this->postJson('/api/laws/suggest', ['q' => 'ภาษี'])
             ->assertOk()
@@ -32,14 +38,15 @@ class LawSuggestTest extends TestCase
     public function test_suggest_endpoint_falls_back_to_file_based_when_es_unavailable(): void
     {
         $this->mock(LawSuggestService::class, fn ($mock) => $mock->shouldReceive('suggest')->andThrow(new \RuntimeException('no route to host')));
-        $this->mock(ReviewStore::class, fn ($mock) => $mock->shouldReceive('listLawMeta')->once()->andReturn([
+        $this->mock(ReviewStore::class, fn ($mock) => $mock->shouldReceive('listLawMeta')->twice()->andReturn([
             [
                 'document_id' => 'doc_public',
                 'title' => 'พระราชบัญญัติภาษีที่ดิน',
                 'status' => 'ingested',
                 'access_scope' => 'public',
                 'law_type' => 'พระราชบัญญัติ',
-                'meta_status' => 'มีผลใช้บังคับ',
+                'meta_status' => 'STA01',
+                'published_date' => '2562-01-01',
                 'change_status' => '',
                 'signer_group' => '',
                 'agencies' => ['กระทรวงการคลัง'],
@@ -70,14 +77,15 @@ class LawSuggestTest extends TestCase
     public function test_suggest_endpoint_uses_file_fuzzy_when_es_returns_empty(): void
     {
         $this->mock(LawSuggestService::class, fn ($mock) => $mock->shouldReceive('suggest')->once()->andReturn(['suggestions' => []]));
-        $this->mock(ReviewStore::class, fn ($mock) => $mock->shouldReceive('listLawMeta')->once()->andReturn([
+        $this->mock(ReviewStore::class, fn ($mock) => $mock->shouldReceive('listLawMeta')->twice()->andReturn([
             [
                 'document_id' => 'doc_external_person',
                 'title' => 'ระเบียบว่าด้วยการให้บริการบุคคลภายนอก',
                 'status' => 'ingested',
                 'access_scope' => 'public',
                 'law_type' => 'ระเบียบ',
-                'meta_status' => 'มีผลใช้บังคับ',
+                'meta_status' => 'STA01',
+                'published_date' => '2567-01-01',
                 'change_status' => '',
                 'signer_group' => '',
                 'agencies' => ['มหาวิทยาลัยบูรพา'],

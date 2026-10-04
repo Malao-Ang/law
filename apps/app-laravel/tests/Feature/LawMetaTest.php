@@ -43,7 +43,7 @@ class LawMetaTest extends TestCase
         $doc = $store->getReviewDocument($id);
 
         $this->assertArrayHasKey('law_meta', $doc);
-        $this->assertSame('', $doc['law_meta']['status']);
+        $this->assertSame('STA03', $doc['law_meta']['status']);
         $this->assertSame('', $doc['law_meta']['law_type']);
         $this->assertSame('public', $doc['law_meta']['access_scope']);
         $this->assertSame([], $doc['law_meta']['permission_group_ids']);
@@ -98,7 +98,7 @@ class LawMetaTest extends TestCase
 
         $response = $this->putJson("/api/documents/{$id}/document-review", [
             'law_meta' => [
-                'status' => 'มีผลใช้บังคับ',
+                'status' => 'มีผลบังคับใช้',
                 'law_type' => 'พระราชบัญญัติ',
                 'law_group' => 'ด้านวิชาการ',
                 'agency' => 'มหาวิทยาลัยบูรพา',
@@ -110,7 +110,7 @@ class LawMetaTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.status', 'มีผลใช้บังคับ');
+        $response->assertJsonPath('law_meta.status', 'STA01');
         $response->assertJsonPath('law_meta.agency', 'มหาวิทยาลัยบูรพา');
         $response->assertJsonPath('law_meta.section_count', 1);
         $response->assertJsonPath('law_meta.keywords', ['ข้อมูลส่วนบุคคล', 'PDPA']);

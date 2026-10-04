@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\MasterData\EnforcementStatuses;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,10 @@ class ReportController extends Controller
 
     private const PROCESSING = ['queued', 'processing', 'ingesting'];
 
-    public function __construct(private readonly ReviewStore $reviewStore) {}
+    public function __construct(
+        private readonly ReviewStore $reviewStore,
+        private readonly EnforcementStatuses $enforcementStatuses,
+    ) {}
 
     public function summary(Request $request): JsonResponse
     {
@@ -21,10 +25,15 @@ class ReportController extends Controller
         $dateTo = trim((string) $request->query('date_to', ''));
         $type = trim((string) $request->query('type', ''));
         $status = trim((string) $request->query('status', ''));
+        $metaStatus = null;
+        if ($status !== '') {
+            $resolvedStatus = $this->enforcementStatuses->resolve($status);
+            $metaStatus = $resolvedStatus === null ? null : (string) $resolvedStatus['code'];
+        }
         $groups = array_values(array_filter((array) $request->query('group', []), 'is_string'));
         $agencies = array_values(array_filter((array) $request->query('agency', []), 'is_string'));
 
-        $rows = array_filter($this->reviewStore->listLawMeta(), function (array $r) use ($dateFrom, $dateTo, $type, $status, $groups, $agencies): bool {
+        $rows = array_filter($this->reviewStore->listLawMeta(), function (array $r) use ($dateFrom, $dateTo, $type, $status, $metaStatus, $groups, $agencies): bool {
             $updated = (string) ($r['updated_at'] ?? '');
             if ($dateFrom !== '' && ($updated === '' || substr($updated, 0, 10) < $dateFrom)) {
                 return false;
@@ -35,7 +44,10 @@ class ReportController extends Controller
             if ($type !== '' && ($r['law_type'] ?? '') !== $type) {
                 return false;
             }
-            if ($status !== '' && ($r['status'] ?? '') !== $status) {
+            if ($metaStatus !== null && ($r['meta_status'] ?? '') !== $metaStatus) {
+                return false;
+            }
+            if ($status !== '' && $metaStatus === null && ($r['status'] ?? '') !== $status) {
                 return false;
             }
             if ($groups !== [] && array_intersect($groups, $r['law_groups'] ?? []) === []) {

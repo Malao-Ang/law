@@ -473,6 +473,7 @@ import { canDisplayLawResult } from '../../utils/lawAccess';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const PER_PAGE = 20;
 
@@ -503,19 +504,6 @@ const CHANGE_STATUS_LABELS: Record<string, string> = {
   amended: 'แก้ไขเพิ่มเติม',
   repealed: 'ยกเลิก',
   consolidated: 'ฉบับรวม',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  active: 'มีผลบังคับใช้',
-  มีผลบังคับใช้: 'มีผลบังคับใช้',
-  มีผลใช้บังคับ: 'มีผลบังคับใช้',
-  ใช้บังคับ: 'มีผลบังคับใช้',
-  บังคับใช้: 'มีผลบังคับใช้',
-  cancelled: 'ยกเลิกการใช้งาน',
-  ยกเลิก: 'ยกเลิกการใช้งาน',
-  ยกเลิกการใช้งาน: 'ยกเลิกการใช้งาน',
-  draft: 'ร่าง',
-  ร่าง: 'ร่าง',
 };
 
 const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
@@ -565,8 +553,9 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
   other: 'อื่น ๆ',
 };
 
+const lawStatus = useLawStatus();
 const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
-const DRAFT_EXCLUDED_STATUSES = ['มีผลบังคับใช้', 'ยกเลิกการใช้งาน'];
+const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
   academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
@@ -1077,11 +1066,11 @@ function changeStatusLabel(value: string | null): string {
 
 function statusLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุสถานะ';
-  return STATUS_LABELS[value] ?? value;
+  return lawStatus.statusLabel(value);
 }
 
 function canonicalUseStatusValue(value: string): string {
-  return STATUS_LABELS[value] ?? value;
+  return lawStatus.statusItem(value)?.code ?? value;
 }
 
 function extractYear(item: LawSearchResult): number {
@@ -1160,8 +1149,8 @@ function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | nul
 }
 
 function useStatusClass(status: string | null | undefined): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'law-use-status--active';
-  if (status === 'cancelled' || status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'law-use-status--cancelled';
+  if (lawStatus.isInForce(status)) return 'law-use-status--active';
+  if (lawStatus.isRepealed(status)) return 'law-use-status--cancelled';
   return 'law-use-status--draft';
 }
 

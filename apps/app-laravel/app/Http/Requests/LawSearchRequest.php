@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\MasterData\EnforcementStatuses;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LawSearchRequest extends FormRequest
@@ -9,6 +10,20 @@ class LawSearchRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $filters = $this->input('filters');
+        if (is_array($filters) && is_array($filters['status'] ?? null)) {
+            $statuses = app(EnforcementStatuses::class);
+            $filters['status'] = array_values(array_map(
+                static fn (mixed $status): string => (string) ($statuses->resolve($status)['code'] ?? trim((string) $status)),
+                $filters['status'],
+            ));
+        }
+
+        $this->merge(['filters' => $filters]);
     }
 
     /**

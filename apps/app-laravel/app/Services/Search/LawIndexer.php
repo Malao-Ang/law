@@ -101,7 +101,7 @@ class LawIndexer
             'title'          => $meta['title'] ?? null,
             'title_suggest'  => $meta['title'] ?? null,
             'law_type'       => $meta['law_type'] ?? null,
-            'status'         => LawMetaNormalizer::legacyStatus($meta['status'] ?? null) ?: null,
+            'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
             'change_status'  => $meta['change_status'] ?? null,
             'agency'         => $meta['agency'] ?? null,
             'agencies'       => $meta['agencies'] ?? [],

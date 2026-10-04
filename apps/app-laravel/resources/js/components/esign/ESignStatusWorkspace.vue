@@ -405,10 +405,12 @@ import {
   RELATION_TYPE_COLORS,
   relationTypeLabel,
 } from '../../types/lawRelation';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const documentStore = useDocumentStore();
+const { inForceCode, isDraft } = useLawStatus();
 
 const session = ref<ESignSession>(loadSession(props.documentId));
 const signers = ref<ESignSigner[]>(loadSigners(props.documentId));
@@ -947,7 +949,7 @@ async function publish(): Promise<void> {
   const payload: { status?: string; published_date: string } = {
     published_date: new Date().toISOString().slice(0, 10),
   };
-  if (!meta?.status || meta.status === 'ร่าง') {
+  if (!meta?.status || isDraft(meta.status)) {
     const result = await Swal.fire({
       icon: 'question',
       title: 'เอกสารยังเป็นร่าง',
@@ -969,7 +971,7 @@ async function publish(): Promise<void> {
     if (!result.isConfirmed) {
       return;
     }
-    payload.status = 'มีผลบังคับใช้';
+    payload.status = inForceCode.value;
   }
 
   publishing.value = true;

@@ -290,6 +290,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { fetchActiveChildren, type SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
+import { useLawStatus } from '../../composables/useLawStatus';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
 import { normalizeChunkType } from '../../types/chunkType';
@@ -306,6 +307,7 @@ const isEditMode = computed(() => route.query.mode === 'edit');
 const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const { documentTypes, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { draftCode, isRepealed } = useLawStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/ข้อบังคับ/u, 'ข้อบังคับ'],
@@ -328,7 +330,7 @@ const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
 const EXTERNAL_LAW_TYPES = new Set(['พระราชกำหนด', 'พระราชบัญญัติ', 'กฎกระทรวง', 'ประกาศกระทรวง']);
 
 const EMPTY: LawMeta = {
-  status: 'ร่าง', source: '', law_type: '', law_group: '', law_groups: [],
+  status: draftCode.value, source: '', law_type: '', law_group: '', law_groups: [],
   change_status: null, change_details: [],
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
@@ -639,7 +641,7 @@ function focusFirstError(errors: { id: string | number; errorMessages: string[] 
 }
 
 function isRepealOrCancelStatus(value: unknown): boolean {
-  return typeof value === 'string' && value.includes('ยกเลิก');
+  return typeof value === 'string' && (isRepealed(value) || value.includes('ยกเลิก'));
 }
 
 function escapeHtml(value: string): string {

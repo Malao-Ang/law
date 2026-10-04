@@ -392,6 +392,7 @@ import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -424,6 +425,7 @@ interface ChangeLogEntry {
 // ── Stores ────────────────────────────────────────────────
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
+const { statusColor } = useLawStatus();
 
 // ── Table state ───────────────────────────────────────────
 const PAGE_SIZE = 20;
@@ -612,8 +614,9 @@ function workflowStageColor(stage: string): string {
 }
 
 function metaStatusColor(status: string): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
-  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
+  const color = statusColor(status);
+  if (color) return color;
+  if (status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
 }

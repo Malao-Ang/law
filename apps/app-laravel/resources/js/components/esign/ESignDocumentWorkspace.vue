@@ -395,6 +395,7 @@ import { documentFileUrl, fetchStatus } from '../../api/client';
 import Swal from 'sweetalert2';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
@@ -405,6 +406,7 @@ const fileUrl = computed(() => documentFileUrl(props.documentId));
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
+const { inForceCode, isDraft } = useLawStatus();
 
 const tocQuery = ref('');
 const sideTab = ref('info');
@@ -468,7 +470,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     }
   }
   // Draft status check — after RAG check passes
-  if (next && (!meta.value.status || meta.value.status === 'ร่าง')) {
+  if (next && (!meta.value.status || isDraft(meta.value.status))) {
     const result = await Swal.fire({
       title: 'เอกสารยังเป็นร่าง',
       html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>หากเผยแพร่ สถานะจะเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> โดยอัตโนมัติ',
@@ -482,7 +484,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     });
 
     if (result.isConfirmed) {
-      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+      await documentStore.saveLawMeta({ status: inForceCode.value });
     } else if (result.isDenied) {
       router.push(`/documents/${props.documentId}/law-info`);
       return;

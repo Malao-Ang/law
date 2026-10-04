@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSuggestRequest;
+use App\Services\MasterData\EnforcementStatuses;
 use App\Services\ReviewStore;
 use App\Services\Search\LawSuggestService;
 use Illuminate\Http\JsonResponse;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 
 class LawSuggestController extends Controller
 {
+    public function __construct(private readonly EnforcementStatuses $enforcementStatuses) {}
+
     public function suggest(LawSuggestRequest $request, LawSuggestService $service, ReviewStore $store): JsonResponse
     {
         $params = $request->validated();
@@ -21,7 +24,7 @@ class LawSuggestController extends Controller
             if (
                 ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
-                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+                && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
             ) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
             }
@@ -59,7 +62,7 @@ class LawSuggestController extends Controller
 
         $rows = [];
         foreach ($store->listLawMeta() as $row) {
-            // Published gate: status=ingested, has published_date, not draft (ร่าง)
+            // Published gate: status=ingested, has published_date, not draft.
             if (! isset($publishedIds[(string) ($row['document_id'] ?? '')])) {
                 continue;
             }

@@ -1,8 +1,9 @@
 import { ref } from 'vue';
-import { getLookups, type LookupData, type SelectableOption } from '../api/client';
+import { getLookups, type LawStatusOption, type LookupData, type SelectableOption } from '../api/client';
 
 const documentTypes = ref<(SelectableOption & { source?: string })[]>([]);
-const statuses = ref<SelectableOption[]>([]);
+const statuses = ref<LawStatusOption[]>([]);
+const statusesAll = ref<LawStatusOption[]>([]);
 const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
 const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
@@ -18,6 +19,7 @@ async function load(): Promise<void> {
     inFlight = getLookups().then((data: LookupData) => {
       documentTypes.value = data.document_types;
       statuses.value = data.statuses;
+      statusesAll.value = data.statuses_all ?? data.statuses;
       changeStatusTypes.value = data.change_status_types;
       changeStatusDetails.value = data.change_status_details;
       agencies.value = data.agencies;
@@ -32,6 +34,11 @@ async function load(): Promise<void> {
   await inFlight;
 }
 
+async function reload(): Promise<void> {
+  loaded = false;
+  await load();
+}
+
 export function useLookups() {
-  return { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load };
+  return { documentTypes, statuses, statusesAll, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load, reload };
 }

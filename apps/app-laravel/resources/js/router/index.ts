@@ -11,6 +11,7 @@ const AdminReportPage = () => import('../pages/admin/AdminReportPage.vue');
 const AdminOcrQueuePage = () => import('../pages/admin/AdminOcrQueuePage.vue');
 const AdminRelationsHubPage = () => import('../pages/admin/AdminRelationsHubPage.vue');
 const AdminShowRelationsPage = () => import('../pages/admin/AdminShowRelationsPage.vue');
+const EnforcementStatusPage = () => import('../pages/admin/master/EnforcementStatusPage.vue');
 const UploadPage = () => import('../pages/UploadPage.vue');
 const ReviewPage = () => import('../pages/review/ReviewPage.vue');
 const ComposePage = () => import('../pages/compose/ComposePage.vue');
@@ -40,6 +41,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/ocr-queue', name: 'admin-ocr-queue', component: AdminOcrQueuePage, meta: { bareLayout: true } },
   { path: '/admin/relations', name: 'admin-relations', component: AdminRelationsHubPage, meta: { bareLayout: true } },
   { path: '/admin/show-relations/:documentId?', name: 'admin-show-relations', component: AdminShowRelationsPage, props: true, meta: { bareLayout: true } },
+  { path: '/admin/master/enforcement-status', name: 'admin-master-enforcement-status', component: EnforcementStatusPage, meta: { bareLayout: true } },
   { path: '/upload', name: 'upload-legacy', component: UploadPage },
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/edit', name: 'edit', component: EditPage, props: true, meta: { bareLayout: true } },

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LawSearchController;
 use App\Http\Controllers\Api\LawSuggestController;
 use App\Http\Controllers\Api\LookupController;
+use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\PermissionDirectoryController;
 use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -34,6 +35,15 @@ Route::post('/permission-groups', [PermissionGroupController::class, 'store']);
 Route::get('/permission-groups/{groupId}', [PermissionGroupController::class, 'show']);
 Route::put('/permission-groups/{groupId}', [PermissionGroupController::class, 'update']);
 Route::delete('/permission-groups/{groupId}', [PermissionGroupController::class, 'destroy']);
+Route::prefix('master-data/{kind}')->group(function (): void {
+    Route::get('/', [MasterDataController::class, 'index']);
+    Route::post('/', [MasterDataController::class, 'store']);
+    Route::patch('/reorder', [MasterDataController::class, 'reorder']);
+    Route::get('/{code}', [MasterDataController::class, 'show']);
+    Route::put('/{code}', [MasterDataController::class, 'update']);
+    Route::patch('/{code}/active', [MasterDataController::class, 'setActive']);
+    Route::delete('/{code}', [MasterDataController::class, 'destroy']);
+});
 
 Route::get('/documents', [UploadController::class, 'index']);
 Route::post('/documents', [UploadController::class, 'store']);

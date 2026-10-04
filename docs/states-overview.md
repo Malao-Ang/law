@@ -29,13 +29,16 @@
 
 ## 1. สถานะบังคับใช้ — `LawMeta.status`
 
-สถานะทางกฎหมายที่แสดงบนหน้าเว็บ.
+สถานะทางกฎหมายที่แสดงบนหน้าเว็บ. ค่าที่เก็บใน `LawMeta.status` เป็น code จาก master data `enforcement_status`
+ไม่ใช่ข้อความ label ภาษาไทยโดยตรง.
 
-| ค่า | ความหมาย |
-|---|---|
-| `ร่าง` | ยังเป็นร่าง ยังไม่มีผล |
-| `มีผลบังคับใช้` | บังคับใช้อยู่ |
-| `ยกเลิกการใช้งาน` | ถูกยกเลิก ไม่บังคับใช้แล้ว |
+| code | label | role | ความหมาย |
+|---|---|---|---|
+| `STA01` | มีผลบังคับใช้ | `in_force` | บังคับใช้อยู่ |
+| `STA02` | ยกเลิกการใช้งาน | `repealed` | ถูกยกเลิก ไม่บังคับใช้แล้ว |
+| `STA03` | ร่าง | `draft` | ยังเป็นร่าง ยังไม่มีผล |
+
+ชื่อ/alias เก่าถูก normalize เป็น code ผ่าน master data service; UI ใช้ label/color/role จาก lookup.
 
 ---
 
@@ -96,7 +99,7 @@ state machine ของการลงนามอิเล็กทรอนิ
 > เอกสารนำเข้าเก่า (`document_type = 'old'`) ไม่ผ่าน e-Sign → แสดง `–`.
 
 **Publish gate:** เผยแพร่ได้ต่อเมื่อ `esign_sign_status = 'Y'` เท่านั้น (ยืนยันใน
-`ReviewController` + `usePublishGates`). ตอน publish สำเร็จจะ set `status = 'มีผลบังคับใช้'`
+`ReviewController` + `usePublishGates`). ตอน publish สำเร็จจะ set `status = 'STA01'`
 **พร้อม** `published_date = now` — **นี่คือที่เดียว** ที่ 2 แกนขยับพร้อมกัน.
 
 ---
@@ -147,15 +150,15 @@ state machine ของการลงนามอิเล็กทรอนิ
 ```
 อัปโหลด        →  pipeline: queued → processing → done
 ตรวจทาน/RAG    →  workflow step 2–3
-กรอกข้อมูล     →  LawMeta.status = "ร่าง", published_date = ""      (step 4)
+กรอกข้อมูล     →  LawMeta.status = "STA03", published_date = ""      (step 4)
 ความสัมพันธ์   →  step 5
 กำหนดสิทธิ์    →  access_scope = public/private                     (step 6)
 ส่งลงนาม       →  e-Sign: draft → waiting
 ลงนามเสร็จ     →  e-Sign: signed (esign_sign_status = "Y")
-เผยแพร่        →  status = "มีผลบังคับใช้" + published_date = now  → e-Sign: published
+เผยแพร่        →  status = "STA01" + published_date = now  → e-Sign: published
 ```
 
-แต่ละบรรทัดขยับคนละแกน — เช่นเอกสารหนึ่งอาจ `status = "ร่าง"`, `access_scope = "private"`,
+แต่ละบรรทัดขยับคนละแกน — เช่นเอกสารหนึ่งอาจ `status = "STA03"`, `access_scope = "private"`,
 e-Sign `waiting`, pipeline `done` พร้อมกันได้ (แกนอิสระต่อกัน).
 
 ---
