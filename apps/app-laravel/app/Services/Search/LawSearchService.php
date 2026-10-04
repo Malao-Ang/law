@@ -2,9 +2,11 @@
 
 namespace App\Services\Search;
 
+use App\Services\MasterData\LawTypes;
+
 class LawSearchService
 {
-    private const TERM_FILTERS = ['law_type', 'status', 'change_status', 'agency', 'law_group', 'signer_group'];
+    private const TERM_FILTERS = ['law_type', 'law_family', 'status', 'change_status', 'agency', 'law_group', 'signer_group'];
     private const FUZZY_MIN_QUERY_LENGTH = 4;
     private const EXTERNAL_LAW_TYPE_ALIASES = [
         'กฎหมายภายนอก',
@@ -40,7 +42,14 @@ class LawSearchService
         'external-ministerial-announcement' => ['ประกาศกระทรวง', 'prakat-krw'],
     ];
 
-    public function __construct(private readonly ElasticClient $client) {}
+    private readonly LawTypes $lawTypes;
+
+    public function __construct(
+        private readonly ElasticClient $client,
+        ?LawTypes $lawTypes = null,
+    ) {
+        $this->lawTypes = $lawTypes ?? app(LawTypes::class);
+    }
 
     /**
      * @param  array{q?:string,filters?:array<string,mixed>,page?:int,per_page?:int}  $params
@@ -332,6 +341,8 @@ class LawSearchService
                 $values = array_values((array) $filters[$field]);
                 if ($field === 'law_type') {
                     $values = $this->expandLawTypeFilterValues($values);
+                } elseif ($field === 'law_family') {
+                    $values = $this->expandLawFamilyFilterValues($values);
                 }
                 $filterClauses[] = ['terms' => [$field => $values]];
             }
@@ -398,16 +409,45 @@ class LawSearchService
             }
             $key = $this->lawTypeFilterKey($type);
             if ($key === 'external') {
-                array_push($expanded, ...self::EXTERNAL_LAW_TYPE_ALIASES);
+                array_push($expanded, ...$this->lawTypes->codesOfFamily('LFM04'), ...self::EXTERNAL_LAW_TYPE_ALIASES);
                 continue;
             }
-            $aliases = self::LAW_TYPE_FILTER_ALIASES[$key] ?? [$type];
-            foreach ($aliases as $alias) {
-                $expanded[] = $alias;
+            $family = $this->lawTypes->family($type);
+            if ($family !== null) {
+                array_push($expanded, ...$this->lawTypes->codesOfFamily((string) $family['code']));
+                continue;
+            }
+            $resolved = $this->lawTypes->resolve($type);
+            if ($resolved !== null) {
+                $expanded[] = (string) $resolved['code'];
+                foreach ((array) ($resolved['aliases'] ?? []) as $alias) {
+                    $expanded[] = (string) $alias;
+                }
+                $expanded[] = (string) ($resolved['name'] ?? '');
+                continue;
+            }
+
+            foreach (self::LAW_TYPE_FILTER_ALIASES[$key] ?? [$type] as $alias) {
+                $expanded[] = (string) $alias;
             }
         }
 
         return array_values(array_unique($expanded));
+    }
+
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandLawFamilyFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $family = $this->lawTypes->family($value);
+            $expanded[] = $family === null ? trim((string) $value) : (string) $family['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
     }
 
     private function canonicalLawType(string $lawType): string
@@ -495,11 +535,17 @@ class LawSearchService
                 }
             }
 
+            $rawType = (string) ($source['law_type'] ?? '');
+            $type = $this->lawTypes->resolve($rawType);
+
             $results[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
                 'title_highlighted' => $titleHighlighted,
-                'law_type' => $source['law_type'] ?? null,
+                'law_type' => $source['law_type_label'] ?? ($type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType)),
+                'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
+                'law_family' => $source['law_family'] ?? ($type['attrs']['family_code'] ?? null),
+                'issuer' => $source['issuer'] ?? null,
                 'status' => $source['status'] ?? null,
                 'change_status' => $source['change_status'] ?? null,
                 'summary' => $source['summary'] ?? null,

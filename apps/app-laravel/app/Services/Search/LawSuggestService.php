@@ -59,7 +59,7 @@ class LawSuggestService
         return [
             'track_total_hits' => false,
             'size' => $size,
-            '_source' => ['law_id', 'title', 'law_type', 'agency', 'published_date', 'keywords'],
+            '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
                     'filter' => [[
@@ -125,7 +125,7 @@ class LawSuggestService
         return [
             'track_total_hits' => false,
             'size' => $size,
-            '_source' => ['law_id', 'title', 'law_type', 'agency', 'published_date', 'keywords'],
+            '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
                     'filter' => [[
@@ -184,7 +184,7 @@ class LawSuggestService
             $suggestions[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
-                'law_type' => $type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType),
+                'law_type' => $source['law_type_label'] ?? ($type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType)),
                 'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
                 'agency' => $source['agency'] ?? null,
                 'published_date' => $source['published_date'] ?? null,

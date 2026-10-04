@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 
 class LawIndexer
@@ -10,6 +11,7 @@ class LawIndexer
     public function __construct(
         private readonly ElasticClient $client,
         private readonly ReviewStore $store,
+        private readonly ?LawTypes $lawTypes = null,
     ) {}
 
     /** Extract a 4-digit year from a freeform date string (Buddhist or Gregorian). */
@@ -89,6 +91,11 @@ class LawIndexer
         $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null)
             ? array_values(array_filter(array_map('strval', $meta['permission_group_ids'])))
             : [];
+        $lawTypes = $this->lawTypes ?? app(LawTypes::class);
+        $lawType = $lawTypes->resolve($meta['law_type'] ?? '');
+        $lawTypeCode = (string) ($lawType['code'] ?? ($meta['law_type'] ?? ''));
+        $lawFamilyCode = (string) ($lawType['attrs']['family_code'] ?? '');
+        $issuer = $lawTypes->issuerResolve($meta['issuer'] ?? '');
 
         return [
             'law_id'         => $documentId,
@@ -100,7 +107,10 @@ class LawIndexer
             'text'           => $chunk['text'] ?? '',
             'title'          => $meta['title'] ?? null,
             'title_suggest'  => $meta['title'] ?? null,
-            'law_type'       => $meta['law_type'] ?? null,
+            'law_type'       => $lawTypeCode !== '' ? $lawTypeCode : null,
+            'law_family'     => $lawFamilyCode !== '' ? $lawFamilyCode : null,
+            'law_type_label' => $lawType === null ? ($meta['law_type'] ?? null) : (string) ($lawType['name'] ?? ''),
+            'issuer'         => $issuer === null ? ($meta['issuer'] ?? null) : (string) ($issuer['code'] ?? ''),
             'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
             'change_status'  => $meta['change_status'] ?? null,
             'agency'         => $meta['agency'] ?? null,
