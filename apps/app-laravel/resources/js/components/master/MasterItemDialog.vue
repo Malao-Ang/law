@@ -41,7 +41,7 @@
             variant="outlined"
             density="comfortable"
           />
-          <slot name="attrs" :form="form" />
+          <slot name="attrs" :form="form" :item="item" />
         </section>
 
         <section class="master-dialog__section">
