@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -38,6 +39,13 @@ class LawSearchRequest extends FormRequest
                 },
                 $filters['law_type'],
             ));
+        }
+        if (is_array($filters) && is_array($filters['law_group'] ?? null)) {
+            $categories = app(LawCategories::class);
+            $filters['law_group'] = array_values(array_unique(array_map(
+                static fn (mixed $group): string => (string) ($categories->resolve($group)['code'] ?? trim((string) $group)),
+                $filters['law_group'],
+            )));
         }
 
         $this->merge(['filters' => $filters]);

@@ -224,7 +224,7 @@
           </div>
           <div v-if="rootMeta?.law_group">
             <div class="rel-root__meta-label"><v-icon icon="mdi-folder-outline" size="14" /> กลุ่มกฎหมาย</div>
-            <div class="rel-root__meta-value">{{ rootMeta.law_group }}</div>
+            <div class="rel-root__meta-value">{{ categoryLabel(rootMeta.law_group) }}</div>
           </div>
         </div>
       </v-card>
@@ -423,6 +423,7 @@ import {
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PAGE_SIZE = 20;
 
@@ -430,6 +431,7 @@ const props = defineProps<{ documentId?: string }>();
 const route = useRoute();
 const router = useRouter();
 const { inForceCode, statusLabel } = useLawStatus();
+const { categoryLabel } = useLawCategory();
 
 const loading = ref(false);
 const detailLoading = ref(false);

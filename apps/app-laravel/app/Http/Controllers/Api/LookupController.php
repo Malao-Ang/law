@@ -16,6 +16,7 @@ class LookupController extends Controller
         $allStatusItems = $this->masterData->all(MasterDataKind::EnforcementStatus);
         $allLawFamilies = $this->masterData->all(MasterDataKind::LawFamily);
         $allLawTypes = $this->masterData->all(MasterDataKind::LawType);
+        $allLawCategories = $this->masterData->all(MasterDataKind::LawCategory);
         $allIssuers = $this->masterData->all(MasterDataKind::Issuer);
 
         return response()->json([
@@ -30,7 +31,8 @@ class LookupController extends Controller
             'change_status_types' => config('lookups.change_status_types'),
             'change_status_details' => config('lookups.change_status_details'),
             'agencies' => config('lookups.agencies'),
-            'law_groups' => config('lookups.law_groups'),
+            'law_groups' => $this->lawCategoryItems(array_values(array_filter($allLawCategories, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
+            'law_groups_all' => $this->lawCategoryItems($allLawCategories),
             'law_sources' => config('lookups.law_sources'),
         ]);
     }
@@ -94,6 +96,20 @@ class LookupController extends Controller
      * @return list<array<string, mixed>>
      */
     private function issuerItems(array $items): array
+    {
+        return array_map(static fn (array $item): array => [
+            'title' => (string) ($item['name'] ?? ''),
+            'value' => (string) ($item['code'] ?? ''),
+            'code' => (string) ($item['code'] ?? ''),
+            'sort_order' => (int) ($item['sort_order'] ?? 0),
+        ], $items);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function lawCategoryItems(array $items): array
     {
         return array_map(static fn (array $item): array => [
             'title' => (string) ($item['name'] ?? ''),

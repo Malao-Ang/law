@@ -44,6 +44,9 @@ class LookupApiTest extends TestCase
         $this->assertSame('in_force', $inForce['role'] ?? null);
         $this->assertContains('กฎหมายใหม่', array_column($data['change_status_types'], 'value'));
         $this->assertContains('ยกเลิกข้อ', array_column($data['change_status_details'], 'value'));
-        $this->assertContains('ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', array_column($data['law_groups'], 'value'));
+        $research = collect($data['law_groups'])->firstWhere('code', 'DCT003');
+        $this->assertSame('ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', $research['title'] ?? null);
+        $this->assertSame('DCT003', $research['value'] ?? null);
+        $this->assertCount(12, $data['law_groups_all']);
     }
 }

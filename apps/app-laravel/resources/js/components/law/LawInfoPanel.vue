@@ -39,7 +39,7 @@
         </div>
         <div v-if="meta.law_group" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.law_group }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ categoryLabel(meta.law_group) }}</span>
         </div>
         <div v-if="meta.agency" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">หน่วยงาน</span>
@@ -54,7 +54,7 @@
         <div v-if="meta.law_groups?.length > 1" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมายทั้งหมด</span>
           <div class="d-flex flex-wrap ga-1 justify-end">
-            <v-chip v-for="group in meta.law_groups" :key="group" size="x-small" variant="tonal">{{ group }}</v-chip>
+            <v-chip v-for="group in categoryLabels(meta.law_groups)" :key="group" size="x-small" variant="tonal">{{ group }}</v-chip>
           </div>
         </div>
         <div v-if="meta.expiry_date" class="law-info-row py-1">
@@ -163,8 +163,10 @@ import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const { typeLabel, issuerLabel } = useLawType();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 interface SectionRelationGroup {
   type: RelationType;

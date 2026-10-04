@@ -20,7 +20,8 @@ const statusesAll = ref<LawStatusOption[]>([]);
 const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
 const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
-const lawGroups = ref<SelectableOption[]>([]);
+const lawGroups = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
+const lawGroupsAll = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
 const lawSources = ref<SelectableOption[]>([]);
 let loaded = false;
 let inFlight: Promise<void> | null = null;
@@ -42,6 +43,7 @@ async function load(): Promise<void> {
       changeStatusDetails.value = data.change_status_details;
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
+      lawGroupsAll.value = data.law_groups_all ?? data.law_groups;
       lawSources.value = data.law_sources;
       loaded = true;
     }).finally(() => {
@@ -71,6 +73,7 @@ export function useLookups() {
     changeStatusDetails,
     agencies,
     lawGroups,
+    lawGroupsAll,
     lawSources,
     load,
     reload,

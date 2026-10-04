@@ -1,6 +1,6 @@
 import type { LawSource } from '../api/client';
 
-export type MasterKind = 'enforcement_status' | 'law_family' | 'law_type' | 'issuer';
+export type MasterKind = 'enforcement_status' | 'law_family' | 'law_type' | 'issuer' | 'law_category';
 
 export type MasterItemAttrs = Record<string, unknown> & {
   color?: string | null;

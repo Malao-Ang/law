@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
@@ -12,21 +13,24 @@ use Illuminate\Console\Command;
 class MigrateMasterDataCommand extends Command
 {
     protected $signature = 'master-data:migrate
-        {kind : Migration kind. Supported: enforcement-status, law-type}
+        {kind : Migration kind. Supported: enforcement-status, law-type, law-category}
         {--dry-run : Audit without writing}
         {--map=* : Extra mapping in the form "legacy value=STA0x"}';
 
     protected $description = 'Migrate legacy data values to master data codes.';
 
-    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, ReviewStore $reviewStore): int
+    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, LawCategories $lawCategories, ReviewStore $reviewStore): int
     {
         $kind = (string) $this->argument('kind');
         if (in_array($kind, ['law-type', 'law_type'], true)) {
             return $this->migrateLawTypes($masterData, $lawTypes, $reviewStore);
         }
+        if (in_array($kind, ['law-category', 'law_category'], true)) {
+            return $this->migrateLawCategories($masterData, $lawCategories, $reviewStore);
+        }
 
         if (! in_array($kind, ['enforcement-status', 'enforcement_status'], true)) {
-            $this->error('Unknown migration kind. Supported: enforcement-status, law-type');
+            $this->error('Unknown migration kind. Supported: enforcement-status, law-type, law-category');
 
             return self::FAILURE;
         }
@@ -273,6 +277,97 @@ class MigrateMasterDataCommand extends Command
         }
 
         return $map;
+    }
+
+    private function migrateLawCategories(MasterDataStore $masterData, LawCategories $lawCategories, ReviewStore $reviewStore): int
+    {
+        $masterData->seedIfEmpty(MasterDataKind::LawCategory);
+
+        $extraMap = [];
+        foreach ((array) $this->option('map') as $entry) {
+            $parts = explode('=', (string) $entry, 2);
+            $target = count($parts) === 2 ? $lawCategories->resolve(trim($parts[1])) : null;
+            if ($target === null) {
+                $this->error('Invalid --map value. Use "legacy value=DCT0xx".');
+
+                return self::FAILURE;
+            }
+            $extraMap[trim($parts[0])] = (string) $target['code'];
+        }
+
+        $audit = [];
+        $unmapped = [];
+        $patches = [];
+
+        foreach ($reviewStore->listLawMeta() as $row) {
+            $documentId = (string) ($row['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+
+            // listLawMeta() already folds a legacy single law_group into law_groups.
+            $values = is_array($row['law_groups'] ?? null) ? $row['law_groups'] : [];
+
+            $codes = [];
+            $rowUnmapped = false;
+            foreach ($values as $value) {
+                $raw = trim((string) $value);
+                if ($raw === '') {
+                    continue;
+                }
+                $code = $extraMap[$raw] ?? (($resolved = $lawCategories->resolve($raw)) === null ? null : (string) $resolved['code']);
+                if ($code === null) {
+                    $audit[$raw]['target'] = 'UNMAPPED';
+                    $audit[$raw]['count'] = ($audit[$raw]['count'] ?? 0) + 1;
+                    $unmapped[$raw][] = $documentId;
+                    $rowUnmapped = true;
+
+                    continue;
+                }
+                $audit[$raw]['target'] = $code;
+                $audit[$raw]['count'] = ($audit[$raw]['count'] ?? 0) + 1;
+                if (! in_array($code, $codes, true)) {
+                    $codes[] = $code;
+                }
+            }
+
+            if ($rowUnmapped) {
+                continue;
+            }
+
+            $currentGroups = array_values(array_map('strval', $values));
+            if ($currentGroups !== $codes) {
+                $patches[$documentId] = ['law_groups' => $codes, 'law_group' => $codes[0] ?? ''];
+            }
+        }
+
+        $this->renderAudit($audit);
+
+        if ($unmapped !== []) {
+            $this->error('UNMAPPED law category value(s) found.');
+            foreach ($unmapped as $value => $documentIds) {
+                $this->line($value.': '.implode(', ', array_unique($documentIds)));
+            }
+
+            return self::FAILURE;
+        }
+
+        if ((bool) $this->option('dry-run')) {
+            $this->info('Dry run: '.$this->patchCountLabel($patches).' would be updated.');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($patches as $documentId => $patch) {
+            $reviewStore->patchLawMeta($documentId, $patch);
+        }
+
+        $this->info($this->patchCountLabel($patches).' updated.');
+        if ($patches !== []) {
+            $this->call('laws:reindex');
+        }
+
+        return self::SUCCESS;
     }
 
     /**

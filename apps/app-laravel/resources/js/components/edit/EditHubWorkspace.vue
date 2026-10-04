@@ -256,8 +256,10 @@ import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const { typeLabel } = useLawType();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = defineProps<{ documentId: string }>();
 
@@ -326,8 +328,8 @@ const agencyLabel = computed(() => {
 });
 
 const lawGroupLabel = computed(() => {
-  if (meta.value.law_groups?.length) return meta.value.law_groups.join(', ');
-  return meta.value.law_group || '-';
+  if (meta.value.law_groups?.length) return categoryLabels(meta.value.law_groups).join(', ');
+  return categoryLabel(meta.value.law_group) || '-';
 });
 
 const updatedAtLabel = computed(() => {

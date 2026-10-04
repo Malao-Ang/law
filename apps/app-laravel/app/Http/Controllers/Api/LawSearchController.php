@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
@@ -21,6 +22,7 @@ class LawSearchController extends Controller
     public function __construct(
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
+        private readonly LawCategories $lawCategories,
     ) {}
 
     private const EXTERNAL_LAW_TYPE_ALIASES = [
@@ -278,7 +280,9 @@ class LawSearchController extends Controller
                 'summary' => null,
                 'published_date' => $r['published_date'] ?? null,
                 'agency' => $r['agencies'][0] ?? null,
-                'law_group' => $r['law_groups'][0] ?? null,
+                'law_group' => $this->lawCategories->labelOf($r['law_groups'][0] ?? ''),
+                'law_groups' => $this->lawCategories->labelsOf((array) ($r['law_groups'] ?? [])),
+                'law_group_codes' => $this->categoryCodesFromRow($r),
                 'signer_group' => $r['signer_group'],
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
@@ -346,8 +350,8 @@ class LawSearchController extends Controller
             return false;
         }
 
-        $wantGroup = $filters['law_group'] ?? null;
-        if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
+        $wantGroup = array_values((array) ($filters['law_group'] ?? []));
+        if ($wantGroup !== [] && array_intersect($wantGroup, $this->categoryCodesFromRow($row)) === []) {
             return false;
         }
 
@@ -438,6 +442,7 @@ class LawSearchController extends Controller
         }
         foreach ((array) ($row['law_groups'] ?? []) as $group) {
             $parts[] = (string) $group;
+            $parts[] = $this->lawCategories->labelOf($group);
         }
 
         return trim(implode(' ', array_filter($parts, static fn (string $p): bool => trim($p) !== '')));
@@ -895,11 +900,43 @@ class LawSearchController extends Controller
             'change_status' => (string) ($r['change_status'] ?? ''),
             'signer_group' => (string) ($r['signer_group'] ?? ''),
             'agencies' => array_values(array_filter([(string) ($r['agency'] ?? '')])),
-            'law_groups' => array_values(array_filter([(string) ($r['law_group'] ?? '')])),
+            'law_groups' => array_values(array_filter((array) ($r['law_group_codes'] ?? [(string) ($r['law_group'] ?? '')]))),
             'promulgation_date' => (string) ($r['published_date'] ?? ''),
         ], $results);
 
         return $this->computeFileBasedFacets($rows);
+    }
+
+    /**
+     * @param  array<string,mixed>  $row
+     * @return list<string>
+     */
+    private function categoryCodesFromRow(array $row): array
+    {
+        $values = (array) ($row['law_groups'] ?? []);
+        if ($values === [] && trim((string) ($row['law_group'] ?? '')) !== '') {
+            $values = [$row['law_group']];
+        }
+
+        $codes = [];
+        foreach ($values as $value) {
+            $code = $this->categoryCode($value);
+            if ($code !== '' && ! in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
+    }
+
+    private function categoryCode(mixed $value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        return (string) ($this->lawCategories->resolve($raw)['code'] ?? $raw);
     }
 
     /**
@@ -935,8 +972,9 @@ class LawSearchController extends Controller
                 }
             }
             foreach ((array) ($r['law_groups'] ?? []) as $g) {
-                if ($g !== '') {
-                    $groupCounts[(string) $g] = ($groupCounts[(string) $g] ?? 0) + 1;
+                $code = $this->categoryCode($g);
+                if ($code !== '') {
+                    $groupCounts[$code] = ($groupCounts[$code] ?? 0) + 1;
                 }
             }
         }
@@ -998,7 +1036,7 @@ class LawSearchController extends Controller
                 $this->tally($termCounts['agency'], (string) $agency);
             }
             foreach ((array) ($row['law_groups'] ?? []) as $group) {
-                $this->tally($termCounts['law_group'], (string) $group);
+                $this->tally($termCounts['law_group'], $this->categoryCode($group));
             }
 
             $year = LawIndexer::parseYear((string) ($row['promulgation_date'] ?? ''));

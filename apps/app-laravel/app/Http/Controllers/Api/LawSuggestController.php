@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSuggestRequest;
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use App\Services\Search\LawSuggestService;
@@ -16,6 +17,7 @@ class LawSuggestController extends Controller
     public function __construct(
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
+        private readonly LawCategories $lawCategories,
     ) {}
 
     public function suggest(LawSuggestRequest $request, LawSuggestService $service, ReviewStore $store): JsonResponse
@@ -129,14 +131,14 @@ class LawSuggestController extends Controller
             (string) ($row['change_status'] ?? ''),
             (string) ($row['signer_group'] ?? ''),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
-            ...array_map('strval', (array) ($row['law_groups'] ?? [])),
+            ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
         ], static fn (string $value): bool => trim($value) !== ''));
     }
 
     private function suggestionFromMeta(array $row): array
     {
         $keywords = array_values(array_unique(array_filter([
-            ...array_map('strval', (array) ($row['law_groups'] ?? [])),
+            ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
             (string) ($row['change_status'] ?? ''),
         ], static fn (string $value): bool => trim($value) !== '')));

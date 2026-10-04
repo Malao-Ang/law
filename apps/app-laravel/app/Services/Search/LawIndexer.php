@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 
@@ -12,6 +13,7 @@ class LawIndexer
         private readonly ElasticClient $client,
         private readonly ReviewStore $store,
         private readonly ?LawTypes $lawTypes = null,
+        private readonly ?LawCategories $lawCategories = null,
     ) {}
 
     /** Extract a 4-digit year from a freeform date string (Buddhist or Gregorian). */
@@ -96,6 +98,13 @@ class LawIndexer
         $lawTypeCode = (string) ($lawType['code'] ?? ($meta['law_type'] ?? ''));
         $lawFamilyCode = (string) ($lawType['attrs']['family_code'] ?? '');
         $issuer = $lawTypes->issuerResolve($meta['issuer'] ?? '');
+        $lawCategories = $this->lawCategories ?? app(LawCategories::class);
+        $lawGroupValues = is_array($meta['law_groups'] ?? null) ? $meta['law_groups'] : [];
+        if ($lawGroupValues === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
+            $lawGroupValues = [$meta['law_group']];
+        }
+        $lawGroupCodes = $lawCategories->codesOf($lawGroupValues);
+        $lawGroupLabels = $lawCategories->labelsOf($lawGroupCodes);
 
         return [
             'law_id'         => $documentId,
@@ -115,8 +124,9 @@ class LawIndexer
             'change_status'  => $meta['change_status'] ?? null,
             'agency'         => $meta['agency'] ?? null,
             'agencies'       => $meta['agencies'] ?? [],
-            'law_group'      => $meta['law_group'] ?? null,
-            'law_groups'     => $meta['law_groups'] ?? [],
+            'law_group'      => $lawGroupCodes[0] ?? null,
+            'law_groups'     => $lawGroupCodes,
+            'law_group_labels' => $lawGroupLabels,
             'signer_group'   => $meta['signer_group'] ?? null,
             'access_scope'   => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
             'permission_group_ids' => $permissionGroupIds,

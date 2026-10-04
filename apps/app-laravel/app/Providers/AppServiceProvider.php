@@ -8,6 +8,7 @@ use App\Services\Fast\LibreOfficeConverter;
 use App\Services\MasterData\CompositeUsageCounter;
 use App\Services\MasterData\EnforcementStatusUsageCounter;
 use App\Services\MasterData\IssuerUsageCounter;
+use App\Services\MasterData\LawCategoryUsageCounter;
 use App\Services\MasterData\LawFamilyUsageCounter;
 use App\Services\MasterData\LawTypeUsageCounter;
 use App\Services\MasterData\MasterDataStore;
@@ -78,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(UsageCounter::class, fn (): UsageCounter => new CompositeUsageCounter([
             $this->app->make(EnforcementStatusUsageCounter::class),
             $this->app->make(LawTypeUsageCounter::class),
+            $this->app->make(LawCategoryUsageCounter::class),
             $this->app->make(IssuerUsageCounter::class),
             $this->app->make(LawFamilyUsageCounter::class),
         ]));

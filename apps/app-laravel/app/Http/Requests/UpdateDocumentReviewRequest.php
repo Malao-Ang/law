@@ -3,11 +3,13 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UpdateDocumentReviewRequest extends FormRequest
 {
@@ -33,6 +35,9 @@ class UpdateDocumentReviewRequest extends FormRequest
             if ($resolved !== null) {
                 $lawMeta['issuer'] = (string) $resolved['code'];
             }
+        }
+        if (is_array($lawMeta) && (array_key_exists('law_groups', $lawMeta) || array_key_exists('law_group', $lawMeta))) {
+            $lawMeta = $this->normalizeLawCategoryFields($lawMeta);
         }
 
         $payload = [
@@ -182,5 +187,47 @@ class UpdateDocumentReviewRequest extends FormRequest
                 static fn (array $item): bool => (bool) ($item['is_active'] ?? false),
             ),
         ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $lawMeta
+     * @return array<string, mixed>
+     */
+    private function normalizeLawCategoryFields(array $lawMeta): array
+    {
+        /** @var LawCategories $categories */
+        $categories = app(LawCategories::class);
+        $values = [];
+        if (array_key_exists('law_groups', $lawMeta)) {
+            $values = is_array($lawMeta['law_groups']) ? $lawMeta['law_groups'] : [$lawMeta['law_groups']];
+        }
+        if ($values === [] && array_key_exists('law_group', $lawMeta)) {
+            $values = [$lawMeta['law_group']];
+        }
+
+        $codes = [];
+        foreach ($values as $value) {
+            $raw = trim((string) $value);
+            if ($raw === '') {
+                continue;
+            }
+
+            $resolved = $categories->resolve($raw);
+            if ($resolved === null) {
+                throw ValidationException::withMessages([
+                    'law_meta.law_groups' => ['ไม่พบหมวดเอกสารที่เลือก'],
+                ]);
+            }
+
+            $code = (string) ($resolved['code'] ?? '');
+            if ($code !== '' && ! in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        $lawMeta['law_groups'] = $codes;
+        $lawMeta['law_group'] = $codes[0] ?? '';
+
+        return $lawMeta;
     }
 }

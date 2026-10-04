@@ -65,6 +65,18 @@
         style="max-width: 180px"
       />
       <v-select
+        v-model="filterCategory"
+        :items="categoryOptions"
+        item-title="label"
+        item-value="value"
+        label="หมวดเอกสาร"
+        variant="outlined"
+        density="compact"
+        hide-details
+        rounded="lg"
+        style="max-width: 220px"
+      />
+      <v-select
         v-model="filterStatus"
         :items="statusOptions"
         item-title="label"
@@ -220,6 +232,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
@@ -229,6 +242,7 @@ import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PAGE_SIZE = 20;
 
@@ -243,6 +257,7 @@ const summary = ref<ReportSummary>({
 const loading = ref(false);
 const search = ref('');
 const filterType = ref<string | null>(null);
+const filterCategory = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const sortOrder = ref('newest');
 const page = ref(1);
@@ -250,6 +265,8 @@ const page = ref(1);
 const versionStore = useVersionStore();
 const { draftCode, inForceCode, isRepealed, statusColor, statusLabel } = useLawStatus();
 const lawTypes = createLawTypeCatalog();
+const lawCategories = useLawCategory();
+const route = useRoute();
 const versionDialogOpen = ref(false);
 
 function openVersions(id: string): void {
@@ -258,6 +275,11 @@ function openVersions(id: string): void {
 }
 
 onMounted(async () => {
+  // Prefilter from URL: ?category=DCTxxx
+  const categoryParam = route.query.category;
+  if (typeof categoryParam === 'string' && categoryParam) {
+    filterCategory.value = lawCategories.normalizeCategory(categoryParam) || categoryParam;
+  }
   loading.value = true;
   try {
     summary.value = await fetchReportSummary();
@@ -266,7 +288,7 @@ onMounted(async () => {
   }
 });
 
-watch([search, filterType, filterStatus, sortOrder], () => {
+watch([search, filterType, filterCategory, filterStatus, sortOrder], () => {
   page.value = 1;
 });
 
@@ -340,6 +362,7 @@ interface LawRow {
   childCount: number;
   org: string;
   group: string;
+  groupCode: string;
   pages: number;
   sections: number | null;
   editedAt: string;
@@ -360,6 +383,7 @@ const laws = computed<LawRow[]>(() =>
     childCount: childCountMap.value[doc.id] ?? 0,
     org: doc.agency !== 'ไม่ระบุ' ? doc.agency : '',
     group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
+    groupCode: doc.group_code ?? lawCategories.normalizeCategory(doc.group !== 'ไม่ระบุ' ? doc.group : '') ?? '',
     pages: doc.page_count ?? 0,
     sections: doc.section_count ?? null,
     editedAt: formatThaiDateNumeric(doc.date) || '-',
@@ -388,6 +412,14 @@ const typeOptions = computed(() => [
   })),
 ]);
 
+const categoryOptions = computed(() => [
+  { label: 'ทุกหมวด', value: null },
+  ...lawCategories.categoryOptions.value.map((cat) => ({
+    label: cat.title,
+    value: cat.code,
+  })),
+]);
+
 const statusOptions = [
   { label: 'ทุกสถานะ', value: null },
   { label: 'ดำเนินการ', value: 'ดำเนินการ' },
@@ -407,6 +439,7 @@ const sortOptions = [
 const filteredLaws = computed(() => {
   let result = laws.value;
   if (filterType.value) result = result.filter((l) => lawTypes.typeFamily(l.lawType) === filterType.value);
+  if (filterCategory.value) result = result.filter((l) => l.groupCode === filterCategory.value);
   if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
   if (search.value.trim()) {
     const q = search.value.trim().toLowerCase();

@@ -418,6 +418,7 @@ export interface ReportDocument {
   title: string;
   type: string;
   group: string;
+  group_code?: string;
   agency: string;
   status: string;
   meta_status: string;
