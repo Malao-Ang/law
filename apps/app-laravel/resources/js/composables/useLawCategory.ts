@@ -35,7 +35,10 @@ const SLUG_ALIASES: Record<string, string> = {
 };
 
 export type LawCategoryCatalogInput = {
+  /** Active categories: used for select/filter options. */
   lawGroups?: Ref<LawCategoryOption[]> | LawCategoryOption[];
+  /** All categories incl. inactive: used to resolve labels of existing documents. */
+  lawGroupsAll?: Ref<LawCategoryOption[]> | LawCategoryOption[];
 };
 
 function readArray<T>(value: Ref<T[]> | T[] | undefined, fallback: T[]): T[] {
@@ -58,6 +61,7 @@ function bySortOrder(items: LawCategoryOption[]): LawCategoryOption[] {
 
 export function createLawCategoryCatalog(input: LawCategoryCatalogInput = {}) {
   const categories = computed(() => readArray(input.lawGroups, FALLBACK_CATEGORIES));
+  const allCategories = computed(() => readArray(input.lawGroupsAll, categories.value));
 
   const categoryItem = (value: string | null | undefined): LawCategoryOption | null => {
     const text = normalize(value);
@@ -66,8 +70,10 @@ export function createLawCategoryCatalog(input: LawCategoryCatalogInput = {}) {
     const viaSlug = SLUG_ALIASES[text];
     const code = viaSlug ?? text;
     return (
-      categories.value.find(
+      allCategories.value.find(
         (item) => item.code === code || item.value === code || item.title === text,
+      ) ?? FALLBACK_CATEGORIES.find(
+        (item) => item.code === code || item.title === text,
       ) ?? null
     );
   };
@@ -106,7 +112,12 @@ export function createLawCategoryCatalog(input: LawCategoryCatalogInput = {}) {
   };
 }
 
+/** Live catalog backed by /api/lookups (renames and new categories show up without a deploy). */
 export function useLawCategory() {
-  const { lawGroups } = useLookups();
-  return createLawCategoryCatalog({ lawGroups: lawGroups as Ref<LawCategoryOption[]> });
+  const { lawGroups, lawGroupsAll, load } = useLookups();
+  void load().catch(() => { /* fallback list stays in use */ });
+  return createLawCategoryCatalog({
+    lawGroups: lawGroups as Ref<LawCategoryOption[]>,
+    lawGroupsAll: lawGroupsAll as Ref<LawCategoryOption[]>,
+  });
 }

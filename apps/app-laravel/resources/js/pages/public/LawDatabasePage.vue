@@ -475,7 +475,7 @@ import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PER_PAGE = 20;
 
@@ -561,7 +561,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 
 const lawStatus = useLawStatus();
 const lawTypes = createLawTypeCatalog();
-const lawCategories = createLawCategoryCatalog();
+const lawCategories = useLawCategory();
 const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
 
 type SortValue = 'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest';

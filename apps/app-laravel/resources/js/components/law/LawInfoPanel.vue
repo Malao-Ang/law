@@ -163,10 +163,10 @@ import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const { typeLabel, issuerLabel } = useLawType();
-const { categoryLabel, categoryLabels } = createLawCategoryCatalog();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 interface SectionRelationGroup {
   type: RelationType;

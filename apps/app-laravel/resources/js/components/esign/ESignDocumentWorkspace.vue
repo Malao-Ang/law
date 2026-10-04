@@ -397,10 +397,10 @@ import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const { typeLabel } = useLawType();
-const { categoryLabel, categoryLabels } = createLawCategoryCatalog();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',

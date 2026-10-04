@@ -256,10 +256,10 @@ import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const { typeLabel } = useLawType();
-const { categoryLabel, categoryLabels } = createLawCategoryCatalog();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = defineProps<{ documentId: string }>();
 

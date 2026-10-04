@@ -36,11 +36,7 @@ const statLabels = {
 };
 
 const columns = [
-  { key: 'sort_order', title: 'ลำดับ', width: '60px', align: 'center' as const },
-  { key: 'code', title: 'รหัสหมวดเอกสาร', width: '140px' },
   { key: 'name', title: 'ชื่อหมวดเอกสาร' },
   { key: 'usage_count', title: 'จำนวนเอกสาร', width: '160px', align: 'center' as const },
-  { key: 'is_active', title: 'สถานะ', width: '100px', align: 'center' as const },
-  { key: 'actions', title: 'จัดการ', width: '120px', align: 'center' as const },
 ];
 </script>

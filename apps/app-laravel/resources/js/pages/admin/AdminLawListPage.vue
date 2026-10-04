@@ -242,7 +242,7 @@ import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PAGE_SIZE = 20;
 
@@ -265,7 +265,7 @@ const page = ref(1);
 const versionStore = useVersionStore();
 const { draftCode, inForceCode, isRepealed, statusColor, statusLabel } = useLawStatus();
 const lawTypes = createLawTypeCatalog();
-const lawCategories = createLawCategoryCatalog();
+const lawCategories = useLawCategory();
 const route = useRoute();
 const versionDialogOpen = ref(false);
 

@@ -291,7 +291,7 @@ import Swal from 'sweetalert2';
 import { fetchActiveChildren, type SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
 import { legacyIssuerForType, useLawType } from '../../composables/useLawType';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
@@ -310,7 +310,7 @@ const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const { documentTypes, issuers, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const lawTypes = useLawType();
-const lawCategories = createLawCategoryCatalog();
+const lawCategories = useLawCategory();
 const { draftCode, isRepealed } = useLawStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [

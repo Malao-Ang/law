@@ -423,7 +423,7 @@ import {
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { createLawCategoryCatalog } from '../../composables/useLawCategory';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PAGE_SIZE = 20;
 
@@ -431,7 +431,7 @@ const props = defineProps<{ documentId?: string }>();
 const route = useRoute();
 const router = useRouter();
 const { inForceCode, statusLabel } = useLawStatus();
-const { categoryLabel } = createLawCategoryCatalog();
+const { categoryLabel } = useLawCategory();
 
 const loading = ref(false);
 const detailLoading = ref(false);

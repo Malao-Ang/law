@@ -50,4 +50,17 @@ assert(catalog.normalizeCategory('ด้านกิจการนิสิต'
 assert(catalog.normalizeCategory('unknown') === 'unknown', 'normalizeCategory unknown -> raw');
 assert(catalog.normalizeCategory('') === '', 'normalizeCategory empty -> empty');
 
+// live data: renamed + inactive + new categories resolve from lawGroupsAll, options stay active-only
+const live = createLawCategoryCatalog({
+  lawGroups: [{ title: 'ด้านกิจการนักศึกษา', value: 'DCT002', code: 'DCT002', sort_order: 2 }],
+  lawGroupsAll: [
+    { title: 'ด้านกิจการนักศึกษา', value: 'DCT002', code: 'DCT002', sort_order: 2 },
+    { title: 'หมวดที่ปิดแล้ว', value: 'DCT013', code: 'DCT013', sort_order: 13 },
+  ],
+});
+assert(live.categoryLabel('DCT002') === 'ด้านกิจการนักศึกษา', 'renamed category shows new name');
+assert(live.categoryLabel('DCT013') === 'หมวดที่ปิดแล้ว', 'inactive category still shows its name');
+assert(live.categoryLabel('DCT001') === 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', 'unknown-to-live code falls back to seed name');
+assert(live.categoryOptions.value.map((o) => o.code).join(',') === 'DCT002', 'options are active only');
+
 console.log('PASS: useLawCategory maps');
