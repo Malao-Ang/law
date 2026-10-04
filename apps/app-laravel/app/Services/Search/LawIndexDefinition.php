@@ -35,6 +35,7 @@ class LawIndexDefinition
                     'agencies'      => ['type' => 'keyword'],
                     'law_group'     => ['type' => 'keyword'],
                     'law_groups'    => ['type' => 'keyword'],
+                    'law_group_labels' => $textThai(true),
                     'signer_group'  => ['type' => 'keyword'],
                     'access_scope'  => ['type' => 'keyword'],
                     'visibility'    => ['type' => 'keyword'],

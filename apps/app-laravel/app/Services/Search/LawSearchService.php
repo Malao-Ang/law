@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 
 class LawSearchService
@@ -43,12 +44,15 @@ class LawSearchService
     ];
 
     private readonly LawTypes $lawTypes;
+    private readonly LawCategories $lawCategories;
 
     public function __construct(
         private readonly ElasticClient $client,
         ?LawTypes $lawTypes = null,
+        ?LawCategories $lawCategories = null,
     ) {
         $this->lawTypes = $lawTypes ?? app(LawTypes::class);
+        $this->lawCategories = $lawCategories ?? app(LawCategories::class);
     }
 
     /**
@@ -343,6 +347,8 @@ class LawSearchService
                     $values = $this->expandLawTypeFilterValues($values);
                 } elseif ($field === 'law_family') {
                     $values = $this->expandLawFamilyFilterValues($values);
+                } elseif ($field === 'law_group') {
+                    $values = $this->expandLawCategoryFilterValues($values);
                 }
                 $filterClauses[] = ['terms' => [$field => $values]];
             }
@@ -450,6 +456,21 @@ class LawSearchService
         return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
     }
 
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandLawCategoryFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $category = $this->lawCategories->resolve($value);
+            $expanded[] = $category === null ? trim((string) $value) : (string) $category['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
+    }
+
     private function canonicalLawType(string $lawType): string
     {
         $lawType = trim($lawType);
@@ -551,7 +572,9 @@ class LawSearchService
                 'summary' => $source['summary'] ?? null,
                 'published_date' => $source['published_date'] ?? null,
                 'agency' => $source['agency'] ?? null,
-                'law_group' => $source['law_group'] ?? null,
+                'law_group' => $source['law_group_labels'][0] ?? $this->lawCategories->labelOf($source['law_group'] ?? ''),
+                'law_groups' => (array) ($source['law_group_labels'] ?? []),
+                'law_group_codes' => (array) ($source['law_groups'] ?? []),
                 'signer_group' => $source['signer_group'] ?? null,
                 'restricted' => $restricted,
                 'requires_permission' => $restricted && $this->hasPermissionGroups($source),

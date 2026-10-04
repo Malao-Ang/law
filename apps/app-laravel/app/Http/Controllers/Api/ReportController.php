@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ class ReportController extends Controller
         private readonly ReviewStore $reviewStore,
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
+        private readonly LawCategories $lawCategories,
     ) {}
 
     public function summary(Request $request): JsonResponse
@@ -33,7 +35,10 @@ class ReportController extends Controller
             $resolvedStatus = $this->enforcementStatuses->resolve($status);
             $metaStatus = $resolvedStatus === null ? null : (string) $resolvedStatus['code'];
         }
-        $groups = array_values(array_filter((array) $request->query('group', []), 'is_string'));
+        $groups = array_values(array_unique(array_map(
+            fn (string $group): string => (string) ($this->lawCategories->resolve($group)['code'] ?? trim($group)),
+            array_values(array_filter((array) $request->query('group', []), 'is_string')),
+        )));
         $agencies = array_values(array_filter((array) $request->query('agency', []), 'is_string'));
 
         $rows = array_filter($this->reviewStore->listLawMeta(), function (array $r) use ($dateFrom, $dateTo, $typeCode, $status, $metaStatus, $groups, $agencies): bool {
@@ -53,7 +58,7 @@ class ReportController extends Controller
             if ($status !== '' && $metaStatus === null && ($r['status'] ?? '') !== $status) {
                 return false;
             }
-            if ($groups !== [] && array_intersect($groups, $r['law_groups'] ?? []) === []) {
+            if ($groups !== [] && array_intersect($groups, $this->categoryKeys((array) ($r['law_groups'] ?? []))) === []) {
                 return false;
             }
             if ($agencies !== [] && array_intersect($agencies, $r['agencies'] ?? []) === []) {
@@ -66,7 +71,7 @@ class ReportController extends Controller
         return response()->json([
             'totals' => $this->totals($rows),
             'by_type' => $this->countLawTypes($rows),
-            'by_group' => $this->countList($rows, 'law_groups'),
+            'by_group' => $this->countLawCategories($rows),
             'by_agency' => $this->countList($rows, 'agencies'),
             'by_year' => $this->countYear($rows),
             'documents' => $this->documents($rows),
@@ -161,6 +166,52 @@ class ReportController extends Controller
         return array_values($buckets);
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return list<array{key: string, label: string, count: int}>
+     */
+    private function countLawCategories(array $rows): array
+    {
+        $buckets = [];
+        foreach ($rows as $r) {
+            $codes = $this->categoryKeys((array) ($r['law_groups'] ?? []));
+            if ($codes === []) {
+                $codes = ['ไม่ระบุ'];
+            }
+            foreach ($codes as $code) {
+                if (! isset($buckets[$code])) {
+                    $label = $code === 'ไม่ระบุ' ? $code : ($this->lawCategories->labelOf($code) ?: $code);
+                    $buckets[$code] = ['key' => $code, 'label' => $label, 'count' => 0];
+                }
+                $buckets[$code]['count']++;
+            }
+        }
+
+        usort($buckets, static fn (array $a, array $b): int => ((int) $b['count']) <=> ((int) $a['count']));
+
+        return array_values($buckets);
+    }
+
+    /**
+     * Category code per value; values that do not resolve (pre-migration data) are kept as-is.
+     *
+     * @param  array<int, mixed>  $values
+     * @return list<string>
+     */
+    private function categoryKeys(array $values): array
+    {
+        $keys = [];
+        foreach ($values as $value) {
+            $raw = trim((string) $value);
+            $key = $raw === '' ? '' : (string) ($this->lawCategories->resolve($raw)['code'] ?? $raw);
+            if ($key !== '' && ! in_array($key, $keys, true)) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
     /** @param array<string, int> $buckets */
     private function toSortedList(array $buckets): array
     {
@@ -189,7 +240,8 @@ class ReportController extends Controller
                 'title' => $r['title'],
                 'type' => $type === null ? ($rawType ?: 'ไม่ระบุ') : (string) ($type['name'] ?? $rawType),
                 'type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
-                'group' => ($r['law_groups'][0] ?? '') ?: 'ไม่ระบุ',
+                'group' => $this->lawCategories->labelOf($r['law_groups'][0] ?? '') ?: 'ไม่ระบุ',
+                'group_code' => $this->categoryKeys((array) ($r['law_groups'] ?? []))[0] ?? '',
                 'agency' => ($r['agencies'][0] ?? '') ?: 'ไม่ระบุ',
                 'status' => $r['status'],
                 'meta_status' => trim((string) ($r['meta_status'] ?? '')),
