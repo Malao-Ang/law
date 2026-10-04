@@ -137,7 +137,6 @@ class MigrateMasterDataCommand extends Command
     private function migrateLawTypes(MasterDataStore $masterData, LawTypes $lawTypes, ReviewStore $reviewStore): int
     {
         $masterData->seedIfEmpty(MasterDataKind::LawFamily);
-        $masterData->seedIfEmpty(MasterDataKind::Issuer);
         $masterData->seedIfEmpty(MasterDataKind::LawType);
 
         $extraMap = $this->parseLawTypeMapOptions($lawTypes);
@@ -145,9 +144,9 @@ class MigrateMasterDataCommand extends Command
             return self::FAILURE;
         }
 
-        $legacyIssuerByType = $this->legacyIssuerByTypeAlias($masterData);
         $audit = [];
         $unmapped = [];
+        $needsForm = [];
         $patches = [];
 
         foreach ($reviewStore->listLawMeta() as $row) {
@@ -159,9 +158,20 @@ class MigrateMasterDataCommand extends Command
             $rawType = trim((string) ($row['law_type'] ?? ''));
             $rawIssuer = trim((string) ($row['issuer'] ?? ''));
             $mapped = $extraMap[$rawType] ?? null;
-            $type = $mapped === null ? $lawTypes->resolve($rawType) : $mapped['type'];
+            $typeCode = $mapped ?? $this->resolveMigratedLawTypeCode($lawTypes, $rawType, $rawIssuer);
 
-            if ($type === null) {
+            if ($typeCode === 'NEEDS_FORM') {
+                $audit[$rawType]['target'] = 'NEEDS_FORM';
+                $audit[$rawType]['count'] = ($audit[$rawType]['count'] ?? 0) + 1;
+                $needsForm[] = [
+                    'document_id' => $documentId,
+                    'title' => (string) ($row['title'] ?? ''),
+                ];
+
+                continue;
+            }
+
+            if ($typeCode === null || $typeCode === '') {
                 $audit[$rawType]['target'] = 'UNMAPPED';
                 $audit[$rawType]['count'] = ($audit[$rawType]['count'] ?? 0) + 1;
                 $unmapped[$rawType][] = $documentId;
@@ -169,41 +179,15 @@ class MigrateMasterDataCommand extends Command
                 continue;
             }
 
-            $typeCode = (string) ($type['code'] ?? '');
-            $requiresIssuer = (bool) ($type['attrs']['requires_issuer'] ?? false);
-            $issuerCode = null;
-            $issuerFromExisting = $rawIssuer === '' ? null : $lawTypes->issuerResolve($rawIssuer);
-            if ($issuerFromExisting !== null) {
-                $issuerCode = (string) $issuerFromExisting['code'];
-            } elseif ($rawIssuer !== '' && $requiresIssuer) {
-                $audit[$rawIssuer]['target'] = 'UNMAPPED';
-                $audit[$rawIssuer]['count'] = ($audit[$rawIssuer]['count'] ?? 0) + 1;
-                $unmapped[$rawIssuer][] = $documentId;
-
-                continue;
-            } elseif (($mapped['issuer'] ?? null) !== null) {
-                $issuerCode = (string) $mapped['issuer']['code'];
-            } elseif (isset($legacyIssuerByType[$rawType])) {
-                $issuerCode = $legacyIssuerByType[$rawType];
-            }
-
-            if (! $requiresIssuer) {
-                $issuerCode = null;
-            }
-
-            $audit[$rawType]['target'] = $typeCode.($issuerCode !== null ? '+'.$issuerCode : '');
+            $audit[$rawType]['target'] = $typeCode;
             $audit[$rawType]['count'] = ($audit[$rawType]['count'] ?? 0) + 1;
 
             $patch = [];
             if ($rawType !== $typeCode) {
                 $patch['law_type'] = $typeCode;
             }
-            if ($issuerCode === null) {
-                if ($rawIssuer !== '') {
-                    $patch['issuer'] = null;
-                }
-            } elseif ($rawIssuer !== $issuerCode) {
-                $patch['issuer'] = $issuerCode;
+            if ($rawIssuer !== '') {
+                $patch['issuer'] = null;
             }
 
             if ($patch !== []) {
@@ -221,6 +205,11 @@ class MigrateMasterDataCommand extends Command
             }
 
             return self::FAILURE;
+        }
+
+        if ($needsForm !== []) {
+            $this->warn('NEEDS_FORM law type value(s) found.');
+            $this->table(['document_id', 'title'], $needsForm);
         }
 
         if ((bool) $this->option('dry-run')) {
@@ -242,7 +231,7 @@ class MigrateMasterDataCommand extends Command
     }
 
     /**
-     * @return array<string, array{type: array<string, mixed>, issuer?: array<string, mixed>}>|null
+     * @return array<string, string>|null
      */
     private function parseLawTypeMapOptions(LawTypes $lawTypes): ?array
     {
@@ -250,30 +239,20 @@ class MigrateMasterDataCommand extends Command
         foreach ((array) $this->option('map') as $entry) {
             $parts = explode('=', (string) $entry, 2);
             if (count($parts) !== 2) {
-                $this->error('Invalid --map value. Use "legacy value=LTY0x" or "legacy value=LTY0x+ISS0x".');
+                $this->error('Invalid --map value. Use "legacy value=LTY0x".');
 
                 return null;
             }
 
             [$legacy, $target] = $parts;
-            $targets = array_map('trim', explode('+', $target, 2));
-            $type = $lawTypes->resolve($targets[0] ?? '');
+            $type = $lawTypes->resolve(trim($target));
             if ($type === null) {
                 $this->error("Invalid --map law type target: {$target}");
 
                 return null;
             }
 
-            $map[trim($legacy)] = ['type' => $type];
-            if (($targets[1] ?? '') !== '') {
-                $issuer = $lawTypes->issuerResolve($targets[1]);
-                if ($issuer === null) {
-                    $this->error("Invalid --map issuer target: {$target}");
-
-                    return null;
-                }
-                $map[trim($legacy)]['issuer'] = $issuer;
-            }
+            $map[trim($legacy)] = (string) $type['code'];
         }
 
         return $map;
@@ -370,20 +349,58 @@ class MigrateMasterDataCommand extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * @return array<string, string>
-     */
-    private function legacyIssuerByTypeAlias(MasterDataStore $masterData): array
+    private function resolveMigratedLawTypeCode(LawTypes $lawTypes, string $rawType, string $rawIssuer): ?string
     {
-        $map = [];
-        foreach ($masterData->all(MasterDataKind::Issuer) as $issuer) {
-            $issuerCode = (string) ($issuer['code'] ?? '');
-            foreach ((array) ($issuer['attrs']['legacy_type_aliases'] ?? []) as $alias) {
-                $map[trim((string) $alias)] = $issuerCode;
+        $type = $lawTypes->resolve($rawType);
+        $typeCode = (string) ($type['code'] ?? '');
+        if ($typeCode !== '') {
+            if ($this->isAmbiguousLegacyAnnouncement($rawType)) {
+                return match ($this->legacyIssuerCode($rawIssuer)) {
+                    'ISS01' => 'LTY01',
+                    'ISS02' => 'LTY09',
+                    null => 'NEEDS_FORM',
+                    default => null,
+                };
             }
+
+            return $typeCode;
         }
 
-        return $map;
+        if ($lawTypes->familyOf($rawType) === 'LFM03') {
+            return match ($this->legacyIssuerCode($rawIssuer)) {
+                'ISS01' => 'LTY01',
+                'ISS02' => 'LTY09',
+                null => 'NEEDS_FORM',
+                default => null,
+            };
+        }
+
+        return null;
+    }
+
+    private function isAmbiguousLegacyAnnouncement(string $rawType): bool
+    {
+        return mb_strtoupper(trim($rawType)) === 'LTY01'
+            || $this->normalizeMigrationText($rawType) === $this->normalizeMigrationText("\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}");
+    }
+
+    private function legacyIssuerCode(string $rawIssuer): ?string
+    {
+        $issuer = $this->normalizeMigrationText($rawIssuer);
+        if ($issuer === '') {
+            return null;
+        }
+
+        return match ($issuer) {
+            'iss01', $this->normalizeMigrationText("\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}") => 'ISS01',
+            'iss02', $this->normalizeMigrationText("\u{0E2A}\u{0E20}\u{0E32}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}") => 'ISS02',
+            default => 'UNMAPPED',
+        };
+    }
+
+    private function normalizeMigrationText(string $text): string
+    {
+        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $text) ?? $text));
     }
 
     /**

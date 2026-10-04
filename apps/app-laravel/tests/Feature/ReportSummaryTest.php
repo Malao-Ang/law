@@ -29,15 +29,15 @@ class ReportSummaryTest extends TestCase
         $agency = 'AGENCY_'.uniqid();
 
         $this->seedDocument($store, 'd1_'.uniqid(), [
-            'law_type' => 'พระราชบัญญัติ', 'agencies' => [$agency],
+            'law_type' => 'LTY05', 'agencies' => [$agency],
             'law_groups' => ['academic'], 'promulgation_date' => '1 มีนาคม 2551',
         ]);
         $this->seedDocument($store, 'd2_'.uniqid(), [
-            'law_type' => 'พระราชบัญญัติ', 'agencies' => [$agency],
+            'law_type' => 'LTY05', 'agencies' => [$agency],
             'law_groups' => ['ด้านการเงิน'], 'promulgation_date' => '2 มีนาคม 2552',
         ]);
         $this->seedDocument($store, 'd3_'.uniqid(), [
-            'law_type' => 'ประกาศ', 'agencies' => [$agency],
+            'law_type' => 'LTY01', 'agencies' => [$agency],
             'law_groups' => ['DCT001'], 'promulgation_date' => 'ไม่มีปี',
         ], 'ingested');
 
@@ -51,7 +51,7 @@ class ReportSummaryTest extends TestCase
         $this->assertSame(2, $byType['LTY05']['count']);
         $this->assertSame('พระราชบัญญัติ', $byType['LTY05']['label']);
         $this->assertSame(1, $byType['LTY01']['count']);
-        $this->assertSame('ประกาศ', $byType['LTY01']['label']);
+        $this->assertSame('ประกาศที่ออกโดยมหาวิทยาลัย', $byType['LTY01']['label']);
 
         $byGroup = collect($res->json('by_group'))->keyBy('key');
         $this->assertSame(2, $byGroup['DCT001']['count']);

@@ -36,7 +36,7 @@ class StoreDocumentRequestTest extends TestCase
         $v = $this->validate([
             'document_type' => 'old',
             'source' => 'internal',
-            'law_type' => 'ประกาศ',
+            'law_type' => 'LTY01',
         ]);
         $this->assertFalse($v->errors()->has('source'));
         $this->assertFalse($v->errors()->has('law_type'));
