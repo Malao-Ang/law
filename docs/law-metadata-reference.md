@@ -14,16 +14,21 @@ must never be treated as authoritative.
 
 | Field | Meaning | Source of truth |
 |---|---|---|
-| `law_type` | ประเภทกฎหมาย (ประกาศ / ระเบียบ / พระราชบัญญัติ / กฎกระทรวง …) | **canonical** |
-| `source` | `internal` / `external` | **derived from `law_type`** |
+| `law_type` | ประเภทเอกสาร code (`LTYxx`) จาก master data `law_type` | **canonical** |
+| `source` | `internal` / `external` | **derived from `law_type.family_code → law_family.source`** |
 | `document_type` | `'new'` \| `'old'` = ที่มา (สร้างในระบบ / นำเข้า PDF ของเก่า) | canonical (its own axis) |
+| `issuer` | ผู้ออกประกาศ code (`ISSxx`) | canonical when `law_type.requires_issuer = true` |
 
 **Rules**
-- `law_type` is the one source of truth for the legal document kind.
-- `source` is **derived** from `law_type` via `config/lookups.php` → `document_types[].source`.
+- `law_type` is the one source of truth for the legal document kind. Store/read the master-data code
+  (`LTY01` etc.); labels and old Thai aliases are normalized at API boundaries.
+- `source` is **derived** from `law_type.family_code` via master data `law_family.source`.
   Do not treat a stored `source` as authoritative for system-created documents — derive it. A stored
   `source` is kept only for old/imported documents, where the user picks it explicitly.
   Prefer a single helper (e.g. `sourceOf(lawType)`) over re-deriving inline.
+- Unit words are also derived from the family: internal = `ข้อ`, external = `มาตรา`.
+- `issuer` is required only when the selected law type has `requires_issuer = true` and must be empty
+  otherwise. The merged announcement model is `law_type = LTY01` plus `issuer = ISS01|ISS02`.
 - `document_type` is **not** the legal kind. `'old'` means "imported legacy PDF" only; `'new'` means
   "created in the system". Read it only for that origin distinction (e.g. show the PDF viewer for
   `'old'`). The name is kept as-is for backward compatibility — do not repurpose it.
@@ -79,7 +84,8 @@ must never be treated as authoritative.
 ## Quick guardrails
 
 - Adding a field that overlaps an existing one? Make it *derived* and document it here instead.
-- Reading `source`? Derive from `law_type`, don't trust a stored value on new docs.
+- Reading `source` or unit word? Derive from `law_type → law_family`, don't trust a stored value on new docs.
+- Reading issuer? Use `issuer` code and resolve the label from master data; do not infer it from the law type label.
 - Reading a group/agency/parent? Use the array; the singular is only `array[0]`.
 - Saw "status" in code? Check **which** status — `LawMeta.status` (legal) vs `DocumentStatus.status`
   (pipeline) are unrelated.
