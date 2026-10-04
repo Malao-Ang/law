@@ -5,7 +5,11 @@ namespace App\Providers;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
+use App\Services\MasterData\CompositeUsageCounter;
 use App\Services\MasterData\EnforcementStatusUsageCounter;
+use App\Services\MasterData\IssuerUsageCounter;
+use App\Services\MasterData\LawFamilyUsageCounter;
+use App\Services\MasterData\LawTypeUsageCounter;
 use App\Services\MasterData\MasterDataStore;
 use App\Services\MasterData\UsageCounter;
 use App\Services\Permissions\PermissionStore;
@@ -71,7 +75,12 @@ class AppServiceProvider extends ServiceProvider
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.master'));
 
-        $this->app->bind(UsageCounter::class, EnforcementStatusUsageCounter::class);
+        $this->app->bind(UsageCounter::class, fn (): UsageCounter => new CompositeUsageCounter([
+            $this->app->make(EnforcementStatusUsageCounter::class),
+            $this->app->make(LawTypeUsageCounter::class),
+            $this->app->make(IssuerUsageCounter::class),
+            $this->app->make(LawFamilyUsageCounter::class),
+        ]));
 
         $this->app->bind(DocumentExportService::class, fn (): DocumentExportService => new DocumentExportService(
             $this->app->make(DocumentHtmlService::class),

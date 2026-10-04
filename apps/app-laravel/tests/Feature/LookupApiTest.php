@@ -12,7 +12,12 @@ class LookupApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'document_types' => [['title', 'value']],
+                'document_types' => [['title', 'value', 'code', 'family_code', 'source', 'requires_issuer']],
+                'document_types_all' => [['title', 'value', 'code', 'family_code', 'source', 'requires_issuer']],
+                'law_families' => [['title', 'value', 'code', 'source', 'color', 'sort_order']],
+                'law_families_all' => [['title', 'value', 'code', 'source', 'color', 'sort_order']],
+                'issuers' => [['title', 'value', 'code', 'sort_order']],
+                'issuers_all' => [['title', 'value', 'code', 'sort_order']],
                 'statuses' => [['title', 'value']],
                 'change_status_types' => [['title', 'value', 'source']],
                 'change_status_details' => [['title', 'value', 'source']],
@@ -21,13 +26,17 @@ class LookupApiTest extends TestCase
             ]);
 
         $data = $response->json();
-        foreach (['document_types', 'statuses', 'change_status_types', 'change_status_details', 'agencies', 'law_groups'] as $key) {
+        foreach (['document_types', 'document_types_all', 'law_families', 'issuers', 'statuses', 'change_status_types', 'change_status_details', 'agencies', 'law_groups'] as $key) {
             $this->assertNotEmpty($data[$key], "Lookup list '{$key}' must not be empty");
         }
 
-        $this->assertNotContains('กฎหมายภายนอก', array_column($data['document_types'], 'value'));
-        $this->assertContains('ประกาศที่ออกโดยมหาวิทยาลัย', array_column($data['document_types'], 'value'));
-        $this->assertContains('ประกาศที่ออกโดยสภามหาวิทยาลัย', array_column($data['document_types'], 'value'));
+        $this->assertContains('LTY01', array_column($data['document_types'], 'value'));
+        $announcement = collect($data['document_types'])->firstWhere('value', 'LTY01');
+        $this->assertSame('LFM03', $announcement['family_code'] ?? null);
+        $this->assertSame('internal', $announcement['source'] ?? null);
+        $this->assertTrue($announcement['requires_issuer'] ?? false);
+        $this->assertContains('LFM04', array_column($data['law_families'], 'value'));
+        $this->assertContains('ISS01', array_column($data['issuers'], 'value'));
         $this->assertContains('มหาวิทยาลัยบูรพา', array_column($data['agencies'], 'value'));
         $this->assertContains('STA01', array_column($data['statuses'], 'value'));
         $inForce = collect($data['statuses'])->firstWhere('value', 'STA01');

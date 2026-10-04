@@ -312,6 +312,7 @@ const parentItems = computed(() =>
   parentDocumentsForChildType(
     catalog.value,
     documentStore.review?.law_meta?.law_type,
+    documentStore.review?.law_meta?.issuer,
     props.documentId,
     parentIds.value,
   ),
@@ -322,10 +323,11 @@ const parentPickerHint = computed(() => {
   if (changeStatus.value === 'กฎหมายใหม่') {
     return 'เลือก พ.ร.บ. ข้อบังคับ ระเบียบ ประกาศ หรือกฎหมายภายนอกที่ต้องการอ้างอิง';
   }
-  if (isUniversityAnnouncementType(lawType)) {
+  const issuer = documentStore.review?.law_meta?.issuer;
+  if (isUniversityAnnouncementType(lawType, issuer)) {
     return 'ประกาศที่ออกโดยมหาวิทยาลัย เลือกกฎหมายแม่ได้เฉพาะระเบียบและข้อบังคับ';
   }
-  if (isCouncilAnnouncementType(lawType)) {
+  if (isCouncilAnnouncementType(lawType, issuer)) {
     return 'ประกาศที่ออกโดยสภามหาวิทยาลัย เลือกกฎหมายแม่ได้จาก พ.ร.บ. ระเบียบ ข้อบังคับ และประกาศ';
   }
   return 'เลือกได้ว่าเอกสารนี้ออกภายใต้กฎหมายฉบับใด เช่น ระเบียบนี้ออกตาม พ.ร.บ. เรื่องนั้น เลือกได้หลายฉบับ ไม่บังคับ';

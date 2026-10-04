@@ -31,7 +31,8 @@ class LawIndexerTest extends TestCase
             'summary' => ['page_count' => 1, 'block_count' => 1, 'review_required_count' => 0],
             'law_meta' => [
                 'title' => 'Test Act',
-                'law_type' => 'phrb',
+                'law_type' => 'พระราชบัญญัติ',
+                'issuer' => 'มหาวิทยาลัย',
                 'status' => 'active',
                 'agency' => 'Test Agency',
                 'published_date' => '2565-01-03',
@@ -73,7 +74,10 @@ class LawIndexerTest extends TestCase
         $this->assertSame($id, $doc['law_id']);
         $this->assertSame("$id-c1", $doc['chunk_id']);
         $this->assertSame('Test Act', $doc['title']);
-        $this->assertSame('phrb', $doc['law_type']);
+        $this->assertSame('LTY05', $doc['law_type']);
+        $this->assertSame('LFM04', $doc['law_family']);
+        $this->assertSame('พระราชบัญญัติ', $doc['law_type_label']);
+        $this->assertSame('ISS01', $doc['issuer']);
         $this->assertSame('Test Agency', $doc['agency']);
         $this->assertSame(2022, $doc['published_year']);
         $this->assertSame('Section 1', $doc['section_path']);

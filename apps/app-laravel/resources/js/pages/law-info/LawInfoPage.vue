@@ -81,7 +81,7 @@
                 required
               />
             </v-col>
-            <v-col v-if="form.law_type === 'ประกาศ'" cols="12">
+            <v-col v-if="selectedTypeRequiresIssuer" cols="12">
               <v-radio-group
                 v-model="form.issuer"
                 :label="requiredLabel('ออกโดย')"
@@ -91,7 +91,7 @@
                 hide-details="auto"
               >
                 <v-radio
-                  v-for="opt in ISSUER_OPTIONS"
+                  v-for="opt in issuerOptions"
                   :key="opt.value"
                   :label="opt.title"
                   :value="opt.value"
@@ -290,6 +290,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { fetchActiveChildren, type SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
+import { legacyIssuerForType, useLawType } from '../../composables/useLawType';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
@@ -306,28 +307,18 @@ const route = useRoute();
 const isEditMode = computed(() => route.query.mode === 'edit');
 const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { documentTypes, issuers, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const lawTypes = useLawType();
 const { draftCode, isRepealed } = useLawStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
-  [/ข้อบังคับ/u, 'ข้อบังคับ'],
-  [/ระเบียบ/u, 'ระเบียบ'],
-  [/สภามหาวิทยาลัย/u, 'ประกาศ'],
-  [/ประกาศ/u, 'ประกาศ'],
-  [/คำสั่ง/u, 'ประกาศ'],
-  [/มติ/u, 'ประกาศ'],
+  [/ข้อบังคับ/u, 'LTY03'],
+  [/ระเบียบ/u, 'LTY02'],
+  [/สภามหาวิทยาลัย/u, 'LTY01'],
+  [/ประกาศ/u, 'LTY01'],
+  [/คำสั่ง/u, 'LTY01'],
+  [/มติ/u, 'LTY01'],
 ];
-
-const ISSUER_OPTIONS: ReadonlyArray<{ title: string; value: string }> = [
-  { title: 'ออกโดยมหาวิทยาลัย', value: 'มหาวิทยาลัย' },
-  { title: 'ออกโดยสภามหาวิทยาลัย', value: 'สภามหาวิทยาลัย' },
-];
-
-const ANNOUNCEMENT_ISSUER_LAW_TYPES: Readonly<Record<string, string>> = {
-  ประกาศที่ออกโดยมหาวิทยาลัย: 'มหาวิทยาลัย',
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: 'สภามหาวิทยาลัย',
-};
-const EXTERNAL_LAW_TYPES = new Set(['พระราชกำหนด', 'พระราชบัญญัติ', 'กฎกระทรวง', 'ประกาศกระทรวง']);
 
 const EMPTY: LawMeta = {
   status: draftCode.value, source: '', law_type: '', law_group: '', law_groups: [],
@@ -345,22 +336,22 @@ const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
 
 function normalizeSavedLawType(saved: string): string {
-  return ANNOUNCEMENT_ISSUER_LAW_TYPES[saved] ? 'ประกาศ' : saved;
+  return lawTypes.typeItem(saved)?.code ?? saved;
 }
 
 function normalizeLawTypeForDocument(saved: string, oldDocument: boolean, title: string): string {
   const normalized = normalizeSavedLawType(saved);
   if (oldDocument) return normalized;
-  if (EXTERNAL_LAW_TYPES.has(normalized)) return '';
+  if (lawTypes.typeSource(normalized) === 'external') return '';
 
   return normalized || inferLawType(title);
 }
 
-function inferAnnouncementIssuer(text: string, selectedAgencies: string[]): string | null {
-  if (selectedAgencies.some((agency) => agency.includes('สภา')) || /สภามหาวิทยาลัย|มติ/u.test(text)) {
-    return 'สภามหาวิทยาลัย';
+function inferAnnouncementIssuer(text: string): string | null {
+  if (/สภามหาวิทยาลัย|มติ/u.test(text)) {
+    return 'ISS02';
   }
-  if (/ประกาศ|คำสั่ง/u.test(text)) return 'มหาวิทยาลัย';
+  if (/ประกาศ|คำสั่ง/u.test(text)) return 'ISS01';
   return null;
 }
 
@@ -385,16 +376,16 @@ function requiredArrayRules(label: string): Array<(v: unknown) => boolean | stri
 }
 
 const issuerRules = [
-  (v: unknown) => form.value.law_type !== 'ประกาศ' || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
+  (v: unknown) => !selectedTypeRequiresIssuer.value || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
 ];
 
-// internal ('ข้อ') vs external ('มาตรา') is derived from the selected law_type's
-// source tag, falling back to the explicit source field for old docs.
 const lawSourceKind = computed<'internal' | 'external'>(() => {
-  const byType = documentTypes.value.find((t) => t.value === form.value.law_type)?.source;
+  const byType = lawTypes.typeItem(form.value.law_type)?.source;
   const src = byType || form.value.source;
   return src === 'external' ? 'external' : 'internal';
 });
+
+const selectedTypeRequiresIssuer = computed(() => lawTypes.requiresIssuer(form.value.law_type));
 
 function matchesSource(optionSource: string | undefined): boolean {
   return optionSource === 'both' || optionSource === undefined || optionSource === lawSourceKind.value;
@@ -423,7 +414,7 @@ const documentTypePlaceholder = computed(() =>
 // New documents are authored internally. Historical uploads choose source first,
 // then see only document types from that source.
 const selectableDocumentTypes = computed(() =>
-  documentTypes.value.filter((t) => !ANNOUNCEMENT_ISSUER_LAW_TYPES[t.value]),
+  documentTypes.value,
 );
 
 const filteredDocumentTypes = computed(() => {
@@ -436,6 +427,10 @@ const filteredDocumentTypes = computed(() => {
   }
   return items;
 });
+
+const issuerOptions = computed(() =>
+  issuers.value.map((issuer) => ({ title: `ออกโดย${issuer.title}`, value: issuer.code })),
+);
 
 const sourceRules = [
   (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
@@ -498,7 +493,7 @@ const articleBlocks = computed<DocumentBlock[]>(() =>
     .filter(isClauseBlock),
 );
 const articleCount = computed(() => articleBlocks.value.length);
-const articleUnitLabel = computed(() => 'ข้อ');
+const articleUnitLabel = computed(() => lawTypes.unitWord(form.value.law_type));
 const sectionCountDisplay = computed(() => `${articleCount.value} ${articleUnitLabel.value}`);
 
 watch(() => documentStore.review, (review) => {
@@ -529,8 +524,8 @@ watch(() => documentStore.review, (review) => {
     parent_document_ids: meta?.parent_document_ids?.length
       ? [...meta.parent_document_ids]
       : (meta?.parent_document_id ? [meta.parent_document_id] : []),
-    issuer: normalizedLawType === 'ประกาศ'
-      ? (meta?.issuer || ANNOUNCEMENT_ISSUER_LAW_TYPES[savedLawType] || inferAnnouncementIssuer(documentTitle, agencies))
+    issuer: lawTypes.requiresIssuer(normalizedLawType)
+      ? (lawTypes.issuerItem(meta?.issuer)?.code || legacyIssuerForType(savedLawType) || inferAnnouncementIssuer(documentTitle))
       : null,
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
@@ -624,7 +619,7 @@ function buildLawMetaPayload(): LawMeta {
     keywords: normalizeKeywords(form.value.keywords),
     imported_by: form.value.imported_by.trim() || CURRENT_ADMIN_LABEL,
     section_count: articleCount.value,
-    issuer: form.value.law_type === 'ประกาศ' ? (form.value.issuer ?? null) : null,
+    issuer: lawTypes.requiresIssuer(form.value.law_type) ? (form.value.issuer ?? null) : null,
     change_details: changeStatusHasDetails.value ? [...(form.value.change_details ?? [])] : [],
   };
 }
@@ -714,7 +709,7 @@ watch(noExpiry, () => {
 });
 
 watch(() => form.value.law_type, (lawType) => {
-  if (lawType !== 'ประกาศ') form.value.issuer = null;
+  if (!lawTypes.requiresIssuer(lawType)) form.value.issuer = null;
 });
 
 watch(() => form.value.change_status, () => {

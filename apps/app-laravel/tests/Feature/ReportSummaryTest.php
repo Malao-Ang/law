@@ -48,8 +48,10 @@ class ReportSummaryTest extends TestCase
         $res->assertJsonPath('totals.published', 1);
 
         $byType = collect($res->json('by_type'))->keyBy('key');
-        $this->assertSame(2, $byType['พระราชบัญญัติ']['count']);
-        $this->assertSame(1, $byType['ประกาศ']['count']);
+        $this->assertSame(2, $byType['LTY05']['count']);
+        $this->assertSame('พระราชบัญญัติ', $byType['LTY05']['label']);
+        $this->assertSame(1, $byType['LTY01']['count']);
+        $this->assertSame('ประกาศ', $byType['LTY01']['label']);
 
         $byGroup = collect($res->json('by_group'))->keyBy('key');
         $this->assertSame(2, $byGroup['ด้านวิชาการ']['count']);

@@ -1,15 +1,16 @@
 <template>
-  <AppShell
-    :breadcrumbs="resolvedBreadcrumbs"
-    :title="title"
-    :subtitle="subtitle"
-    show-bell
-  >
-    <template #title-actions>
+  <component :is="embedded ? 'div' : AppShell" v-bind="shellProps">
+    <template v-if="!embedded" #title-actions>
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
         {{ addLabel }}
       </v-btn>
     </template>
+
+    <div v-if="embedded" class="master-page__embedded-actions">
+      <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
+        {{ addLabel }}
+      </v-btn>
+    </div>
 
     <div class="master-page">
       <MasterStatCards :stats="master.stats.value" :labels="statLabels" />
@@ -73,7 +74,7 @@
       @save="handleSave"
     >
       <template #attrs="{ form }">
-        <slot name="attrs" :form="form" />
+        <slot name="attrs" :form="form" :item="editingItem" />
       </template>
     </MasterItemDialog>
 
@@ -83,7 +84,7 @@
       :item="viewItem"
       :field-labels="fieldLabels"
     />
-  </AppShell>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -110,6 +111,7 @@ const props = defineProps<{
   dialogTitle: { create: string; edit: string };
   dialogSubtitle: string;
   fieldLabels: { code: string; name: string };
+  embedded?: boolean;
 }>();
 
 const master = useMasterData(props.kind);
@@ -122,6 +124,12 @@ const togglingCode = ref<string | null>(null);
 const fieldErrors = ref<Record<string, string[]>>({});
 
 const resolvedBreadcrumbs = computed(() => props.breadcrumbs ?? ['จัดการข้อมูลระบบ', props.title]);
+const shellProps = computed(() => props.embedded ? {} : {
+  breadcrumbs: resolvedBreadcrumbs.value,
+  title: props.title,
+  subtitle: props.subtitle,
+  showBell: true,
+});
 
 const activeOptions = [
   { title: 'สถานะ: ทั้งหมด', value: 'all' },
@@ -207,6 +215,12 @@ async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.master-page__embedded-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 .master-page__filters {

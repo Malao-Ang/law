@@ -228,6 +228,7 @@ import AppShell from '../../components/shared/AppShell.vue';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { createLawTypeCatalog } from '../../composables/useLawType';
 
 const PAGE_SIZE = 20;
 
@@ -248,6 +249,7 @@ const page = ref(1);
 
 const versionStore = useVersionStore();
 const { draftCode, inForceCode, isRepealed, statusColor, statusLabel } = useLawStatus();
+const lawTypes = createLawTypeCatalog();
 const versionDialogOpen = ref(false);
 
 function openVersions(id: string): void {
@@ -268,32 +270,23 @@ watch([search, filterType, filterStatus, sortOrder], () => {
   page.value = 1;
 });
 
-const TYPE_META: Record<string, { color: string; icon: string }> = {
-  กฎหมายภายนอก: { color: 'doc-phaainok', icon: 'mdi-bank-outline' },
-  ข้อบังคับ: { color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
-  ระเบียบ: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
-  ประกาศ: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
-  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
+const FAMILY_META: Record<string, { color: string; icon: string }> = {
+  LFM04: { color: 'doc-phaainok', icon: 'mdi-bank-outline' },
+  LFM01: { color: 'doc-kho-bangkhab', icon: 'mdi-scale-balance' },
+  LFM02: { color: 'doc-rabiap', icon: 'mdi-folder-outline' },
+  LFM03: { color: 'doc-prakat', icon: 'mdi-bullhorn-variant-outline' },
 };
-
-const FEATURED_TYPES = ['กฎหมายภายนอก', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ'];
 
 const statCards = computed(() => {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  return FEATURED_TYPES.map((typeName) => {
-    const matchesType = (value: string) => (
-      typeName === 'ประกาศ' ? value.includes('ประกาศ') : value === typeName
-    );
-    const docsForType = typeName === FEATURED_TYPES[0]
-      ? summary.value.documents.filter((d) => d.source === 'external')
-      : summary.value.documents.filter((d) => matchesType(d.type));
+  return lawTypes.familiesOrdered.value.map((family) => {
+    const docsForType = summary.value.documents.filter((d) => lawTypes.typeFamily(d.type) === family.code);
     const count = docsForType.length;
     const recent = docsForType.filter(
       (d) => d.date && new Date(d.date).getTime() > thirtyDaysAgo,
     ).length;
-    const meta = TYPE_META[typeName] ?? { color: 'grey', icon: 'mdi-file-outline' };
-    return { type: typeName, count, recent, ...meta };
+    const meta = FAMILY_META[family.code] ?? { color: 'grey', icon: 'mdi-file-outline' };
+    return { type: family.title, count, recent, ...meta };
   });
 });
 
@@ -379,7 +372,8 @@ const laws = computed<LawRow[]>(() =>
 const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
   const counts = new Map<string, number>();
   for (const law of laws.value) {
-    if (law.lawType) counts.set(law.lawType, (counts.get(law.lawType) ?? 0) + 1);
+    const familyCode = lawTypes.typeFamily(law.lawType);
+    if (familyCode) counts.set(familyCode, (counts.get(familyCode) ?? 0) + 1);
   }
   return [...counts.entries()]
     .map(([key, count]) => ({ key, count }))
@@ -388,7 +382,10 @@ const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
 
 const typeOptions = computed(() => [
   { label: 'ทุกประเภท', value: null },
-  ...typeCounts.value.map((b) => ({ label: b.key, value: b.key })),
+  ...lawTypes.familiesOrdered.value.map((family) => ({
+    label: `${family.title} (${typeCounts.value.find((b) => b.key === family.code)?.count ?? 0})`,
+    value: family.code,
+  })),
 ]);
 
 const statusOptions = [
@@ -409,7 +406,7 @@ const sortOptions = [
 
 const filteredLaws = computed(() => {
   let result = laws.value;
-  if (filterType.value) result = result.filter((l) => l.lawType === filterType.value);
+  if (filterType.value) result = result.filter((l) => lawTypes.typeFamily(l.lawType) === filterType.value);
   if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
   if (search.value.trim()) {
     const q = search.value.trim().toLowerCase();
@@ -428,7 +425,7 @@ const rangeStart = computed(() => (filteredLaws.value.length === 0 ? 0 : (page.v
 const rangeEnd = computed(() => Math.min(page.value * PAGE_SIZE, filteredLaws.value.length));
 
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
+  return FAMILY_META[lawTypes.typeFamily(type)]?.color ?? 'grey';
 }
 
 function metaStatusColor(status: string): string {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\MasterData\LawTypes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDocumentRequest extends FormRequest
@@ -9,6 +10,17 @@ class StoreDocumentRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $lawType = $this->input('law_type');
+        if ($lawType !== null && $lawType !== '') {
+            $resolved = app(LawTypes::class)->resolve($lawType);
+            if ($resolved !== null) {
+                $this->merge(['law_type' => (string) $resolved['code']]);
+            }
+        }
     }
 
     /**
@@ -33,15 +45,18 @@ class StoreDocumentRequest extends FormRequest
                     if ($value === null || $value === '') {
                         return;
                     }
-                    $match = collect(config('lookups.document_types'))
-                        ->firstWhere('value', $value);
-                    if ($match === null) {
+
+                    $lawTypes = app(LawTypes::class);
+                    $match = $lawTypes->resolve($value);
+                    if ($match === null || ! (bool) ($match['is_active'] ?? false)) {
                         $fail('ประเภทกฎหมายไม่ถูกต้อง');
+
                         return;
                     }
+
                     $data = method_exists($validator, 'getData') ? $validator->getData() : [];
                     $source = $data['source'] ?? $this->input('source');
-                    if ($source !== null && ($match['source'] ?? null) !== $source) {
+                    if ($source !== null && $lawTypes->sourceOf($value) !== $source) {
                         $fail('ประเภทกฎหมายไม่ตรงกับแหล่งที่มาที่เลือก');
                     }
                 },

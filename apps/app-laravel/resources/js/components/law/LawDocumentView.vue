@@ -10,7 +10,7 @@
           <v-breadcrumbs-item to="/database">สืบค้นกฎหมาย</v-breadcrumbs-item>
           <template v-if="meta.law_type">
             <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
-            <v-breadcrumbs-item>{{ meta.law_type }}</v-breadcrumbs-item>
+            <v-breadcrumbs-item>{{ typeLabel(meta.law_type) }}</v-breadcrumbs-item>
           </template>
           <v-breadcrumbs-divider>/</v-breadcrumbs-divider>
           <v-breadcrumbs-item>
@@ -118,7 +118,7 @@
           <p v-if="buddhistYear" class="lawx-headcard__year">พ.ศ. {{ buddhistYear }}</p>
           <p v-if="meta.issuer" class="lawx-headcard__issuer">
             <span class="mdi mdi-office-building-outline" />
-            {{ meta.issuer }}
+            {{ issuerLabel(meta.issuer) }}
           </p>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
@@ -270,6 +270,9 @@ import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
 import ELawNavbar from '../shared/ELawNavbar.vue';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel, issuerLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();

@@ -1,6 +1,7 @@
 import type { DocumentBlock, LawRelation, ReviewDocument } from '../types/document';
 import { CHUNK_TYPE_LABELS, HEAD_CHUNK_TYPES, normalizeChunkType } from '../types/chunkType';
 import type { ChunkType } from '../types/chunkType';
+import { createLawTypeCatalog } from './useLawType';
 
 export interface LawSection {
   id: string;
@@ -19,6 +20,7 @@ export interface TocGroup {
 
 const HEAD_RE = /^(คำปรารภ|บทเฉพาะกาล|หมวด\s*[๐-๙0-9]+|ส่วนที่\s*[๐-๙0-9]+|มาตรา\s*[๐-๙0-9]+(?:\/[๐-๙0-9]+)?|ข้อ\s*[๐-๙0-9]+(?:\.[๐-๙0-9]+)*)/u;
 const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะกาล)\s*/u;
+const lawTypes = createLawTypeCatalog();
 
 // Structural heading chunk-types: assigning one makes a block a section head,
 // so the following blocks group under it without merging text.
@@ -194,6 +196,6 @@ export function sourceOf(
   documentTypes: { value: string; source?: string }[],
   fallback?: string | null,
 ): 'internal' | 'external' {
-  const hit = documentTypes.find((t) => t.value === lawType)?.source;
+  const hit = lawTypes.typeItem(lawType)?.source ?? documentTypes.find((t) => t.value === lawType)?.source;
   return (hit ?? fallback) === 'external' ? 'external' : 'internal';
 }

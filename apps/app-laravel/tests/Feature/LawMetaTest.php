@@ -117,7 +117,7 @@ class LawMetaTest extends TestCase
         $response->assertJsonPath('law_meta.repealed_laws', ['พ.ร.บ. เก่า ๒๕๓๓']);
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('พระราชบัญญัติ', $doc['law_meta']['law_type']);
+        $this->assertSame('LTY05', $doc['law_meta']['law_type']);
         $this->assertSame(1, $doc['law_meta']['section_count']);
         $this->assertSame(['ข้อมูลส่วนบุคคล', 'PDPA'], $doc['law_meta']['keywords']);
     }

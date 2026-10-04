@@ -68,7 +68,7 @@
 
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
-          {{ item.lawType }}
+          {{ typeLabel(item.lawType) }}
         </v-chip>
         <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
         <v-chip v-else size="small" color="grey" variant="tonal">รอประมวลผล</v-chip>
@@ -179,6 +179,9 @@ import {
   deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 interface Row {
   no: number;

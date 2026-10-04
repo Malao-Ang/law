@@ -27,7 +27,7 @@
         </div>
         <div v-if="meta.law_type" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">ประเภท</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.law_type }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ typeLabel(meta.law_type) }}</span>
         </div>
         <div v-if="meta.gazette_reference" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">อ้างอิง</span>
@@ -35,7 +35,7 @@
         </div>
         <div v-if="meta.issuer" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">ออกโดย</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.issuer }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ issuerLabel(meta.issuer) }}</span>
         </div>
         <div v-if="meta.law_group" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
@@ -162,6 +162,9 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel, issuerLabel } = useLawType();
 
 interface SectionRelationGroup {
   type: RelationType;

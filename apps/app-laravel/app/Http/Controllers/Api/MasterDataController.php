@@ -88,7 +88,12 @@ class MasterDataController extends Controller
             return $this->unknownKind();
         }
 
-        $item = $this->store->update($masterKind, $code, $request->validated());
+        try {
+            $item = $this->store->update($masterKind, $code, $request->validated());
+        } catch (MasterDataConflict $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
         if ($item === null) {
             return response()->json(['message' => 'Master data item not found.'], 404);
         }

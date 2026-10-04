@@ -75,7 +75,8 @@ class LawSearchServiceTest extends TestCase
         $raw = [
             'aggregations' => [
                 'total_laws' => ['value' => 1],
-                'law_type' => ['buckets' => [['key' => 'phrb', 'doc_count' => 3]]],
+                'law_type' => ['buckets' => [['key' => 'LTY05', 'doc_count' => 3]]],
+                'law_family' => ['buckets' => [['key' => 'LFM04', 'doc_count' => 3]]],
                 'status' => ['buckets' => []],
                 'change_status' => ['buckets' => []],
                 'agency' => ['buckets' => []],
@@ -88,7 +89,9 @@ class LawSearchServiceTest extends TestCase
                 '_source' => [
                     'law_id' => 'L1',
                     'title' => 'พ.ร.บ. ทดสอบ',
-                    'law_type' => 'phrb',
+                    'law_type' => 'LTY05',
+                    'law_family' => 'LFM04',
+                    'law_type_label' => 'พระราชบัญญัติ',
                     'status' => 'active',
                     'summary' => 's',
                     'published_date' => '2565',
@@ -116,7 +119,10 @@ class LawSearchServiceTest extends TestCase
         $this->assertSame(['ว่าด้วย<mark>ภาษี</mark>อากร'], $out['results'][0]['snippets']);
         $this->assertSame(1.0, $out['results'][0]['confidence']);
         $this->assertSame('exact', $out['results'][0]['match_mode']);
-        $this->assertSame([['value' => 'phrb', 'count' => 3]], $out['facets']['law_type']);
+        $this->assertSame('พระราชบัญญัติ', $out['results'][0]['law_type']);
+        $this->assertSame('LTY05', $out['results'][0]['law_type_code']);
+        $this->assertSame('LFM04', $out['results'][0]['law_family']);
+        $this->assertSame([['value' => 'LTY05', 'count' => 3]], $out['facets']['law_type']);
         $this->assertSame('elastic', $out['meta']['engine']);
         $this->assertSame('exact', $out['meta']['mode']);
         $this->assertSame(1.0, $out['meta']['confidence']);

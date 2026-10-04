@@ -1,7 +1,20 @@
 import { ref } from 'vue';
-import { getLookups, type LawStatusOption, type LookupData, type SelectableOption } from '../api/client';
+import {
+  getLookups,
+  type DocumentTypeOption,
+  type IssuerOption,
+  type LawFamilyOption,
+  type LawStatusOption,
+  type LookupData,
+  type SelectableOption,
+} from '../api/client';
 
-const documentTypes = ref<(SelectableOption & { source?: string })[]>([]);
+const documentTypes = ref<DocumentTypeOption[]>([]);
+const documentTypesAll = ref<DocumentTypeOption[]>([]);
+const lawFamilies = ref<LawFamilyOption[]>([]);
+const lawFamiliesAll = ref<LawFamilyOption[]>([]);
+const issuers = ref<IssuerOption[]>([]);
+const issuersAll = ref<IssuerOption[]>([]);
 const statuses = ref<LawStatusOption[]>([]);
 const statusesAll = ref<LawStatusOption[]>([]);
 const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
@@ -18,6 +31,11 @@ async function load(): Promise<void> {
   if (!inFlight) {
     inFlight = getLookups().then((data: LookupData) => {
       documentTypes.value = data.document_types;
+      documentTypesAll.value = data.document_types_all ?? data.document_types;
+      lawFamilies.value = data.law_families;
+      lawFamiliesAll.value = data.law_families_all ?? data.law_families;
+      issuers.value = data.issuers;
+      issuersAll.value = data.issuers_all ?? data.issuers;
       statuses.value = data.statuses;
       statusesAll.value = data.statuses_all ?? data.statuses;
       changeStatusTypes.value = data.change_status_types;
@@ -40,5 +58,21 @@ async function reload(): Promise<void> {
 }
 
 export function useLookups() {
-  return { documentTypes, statuses, statusesAll, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load, reload };
+  return {
+    documentTypes,
+    documentTypesAll,
+    lawFamilies,
+    lawFamiliesAll,
+    issuers,
+    issuersAll,
+    statuses,
+    statusesAll,
+    changeStatusTypes,
+    changeStatusDetails,
+    agencies,
+    lawGroups,
+    lawSources,
+    load,
+    reload,
+  };
 }

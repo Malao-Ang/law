@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
 use App\Services\ReviewStore;
@@ -11,16 +12,21 @@ use Illuminate\Console\Command;
 class MigrateMasterDataCommand extends Command
 {
     protected $signature = 'master-data:migrate
-        {kind : Migration kind. Supported: enforcement-status}
+        {kind : Migration kind. Supported: enforcement-status, law-type}
         {--dry-run : Audit without writing}
         {--map=* : Extra mapping in the form "legacy value=STA0x"}';
 
     protected $description = 'Migrate legacy data values to master data codes.';
 
-    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, ReviewStore $reviewStore): int
+    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, ReviewStore $reviewStore): int
     {
-        if (! in_array((string) $this->argument('kind'), ['enforcement-status', 'enforcement_status'], true)) {
-            $this->error('Unknown migration kind. Supported: enforcement-status');
+        $kind = (string) $this->argument('kind');
+        if (in_array($kind, ['law-type', 'law_type'], true)) {
+            return $this->migrateLawTypes($masterData, $lawTypes, $reviewStore);
+        }
+
+        if (! in_array($kind, ['enforcement-status', 'enforcement_status'], true)) {
+            $this->error('Unknown migration kind. Supported: enforcement-status, law-type');
 
             return self::FAILURE;
         }
@@ -119,6 +125,167 @@ class MigrateMasterDataCommand extends Command
             }
 
             $map[trim($legacy)] = (string) $resolved['code'];
+        }
+
+        return $map;
+    }
+
+    private function migrateLawTypes(MasterDataStore $masterData, LawTypes $lawTypes, ReviewStore $reviewStore): int
+    {
+        $masterData->seedIfEmpty(MasterDataKind::LawFamily);
+        $masterData->seedIfEmpty(MasterDataKind::Issuer);
+        $masterData->seedIfEmpty(MasterDataKind::LawType);
+
+        $extraMap = $this->parseLawTypeMapOptions($lawTypes);
+        if ($extraMap === null) {
+            return self::FAILURE;
+        }
+
+        $legacyIssuerByType = $this->legacyIssuerByTypeAlias($masterData);
+        $audit = [];
+        $unmapped = [];
+        $patches = [];
+
+        foreach ($reviewStore->listLawMeta() as $row) {
+            $documentId = (string) ($row['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+
+            $rawType = trim((string) ($row['law_type'] ?? ''));
+            $rawIssuer = trim((string) ($row['issuer'] ?? ''));
+            $mapped = $extraMap[$rawType] ?? null;
+            $type = $mapped === null ? $lawTypes->resolve($rawType) : $mapped['type'];
+
+            if ($type === null) {
+                $audit[$rawType]['target'] = 'UNMAPPED';
+                $audit[$rawType]['count'] = ($audit[$rawType]['count'] ?? 0) + 1;
+                $unmapped[$rawType][] = $documentId;
+
+                continue;
+            }
+
+            $typeCode = (string) ($type['code'] ?? '');
+            $requiresIssuer = (bool) ($type['attrs']['requires_issuer'] ?? false);
+            $issuerCode = null;
+            $issuerFromExisting = $rawIssuer === '' ? null : $lawTypes->issuerResolve($rawIssuer);
+            if ($issuerFromExisting !== null) {
+                $issuerCode = (string) $issuerFromExisting['code'];
+            } elseif ($rawIssuer !== '' && $requiresIssuer) {
+                $audit[$rawIssuer]['target'] = 'UNMAPPED';
+                $audit[$rawIssuer]['count'] = ($audit[$rawIssuer]['count'] ?? 0) + 1;
+                $unmapped[$rawIssuer][] = $documentId;
+
+                continue;
+            } elseif (($mapped['issuer'] ?? null) !== null) {
+                $issuerCode = (string) $mapped['issuer']['code'];
+            } elseif (isset($legacyIssuerByType[$rawType])) {
+                $issuerCode = $legacyIssuerByType[$rawType];
+            }
+
+            if (! $requiresIssuer) {
+                $issuerCode = null;
+            }
+
+            $audit[$rawType]['target'] = $typeCode.($issuerCode !== null ? '+'.$issuerCode : '');
+            $audit[$rawType]['count'] = ($audit[$rawType]['count'] ?? 0) + 1;
+
+            $patch = [];
+            if ($rawType !== $typeCode) {
+                $patch['law_type'] = $typeCode;
+            }
+            if ($issuerCode === null) {
+                if ($rawIssuer !== '') {
+                    $patch['issuer'] = null;
+                }
+            } elseif ($rawIssuer !== $issuerCode) {
+                $patch['issuer'] = $issuerCode;
+            }
+
+            if ($patch !== []) {
+                $patches[$documentId] = $patch;
+            }
+        }
+
+        $this->renderAudit($audit);
+
+        if ($unmapped !== []) {
+            $this->error('UNMAPPED law type or issuer value(s) found.');
+            foreach ($unmapped as $value => $documentIds) {
+                $label = $value === '' ? '<empty>' : $value;
+                $this->line($label.': '.implode(', ', $documentIds));
+            }
+
+            return self::FAILURE;
+        }
+
+        if ((bool) $this->option('dry-run')) {
+            $this->info('Dry run: '.$this->patchCountLabel($patches).' would be updated.');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($patches as $documentId => $patch) {
+            $reviewStore->patchLawMeta($documentId, $patch);
+        }
+
+        $this->info($this->patchCountLabel($patches).' updated.');
+        if ($patches !== []) {
+            $this->call('laws:reindex');
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, array{type: array<string, mixed>, issuer?: array<string, mixed>}>|null
+     */
+    private function parseLawTypeMapOptions(LawTypes $lawTypes): ?array
+    {
+        $map = [];
+        foreach ((array) $this->option('map') as $entry) {
+            $parts = explode('=', (string) $entry, 2);
+            if (count($parts) !== 2) {
+                $this->error('Invalid --map value. Use "legacy value=LTY0x" or "legacy value=LTY0x+ISS0x".');
+
+                return null;
+            }
+
+            [$legacy, $target] = $parts;
+            $targets = array_map('trim', explode('+', $target, 2));
+            $type = $lawTypes->resolve($targets[0] ?? '');
+            if ($type === null) {
+                $this->error("Invalid --map law type target: {$target}");
+
+                return null;
+            }
+
+            $map[trim($legacy)] = ['type' => $type];
+            if (($targets[1] ?? '') !== '') {
+                $issuer = $lawTypes->issuerResolve($targets[1]);
+                if ($issuer === null) {
+                    $this->error("Invalid --map issuer target: {$target}");
+
+                    return null;
+                }
+                $map[trim($legacy)]['issuer'] = $issuer;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function legacyIssuerByTypeAlias(MasterDataStore $masterData): array
+    {
+        $map = [];
+        foreach ($masterData->all(MasterDataKind::Issuer) as $issuer) {
+            $issuerCode = (string) ($issuer['code'] ?? '');
+            foreach ((array) ($issuer['attrs']['legacy_type_aliases'] ?? []) as $alias) {
+                $map[trim((string) $alias)] = $issuerCode;
+            }
         }
 
         return $map;

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchQuery;
@@ -17,7 +18,10 @@ use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
 {
-    public function __construct(private readonly EnforcementStatuses $enforcementStatuses) {}
+    public function __construct(
+        private readonly EnforcementStatuses $enforcementStatuses,
+        private readonly LawTypes $lawTypes,
+    ) {}
 
     private const EXTERNAL_LAW_TYPE_ALIASES = [
         'กฎหมายภายนอก',
@@ -257,13 +261,18 @@ class LawSearchController extends Controller
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
 
+            $lawType = $this->lawTypes->resolve($r['law_type'] ?? '');
+            $issuer = $this->lawTypes->issuerResolve($r['issuer'] ?? '');
+
             return [
                 'law_id' => $id,
                 'title' => $r['title'],
                 'title_highlighted' => $this->highlightTitle((string) ($r['title'] ?? ''), $query),
-                'law_type' => $r['law_type'],
+                'law_type' => $lawType === null ? $r['law_type'] : (string) ($lawType['name'] ?? $r['law_type']),
+                'law_type_code' => $lawType === null ? (string) ($r['law_type'] ?? '') : (string) ($lawType['code'] ?? ''),
                 'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
-                'issuer' => (string) ($r['issuer'] ?? ''),
+                'issuer' => $issuer === null ? (string) ($r['issuer'] ?? '') : (string) ($issuer['name'] ?? ''),
+                'issuer_code' => $issuer === null ? (string) ($r['issuer'] ?? '') : (string) ($issuer['code'] ?? ''),
                 'status' => $r['meta_status'],
                 'change_status' => $r['change_status'],
                 'summary' => null,
@@ -382,9 +391,20 @@ class LawSearchController extends Controller
             return true;
         }
 
+        $rowType = $this->lawTypes->resolve($lawType);
+        $rowTypeCode = (string) ($rowType['code'] ?? '');
+        $rowFamilyCode = (string) ($rowType['attrs']['family_code'] ?? '');
         $rowKey = $this->lawTypeFilterKey($lawType);
         foreach ((array) $want as $wantedType) {
             $wanted = (string) $wantedType;
+            $wantedTypeItem = $this->lawTypes->resolve($wanted);
+            if ($wantedTypeItem !== null && $rowTypeCode !== '' && (string) ($wantedTypeItem['code'] ?? '') === $rowTypeCode) {
+                return true;
+            }
+            $wantedFamily = $this->lawTypes->family($wanted);
+            if ($wantedFamily !== null && $rowFamilyCode !== '' && (string) ($wantedFamily['code'] ?? '') === $rowFamilyCode) {
+                return true;
+            }
             $wantedKey = $this->lawTypeFilterKey($wanted);
             if ($lawType === $wanted || $rowKey === $wantedKey) {
                 return true;
@@ -1017,17 +1037,7 @@ class LawSearchController extends Controller
     /** internal/external for a law_type, from config document_types (legacy กฎหมายภายนอก = external). */
     private function sourceForLawType(string $lawType): string
     {
-        $lawType = trim($lawType);
-        if ($this->canonicalType($lawType) === 'kotmai-phaainok') {
-            return 'external';
-        }
-        foreach ((array) config('lookups.document_types', []) as $type) {
-            if ((string) ($type['value'] ?? '') === $lawType) {
-                return ($type['source'] ?? '') === 'external' ? 'external' : 'internal';
-            }
-        }
-
-        return 'internal';
+        return $this->lawTypes->sourceOf($lawType);
     }
 
     private function canonicalType(string $lawType): string

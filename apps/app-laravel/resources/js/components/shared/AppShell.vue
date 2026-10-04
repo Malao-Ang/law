@@ -169,6 +169,7 @@ const defaultNavGroups: NavGroup[] = [
   {
     label: 'จัดการข้อมูลระบบ (META DATA)',
     items: [
+      { label: 'ประเภทเอกสาร', icon: 'mdi-file-document-outline', to: '/admin/master/law-types', section: 'ข้อมูลเอกสาร' },
       { label: 'สถานะการบังคับใช้', icon: 'mdi-shield-check-outline', to: '/admin/master/enforcement-status', section: 'สถานะกฎหมาย' },
     ],
   },

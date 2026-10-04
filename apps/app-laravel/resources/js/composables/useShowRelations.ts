@@ -2,23 +2,19 @@ import type { LawRelation, RelationType, ReportDocument } from '../types/documen
 import { parentIdsOf } from './useLawCatalog';
 import { formatThaiDate } from '../utils/thaiDate';
 import { useLawStatus } from './useLawStatus';
+import { createLawTypeCatalog } from './useLawType';
 
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
 export const MAX_DEPTH = 6;
 export const SAME_LEVEL_PREVIEW_COUNT = 5;
 
-export const TYPE_META: Record<string, { color: string; short: string }> = {
-  กฎหมายภายนอก: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
-  พระราชบัญญัติ: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
-  พระราชกำหนด: { color: 'doc-phaainok', short: 'พ.ร.ก.' },
-  กฎกระทรวง: { color: 'doc-phaainok', short: 'กฎกระทรวง' },
-  ประกาศกระทรวง: { color: 'doc-phaainok', short: 'ประกาศ ก.' },
-  ข้อบังคับ: { color: 'doc-kho-bangkhab', short: 'ข้อบังคับ' },
-  ระเบียบ: { color: 'doc-rabiap', short: 'ระเบียบ' },
-  ประกาศ: { color: 'doc-prakat', short: 'ประกาศ' },
-  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat', short: 'ประกาศ มหาลัย' },
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat', short: 'ประกาศ สภา' },
+const lawTypes = createLawTypeCatalog();
+const FAMILY_COLOR_CLASS: Record<string, string> = {
+  LFM01: 'doc-kho-bangkhab',
+  LFM02: 'doc-rabiap',
+  LFM03: 'doc-prakat',
+  LFM04: 'doc-phaainok',
 };
 
 export const RELATION_FILTERS: Array<{ value: RelationType; label: string }> = [
@@ -58,24 +54,19 @@ export interface RelTreeNode {
 }
 
 export function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
+  return FAMILY_COLOR_CLASS[lawTypes.typeFamily(type)] ?? 'grey';
 }
 
 export function typeShort(type: string): string {
-  return TYPE_META[type]?.short ?? (type.includes('ประกาศ') ? 'ประกาศ' : type);
+  return lawTypes.typeLabel(type) || type;
 }
 
 export function typeIcon(type: string): string {
-  if (
-    type === 'กฎหมายภายนอก'
-    || type === 'พระราชบัญญัติ'
-    || type === 'พระราชกำหนด'
-    || type === 'กฎกระทรวง'
-    || type === 'ประกาศกระทรวง'
-  ) return 'mdi-office-building-outline';
-  if (type === 'ข้อบังคับ') return 'mdi-scale-balance';
-  if (type === 'ระเบียบ') return 'mdi-folder-outline';
-  if (type.includes('ประกาศ')) return 'mdi-bullhorn-outline';
+  const familyCode = lawTypes.typeFamily(type);
+  if (familyCode === 'LFM04') return 'mdi-office-building-outline';
+  if (familyCode === 'LFM01') return 'mdi-scale-balance';
+  if (familyCode === 'LFM02') return 'mdi-folder-outline';
+  if (familyCode === 'LFM03') return 'mdi-bullhorn-outline';
   return 'mdi-file-document-outline';
 }
 

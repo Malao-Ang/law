@@ -48,8 +48,34 @@ export type LawStatusOption = SelectableOption & {
   role: LawStatusRole;
 };
 
+export type LawSource = 'internal' | 'external';
+
+export type DocumentTypeOption = SelectableOption & {
+  code: string;
+  family_code: string;
+  source: LawSource;
+  requires_issuer: boolean;
+};
+
+export type LawFamilyOption = SelectableOption & {
+  code: string;
+  source: LawSource;
+  color: string;
+  sort_order: number;
+};
+
+export type IssuerOption = SelectableOption & {
+  code: string;
+  sort_order: number;
+};
+
 export type LookupData = {
-  document_types: (SelectableOption & { source?: string })[];
+  document_types: DocumentTypeOption[];
+  document_types_all?: DocumentTypeOption[];
+  law_families: LawFamilyOption[];
+  law_families_all?: LawFamilyOption[];
+  issuers: IssuerOption[];
+  issuers_all?: IssuerOption[];
   statuses: LawStatusOption[];
   statuses_all?: LawStatusOption[];
   change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];

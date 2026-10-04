@@ -70,15 +70,15 @@
         </section>
 
         <!-- Type sections: rendered from typeSections in priority order -->
-        <section v-for="section in typeSections" :key="section.type" class="elaw-home-section">
+        <section v-for="section in typeSections" :key="section.familyCode" class="elaw-home-section">
           <div class="elaw-section-header">
             <div class="elaw-section-header__left">
               <div class="elaw-section-heading">
-                <span class="elaw-section-heading__bar" :class="section.barClass" />
+                <span class="elaw-section-heading__bar" :style="{ background: section.color }" />
                 <h2 class="elaw-section-heading__text">{{ section.title }}</h2>
               </div>
             </div>
-            <a class="elaw-section-link" @click.prevent="goToDatabase(section.type)">ดูทั้งหมด →</a>
+            <a class="elaw-section-link" @click.prevent="goToDatabase(section.familyCode)">ดูทั้งหมด →</a>
           </div>
           <!-- carousel when >3 items -->
           <div v-if="section.docs.length > 3" class="elaw-carousel mt-2">
@@ -149,6 +149,8 @@ import ELawHeroSearch from '../../components/shared/ELawHeroSearch.vue';
 import ELawLawCard from '../../components/shared/ELawLawCard.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import { docTypeToBadge, type DocType } from '../../components/shared/lawBadge';
+import { useLawType } from '../../composables/useLawType';
+import { useLookups } from '../../composables/useLookups';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
 import type { LawSearchResult } from '../../types/lawSearch';
 import { formatThaiDate } from '../../utils/thaiDate';
@@ -178,6 +180,8 @@ function handleWheelScroll(event: WheelEvent): void {
 
 const router = useRouter();
 const auth = useAuthStore();
+const { load: loadLookups } = useLookups();
+const lawTypes = useLawType();
 
 function onSearch(query: string, types: string[], groups: string[]): void {
   router.push({
@@ -210,21 +214,10 @@ function openLaw(doc: DocumentVersion): void {
   router.push(lawPath);
 }
 
-// Type-section order (controls order only); types present but not listed are
-// appended automatically, so a new document type needs no edit here.
-const TYPE_PRIORITY: DocumentType[] = ['kho-bangkhab', 'rabiap', 'prakat', 'kotmai-phaainok'];
-
-const BAR_CLASS: Partial<Record<DocumentType, string>> = {
-  rabiap: 'elaw-section-heading__bar--rabiap',
-  prakat: 'elaw-section-heading__bar--prakat',
-  'kho-bangkhab': 'elaw-section-heading__bar--kho-bangkhab',
-  'kotmai-phaainok': 'elaw-section-heading__bar--external',
-};
-
 interface TypeSection {
-  type: DocumentType;
+  familyCode: string;
   title: string;
-  barClass: string;
+  color: string;
   docs: DocumentVersion[];
   showIssuer: boolean;
 }
@@ -234,6 +227,7 @@ const allDocs = ref<DocumentVersion[]>([]);
 
 onMounted(async () => {
   try {
+    await loadLookups();
     const response = await searchLaws({ q: '', filters: {}, page: 1, per_page: HOME_SEARCH_PAGE_SIZE });
     const databaseDocs = response.results
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
@@ -249,7 +243,7 @@ onMounted(async () => {
     // Latest section groups by the same type priority, newest-first within each
     // type (stable sort keeps the date order already applied to allDocs).
     latestDocs.value = [...allDocs.value]
-      .sort((a, b) => priorityIndex(a.metadata.documentType) - priorityIndex(b.metadata.documentType))
+      .sort((a, b) => familyPriority(a.metadata.lawTypeName) - familyPriority(b.metadata.lawTypeName))
       .slice(0, HOME_SECTION_LIMIT);
   } catch {
     allDocs.value = [];
@@ -258,42 +252,37 @@ onMounted(async () => {
 });
 
 const typeSections = computed<TypeSection[]>(() => {
-  const present = Array.from(new Set(allDocs.value.map((doc) => doc.metadata.documentType)))
-    .filter((type) => type !== 'other')
-    .sort((a, b) => priorityIndex(a) - priorityIndex(b));
+  const present = new Set(allDocs.value.map((doc) => lawTypes.typeFamily(doc.metadata.lawTypeName)).filter(Boolean));
 
-  return present.map((type) => ({
-    type,
-    title: docTypeToBadge(type) ?? type,
-    barClass: BAR_CLASS[type] ?? '',
-    docs: type === 'prakat' ? sortPrakat(docsByType(type)) : docsByType(type),
-    showIssuer: type === 'prakat',
-  }));
+  return lawTypes.familiesOrdered.value
+    .filter((family) => present.has(family.code))
+    .map((family) => {
+      const docs = docsByFamily(family.code);
+      return {
+        familyCode: family.code,
+        title: family.title,
+        color: family.color,
+        docs: family.source === 'internal' ? sortByIssuer(docs) : docs,
+        showIssuer: docs.some((doc) => (doc.metadata.issuer ?? '').trim() !== ''),
+      };
+    });
 });
 
-function priorityIndex(type: DocumentType): number {
-  const index = TYPE_PRIORITY.indexOf(type);
-  return index === -1 ? TYPE_PRIORITY.length : index;
+function familyPriority(lawType: string | null | undefined): number {
+  const familyCode = lawTypes.typeFamily(lawType);
+  const family = lawTypes.familyItem(familyCode);
+  return family?.sort_order ?? 9999;
 }
 
-function docsByType(type: DocumentType): DocumentVersion[] {
-  return allDocs.value.filter((doc) => doc.metadata.documentType === type).slice(0, HOME_SECTION_LIMIT);
+function docsByFamily(familyCode: string): DocumentVersion[] {
+  return allDocs.value.filter((doc) => lawTypes.typeFamily(doc.metadata.lawTypeName) === familyCode).slice(0, HOME_SECTION_LIMIT);
 }
 
 function issuerRank(doc: DocumentVersion): number {
-  const source = [
-    doc.metadata.lawTypeName,
-    doc.metadata.issuer,
-    doc.metadata.title,
-  ].join(' ');
-
-  if (source.includes('สภามหาวิทยาลัย')) return 1;
-  if (source.includes('มหาวิทยาลัย')) return 0;
-  return 2;
+  return lawTypes.issuerRank(doc.metadata.issuer);
 }
 
-// ประกาศ: มหาวิทยาลัย first, then สภามหาวิทยาลัย, then newest within each rank.
-function sortPrakat(docs: DocumentVersion[]): DocumentVersion[] {
+function sortByIssuer(docs: DocumentVersion[]): DocumentVersion[] {
   return [...docs].sort((a, b) => {
     const rank = issuerRank(a) - issuerRank(b);
     if (rank !== 0) return rank;
@@ -329,25 +318,12 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
 }
 
 function docTypeFromSource(law: LawSearchResult): DocumentType {
-  if (law.source === 'external') return 'kotmai-phaainok';
-  if (law.source === 'internal') return internalDocType(law.law_type ?? law.title ?? '');
-  // source missing (older result) — fall back to the legacy heuristic
-  return inferDocType(law.law_type ?? law.title ?? '');
-}
-
-function internalDocType(source: string): DocumentType {
-  const value = source.replace(/\s+/g, '');
-  if (value.includes('ข้อบังคับ')) return 'kho-bangkhab';
-  if (value.includes('ประกาศ')) return 'prakat';
-  return 'rabiap';
-}
-
-function inferDocType(source: string): DocumentType {
-  const value = source.replace(/\s+/g, '');
-  if (value.includes('พระราชบัญญัติ') || value.includes('พ.ร.บ.') || value.includes('กฎหมายภายนอก')) return 'kotmai-phaainok';
-  if (value.includes('ข้อบังคับ')) return 'kho-bangkhab';
-  if (value.includes('ประกาศ')) return 'prakat';
-  return 'rabiap';
+  const familyCode = lawTypes.typeFamily(law.law_type);
+  if (familyCode === 'LFM01') return 'kho-bangkhab';
+  if (familyCode === 'LFM02') return 'rabiap';
+  if (familyCode === 'LFM03') return 'prakat';
+  if (lawTypes.typeSource(law.law_type) === 'external' || law.source === 'external') return 'kotmai-phaainok';
+  return 'other';
 }
 
 function buildDocumentVersion(input: {

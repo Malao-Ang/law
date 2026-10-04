@@ -474,6 +474,7 @@ import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { createLawTypeCatalog } from '../../composables/useLawType';
 
 const PER_PAGE = 20;
 
@@ -546,6 +547,10 @@ const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
 };
 
 const CHILD_CHIP_LABELS: Record<string, string> = {
+  LFM04: 'กฎหมายภายนอก',
+  LFM01: 'ข้อบังคับ',
+  LFM02: 'ระเบียบ',
+  LFM03: 'ประกาศ',
   'kotmai-phaainok': 'กฎหมายภายนอก',
   'kho-bangkhab': 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
@@ -554,7 +559,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 };
 
 const lawStatus = useLawStatus();
-const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
+const lawTypes = createLawTypeCatalog();
 const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
 
 const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
@@ -655,7 +660,19 @@ function canonicalFacetOptions(
   return values.map((value) => ({ label: labelResolver(value), value, count: counts.get(value) ?? 0 }));
 }
 
-const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER, true));
+const typeFilters = computed(() => {
+  const counts = new Map<string, number>();
+  for (const bucket of stableFacet('law_type')) {
+    const familyCode = canonicalLawTypeValue(bucket.value);
+    if (!familyCode) continue;
+    counts.set(familyCode, (counts.get(familyCode) ?? 0) + bucket.count);
+  }
+  return lawTypes.familiesOrdered.value.map((family) => ({
+    label: family.title,
+    value: family.code,
+    count: counts.get(family.code) ?? 0,
+  }));
+});
 const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
 const agencyFilters = computed(() => {
   const allowed = new Set((lookupFacets.value?.agency ?? []).map((b) => b.value));
@@ -1034,16 +1051,14 @@ function lookupDataToFacets(data: LookupData): LawSearchFacets {
 }
 
 function canonicalLawTypeValue(value: string): string {
-  if (LAW_TYPE_CANONICAL_VALUES[value]) return LAW_TYPE_CANONICAL_VALUES[value];
-  if (value.includes('ประกาศ')) return 'prakat';
-  return value;
+  const familyCode = lawTypes.typeFamily(value) || lawTypes.familyItem(value)?.code;
+  if (familyCode) return familyCode;
+  const legacy = LAW_TYPE_CANONICAL_VALUES[value];
+  return legacy ? canonicalLawTypeValue(legacy) : value;
 }
 
 function expandLawTypeFilterValues(values: string[]): string[] {
-  return Array.from(new Set(values.flatMap((value) => {
-    const canonical = canonicalLawTypeValue(value);
-    return LAW_TYPE_FILTER_ALIASES[canonical] ?? [canonical];
-  })));
+  return Array.from(new Set(values.map(canonicalLawTypeValue)));
 }
 
 function normalizeLawGroupValue(value: string): string {
@@ -1056,7 +1071,7 @@ function uniqueStrings(values: string[]): string[] {
 
 function lawTypeLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุประเภท';
-  return LAW_TYPE_LABELS[value] ?? value;
+  return lawTypes.familyItem(value)?.title ?? lawTypes.typeLabel(value) ?? LAW_TYPE_LABELS[value] ?? value;
 }
 
 function changeStatusLabel(value: string | null): string {
@@ -1079,10 +1094,12 @@ function extractYear(item: LawSearchResult): number {
 }
 
 function toDocType(lawType: string | null | undefined): LawTypeCardClass {
-  const raw = lawType ?? '';
-  return LAW_TYPE_TO_DOC_TYPE[raw]
-    ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(raw)]
-    ?? (raw.includes('ประกาศ') ? 'prakat' : 'other');
+  const familyCode = lawTypes.typeFamily(lawType);
+  if (familyCode === 'LFM01') return 'kho-bangkhab';
+  if (familyCode === 'LFM02') return 'rabiap';
+  if (familyCode === 'LFM03') return 'prakat';
+  if (familyCode === 'LFM04') return 'kotmai-phaainok';
+  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? 'other';
 }
 
 function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
@@ -1145,7 +1162,12 @@ function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined
 
 function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | null {
   if (!lawType) return null;
-  return LAW_TYPE_TO_BADGE[lawType] ?? LAW_TYPE_TO_BADGE[canonicalLawTypeValue(lawType)] ?? null;
+  const familyCode = canonicalLawTypeValue(lawType);
+  if (familyCode === 'LFM04') return 'กฎหมายภายนอก';
+  if (familyCode === 'LFM01') return 'ข้อบังคับ';
+  if (familyCode === 'LFM02') return 'ระเบียบ';
+  if (familyCode === 'LFM03') return 'ประกาศ';
+  return LAW_TYPE_TO_BADGE[lawType] ?? null;
 }
 
 function useStatusClass(status: string | null | undefined): string {

@@ -1,12 +1,13 @@
 // Maps ELawLawCard domain enums to the eLaw home design-system badge labels.
+import { createLawTypeCatalog } from '../../composables/useLawType';
 
 export type DocType = 'rabiap' | 'kho-bangkhab' | 'prakat' | 'kotmai-phaainok' | 'other';
 export type ChangeStatus = 'new' | 'amended' | 'repealed';
 
 export type LawTypeBadge =
-  | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ' | 'ประกาศมหาวิทยาลัย' | 'ประกาศสภา'
+  | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ'
   | 'พระราชบัญญัติ' | 'พระราชกำหนด' | 'กฎกระทรวง' | 'ประกาศกระทรวง'
-  | 'กฎหมายภายนอก' | 'คำสั่ง' | 'มติ';
+  | 'กฎหมายภายนอก';
 
 export type StatusBadge = 'ใหม่ล่าสุด' | 'ปรับปรุงรายมาตรา' | 'ปรับปรุงทั้งฉบับ' | 'ยกเลิกบางส่วน' | 'ยกเลิกแล้ว';
 export type LawTypeCardClass = DocType | 'prb' | 'phrk' | 'kotmai-krw' | 'prakat-krw' | 'command' | 'resolution';
@@ -21,21 +22,29 @@ const DOC_TYPE_BADGES: Record<DocType, LawTypeBadge | null> = {
 
 export const LAW_TYPE_TO_BADGE: Record<string, LawTypeBadge> = {
   ระเบียบ: 'ระเบียบ',
+  LTY02: 'ระเบียบ',
   ข้อบังคับ: 'ข้อบังคับ',
+  LTY03: 'ข้อบังคับ',
   ประกาศ: 'ประกาศ',
-  'ประกาศที่ออกโดยมหาวิทยาลัย': 'ประกาศมหาวิทยาลัย',
-  'ประกาศที่ออกโดยสภามหาวิทยาลัย': 'ประกาศสภา',
+  LTY01: 'ประกาศ',
+  'ประกาศที่ออกโดยมหาวิทยาลัย': 'ประกาศ',
+  'ประกาศที่ออกโดยสภามหาวิทยาลัย': 'ประกาศ',
   พระราชบัญญัติ: 'พระราชบัญญัติ',
+  LTY05: 'พระราชบัญญัติ',
   'พ.ร.บ.': 'พระราชบัญญัติ',
   phrb: 'พระราชบัญญัติ',
   พระราชกำหนด: 'พระราชกำหนด',
+  LTY04: 'พระราชกำหนด',
   กฎกระทรวง: 'กฎกระทรวง',
+  LTY06: 'กฎกระทรวง',
   ประกาศกระทรวง: 'ประกาศกระทรวง',
+  LTY07: 'ประกาศกระทรวง',
   'kotmai-phaainok': 'กฎหมายภายนอก',
-  คำสั่ง: 'คำสั่ง',
-  command: 'คำสั่ง',
-  มติ: 'มติ',
-  resolution: 'มติ',
+  LTY08: 'กฎหมายภายนอก',
+  คำสั่ง: 'ประกาศ',
+  command: 'ประกาศ',
+  มติ: 'ประกาศ',
+  resolution: 'ประกาศ',
 };
 
 export const LAW_TYPE_TO_DOC_TYPE: Record<string, LawTypeCardClass> = {
@@ -60,6 +69,14 @@ export const LAW_TYPE_TO_DOC_TYPE: Record<string, LawTypeCardClass> = {
   command: 'command',
   มติ: 'resolution',
   resolution: 'resolution',
+  LTY01: 'prakat',
+  LTY02: 'rabiap',
+  LTY03: 'kho-bangkhab',
+  LTY04: 'phrk',
+  LTY05: 'prb',
+  LTY06: 'kotmai-krw',
+  LTY07: 'prakat-krw',
+  LTY08: 'kotmai-phaainok',
 };
 
 const CHANGE_STATUS_BADGES: Record<ChangeStatus, StatusBadge> = {
@@ -68,12 +85,21 @@ const CHANGE_STATUS_BADGES: Record<ChangeStatus, StatusBadge> = {
   repealed: 'ยกเลิกแล้ว',
 };
 
+const lawTypes = createLawTypeCatalog();
+
 export function docTypeToBadge(type: DocType): LawTypeBadge | null {
   return DOC_TYPE_BADGES[type];
 }
 
 export function lawTypeToBadge(lawType: string): LawTypeBadge | null {
-  return LAW_TYPE_TO_BADGE[lawType] ?? null;
+  const direct = LAW_TYPE_TO_BADGE[lawType];
+  if (direct) return direct;
+  const familyCode = lawTypes.typeFamily(lawType);
+  if (familyCode === 'LFM04') return 'กฎหมายภายนอก';
+  if (familyCode === 'LFM01') return 'ข้อบังคับ';
+  if (familyCode === 'LFM02') return 'ระเบียบ';
+  if (familyCode === 'LFM03') return 'ประกาศ';
+  return null;
 }
 
 export function changeStatusToBadge(status: ChangeStatus): StatusBadge {
