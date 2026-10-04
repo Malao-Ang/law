@@ -110,4 +110,26 @@ class LawTypeMasterDataSeedTest extends TestCase
         $this->deleteJson('/api/master-data/law_type/LTY01')
             ->assertStatus(409);
     }
+
+    public function test_usage_counts_resolve_law_type_family_and_issuer_values(): void
+    {
+        /** @var ReviewStore $reviewStore */
+        $reviewStore = app(ReviewStore::class);
+        $reviewStore->setStatus('law_code', ['document_id' => 'law_code', 'status' => 'ingested']);
+        $reviewStore->patchLawMeta('law_code', ['law_type' => 'LTY01', 'issuer' => 'ISS01']);
+        $reviewStore->setStatus('law_legacy', ['document_id' => 'law_legacy', 'status' => 'ingested']);
+        $reviewStore->patchLawMeta('law_legacy', ['law_type' => 'คำสั่ง', 'issuer' => 'มหาวิทยาลัย']);
+
+        $this->getJson('/api/master-data/law_type/LTY01')
+            ->assertOk()
+            ->assertJsonPath('usage_count', 2);
+
+        $this->getJson('/api/master-data/issuer/ISS01')
+            ->assertOk()
+            ->assertJsonPath('usage_count', 2);
+
+        $this->getJson('/api/master-data/law_family/LFM03')
+            ->assertOk()
+            ->assertJsonPath('usage_count', 3);
+    }
 }
