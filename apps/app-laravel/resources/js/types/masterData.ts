@@ -28,6 +28,7 @@ export interface MasterListResponse {
   items: MasterItem[];
   total: number;
   stats: MasterStats;
+  next_code: string;
 }
 
 export type MasterActiveFilter = 'all' | '1' | '0';
@@ -40,7 +41,6 @@ export interface MasterListParams {
 }
 
 export interface UpsertMasterItemPayload {
-  code?: string | null;
   name: string;
   description?: string | null;
   is_active?: boolean;

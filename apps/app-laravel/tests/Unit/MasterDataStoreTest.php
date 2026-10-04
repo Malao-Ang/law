@@ -22,9 +22,7 @@ class MasterDataStoreTest extends TestCase
 
         $this->assertSame('STA04', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'One'])['code']);
         $this->assertSame('STA05', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'Two'])['code']);
-        $store->create(MasterDataKind::EnforcementStatus, ['code' => 'STA09', 'name' => 'Nine']);
-
-        $this->assertSame('STA10', $store->create(MasterDataKind::EnforcementStatus, ['name' => 'Ten'])['code']);
+        $this->assertSame('STA06', $store->create(MasterDataKind::EnforcementStatus, ['code' => 'STA09', 'name' => 'Six'])['code']);
     }
 
     public function test_resolve_matches_code_alias_and_name_including_inactive_items(): void

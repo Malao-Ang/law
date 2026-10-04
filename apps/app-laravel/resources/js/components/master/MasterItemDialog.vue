@@ -16,12 +16,12 @@
             <span>ข้อมูลพื้นฐาน</span>
           </div>
           <v-text-field
-            v-model="form.code"
+            :model-value="item?.code ?? nextCode"
             :label="fieldLabels.code"
-            :placeholder="`เช่น ${prefix}01`"
-            :readonly="editing"
-            :bg-color="editing ? 'grey-lighten-4' : undefined"
-            :error-messages="fieldError('code')"
+            :hint="editing ? undefined : 'ระบบสร้างรหัสอัตโนมัติ'"
+            :persistent-hint="!editing"
+            readonly
+            bg-color="grey-lighten-4"
             variant="outlined"
             density="comfortable"
           />
@@ -101,7 +101,7 @@ const props = defineProps<{
   title: string;
   subtitle: string;
   item?: MasterItem | null;
-  prefix: string;
+  nextCode: string;
   fieldLabels: { code: string; name: string };
   loading?: boolean;
   errors?: Record<string, string[]>;
@@ -113,7 +113,6 @@ const emit = defineEmits<{
 }>();
 
 const form = reactive<UpsertMasterItemPayload>({
-  code: '',
   name: '',
   description: '',
   is_active: true,
@@ -125,7 +124,6 @@ const requiredRule = (value: string) => !!value?.trim() || 'กรุณาก�
 
 watch(() => [props.modelValue, props.item] as const, () => {
   if (!props.modelValue) return;
-  form.code = props.item?.code ?? '';
   form.name = props.item?.name ?? '';
   form.description = props.item?.description ?? '';
   form.is_active = props.item?.is_active ?? true;
@@ -138,7 +136,6 @@ function fieldError(field: string): string[] {
 
 function submit(): void {
   emit('save', {
-    code: props.item ? undefined : form.code?.trim() || undefined,
     name: form.name,
     description: form.description,
     is_active: form.is_active,

@@ -10,7 +10,6 @@
     :dialog-title="dialogTitle"
     dialog-subtitle="กำหนดข้อมูลสถานะสำหรับใช้เป็นตัวเลือกในระบบจัดการเอกสารกฎหมาย"
     :field-labels="fieldLabels"
-    prefix="STA"
   >
     <template #item.name="{ item }">
       <v-chip :color="item.attrs.color || 'grey'" variant="tonal" size="small" class="font-weight-medium">

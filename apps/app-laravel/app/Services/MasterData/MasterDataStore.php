@@ -23,7 +23,7 @@ class MasterDataStore
     }
 
     /**
-     * @return array{items: list<array<string, mixed>>, total: int, stats: array{total: int, active: int, inactive: int}}
+     * @return array{items: list<array<string, mixed>>, total: int, stats: array{total: int, active: int, inactive: int}, next_code: string}
      */
     public function list(MasterDataKind $kind, ?string $q, ?bool $active, int $page, int $perPage): array
     {
@@ -52,6 +52,7 @@ class MasterDataStore
             'items' => array_slice($filtered, $offset, $perPage),
             'total' => count($filtered),
             'stats' => $stats,
+            'next_code' => $this->nextCode($kind, $items),
         ];
     }
 
@@ -82,12 +83,7 @@ class MasterDataStore
 
         $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $payload, &$created): void {
             $items = $this->sortItems($this->itemsFromData($data));
-            $code = $this->normalizeCode((string) ($payload['code'] ?? ''));
-            if ($code === '') {
-                $code = $this->nextCode($kind, $items);
-            }
-
-            $this->assertUniqueCode($items, $code);
+            $code = $this->nextCode($kind, $items);
             $this->assertUniqueName($items, (string) ($payload['name'] ?? ''));
 
             $timestamp = now()->toIso8601String();
@@ -396,20 +392,6 @@ class MasterDataStore
         }
 
         return $kind->prefix().str_pad((string) ($max + 1), $kind->codePad(), '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $items
-     */
-    private function assertUniqueCode(array $items, string $code): void
-    {
-        foreach ($items as $item) {
-            if ((string) ($item['code'] ?? '') === $code) {
-                throw ValidationException::withMessages([
-                    'code' => ['This code is already in use.'],
-                ]);
-            }
-        }
     }
 
     /**

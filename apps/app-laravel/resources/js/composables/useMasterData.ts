@@ -21,6 +21,7 @@ export function useMasterData(kind: MasterKind) {
   const items = ref<MasterItem[]>([]);
   const total = ref(0);
   const stats = ref<MasterStats>({ total: 0, active: 0, inactive: 0 });
+  const nextCode = ref('');
   const loading = ref(false);
   const q = ref('');
   const activeFilter = ref<MasterActiveFilter>('all');
@@ -47,6 +48,7 @@ export function useMasterData(kind: MasterKind) {
       items.value = response.items;
       total.value = response.total;
       stats.value = response.stats;
+      nextCode.value = response.next_code;
     } catch (err) {
       if (seq !== requestSeq) return;
       const message = err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ';
@@ -106,6 +108,7 @@ export function useMasterData(kind: MasterKind) {
     items,
     total,
     stats,
+    nextCode,
     loading,
     q,
     activeFilter,

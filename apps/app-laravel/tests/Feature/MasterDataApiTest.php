@@ -20,7 +20,7 @@ class MasterDataApiTest extends TestCase
             ->assertJsonPath('message', 'Unknown master data kind');
     }
 
-    public function test_create_generates_codes_uppercases_explicit_code_and_rejects_duplicates(): void
+    public function test_create_always_generates_running_codes_and_rejects_duplicate_names(): void
     {
         $this->postJson('/api/master-data/enforcement_status', [
             'name' => 'Alpha',
@@ -42,12 +42,11 @@ class MasterDataApiTest extends TestCase
             'name' => 'Gamma',
         ])
             ->assertCreated()
-            ->assertJsonPath('code', 'CUSTOM-1');
+            ->assertJsonPath('code', 'STA06');
 
-        $this->postJson('/api/master-data/enforcement_status', [
-            'code' => 'custom-1',
-            'name' => 'Delta',
-        ])->assertStatus(422);
+        $this->getJson('/api/master-data/enforcement_status')
+            ->assertOk()
+            ->assertJsonPath('next_code', 'STA07');
 
         $this->postJson('/api/master-data/enforcement_status', [
             'name' => '  alpha  ',

@@ -66,7 +66,7 @@
       :title="editingItem ? dialogTitle.edit : dialogTitle.create"
       :subtitle="dialogSubtitle"
       :item="editingItem"
-      :prefix="prefix"
+      :next-code="master.nextCode.value"
       :field-labels="fieldLabels"
       :loading="saving"
       :errors="fieldErrors"
@@ -110,7 +110,6 @@ const props = defineProps<{
   dialogTitle: { create: string; edit: string };
   dialogSubtitle: string;
   fieldLabels: { code: string; name: string };
-  prefix?: string;
 }>();
 
 const master = useMasterData(props.kind);
@@ -123,7 +122,6 @@ const togglingCode = ref<string | null>(null);
 const fieldErrors = ref<Record<string, string[]>>({});
 
 const resolvedBreadcrumbs = computed(() => props.breadcrumbs ?? ['จัดการข้อมูลระบบ', props.title]);
-const prefix = computed(() => props.prefix ?? 'STA');
 
 const activeOptions = [
   { title: 'สถานะ: ทั้งหมด', value: 'all' },
