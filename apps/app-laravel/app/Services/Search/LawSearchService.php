@@ -566,7 +566,7 @@ class LawSearchService
                 'law_type' => $source['law_type_label'] ?? ($type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType)),
                 'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
                 'law_family' => $source['law_family'] ?? ($type['attrs']['family_code'] ?? null),
-                'issuer' => $source['issuer'] ?? null,
+                'issuer' => null,
                 'status' => $source['status'] ?? null,
                 'change_status' => $source['change_status'] ?? null,
                 'summary' => $source['summary'] ?? null,

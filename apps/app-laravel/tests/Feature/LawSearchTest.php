@@ -268,7 +268,7 @@ class LawSearchTest extends TestCase
             ->assertJsonPath('total', 1);
     }
 
-    public function test_results_expose_source_and_issuer(): void
+    public function test_results_expose_source_and_null_issuer(): void
     {
         $this->mock(\App\Services\Search\LawSearchService::class, fn ($mock) => $mock
             ->shouldReceive('search')->andReturn(['total' => 0, 'results' => [], 'facets' => []]));
@@ -297,7 +297,7 @@ class LawSearchTest extends TestCase
 
         $this->assertSame('external', $bySource['EXT1']['source']);
         $this->assertSame('internal', $bySource['PRK1']['source']);
-        $this->assertSame('มหาวิทยาลัย', $bySource['PRK1']['issuer']);
+        $this->assertNull($bySource['PRK1']['issuer']);
     }
 
     public function test_external_law_filter_includes_all_external_subtypes(): void

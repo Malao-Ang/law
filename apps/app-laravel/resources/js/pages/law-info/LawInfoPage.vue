@@ -34,6 +34,16 @@
         >
           กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน ยกเว้นคำสำคัญ และเลือกวันที่สิ้นสุดการใช้หรือเลือกไม่มีวันสิ้นสุด
         </v-alert>
+        <v-alert
+          v-if="ambiguousAnnouncementLoaded && !form.law_type"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          icon="mdi-alert-outline"
+        >
+          ประกาศฉบับนี้ยังไม่ระบุผู้ออก กรุณาเลือก "ประกาศที่ออกโดยมหาวิทยาลัย" หรือ "ประกาศที่ออกโดยสภามหาวิทยาลัย"
+        </v-alert>
 
         <!-- ข้อมูลพื้นฐาน -->
         <v-card flat border rounded="lg" class="pa-6 mb-4">
@@ -78,25 +88,17 @@
                 :custom-filter="searchSelectableOption"
                 :rules="documentTypeRules"
                 no-data-text="ไม่พบประเภทเอกสารสำหรับแหล่งที่มานี้"
+                persistent-hint
+                :hint="documentTypeHint"
                 required
-              />
-            </v-col>
-            <v-col v-if="selectedTypeRequiresIssuer" cols="12">
-              <v-radio-group
-                v-model="form.issuer"
-                :label="requiredLabel('ออกโดย')"
-                :rules="issuerRules"
-                required
-                inline
-                hide-details="auto"
               >
-                <v-radio
-                  v-for="opt in issuerOptions"
-                  :key="opt.value"
-                  :label="opt.title"
-                  :value="opt.value"
-                />
-              </v-radio-group>
+                <template #item="{ props: itemProps, item }">
+                  <v-list-subheader v-if="item.raw.option_type === 'subheader'">
+                    {{ item.raw.title }}
+                  </v-list-subheader>
+                  <v-list-item v-else v-bind="itemProps" />
+                </template>
+              </v-autocomplete>
             </v-col>
             <v-col v-if="isEditMode || isOld" cols="12" sm="6">
               <v-autocomplete
@@ -290,7 +292,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { fetchActiveChildren, type SelectableOption } from '../../api/client';
 import { useLookups } from '../../composables/useLookups';
-import { legacyIssuerForType, useLawType } from '../../composables/useLawType';
+import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -308,7 +310,7 @@ const route = useRoute();
 const isEditMode = computed(() => route.query.mode === 'edit');
 const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { documentTypes, issuers, statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const lawTypes = useLawType();
 const lawCategories = useLawCategory();
 const { draftCode, isRepealed } = useLawStatus();
@@ -316,10 +318,9 @@ const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/ข้อบังคับ/u, 'LTY03'],
   [/ระเบียบ/u, 'LTY02'],
-  [/สภามหาวิทยาลัย/u, 'LTY01'],
-  [/ประกาศ/u, 'LTY01'],
+  [/ประกาศที่ออกโดยสภามหาวิทยาลัย|สภามหาวิทยาลัย|มติ/u, 'LTY09'],
+  [/ประกาศที่ออกโดยมหาวิทยาลัย|คำสั่ง/u, 'LTY01'],
   [/คำสั่ง/u, 'LTY01'],
-  [/มติ/u, 'LTY01'],
 ];
 
 const EMPTY: LawMeta = {
@@ -328,7 +329,7 @@ const EMPTY: LawMeta = {
   agency: '', agencies: [], promulgation_date: '', effective_date: '',
   published_date: '', expiry_date: null, section_count: null,
   title: '', gazette_reference: '', royal_command: '', repealed_laws: [], keywords: [],
-  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, parent_document_ids: [], signer_group: null, issuer: null,
+  imported_by: CURRENT_ADMIN_LABEL, parent_document_id: null, parent_document_ids: [], signer_group: null,
   access_scope: 'public', permission_group_ids: [],
 };
 
@@ -336,25 +337,33 @@ const form = ref<LawMeta>({ ...EMPTY, law_groups: [], agencies: [], repealed_law
 const noExpiry = ref(false);
 const formRef = ref<VForm | null>(null);
 const validationFailed = ref(false);
+const ambiguousAnnouncementLoaded = ref(false);
 
 function normalizeSavedLawType(saved: string): string {
   return lawTypes.typeItem(saved)?.code ?? saved;
 }
 
-function normalizeLawTypeForDocument(saved: string, oldDocument: boolean, title: string): string {
+function legacyAnnouncementSourceCode(value: unknown): 'ISS01' | 'ISS02' | null {
+  const source = typeof value === 'string' ? value.trim() : '';
+  if (source === 'ISS01' || source === 'มหาวิทยาลัย') return 'ISS01';
+  if (source === 'ISS02' || source === 'สภามหาวิทยาลัย') return 'ISS02';
+  return null;
+}
+
+function normalizeLawTypeForDocument(saved: string, oldDocument: boolean, title: string, legacySource?: unknown): string {
+  const sourceCode = legacyAnnouncementSourceCode(legacySource);
+  if (saved === 'ประกาศ' || saved === 'LTY01') {
+    if (sourceCode === 'ISS01') return 'LTY01';
+    if (sourceCode === 'ISS02') return 'LTY09';
+    ambiguousAnnouncementLoaded.value = true;
+    return '';
+  }
+
   const normalized = normalizeSavedLawType(saved);
   if (oldDocument) return normalized;
   if (lawTypes.typeSource(normalized) === 'external') return '';
 
   return normalized || inferLawType(title);
-}
-
-function inferAnnouncementIssuer(text: string): string | null {
-  if (/สภามหาวิทยาลัย|มติ/u.test(text)) {
-    return 'ISS02';
-  }
-  if (/ประกาศ|คำสั่ง/u.test(text)) return 'ISS01';
-  return null;
 }
 
 function requiredLabel(label: string): string {
@@ -377,17 +386,11 @@ function requiredArrayRules(label: string): Array<(v: unknown) => boolean | stri
   return [(v: unknown) => hasArrayValue(v) || `กรุณาเลือก${label}`];
 }
 
-const issuerRules = [
-  (v: unknown) => !selectedTypeRequiresIssuer.value || hasText(v) || 'กรุณาเลือกผู้ออกประกาศ',
-];
-
 const lawSourceKind = computed<'internal' | 'external'>(() => {
   const byType = lawTypes.typeItem(form.value.law_type)?.source;
   const src = byType || form.value.source;
   return src === 'external' ? 'external' : 'internal';
 });
-
-const selectedTypeRequiresIssuer = computed(() => lawTypes.requiresIssuer(form.value.law_type));
 
 function matchesSource(optionSource: string | undefined): boolean {
   return optionSource === 'both' || optionSource === undefined || optionSource === lawSourceKind.value;
@@ -413,25 +416,21 @@ const documentTypePlaceholder = computed(() =>
   documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
 );
 
-// New documents are authored internally. Historical uploads choose source first,
-// then see only document types from that source.
-const selectableDocumentTypes = computed(() =>
-  documentTypes.value,
-);
-
 const filteredDocumentTypes = computed(() => {
   const items = isOld.value
-    ? selectableDocumentTypes.value.filter((t) => hasText(form.value.source) && t.source === form.value.source)
-    : selectableDocumentTypes.value.filter((t) => t.source !== 'external');
+    ? lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || (hasText(form.value.source) && t.source === form.value.source))
+    : lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || t.source !== 'external');
   const current = form.value.law_type?.trim() ?? '';
-  if (isOld.value && current && !items.some((item) => item.value === current)) {
-    return [{ title: current, value: current }, ...items];
+  if (isOld.value && current && !items.some((item) => item.option_type !== 'subheader' && item.value === current)) {
+    return [{ title: lawTypes.typeLabel(current), value: current, code: current, family_code: '', source: lawSourceKind.value }, ...items];
   }
   return items;
 });
 
-const issuerOptions = computed(() =>
-  issuers.value.map((issuer) => ({ title: `ออกโดย${issuer.title}`, value: issuer.code })),
+const documentTypeHint = computed(() =>
+  lawTypes.typeSource(form.value.law_type) === 'external'
+    ? 'ภายนอก · นับเป็น "มาตรา"'
+    : 'ภายใน · นับเป็น "ข้อ"',
 );
 
 const sourceRules = [
@@ -443,7 +442,7 @@ const documentTypeRules = [
   (v: unknown) => hasText(v) || 'กรุณาเลือกประเภทเอกสาร',
   (v: unknown) => {
     if (!hasText(v)) return true;
-    return filteredDocumentTypes.value.some((type) => type.value === v)
+    return filteredDocumentTypes.value.some((type) => type.option_type !== 'subheader' && type.value === v)
       || 'ประเภทเอกสารไม่ตรงกับแหล่งที่มา';
   },
 ];
@@ -508,7 +507,9 @@ watch(() => documentStore.review, (review) => {
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
   const savedLawType = meta?.law_type?.trim() ?? '';
   const oldDocument = meta?.document_type === 'old';
-  const normalizedLawType = normalizeLawTypeForDocument(savedLawType, oldDocument, documentTitle);
+  ambiguousAnnouncementLoaded.value = false;
+  const legacySource = (meta as Record<string, unknown> | undefined)?.['is' + 'suer'];
+  const normalizedLawType = normalizeLawTypeForDocument(savedLawType, oldDocument, documentTitle, legacySource);
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
@@ -527,9 +528,6 @@ watch(() => documentStore.review, (review) => {
     parent_document_ids: meta?.parent_document_ids?.length
       ? [...meta.parent_document_ids]
       : (meta?.parent_document_id ? [meta.parent_document_id] : []),
-    issuer: lawTypes.requiresIssuer(normalizedLawType)
-      ? (lawTypes.issuerItem(meta?.issuer)?.code || legacyIssuerForType(savedLawType) || inferAnnouncementIssuer(documentTitle))
-      : null,
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });
@@ -622,7 +620,6 @@ function buildLawMetaPayload(): LawMeta {
     keywords: normalizeKeywords(form.value.keywords),
     imported_by: form.value.imported_by.trim() || CURRENT_ADMIN_LABEL,
     section_count: articleCount.value,
-    issuer: lawTypes.requiresIssuer(form.value.law_type) ? (form.value.issuer ?? null) : null,
     change_details: changeStatusHasDetails.value ? [...(form.value.change_details ?? [])] : [],
   };
 }
@@ -711,10 +708,6 @@ watch(noExpiry, () => {
   void clearValidationBannerIfValid();
 });
 
-watch(() => form.value.law_type, (lawType) => {
-  if (!lawTypes.requiresIssuer(lawType)) form.value.issuer = null;
-});
-
 watch(() => form.value.change_status, () => {
   if (!changeStatusHasDetails.value) form.value.change_details = [];
 });
@@ -727,7 +720,7 @@ watch(() => form.value.source, () => {
     form.value.law_type = '';
     return;
   }
-  const stillValid = filteredDocumentTypes.value.some((t) => t.value === form.value.law_type);
+  const stillValid = filteredDocumentTypes.value.some((t) => t.option_type !== 'subheader' && t.value === form.value.law_type);
   if (!stillValid) form.value.law_type = '';
 });
 

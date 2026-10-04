@@ -27,7 +27,7 @@ class OldDocumentMinioUploadTest extends TestCase
             'file' => UploadedFile::fake()->create('old-law.pdf', 100, 'application/pdf'),
             'document_type' => 'old',
             'source' => 'internal',
-            'law_type' => config('lookups.document_types.0.value'),
+            'law_type' => 'LTY01',
         ]);
 
         $response->assertStatus(202)->assertJsonPath('status', 'done');
@@ -58,7 +58,7 @@ class OldDocumentMinioUploadTest extends TestCase
             'file' => UploadedFile::fake()->create('old-law.pdf', 100, 'application/pdf'),
             'document_type' => 'old',
             'source' => 'internal',
-            'law_type' => config('lookups.document_types.0.value'),
+            'law_type' => 'LTY01',
         ]);
 
         $response->assertStatus(202)->assertJsonPath('status', 'done');
@@ -86,7 +86,7 @@ class OldDocumentMinioUploadTest extends TestCase
             'file' => UploadedFile::fake()->create('old-law.pdf', 100, 'application/pdf'),
             'document_type' => 'old',
             'source' => 'internal',
-            'law_type' => config('lookups.document_types.0.value'),
+            'law_type' => 'LTY01',
         ]);
 
         $response->assertStatus(202)->assertJsonPath('status', 'done');

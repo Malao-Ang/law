@@ -1,95 +1,89 @@
 # LawMeta Field Reference
 
-Canonical reference for the document type/status fields on `LawMeta`
+Canonical reference for document type/status fields on `LawMeta`
 (`apps/app-laravel/resources/js/types/document.ts`). Purpose: stop conflating overlapping fields.
-Every field below names its **single source of truth**; anything marked *derived* or *legacy mirror*
-must never be treated as authoritative.
+Every field below names its single source of truth; anything marked derived or legacy mirror must not
+be treated as authoritative.
 
-> Rule of thumb: if two fields seem to hold the same thing, one of them is a *mirror* or *derived* —
-> read this file before adding logic that reads or writes either.
-
----
-
-## Group 1 — Document kind (3 overlapping fields)
+## Document Kind
 
 | Field | Meaning | Source of truth |
 |---|---|---|
-| `law_type` | ประเภทเอกสาร code (`LTYxx`) จาก master data `law_type` | **canonical** |
-| `source` | `internal` / `external` | **derived from `law_type.family_code → law_family.source`** |
-| `document_type` | `'new'` \| `'old'` = ที่มา (สร้างในระบบ / นำเข้า PDF ของเก่า) | canonical (its own axis) |
-| `issuer` | ผู้ออกประกาศ code (`ISSxx`) | canonical when `law_type.requires_issuer = true` |
+| `law_type` | ประเภทเอกสาร code (`LTYxx`) from master data `law_type` | canonical when a specific type is known |
+| `source` | `internal` / `external` | derived from `law_type.family_code -> law_family.source` |
+| `document_type` | `'new'` / `'old'` = created in system / imported legacy PDF | canonical for origin only |
 
-**Rules**
-- `law_type` is the one source of truth for the legal document kind. Store/read the master-data code
-  (`LTY01` etc.); labels and old Thai aliases are normalized at API boundaries.
-- `source` is **derived** from `law_type.family_code` via master data `law_family.source`.
-  Do not treat a stored `source` as authoritative for system-created documents — derive it. A stored
-  `source` is kept only for old/imported documents, where the user picks it explicitly.
-  Prefer a single helper (e.g. `sourceOf(lawType)`) over re-deriving inline.
-- Unit words are also derived from the family: internal = `ข้อ`, external = `มาตรา`.
-- `issuer` is required only when the selected law type has `requires_issuer = true` and must be empty
-  otherwise. The merged announcement model is `law_type = LTY01` plus `issuer = ISS01|ISS02`.
-- `document_type` is **not** the legal kind. `'old'` means "imported legacy PDF" only; `'new'` means
-  "created in the system". Read it only for that origin distinction (e.g. show the PDF viewer for
-  `'old'`). The name is kept as-is for backward compatibility — do not repurpose it.
+`law_type` stores a type code, not a family code. The display hierarchy is:
 
----
+```text
+law_family (LFMxx) -> law_type (LTYxx)
+```
 
-## Group 2 — Singular ↔ array pairs (same value stored twice)
+Families drive color, source, unit word, homepage sections, and family-level filters. Types are the
+values saved on documents.
 
-| Canonical (array) | Legacy mirror (singular) |
+Announcement types are now explicit:
+
+| code | title | family |
+|---|---|---|
+| `LTY01` | ประกาศที่ออกโดยมหาวิทยาลัย | `LFM03` ประกาศ |
+| `LTY09` | ประกาศที่ออกโดยสภามหาวิทยาลัย | `LFM03` ประกาศ |
+
+There is no issuer lookup, no `requires_issuer`, and `law_meta.issuer` is ignored by the API. Legacy
+payloads may still carry `issuer`; use it only during migration/form-load compatibility.
+
+Bare `ประกาศ` is a family-level legacy value, not a type. It resolves to family `LFM03` for badges,
+sections, and unit words, but it does not auto-select `LTY01` or `LTY09`.
+
+## Source And Units
+
+- `source` is derived from the family: `internal` = ภายใน, `external` = ภายนอก.
+- Unit words are also derived from the family: `internal` = `ข้อ`, `external` = `มาตรา`.
+- For old/imported documents, a stored `source` can be used as fallback while the user selects a
+  valid type.
+
+## Singular And Array Pairs
+
+| Canonical array | Legacy mirror |
 |---|---|
 | `law_groups: string[]` | `law_group: string` |
 | `agencies: string[]` | `agency: string` |
-| `parent_document_ids: string[]` | `parent_document_id: string \| null` |
+| `parent_document_ids: string[]` | `parent_document_id: string | null` |
 
-**Rules**
-- The **array is canonical**. The singular field is a legacy mirror equal to `array[0]`, kept for
-  backward compatibility. Never treat the singular as the source of truth.
-- **Write the array.** Keep the singular in sync as `array[0]` at the save boundary
-  (`LawInfoPage.buildLawMetaPayload` already sets `law_group = law_groups[0]`,
-  `agency = agencies[0]`; the review-load watcher reconstructs `parent_document_ids` from the
-  singular for very old records).
-- **Read the array first**, falling back to the singular only for records that predate the array.
-- **`law_groups` values are `DCTxxx` codes** (master data `law_category`) as of Phase 3.
-  Old data migrated with `php artisan master-data:migrate law-category`. Unmigrated records may
-  still contain full Thai names or slugs (`academic`, `student-affairs`, …) — `useLawCategory`
-  normalizes them; the admin page `/admin/master/categories` manages the master list.
+Use the array first. The singular field is a legacy mirror equal to `array[0]`.
 
----
+`law_groups` values are `DCTxxx` codes from master data `law_category`. Unmigrated records may still
+contain Thai names or older slugs; `useLawCategory` normalizes them.
 
-## Group 3 — Status axes (4 orthogonal axes; do not derive one from another)
+## Status Axes
 
-| Field | Axis / question | Values |
-|---|---|---|
-| `status` | สถานะบังคับใช้ — legal enforcement | ร่าง / มีผลบังคับใช้ / ยกเลิกการใช้งาน |
-| `published_date` | เผยแพร่ — visible or not | empty = ไม่เผยแพร่, has date = เผยแพร่ |
-| `access_scope` | ใครเห็น — audience | `public` / `private` (+ `permission_group_ids`) |
-| `change_status` + `change_details` | แก้อะไรเทียบเวอร์ชันก่อน | parent + multi-select details |
+| Field | Axis / question |
+|---|---|
+| `status` | legal enforcement state |
+| `published_date` | visible/published or not |
+| `access_scope` | who can see it |
+| `change_status` + `change_details` | what changed versus a previous version |
 
-**Rules**
-- These four are **independent axes** — each answers a different question. Do not derive one from
-  another, with the single documented exception below.
-- **Publish transition:** publishing (after e-sign) sets `status = 'มีผลบังคับใช้'` **and**
-  `published_date = now`. That is the only place two axes move together.
-- `change_status` stays a plain string (parent value); `change_details: string[]` holds the
-  sub-selections. The version timeline and search facets read `change_status` as a string — keep it
-  that way.
+These axes are independent. The only documented coupled transition is publish: after e-sign,
+publishing sets legal `status` to in-force and sets `published_date`.
 
-### Not part of LawMeta — do not conflate
+## Migration Guardrail
 
-| Concept | Where | Note |
-|---|---|---|
-| pipeline `status` | `DocumentStatus.status` (`queued`…`ingested`/`failed`) | OCR/extraction processing, **a different object** — never mix with `LawMeta.status`. |
-| `StageKey` | `data/documentPipeline.ts` | Admin workflow stage; **derived** from workflow step / backend status (and, per the publication design, from `published_date`). Not stored on `LawMeta`. |
+`php artisan master-data:migrate law-type` treats bare `ประกาศ` and legacy `LTY01` without a known
+legacy issuer as `NEEDS_FORM`: it reports document id + title and exits successfully without writing
+a guessed type. Users must choose either `LTY01` or `LTY09` in the law-info form.
 
----
+Legacy mappings that are still deterministic:
 
-## Quick guardrails
+| legacy value | target |
+|---|---|
+| `คำสั่ง`, `ประกาศที่ออกโดยมหาวิทยาลัย`, `ประกาศ`/`LTY01` + legacy `มหาวิทยาลัย`/`ISS01` | `LTY01` |
+| `มติ`, `ประกาศที่ออกโดยสภามหาวิทยาลัย`, `ประกาศ`/`LTY01` + legacy `สภามหาวิทยาลัย`/`ISS02` | `LTY09` |
 
-- Adding a field that overlaps an existing one? Make it *derived* and document it here instead.
-- Reading `source` or unit word? Derive from `law_type → law_family`, don't trust a stored value on new docs.
-- Reading issuer? Use `issuer` code and resolve the label from master data; do not infer it from the law type label.
-- Reading a group/agency/parent? Use the array; the singular is only `array[0]`.
-- Saw "status" in code? Check **which** status — `LawMeta.status` (legal) vs `DocumentStatus.status`
-  (pipeline) are unrelated.
+## Quick Guardrails
+
+- Need label/color/source/unit? Resolve `law_type -> law_family`.
+- Need relation restrictions? Only `LTY01` and `LTY09` have special parent rules.
+- Need announcement issuer? It is part of the selected type title now.
+- Saw `status` in code? Check which status: `LawMeta.status` is legal, `DocumentStatus.status` is
+  pipeline processing.

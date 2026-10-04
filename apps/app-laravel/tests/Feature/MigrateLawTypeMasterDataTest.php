@@ -9,6 +9,15 @@ use Tests\TestCase;
 
 class MigrateLawTypeMasterDataTest extends TestCase
 {
+    private const ANNOUNCEMENT = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}";
+    private const ANNOUNCEMENT_UNIVERSITY = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const COMMAND = "\u{0E04}\u{0E33}\u{0E2A}\u{0E31}\u{0E48}\u{0E07}";
+    private const ANNOUNCEMENT_COUNCIL = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E2A}\u{0E20}\u{0E32}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const RESOLUTION = "\u{0E21}\u{0E15}\u{0E34}";
+    private const UNIVERSITY = "\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const COUNCIL = "\u{0E2A}\u{0E20}\u{0E32}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const ACT_ABBR = "\u{0E1E}.\u{0E23}.\u{0E1A}.";
+
     private ReviewStore $store;
 
     protected function setUp(): void
@@ -19,45 +28,64 @@ class MigrateLawTypeMasterDataTest extends TestCase
         app('mongo.blob.master')->truncate();
     }
 
-    public function test_migrates_legacy_announcement_aliases_to_type_and_issuer_codes(): void
+    public function test_migrates_legacy_announcement_aliases_to_folded_type_codes(): void
     {
-        $this->seedLaw('law_command', ['law_type' => 'คำสั่ง']);
-        $this->seedLaw('law_resolution', ['law_type' => 'มติ']);
-        $this->seedLaw('law_uni', ['law_type' => 'ประกาศที่ออกโดยมหาวิทยาลัย']);
-        $this->seedLaw('law_council', ['law_type' => 'ประกาศที่ออกโดยสภามหาวิทยาลัย']);
+        $this->seedLaw('law_command', ['law_type' => self::COMMAND]);
+        $this->seedLaw('law_resolution', ['law_type' => self::RESOLUTION]);
+        $this->seedLaw('law_uni', ['law_type' => self::ANNOUNCEMENT_UNIVERSITY, 'issuer' => 'ISS01']);
+        $this->seedLaw('law_council', ['law_type' => self::ANNOUNCEMENT_COUNCIL, 'issuer' => 'ISS02']);
         $this->mockReindex(['law_command', 'law_resolution', 'law_uni', 'law_council']);
 
         $this->artisan('master-data:migrate', ['kind' => 'law-type'])
             ->assertExitCode(0);
 
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS01'], $this->onlyTypeIssuer('law_command'));
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS02'], $this->onlyTypeIssuer('law_resolution'));
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS01'], $this->onlyTypeIssuer('law_uni'));
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS02'], $this->onlyTypeIssuer('law_council'));
+        $this->assertSame(['law_type' => 'LTY01', 'issuer' => null], $this->onlyTypeIssuer('law_command'));
+        $this->assertSame(['law_type' => 'LTY09', 'issuer' => null], $this->onlyTypeIssuer('law_resolution'));
+        $this->assertSame(['law_type' => 'LTY01', 'issuer' => null], $this->onlyTypeIssuer('law_uni'));
+        $this->assertSame(['law_type' => 'LTY09', 'issuer' => null], $this->onlyTypeIssuer('law_council'));
     }
 
-    public function test_migrates_aliases_preserves_existing_issuer_and_clears_stale_issuer(): void
+    public function test_folds_legacy_issuer_for_bare_announcement_and_clears_stale_issuer(): void
     {
-        $this->seedLaw('law_prb', ['law_type' => 'พ.ร.บ.', 'issuer' => 'มหาวิทยาลัย']);
-        $this->seedLaw('law_existing_issuer', ['law_type' => 'คำสั่ง', 'issuer' => 'สภามหาวิทยาลัย']);
-        $this->mockReindex(['law_prb', 'law_existing_issuer']);
+        $this->seedLaw('law_prb', ['law_type' => self::ACT_ABBR, 'issuer' => self::UNIVERSITY]);
+        $this->seedLaw('law_uni', ['law_type' => self::ANNOUNCEMENT, 'issuer' => 'ISS01']);
+        $this->seedLaw('law_council', ['law_type' => 'LTY01', 'issuer' => self::COUNCIL]);
+        $this->mockReindex(['law_prb', 'law_uni', 'law_council']);
 
         $this->artisan('master-data:migrate', ['kind' => 'law-type'])
             ->assertExitCode(0);
 
         $this->assertSame(['law_type' => 'LTY05', 'issuer' => null], $this->onlyTypeIssuer('law_prb'));
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS02'], $this->onlyTypeIssuer('law_existing_issuer'));
+        $this->assertSame(['law_type' => 'LTY01', 'issuer' => null], $this->onlyTypeIssuer('law_uni'));
+        $this->assertSame(['law_type' => 'LTY09', 'issuer' => null], $this->onlyTypeIssuer('law_council'));
     }
 
     public function test_dry_run_does_not_write(): void
     {
-        $this->seedLaw('law_dry', ['law_type' => 'พ.ร.บ.']);
+        $this->seedLaw('law_dry', ['law_type' => self::ACT_ABBR, 'issuer' => 'ISS01']);
 
         $this->artisan('master-data:migrate', ['kind' => 'law-type', '--dry-run' => true])
             ->expectsOutputToContain('Dry run')
             ->assertExitCode(0);
 
-        $this->assertSame('พ.ร.บ.', $this->store->getReviewDocument('law_dry')['law_meta']['law_type']);
+        $meta = $this->store->getReviewDocument('law_dry')['law_meta'];
+        $this->assertSame(self::ACT_ABBR, $meta['law_type']);
+        $this->assertSame('ISS01', $meta['issuer']);
+    }
+
+    public function test_bare_announcement_without_issuer_needs_form_and_does_not_abort_or_write(): void
+    {
+        $this->seedLaw('law_needs_form', ['title' => 'ประกาศเก่า', 'law_type' => self::ANNOUNCEMENT]);
+        $this->seedLaw('law_lty01_empty', ['title' => 'รหัสเก่า', 'law_type' => 'LTY01']);
+
+        $this->artisan('master-data:migrate', ['kind' => 'law-type'])
+            ->expectsOutputToContain('NEEDS_FORM')
+            ->expectsOutputToContain('law_needs_form')
+            ->expectsOutputToContain('law_lty01_empty')
+            ->assertExitCode(0);
+
+        $this->assertSame(['law_type' => self::ANNOUNCEMENT, 'issuer' => null], $this->onlyTypeIssuer('law_needs_form'));
+        $this->assertSame(['law_type' => 'LTY01', 'issuer' => null], $this->onlyTypeIssuer('law_lty01_empty'));
     }
 
     public function test_unmapped_values_abort_and_explicit_map_migrates(): void
@@ -80,15 +108,15 @@ class MigrateLawTypeMasterDataTest extends TestCase
         $this->assertSame(['law_type' => 'LTY08', 'issuer' => null], $this->onlyTypeIssuer('law_unknown'));
     }
 
-    public function test_existing_codes_are_idempotent_and_old_command_is_deprecated(): void
+    public function test_existing_non_ambiguous_codes_are_idempotent_and_old_command_is_deprecated(): void
     {
-        $this->seedLaw('law_code', ['law_type' => 'LTY01', 'issuer' => 'ISS01']);
+        $this->seedLaw('law_code', ['law_type' => 'LTY09', 'issuer' => null]);
 
         $this->artisan('master-data:migrate', ['kind' => 'law-type'])
             ->expectsOutputToContain('0 document(s) updated.')
             ->assertExitCode(0);
 
-        $this->assertSame(['law_type' => 'LTY01', 'issuer' => 'ISS01'], $this->onlyTypeIssuer('law_code'));
+        $this->assertSame(['law_type' => 'LTY09', 'issuer' => null], $this->onlyTypeIssuer('law_code'));
 
         $this->artisan('laws:migrate-types')
             ->expectsOutputToContain('Deprecated')

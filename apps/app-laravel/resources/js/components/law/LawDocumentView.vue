@@ -116,10 +116,6 @@
           <DocBadge :type="badgeType" :label="badgeLabel" class="lawx-headcard__badge" />
           <h1 class="lawx-headcard__title">{{ meta.title || cleanSourceFile || 'เอกสาร' }}</h1>
           <p v-if="buddhistYear" class="lawx-headcard__year">พ.ศ. {{ buddhistYear }}</p>
-          <p v-if="meta.issuer" class="lawx-headcard__issuer">
-            <span class="mdi mdi-office-building-outline" />
-            {{ issuerLabel(meta.issuer) }}
-          </p>
           <div class="lawx-headcard__meta">
             <span v-if="meta.promulgation_date"><span class="mdi mdi-calendar" /> ประกาศ {{ formatLawDate(meta.promulgation_date) }}</span>
             <span v-if="meta.gazette_reference"><span class="mdi mdi-book-open-variant" /> {{ meta.gazette_reference }}</span>
@@ -272,7 +268,7 @@ import ELawNavbar from '../shared/ELawNavbar.vue';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawType } from '../../composables/useLawType';
 
-const { typeLabel, issuerLabel } = useLawType();
+const { typeLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
@@ -739,8 +735,6 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-headcard__badge { margin-bottom: 12px; }
 .lawx-headcard__title { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight: 700; color: #1f1b14; margin: 0 0 14px; line-height: 1.3; }
 .lawx-headcard__year { color: #92400e; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 18px; font-weight: 700; margin: -4px 0 10px; }
-.lawx-headcard__issuer { align-items: center; color: #4e4538; display: flex; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; gap: 6px; justify-content: center; margin: 0 0 12px; }
-.lawx-headcard__issuer .mdi { color: #b68d40; }
 .lawx-headcard__meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #4e4538; }
 .lawx-headcard__meta .mdi { color: #b68d40; }
 

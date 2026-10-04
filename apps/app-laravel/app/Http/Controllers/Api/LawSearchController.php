@@ -158,13 +158,13 @@ class LawSearchController extends Controller
     {
         if ($fileRow === null) {
             $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
-            $row['issuer'] = (string) ($row['issuer'] ?? '');
+            $row['issuer'] = null;
 
             return $row;
         }
 
         $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
-        $row['issuer'] = (string) ($fileRow['issuer'] ?? ($row['issuer'] ?? ''));
+        $row['issuer'] = null;
         if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
             $row['title_highlighted'] = $fileRow['title_highlighted'];
         }
@@ -264,7 +264,6 @@ class LawSearchController extends Controller
             $id = (string) $r['document_id'];
 
             $lawType = $this->lawTypes->resolve($r['law_type'] ?? '');
-            $issuer = $this->lawTypes->issuerResolve($r['issuer'] ?? '');
 
             return [
                 'law_id' => $id,
@@ -273,8 +272,8 @@ class LawSearchController extends Controller
                 'law_type' => $lawType === null ? $r['law_type'] : (string) ($lawType['name'] ?? $r['law_type']),
                 'law_type_code' => $lawType === null ? (string) ($r['law_type'] ?? '') : (string) ($lawType['code'] ?? ''),
                 'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
-                'issuer' => $issuer === null ? (string) ($r['issuer'] ?? '') : (string) ($issuer['name'] ?? ''),
-                'issuer_code' => $issuer === null ? (string) ($r['issuer'] ?? '') : (string) ($issuer['code'] ?? ''),
+                'issuer' => null,
+                'issuer_code' => null,
                 'status' => $r['meta_status'],
                 'change_status' => $r['change_status'],
                 'summary' => null,
@@ -432,7 +431,6 @@ class LawSearchController extends Controller
             (string) ($row['title'] ?? ''),
             (string) ($row['law_type'] ?? ''),
             (string) ($row['gazette_reference'] ?? ''),
-            (string) ($row['issuer'] ?? ''),
         ];
         foreach ((array) ($row['keywords'] ?? []) as $keyword) {
             $parts[] = (string) $keyword;

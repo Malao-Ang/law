@@ -1,5 +1,5 @@
 import type { DocumentListItem } from '../types/document';
-import { createLawTypeCatalog, legacyIssuerForType } from './useLawType';
+import { createLawTypeCatalog } from './useLawType';
 
 const PICKABLE_STATUSES = new Set(['done', 'exported', 'ingested']);
 const RELATION_READY_STEP = 4;
@@ -147,14 +147,12 @@ export type ParentLawFamily = 'act' | 'regulation' | 'ordinance' | 'announcement
 
 const lawTypes = createLawTypeCatalog();
 
-export function isUniversityAnnouncementType(lawType: string | null | undefined, issuer?: string | null): boolean {
-  const issuerCode = lawTypes.issuerItem(issuer)?.code ?? legacyIssuerForType(lawType);
-  return lawTypes.requiresIssuer(lawType) && issuerCode === 'ISS01';
+export function isUniversityAnnouncementType(lawType: string | null | undefined): boolean {
+  return lawTypes.typeItem(lawType)?.code === 'LTY01';
 }
 
-export function isCouncilAnnouncementType(lawType: string | null | undefined, issuer?: string | null): boolean {
-  const issuerCode = lawTypes.issuerItem(issuer)?.code ?? legacyIssuerForType(lawType);
-  return lawTypes.requiresIssuer(lawType) && issuerCode === 'ISS02';
+export function isCouncilAnnouncementType(lawType: string | null | undefined): boolean {
+  return lawTypes.typeItem(lawType)?.code === 'LTY09';
 }
 
 export function matchesParentLawFamily(lawType: string | null | undefined, family: ParentLawFamily): boolean {
@@ -166,11 +164,11 @@ export function matchesParentLawFamily(lawType: string | null | undefined, famil
   return lawTypes.typeSource(lawType) === 'external';
 }
 
-export function allowedParentFamiliesForChild(childLawType: string | null | undefined, issuer?: string | null): ParentLawFamily[] | null {
-  if (isCouncilAnnouncementType(childLawType, issuer)) {
+export function allowedParentFamiliesForChild(childLawType: string | null | undefined): ParentLawFamily[] | null {
+  if (isCouncilAnnouncementType(childLawType)) {
     return ['act', 'regulation', 'ordinance', 'announcement'];
   }
-  if (isUniversityAnnouncementType(childLawType, issuer)) {
+  if (isUniversityAnnouncementType(childLawType)) {
     return ['regulation', 'ordinance'];
   }
   return null;
@@ -179,11 +177,10 @@ export function allowedParentFamiliesForChild(childLawType: string | null | unde
 export function parentDocumentsForChildType(
   documents: DocumentListItem[],
   childLawType: string | null | undefined,
-  issuer?: string | null,
   excludeDocumentId?: string | null,
   keepDocumentIds: string[] = [],
 ): DocumentListItem[] {
-  const families = allowedParentFamiliesForChild(childLawType, issuer);
+  const families = allowedParentFamiliesForChild(childLawType);
   const keep = new Set(keepDocumentIds.map((id) => id.trim()).filter(Boolean));
 
   return documents.filter((doc) => {

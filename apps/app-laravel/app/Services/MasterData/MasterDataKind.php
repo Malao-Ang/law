@@ -4,11 +4,27 @@ namespace App\Services\MasterData;
 
 enum MasterDataKind: string
 {
+    private const FAMILY_ORDINANCE = "\u{0E02}\u{0E49}\u{0E2D}\u{0E1A}\u{0E31}\u{0E07}\u{0E04}\u{0E31}\u{0E1A}";
+    private const FAMILY_REGULATION = "\u{0E23}\u{0E30}\u{0E40}\u{0E1A}\u{0E35}\u{0E22}\u{0E1A}";
+    private const FAMILY_ANNOUNCEMENT = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}";
+    private const FAMILY_EXTERNAL = "\u{0E01}\u{0E0E}\u{0E2B}\u{0E21}\u{0E32}\u{0E22}\u{0E20}\u{0E32}\u{0E22}\u{0E19}\u{0E2D}\u{0E01}";
+    private const TYPE_ANNOUNCEMENT_UNIVERSITY = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const TYPE_COMMAND = "\u{0E04}\u{0E33}\u{0E2A}\u{0E31}\u{0E48}\u{0E07}";
+    private const TYPE_ANNOUNCEMENT_COUNCIL = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E2A}\u{0E20}\u{0E32}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+    private const TYPE_RESOLUTION = "\u{0E21}\u{0E15}\u{0E34}";
+    private const TYPE_DECREE = "\u{0E1E}\u{0E23}\u{0E30}\u{0E23}\u{0E32}\u{0E0A}\u{0E01}\u{0E33}\u{0E2B}\u{0E19}\u{0E14}";
+    private const TYPE_DECREE_ABBR = "\u{0E1E}.\u{0E23}.\u{0E01}.";
+    private const TYPE_ACT = "\u{0E1E}\u{0E23}\u{0E30}\u{0E23}\u{0E32}\u{0E0A}\u{0E1A}\u{0E31}\u{0E0D}\u{0E0D}\u{0E31}\u{0E15}\u{0E34}";
+    private const TYPE_ACT_ABBR = "\u{0E1E}.\u{0E23}.\u{0E1A}.";
+    private const TYPE_ACT_ABBR_COMPACT = "\u{0E1E}\u{0E23}\u{0E1A}";
+    private const TYPE_MINISTERIAL_RULE = "\u{0E01}\u{0E0E}\u{0E01}\u{0E23}\u{0E30}\u{0E17}\u{0E23}\u{0E27}\u{0E07}";
+    private const TYPE_MINISTERIAL_ANNOUNCEMENT = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E01}\u{0E23}\u{0E30}\u{0E17}\u{0E23}\u{0E27}\u{0E07}";
+    private const TYPE_EXTERNAL_OTHER = "\u{0E01}\u{0E0E}\u{0E2B}\u{0E21}\u{0E32}\u{0E22}\u{0E20}\u{0E32}\u{0E22}\u{0E19}\u{0E2D}\u{0E01}\u{0E2D}\u{0E37}\u{0E48}\u{0E19} \u{0E46}";
+
     case EnforcementStatus = 'enforcement_status';
     case LawFamily = 'law_family';
     case LawType = 'law_type';
     case LawCategory = 'law_category';
-    case Issuer = 'issuer';
 
     public function prefix(): string
     {
@@ -17,7 +33,6 @@ enum MasterDataKind: string
             self::LawFamily => 'LFM',
             self::LawType => 'LTY',
             self::LawCategory => 'DCT',
-            self::Issuer => 'ISS',
         };
     }
 
@@ -38,7 +53,6 @@ enum MasterDataKind: string
             self::LawFamily => 'กลุ่มประเภท',
             self::LawType => 'ประเภทเอกสาร',
             self::LawCategory => 'หมวดเอกสาร',
-            self::Issuer => 'ผู้ออกประกาศ',
         };
     }
 
@@ -74,123 +88,113 @@ enum MasterDataKind: string
             self::LawFamily => [
                 [
                     'code' => 'LFM01',
-                    'name' => 'ข้อบังคับ',
+                    'name' => self::FAMILY_ORDINANCE,
                     'description' => '',
-                    'aliases' => ['ข้อบังคับ'],
+                    'aliases' => [self::FAMILY_ORDINANCE],
                     'attrs' => ['source' => 'internal', 'color' => '#10B981'],
                 ],
                 [
                     'code' => 'LFM02',
-                    'name' => 'ระเบียบ',
+                    'name' => self::FAMILY_REGULATION,
                     'description' => '',
-                    'aliases' => ['ระเบียบ'],
+                    'aliases' => [self::FAMILY_REGULATION],
                     'attrs' => ['source' => 'internal', 'color' => '#3B82F6'],
                 ],
                 [
                     'code' => 'LFM03',
-                    'name' => 'ประกาศ',
+                    'name' => self::FAMILY_ANNOUNCEMENT,
                     'description' => '',
-                    'aliases' => ['ประกาศ'],
+                    'aliases' => [self::FAMILY_ANNOUNCEMENT],
                     'attrs' => ['source' => 'internal', 'color' => '#FB923C'],
                 ],
                 [
                     'code' => 'LFM04',
-                    'name' => 'กฎหมายภายนอก',
+                    'name' => self::FAMILY_EXTERNAL,
                     'description' => '',
-                    'aliases' => ['กฎหมายภายนอก'],
+                    'aliases' => [self::FAMILY_EXTERNAL],
                     'attrs' => ['source' => 'external', 'color' => '#854D0E'],
-                ],
-            ],
-            self::Issuer => [
-                [
-                    'code' => 'ISS01',
-                    'name' => 'มหาวิทยาลัย',
-                    'description' => '',
-                    'aliases' => ['มหาวิทยาลัย'],
-                    'attrs' => [
-                        'legacy_type_aliases' => [
-                            'ประกาศที่ออกโดยมหาวิทยาลัย',
-                            'คำสั่ง',
-                        ],
-                    ],
-                ],
-                [
-                    'code' => 'ISS02',
-                    'name' => 'สภามหาวิทยาลัย',
-                    'description' => '',
-                    'aliases' => ['สภามหาวิทยาลัย'],
-                    'attrs' => [
-                        'legacy_type_aliases' => [
-                            'ประกาศที่ออกโดยสภามหาวิทยาลัย',
-                            'มติ',
-                        ],
-                    ],
                 ],
             ],
             self::LawType => [
                 [
                     'code' => 'LTY01',
-                    'name' => 'ประกาศ',
+                    'name' => self::TYPE_ANNOUNCEMENT_UNIVERSITY,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['ประกาศ', 'ประกาศที่ออกโดยมหาวิทยาลัย', 'ประกาศที่ออกโดยสภามหาวิทยาลัย', 'คำสั่ง', 'มติ'],
-                    'attrs' => ['family_code' => 'LFM03', 'requires_issuer' => true],
+                    'aliases' => [self::TYPE_ANNOUNCEMENT_UNIVERSITY, self::TYPE_COMMAND],
+                    'attrs' => ['family_code' => 'LFM03'],
+                ],
+                [
+                    'code' => 'LTY09',
+                    'name' => self::TYPE_ANNOUNCEMENT_COUNCIL,
+                    'description' => '',
+                    'is_system' => false,
+                    'sort_order' => 2,
+                    'aliases' => [self::TYPE_ANNOUNCEMENT_COUNCIL, self::TYPE_RESOLUTION],
+                    'attrs' => ['family_code' => 'LFM03'],
                 ],
                 [
                     'code' => 'LTY02',
-                    'name' => 'ระเบียบ',
+                    'name' => self::FAMILY_REGULATION,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['ระเบียบ'],
-                    'attrs' => ['family_code' => 'LFM02', 'requires_issuer' => false],
+                    'sort_order' => 3,
+                    'aliases' => [self::FAMILY_REGULATION],
+                    'attrs' => ['family_code' => 'LFM02'],
                 ],
                 [
                     'code' => 'LTY03',
-                    'name' => 'ข้อบังคับ',
+                    'name' => self::FAMILY_ORDINANCE,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['ข้อบังคับ'],
-                    'attrs' => ['family_code' => 'LFM01', 'requires_issuer' => false],
+                    'sort_order' => 4,
+                    'aliases' => [self::FAMILY_ORDINANCE],
+                    'attrs' => ['family_code' => 'LFM01'],
                 ],
                 [
                     'code' => 'LTY04',
-                    'name' => 'พระราชกำหนด',
+                    'name' => self::TYPE_DECREE,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['พระราชกำหนด', 'พ.ร.ก.'],
-                    'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
+                    'sort_order' => 5,
+                    'aliases' => [self::TYPE_DECREE, self::TYPE_DECREE_ABBR],
+                    'attrs' => ['family_code' => 'LFM04'],
                 ],
                 [
                     'code' => 'LTY05',
-                    'name' => 'พระราชบัญญัติ',
+                    'name' => self::TYPE_ACT,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['พระราชบัญญัติ', 'พ.ร.บ.', 'พรบ'],
-                    'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
+                    'sort_order' => 6,
+                    'aliases' => [self::TYPE_ACT, self::TYPE_ACT_ABBR, self::TYPE_ACT_ABBR_COMPACT],
+                    'attrs' => ['family_code' => 'LFM04'],
                 ],
                 [
                     'code' => 'LTY06',
-                    'name' => 'กฎกระทรวง',
+                    'name' => self::TYPE_MINISTERIAL_RULE,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['กฎกระทรวง'],
-                    'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
+                    'sort_order' => 7,
+                    'aliases' => [self::TYPE_MINISTERIAL_RULE],
+                    'attrs' => ['family_code' => 'LFM04'],
                 ],
                 [
                     'code' => 'LTY07',
-                    'name' => 'ประกาศกระทรวง',
+                    'name' => self::TYPE_MINISTERIAL_ANNOUNCEMENT,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['ประกาศกระทรวง'],
-                    'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
+                    'sort_order' => 8,
+                    'aliases' => [self::TYPE_MINISTERIAL_ANNOUNCEMENT],
+                    'attrs' => ['family_code' => 'LFM04'],
                 ],
                 [
                     'code' => 'LTY08',
-                    'name' => 'กฎหมายภายนอกอื่น ๆ',
+                    'name' => self::TYPE_EXTERNAL_OTHER,
                     'description' => '',
                     'is_system' => false,
-                    'aliases' => ['กฎหมายภายนอก'],
-                    'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
+                    'sort_order' => 9,
+                    'aliases' => [self::FAMILY_EXTERNAL],
+                    'attrs' => ['family_code' => 'LFM04'],
                 ],
             ],
             self::LawCategory => [
@@ -309,10 +313,8 @@ enum MasterDataKind: string
             ],
             self::LawType => [
                 'attrs.family_code' => ['required', 'string', 'max:32'],
-                'attrs.requires_issuer' => ['nullable', 'boolean'],
             ],
-            self::LawCategory,
-            self::Issuer => [],
+            self::LawCategory => [],
         };
     }
 }

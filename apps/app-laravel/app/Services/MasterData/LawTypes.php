@@ -10,9 +10,6 @@ class LawTypes
     /** @var list<array<string, mixed>>|null */
     private ?array $families = null;
 
-    /** @var list<array<string, mixed>>|null */
-    private ?array $issuers = null;
-
     public function __construct(private readonly MasterDataStore $store) {}
 
     /**
@@ -33,6 +30,11 @@ class LawTypes
     public function familyOf(mixed $codeOrName): ?string
     {
         $item = $this->resolve($codeOrName);
+        if ($item === null) {
+            $family = $this->family($codeOrName);
+
+            return $family === null ? null : (string) ($family['code'] ?? '');
+        }
 
         return $item === null ? null : (string) ($item['attrs']['family_code'] ?? '');
     }
@@ -46,14 +48,9 @@ class LawTypes
 
     public function unitWordOf(mixed $codeOrName): string
     {
-        return $this->sourceOf($codeOrName) === 'external' ? 'มาตรา' : 'ข้อ';
-    }
-
-    public function requiresIssuer(mixed $codeOrName): bool
-    {
-        $item = $this->resolve($codeOrName);
-
-        return (bool) ($item['attrs']['requires_issuer'] ?? false);
+        return $this->sourceOf($codeOrName) === 'external'
+            ? "\u{0E21}\u{0E32}\u{0E15}\u{0E23}\u{0E32}"
+            : "\u{0E02}\u{0E49}\u{0E2D}";
     }
 
     /**
@@ -87,21 +84,6 @@ class LawTypes
     /**
      * @return array<string, mixed>|null
      */
-    public function issuerResolve(mixed $codeOrName): ?array
-    {
-        return $this->resolveFrom($this->issuers(), $codeOrName);
-    }
-
-    public function issuerLabel(mixed $codeOrName): string
-    {
-        $issuer = $this->issuerResolve($codeOrName);
-
-        return $issuer === null ? trim((string) $codeOrName) : (string) ($issuer['name'] ?? '');
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
     public function family(mixed $codeOrName): ?array
     {
         return $this->resolveFrom($this->families(), $codeOrName);
@@ -129,18 +111,6 @@ class LawTypes
         }
 
         return $this->families;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function issuers(): array
-    {
-        if ($this->issuers === null) {
-            $this->issuers = $this->store->all(MasterDataKind::Issuer);
-        }
-
-        return $this->issuers;
     }
 
     /**

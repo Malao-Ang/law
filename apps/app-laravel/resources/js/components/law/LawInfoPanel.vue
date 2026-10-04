@@ -33,10 +33,6 @@
           <span class="law-info-row__label text-medium-emphasis">อ้างอิง</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.gazette_reference }}</span>
         </div>
-        <div v-if="meta.issuer" class="law-info-row py-1">
-          <span class="law-info-row__label text-medium-emphasis">ออกโดย</span>
-          <span class="law-info-row__value font-weight-semibold">{{ issuerLabel(meta.issuer) }}</span>
-        </div>
         <div v-if="meta.law_group" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
           <span class="law-info-row__value font-weight-semibold">{{ categoryLabel(meta.law_group) }}</span>
@@ -165,7 +161,7 @@ import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 
-const { typeLabel, issuerLabel } = useLawType();
+const { typeLabel } = useLawType();
 const { categoryLabel, categoryLabels } = useLawCategory();
 
 interface SectionRelationGroup {

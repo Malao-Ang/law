@@ -17,15 +17,12 @@ class LookupController extends Controller
         $allLawFamilies = $this->masterData->all(MasterDataKind::LawFamily);
         $allLawTypes = $this->masterData->all(MasterDataKind::LawType);
         $allLawCategories = $this->masterData->all(MasterDataKind::LawCategory);
-        $allIssuers = $this->masterData->all(MasterDataKind::Issuer);
 
         return response()->json([
             'document_types' => $this->lawTypeItems(array_values(array_filter($allLawTypes, static fn (array $item): bool => (bool) ($item['is_active'] ?? false))), $allLawFamilies),
             'document_types_all' => $this->lawTypeItems($allLawTypes, $allLawFamilies),
             'law_families' => $this->lawFamilyItems(array_values(array_filter($allLawFamilies, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'law_families_all' => $this->lawFamilyItems($allLawFamilies),
-            'issuers' => $this->issuerItems(array_values(array_filter($allIssuers, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
-            'issuers_all' => $this->issuerItems($allIssuers),
             'statuses' => $this->statusItems(array_values(array_filter($allStatusItems, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'statuses_all' => $this->statusItems($allStatusItems),
             'change_status_types' => config('lookups.change_status_types'),
@@ -86,23 +83,8 @@ class LookupController extends Controller
                 'code' => (string) ($item['code'] ?? ''),
                 'family_code' => $familyCode,
                 'source' => (string) ($family['attrs']['source'] ?? 'internal'),
-                'requires_issuer' => (bool) ($item['attrs']['requires_issuer'] ?? false),
             ];
         }, $items);
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $items
-     * @return list<array<string, mixed>>
-     */
-    private function issuerItems(array $items): array
-    {
-        return array_map(static fn (array $item): array => [
-            'title' => (string) ($item['name'] ?? ''),
-            'value' => (string) ($item['code'] ?? ''),
-            'code' => (string) ($item['code'] ?? ''),
-            'sort_order' => (int) ($item['sort_order'] ?? 0),
-        ], $items);
     }
 
     /**
