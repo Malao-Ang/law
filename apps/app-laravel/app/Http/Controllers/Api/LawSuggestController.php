@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSuggestRequest;
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use App\Services\Search\LawSuggestService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use Illuminate\Support\Facades\Log;
 
 class LawSuggestController extends Controller
 {
-    public function __construct(private readonly EnforcementStatuses $enforcementStatuses) {}
+    public function __construct(
+        private readonly EnforcementStatuses $enforcementStatuses,
+        private readonly LawTypes $lawTypes,
+    ) {}
 
     public function suggest(LawSuggestRequest $request, LawSuggestService $service, ReviewStore $store): JsonResponse
     {
@@ -137,10 +141,14 @@ class LawSuggestController extends Controller
             (string) ($row['change_status'] ?? ''),
         ], static fn (string $value): bool => trim($value) !== '')));
 
+        $rawType = (string) ($row['law_type'] ?? '');
+        $type = $this->lawTypes->resolve($rawType);
+
         return [
             'law_id' => (string) ($row['document_id'] ?? ''),
             'title' => $row['title'] ?? null,
-            'law_type' => $row['law_type'] ?? null,
+            'law_type' => $type === null ? ($row['law_type'] ?? null) : (string) ($type['name'] ?? $rawType),
+            'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
             'agency' => $row['agencies'][0] ?? null,
             'published_date' => $row['promulgation_date'] ?? null,
             'keywords' => $keywords,

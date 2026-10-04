@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Services\MasterData\LawTypes;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -9,7 +10,14 @@ class LawSuggestService
 {
     private const FUZZY_MIN_QUERY_LENGTH = 4;
 
-    public function __construct(private readonly ElasticClient $client) {}
+    private readonly LawTypes $lawTypes;
+
+    public function __construct(
+        private readonly ElasticClient $client,
+        ?LawTypes $lawTypes = null,
+    ) {
+        $this->lawTypes = $lawTypes ?? app(LawTypes::class);
+    }
 
     /**
      * @param  array{q:string,size?:int}  $params
@@ -170,10 +178,14 @@ class LawSuggestService
         $suggestions = [];
         foreach ($raw['hits']['hits'] ?? [] as $hit) {
             $source = is_array($hit['_source'] ?? null) ? $hit['_source'] : [];
+            $rawType = (string) ($source['law_type'] ?? '');
+            $type = $this->lawTypes->resolve($rawType);
+
             $suggestions[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
-                'law_type' => $source['law_type'] ?? null,
+                'law_type' => $type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType),
+                'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
                 'agency' => $source['agency'] ?? null,
                 'published_date' => $source['published_date'] ?? null,
                 'keywords' => array_values(array_filter((array) ($source['keywords'] ?? []), 'is_string')),

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawTypes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LawSearchRequest extends FormRequest
@@ -20,6 +21,22 @@ class LawSearchRequest extends FormRequest
             $filters['status'] = array_values(array_map(
                 static fn (mixed $status): string => (string) ($statuses->resolve($status)['code'] ?? trim((string) $status)),
                 $filters['status'],
+            ));
+        }
+        if (is_array($filters) && is_array($filters['law_type'] ?? null)) {
+            $lawTypes = app(LawTypes::class);
+            $filters['law_type'] = array_values(array_map(
+                static function (mixed $type) use ($lawTypes): string {
+                    $resolvedType = $lawTypes->resolve($type);
+                    if ($resolvedType !== null) {
+                        return (string) $resolvedType['code'];
+                    }
+
+                    $resolvedFamily = $lawTypes->family($type);
+
+                    return $resolvedFamily === null ? trim((string) $type) : (string) $resolvedFamily['code'];
+                },
+                $filters['law_type'],
             ));
         }
 

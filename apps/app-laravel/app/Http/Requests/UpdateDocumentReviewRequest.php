@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
 use Illuminate\Foundation\Http\FormRequest;
@@ -20,6 +21,18 @@ class UpdateDocumentReviewRequest extends FormRequest
         $lawMeta = $this->input('law_meta');
         if (is_array($lawMeta) && array_key_exists('status', $lawMeta)) {
             $lawMeta['status'] = app(EnforcementStatuses::class)->resolve($lawMeta['status'])['code'] ?? trim((string) $lawMeta['status']);
+        }
+        if (is_array($lawMeta) && array_key_exists('law_type', $lawMeta)) {
+            $resolved = app(LawTypes::class)->resolve($lawMeta['law_type']);
+            if ($resolved !== null) {
+                $lawMeta['law_type'] = (string) $resolved['code'];
+            }
+        }
+        if (is_array($lawMeta) && array_key_exists('issuer', $lawMeta)) {
+            $resolved = app(LawTypes::class)->issuerResolve($lawMeta['issuer']);
+            if ($resolved !== null) {
+                $lawMeta['issuer'] = (string) $resolved['code'];
+            }
         }
 
         $payload = [
@@ -93,7 +106,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.parent_document_ids' => ['nullable', 'array'],
             'law_meta.parent_document_ids.*' => ['nullable', 'string', 'max:128'],
             'law_meta.access_scope' => ['nullable', 'string', 'in:public,private'],
-            'law_meta.permission_group_ids' => ['nullable', 'array'],
+            'law_meta.permission_group_ids' => ['nullable', 'required_if:law_meta.access_scope,private', 'array', 'min:1'],
             'law_meta.permission_group_ids.*' => ['nullable', 'string', 'max:128'],
             'relations' => ['nullable', 'array'],
             'relations.*.id' => ['nullable', 'string', 'max:64'],
@@ -108,6 +121,50 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.url' => ['nullable', 'url', 'max:500'],
             'relations.*.change_detail' => ['nullable', 'string', 'max:120'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $lawMeta = $this->input('law_meta');
+            if (! is_array($lawMeta)) {
+                return;
+            }
+
+            $lawTypeValue = $lawMeta['law_type'] ?? null;
+            if ($lawTypeValue === null || $lawTypeValue === '') {
+                return;
+            }
+
+            /** @var LawTypes $lawTypes */
+            $lawTypes = app(LawTypes::class);
+            $lawType = $lawTypes->resolve($lawTypeValue);
+            if ($lawType === null) {
+                $validator->errors()->add('law_meta.law_type', 'Invalid law type.');
+
+                return;
+            }
+
+            $source = $lawMeta['source'] ?? null;
+            if ($source !== null && $source !== '' && $lawTypes->sourceOf($lawTypeValue) !== $source) {
+                $validator->errors()->add('law_meta.source', 'Law type source does not match.');
+            }
+
+            $issuer = trim((string) ($lawMeta['issuer'] ?? ''));
+            if ($lawTypes->requiresIssuer($lawTypeValue)) {
+                if ($issuer === '') {
+                    $validator->errors()->add('law_meta.issuer', 'Issuer is required for this law type.');
+                } elseif ($lawTypes->issuerResolve($issuer) === null) {
+                    $validator->errors()->add('law_meta.issuer', 'Invalid issuer.');
+                }
+
+                return;
+            }
+
+            if ($issuer !== '') {
+                $validator->errors()->add('law_meta.issuer', 'Issuer must be empty for this law type.');
+            }
+        });
     }
 
     /**

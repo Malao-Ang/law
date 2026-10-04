@@ -25,7 +25,7 @@ class LawMetaIssuerTest extends TestCase
         ])->assertOk();
 
         $doc = $store->getReviewDocument($documentId);
-        $this->assertSame('สภามหาวิทยาลัย', $doc['law_meta']['issuer']);
+        $this->assertSame('ISS02', $doc['law_meta']['issuer']);
     }
 
     public function test_issuer_defaults_to_null_when_absent(): void
