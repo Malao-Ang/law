@@ -34,7 +34,9 @@
               <button type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
                 <v-icon :icon="expandedCodes.includes(row.family.code) ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
               </button>
-              <span class="master-tree__mono">{{ row.family.code }}</span>
+              <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
+                {{ row.family.code }}
+              </v-chip>
             </td>
             <td>
               <span class="master-tree__dot" :style="{ background: row.color }" />
@@ -47,7 +49,9 @@
             <td>{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
             <td class="text-right font-weight-bold">{{ row.usage.toLocaleString('th-TH') }}</td>
             <td>
-              <StatusChip :active="row.family.is_active" />
+              <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
+                {{ row.family.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              </v-chip>
             </td>
             <td>
               <div class="master-tree__action-row">
@@ -111,7 +115,11 @@
             @drop="handleDrop($event, 'type', type.code, row.family.code)"
           >
             <td class="master-tree__order-cell master-tree__child-order">{{ familyIndex + 1 }}.{{ typeIndex + 1 }}</td>
-            <td class="master-tree__child-code"><span class="master-tree__mono">{{ type.code }}</span></td>
+            <td class="master-tree__child-code">
+              <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
+                {{ type.code }}
+              </v-chip>
+            </td>
             <td class="master-tree__child-name">{{ type.name }}</td>
             <td class="text-medium-emphasis">ตามกลุ่ม</td>
             <td class="text-right">
@@ -119,13 +127,16 @@
                 size="small"
                 variant="tonal"
                 color="admin-primary"
+                prepend-icon="mdi-file-document-outline"
                 :to="`/admin/laws?type=${encodeURIComponent(type.code)}`"
               >
                 {{ (type.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
               </v-chip>
             </td>
             <td>
-              <StatusChip :active="type.is_active" />
+              <v-chip size="small" :color="type.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
+                {{ type.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              </v-chip>
             </td>
             <td>
               <div class="master-tree__action-row">
@@ -185,7 +196,6 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h } from 'vue';
 import type { LawSource } from '../../api/client';
 import type { MasterItem } from '../../types/masterData';
 
@@ -225,23 +235,6 @@ type DragPayload = {
   familyCode?: string;
 };
 
-const StatusChip = defineComponent({
-  props: {
-    active: { type: Boolean, required: true },
-  },
-  setup(props) {
-    return () => h(
-      'span',
-      {
-        class: [
-          'master-tree__status-chip',
-          props.active ? 'master-tree__status-chip--active' : 'master-tree__status-chip--inactive',
-        ],
-      },
-      props.active ? 'ใช้งาน' : 'ปิดใช้งาน',
-    );
-  },
-});
 
 function sourceLabel(source: LawSource): string {
   return source === 'external' ? 'ภายนอก' : 'ภายใน';
@@ -298,14 +291,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 .master-tree__actions { width: 210px; }
 
 .master-tree__group td {
-  background: #f8fafc;
-  border-top: 2px solid #d0d5dd;
-  font-weight: 700;
-}
-
-.master-tree__child td {
-  background: #fff;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 .master-tree__toggle {
@@ -328,13 +314,11 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 }
 
 .master-tree__order-cell {
-  font-weight: 700;
   white-space: nowrap;
 }
 
-.master-tree__mono {
+.master-tree__code-chip {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-weight: 700;
 }
 
 .master-tree__dot {
@@ -377,11 +361,6 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   padding-left: 34px !important;
 }
 
-.master-tree__child-code .master-tree__mono {
-  color: #667085;
-  font-weight: 600;
-}
-
 .master-tree__child-name {
   font-weight: 400;
 }
@@ -398,23 +377,6 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   cursor: grab;
 }
 
-.master-tree__status-chip {
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-}
-
-.master-tree__status-chip--active {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.master-tree__status-chip--inactive {
-  background: #f1f5f9;
-  color: #64748b;
-}
 
 @media (max-width: 900px) {
   .master-tree {

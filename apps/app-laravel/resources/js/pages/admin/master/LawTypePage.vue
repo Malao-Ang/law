@@ -6,9 +6,21 @@
     show-bell
   >
     <template #title-actions>
-      <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreateFamily">
-        เพิ่มกลุ่มประเภท
-      </v-btn>
+      <div class="law-type-tree-page__title-actions">
+        <v-btn
+          variant="outlined"
+          color="admin-primary"
+          prepend-icon="mdi-swap-vertical"
+          class="text-none"
+          :disabled="reorderMode"
+          @click="startReorder"
+        >
+          จัดลำดับ
+        </v-btn>
+        <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" :disabled="reorderMode" @click="openCreateFamily">
+          เพิ่มกลุ่มประเภท
+        </v-btn>
+      </div>
     </template>
 
     <div class="law-type-tree-page">
@@ -48,15 +60,6 @@
         />
         <v-btn variant="outlined" prepend-icon="mdi-refresh" class="text-none" :disabled="reorderMode" @click="resetFilters">
           ล้างตัวกรอง
-        </v-btn>
-        <v-btn
-          v-if="!reorderMode"
-          variant="outlined"
-          prepend-icon="mdi-swap-vertical"
-          class="text-none law-type-tree-page__reorder-button"
-          @click="startReorder"
-        >
-          จัดลำดับ
         </v-btn>
       </v-card>
 
@@ -626,6 +629,13 @@ async function handleToggleType(type: MasterItem, next: boolean): Promise<void> 
 </script>
 
 <style scoped>
+.law-type-tree-page__title-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .law-type-tree-page {
   display: flex;
   flex-direction: column;
