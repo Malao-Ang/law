@@ -17,6 +17,7 @@ class LookupController extends Controller
         $allLawFamilies = $this->masterData->all(MasterDataKind::LawFamily);
         $allLawTypes = $this->masterData->all(MasterDataKind::LawType);
         $allLawCategories = $this->masterData->all(MasterDataKind::LawCategory);
+        $allLegalStructures = $this->masterData->all(MasterDataKind::LegalStructure);
 
         return response()->json([
             'document_types' => $this->lawTypeItems(array_values(array_filter($allLawTypes, static fn (array $item): bool => (bool) ($item['is_active'] ?? false))), $allLawFamilies),
@@ -30,6 +31,8 @@ class LookupController extends Controller
             'agencies' => config('lookups.agencies'),
             'law_groups' => $this->lawCategoryItems(array_values(array_filter($allLawCategories, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'law_groups_all' => $this->lawCategoryItems($allLawCategories),
+            'legal_structures' => $this->legalStructureItems(array_values(array_filter($allLegalStructures, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
+            'legal_structures_all' => $this->legalStructureItems($allLegalStructures),
             'law_sources' => config('lookups.law_sources'),
         ]);
     }
@@ -97,6 +100,27 @@ class LookupController extends Controller
             'title' => (string) ($item['name'] ?? ''),
             'value' => (string) ($item['code'] ?? ''),
             'code' => (string) ($item['code'] ?? ''),
+            'sort_order' => (int) ($item['sort_order'] ?? 0),
+        ], $items);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function legalStructureItems(array $items): array
+    {
+        return array_map(static fn (array $item): array => [
+            'title' => (string) ($item['name'] ?? ''),
+            'value' => (string) ($item['code'] ?? ''),
+            'code' => (string) ($item['code'] ?? ''),
+            'family_codes' => array_values(array_map('strval', (array) ($item['attrs']['family_codes'] ?? []))),
+            'file_types' => array_values(array_map('strval', (array) ($item['attrs']['file_types'] ?? []))),
+            'is_head' => (bool) ($item['attrs']['is_head'] ?? false),
+            'counts_as_section' => (bool) ($item['attrs']['counts_as_section'] ?? false),
+            'is_required' => (bool) ($item['attrs']['is_required'] ?? false),
+            'color' => (string) ($item['attrs']['color'] ?? 'blue-grey'),
+            'export_key' => (string) ($item['attrs']['export_key'] ?? $item['code'] ?? ''),
             'sort_order' => (int) ($item['sort_order'] ?? 0),
         ], $items);
     }

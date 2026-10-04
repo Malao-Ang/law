@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\LegalStructures;
+
 class ExportService
 {
     // Target token budget per chunk.  Thai chars ≈ 1.5 tokens, ASCII ≈ 0.75.
@@ -13,6 +15,7 @@ class ExportService
     public function __construct(
         private readonly ReviewStore $reviewStore,
         private readonly DocumentHtmlService $documentHtmlService,
+        private readonly LegalStructures $legalStructures,
     ) {}
 
     /**
@@ -37,6 +40,8 @@ class ExportService
             $fallback = $this->buildChunksFromBlocks($documentId, $document);
             $documentTitle = $fallback['document_title'];
             $chunks = $fallback['chunks'];
+        } else {
+            $chunks = $this->annotateHtmlChunksWithLegalStructure($chunks, $document);
         }
 
         $exportData = [
@@ -76,17 +81,18 @@ class ExportService
         $counter = 1;
         $title = null;
         $sectionContext = null;
+        $sectionHeadBlock = null;
 
         // Accumulator for the current sliding window
         $windowBlocks = [];
         $windowTokens = 0;
 
-        $flush = function () use (&$chunks, &$counter, &$windowBlocks, &$windowTokens, $documentId, &$sectionContext): void {
+        $flush = function () use (&$chunks, &$counter, &$windowBlocks, &$windowTokens, $documentId, &$sectionContext, &$sectionHeadBlock): void {
             if ($windowBlocks === []) {
                 return;
             }
 
-            $chunks[] = $this->buildWindowChunk($documentId, $counter++, $windowBlocks, $sectionContext);
+            $chunks[] = $this->buildWindowChunk($documentId, $counter++, $windowBlocks, $sectionContext, $sectionHeadBlock);
             $windowBlocks = [];
             $windowTokens = 0;
         };
@@ -110,7 +116,7 @@ class ExportService
                 // Solo types are never merged — flush current window first, emit solo, continue.
                 if (in_array($type, self::SOLO_TYPES, true)) {
                     ($flush)();
-                    $chunks[] = $this->buildSoloChunk($documentId, $counter++, $block, $pageNo, $sectionContext);
+                    $chunks[] = $this->buildSoloChunk($documentId, $counter++, $block, $pageNo, $sectionContext, $sectionHeadBlock);
 
                     continue;
                 }
@@ -119,6 +125,7 @@ class ExportService
                 if ($type === 'section_header') {
                     ($flush)();
                     $sectionContext = $text;
+                    $sectionHeadBlock = $block;
                 }
 
                 $tokens = $this->estimateTokens($text);
@@ -147,7 +154,7 @@ class ExportService
      * @param  array<int, array{block: array<string, mixed>, page_no: int}>  $windowBlocks
      * @return array<string, mixed>
      */
-    private function buildWindowChunk(string $documentId, int $counter, array $windowBlocks, ?string $sectionContext): array
+    private function buildWindowChunk(string $documentId, int $counter, array $windowBlocks, ?string $sectionContext, ?array $sectionHeadBlock): array
     {
         $texts = [];
         $blockIds = [];
@@ -181,6 +188,7 @@ class ExportService
                 'html' => $htmlParts !== [] ? implode('', $htmlParts) : null,
                 'layout' => $firstBlock['meta']['layout'] ?? ['bbox' => $firstBlock['bbox'] ?? null, 'reading_order' => $firstBlock['reading_order'] ?? null],
                 'table' => null,
+                'legal_structure' => $this->legalStructureMeta($sectionHeadBlock),
             ],
         ];
     }
@@ -191,7 +199,7 @@ class ExportService
      * @param  array<string, mixed>  $block
      * @return array<string, mixed>
      */
-    private function buildSoloChunk(string $documentId, int $counter, array $block, int $pageNo, ?string $sectionContext): array
+    private function buildSoloChunk(string $documentId, int $counter, array $block, int $pageNo, ?string $sectionContext, ?array $sectionHeadBlock): array
     {
         $type = (string) ($block['type'] ?? 'unknown');
         $text = trim((string) ($block['approved_text'] ?? $block['ai_suggested_text'] ?? $block['normalized_text'] ?? $block['raw_text'] ?? ''));
@@ -208,7 +216,61 @@ class ExportService
                 'html' => $block['meta']['reviewed_html'] ?? null,
                 'layout' => $block['meta']['layout'] ?? ['bbox' => $block['bbox'] ?? null, 'reading_order' => $block['reading_order'] ?? null],
                 'table' => $block['meta']['table'] ?? null,
+                'legal_structure' => $this->legalStructureMeta($sectionHeadBlock),
             ],
+        ];
+    }
+
+    /**
+     * HTML-derived chunks map 1:1 to blocks (data-block-id). Carry the legal structure of the
+     * most recent head block forward, the same way the block-window path does.
+     *
+     * @param  array<int, array<string, mixed>>  $chunks
+     * @param  array<string, mixed>  $document
+     * @return array<int, array<string, mixed>>
+     */
+    private function annotateHtmlChunksWithLegalStructure(array $chunks, array $document): array
+    {
+        $blocksById = [];
+        foreach (($document['pages'] ?? []) as $page) {
+            foreach (($page['blocks'] ?? []) as $block) {
+                if (is_array($block) && ($block['block_id'] ?? '') !== '') {
+                    $blocksById[(string) $block['block_id']] = $block;
+                }
+            }
+        }
+
+        $currentHead = null;
+        foreach ($chunks as &$chunk) {
+            $block = $blocksById[(string) (($chunk['block_ids'] ?? [])[0] ?? '')] ?? null;
+            if ($block !== null && $this->legalStructures->isHead($block['meta']['chunk_type'] ?? null)) {
+                $currentHead = $block;
+            }
+            $chunk['meta']['legal_structure'] = $this->legalStructureMeta($currentHead);
+        }
+        unset($chunk);
+
+        return $chunks;
+    }
+
+    /**
+     * @return array{code: string, export_key: string}|null
+     */
+    private function legalStructureMeta(?array $sectionHeadBlock): ?array
+    {
+        if ($sectionHeadBlock === null) {
+            return null;
+        }
+
+        $item = $this->legalStructures->resolve($sectionHeadBlock['meta']['chunk_type'] ?? null);
+        $code = (string) ($item['code'] ?? '');
+        if ($code === '') {
+            return null;
+        }
+
+        return [
+            'code' => $code,
+            'export_key' => (string) ($item['attrs']['export_key'] ?? $code),
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LegalStructures;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -2053,8 +2054,7 @@ class ReviewStore
                     continue;
                 }
 
-                $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
-                if (in_array($chunkType, ['BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM'], true)) {
+                if (app(LegalStructures::class)->countsAsSection($block['meta']['chunk_type'] ?? null)) {
                     $count++;
                 }
             }
