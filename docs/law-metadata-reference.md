@@ -51,6 +51,10 @@ must never be treated as authoritative.
   `agency = agencies[0]`; the review-load watcher reconstructs `parent_document_ids` from the
   singular for very old records).
 - **Read the array first**, falling back to the singular only for records that predate the array.
+- **`law_groups` values are `DCTxxx` codes** (master data `law_category`) as of Phase 3.
+  Old data migrated with `php artisan master-data:migrate law-category`. Unmigrated records may
+  still contain full Thai names or slugs (`academic`, `student-affairs`, …) — `useLawCategory`
+  normalizes them; the admin page `/admin/master/categories` manages the master list.
 
 ---
 
