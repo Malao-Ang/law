@@ -3,6 +3,7 @@
 namespace App\Services\MasterData;
 
 use App\Exceptions\MasterDataConflict;
+use App\Services\ReviewStore;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Validation\ValidationException;
 
@@ -134,6 +135,8 @@ class MasterDataStore
             if (($existing['is_system'] ?? false) === true && isset($existing['attrs']['role'])) {
                 $attrs['role'] = $existing['attrs']['role'];
             }
+
+            $this->assertAttrsMayChange($kind, $existing, $attrs);
 
             $updated = $this->normalizeItem($kind, array_merge($payload, ['attrs' => $attrs]), $items, [
                 'code' => $normalizedCode,
@@ -452,7 +455,113 @@ class MasterDataStore
                 'role' => $isSystem ? ($attrs['role'] ?? $existing['attrs']['role'] ?? null) : null,
                 'color' => $attrs['color'] ?? $existing['attrs']['color'] ?? null,
             ],
+            MasterDataKind::LawFamily => [
+                'source' => in_array(($attrs['source'] ?? null), ['internal', 'external'], true) ? $attrs['source'] : 'internal',
+                'color' => $this->normalizeHexColor($attrs['color'] ?? $existing['attrs']['color'] ?? null),
+            ],
+            MasterDataKind::LawType => $this->normalizeLawTypeAttrs($attrs),
+            MasterDataKind::Issuer => [
+                'legacy_type_aliases' => $this->normalizeStringList($attrs['legacy_type_aliases'] ?? $existing['attrs']['legacy_type_aliases'] ?? []),
+            ],
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @return array{family_code: string, requires_issuer: bool}
+     */
+    private function normalizeLawTypeAttrs(array $attrs): array
+    {
+        $familyCode = $this->normalizeCode((string) ($attrs['family_code'] ?? ''));
+        $family = $this->find(MasterDataKind::LawFamily, $familyCode);
+        if ($family === null) {
+            throw ValidationException::withMessages([
+                'attrs.family_code' => ['The selected family code is invalid.'],
+            ]);
+        }
+
+        $requiresIssuer = filter_var($attrs['requires_issuer'] ?? false, FILTER_VALIDATE_BOOL);
+        if ($requiresIssuer && ($family['attrs']['source'] ?? null) !== 'internal') {
+            throw ValidationException::withMessages([
+                'attrs.requires_issuer' => ['Issuer is only allowed for internal law families.'],
+            ]);
+        }
+
+        return [
+            'family_code' => $familyCode,
+            'requires_issuer' => $requiresIssuer,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $existing
+     * @param  array<string, mixed>  $nextAttrs
+     */
+    private function assertAttrsMayChange(MasterDataKind $kind, array $existing, array $nextAttrs): void
+    {
+        $code = (string) ($existing['code'] ?? '');
+        if ($code === '') {
+            return;
+        }
+
+        if ($kind === MasterDataKind::LawType) {
+            $existingFamily = (string) ($existing['attrs']['family_code'] ?? '');
+            $nextFamily = $this->normalizeCode((string) ($nextAttrs['family_code'] ?? $existingFamily));
+            $existingRequiresIssuer = (bool) ($existing['attrs']['requires_issuer'] ?? false);
+            $nextRequiresIssuer = filter_var($nextAttrs['requires_issuer'] ?? $existingRequiresIssuer, FILTER_VALIDATE_BOOL);
+            if (($existingFamily !== $nextFamily || $existingRequiresIssuer !== $nextRequiresIssuer)
+                && $this->countLawTypeUsage($code) > 0) {
+                throw new MasterDataConflict('law type attributes cannot be changed while in use');
+            }
+        }
+
+        if ($kind === MasterDataKind::LawFamily) {
+            $existingSource = (string) ($existing['attrs']['source'] ?? '');
+            $nextSource = (string) ($nextAttrs['source'] ?? $existingSource);
+            if ($existingSource !== $nextSource && $this->countLawFamilyUsage($code) > 0) {
+                throw new MasterDataConflict('law family source cannot be changed while in use');
+            }
+        }
+    }
+
+    private function countLawTypeUsage(string $code): int
+    {
+        $count = 0;
+        foreach (app(ReviewStore::class)->listLawMeta() as $row) {
+            $value = trim((string) ($row['law_type'] ?? ''));
+            $item = $this->resolve(MasterDataKind::LawType, $value);
+            if (($item['code'] ?? null) === $code) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function countLawFamilyUsage(string $code): int
+    {
+        $count = 0;
+        foreach ($this->all(MasterDataKind::LawType) as $type) {
+            if (($type['attrs']['family_code'] ?? null) === $code) {
+                $count++;
+            }
+        }
+
+        foreach (app(ReviewStore::class)->listLawMeta() as $row) {
+            $item = $this->resolve(MasterDataKind::LawType, (string) ($row['law_type'] ?? ''));
+            if (($item['attrs']['family_code'] ?? null) === $code) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function normalizeHexColor(mixed $value): ?string
+    {
+        $color = trim((string) $value);
+
+        return preg_match('/^#[0-9A-Fa-f]{6}$/', $color) === 1 ? mb_strtoupper($color) : null;
     }
 
     /**
