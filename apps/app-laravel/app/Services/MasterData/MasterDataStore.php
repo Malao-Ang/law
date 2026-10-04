@@ -460,6 +460,7 @@ class MasterDataStore
                 'color' => $this->normalizeHexColor($attrs['color'] ?? $existing['attrs']['color'] ?? null),
             ],
             MasterDataKind::LawType => $this->normalizeLawTypeAttrs($attrs),
+            MasterDataKind::LawCategory => [],
             MasterDataKind::Issuer => [
                 'legacy_type_aliases' => $this->normalizeStringList($attrs['legacy_type_aliases'] ?? $existing['attrs']['legacy_type_aliases'] ?? []),
             ],

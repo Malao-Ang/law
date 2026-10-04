@@ -7,6 +7,7 @@ enum MasterDataKind: string
     case EnforcementStatus = 'enforcement_status';
     case LawFamily = 'law_family';
     case LawType = 'law_type';
+    case LawCategory = 'law_category';
     case Issuer = 'issuer';
 
     public function prefix(): string
@@ -15,13 +16,14 @@ enum MasterDataKind: string
             self::EnforcementStatus => 'STA',
             self::LawFamily => 'LFM',
             self::LawType => 'LTY',
+            self::LawCategory => 'DCT',
             self::Issuer => 'ISS',
         };
     }
 
     public function codePad(): int
     {
-        return 2;
+        return $this === self::LawCategory ? 3 : 2;
     }
 
     public function deletable(): bool
@@ -35,6 +37,7 @@ enum MasterDataKind: string
             self::EnforcementStatus => 'สถานะการบังคับใช้',
             self::LawFamily => 'กลุ่มประเภท',
             self::LawType => 'ประเภทเอกสาร',
+            self::LawCategory => 'หมวดเอกสาร',
             self::Issuer => 'ผู้ออกประกาศ',
         };
     }
@@ -190,6 +193,104 @@ enum MasterDataKind: string
                     'attrs' => ['family_code' => 'LFM04', 'requires_issuer' => false],
                 ],
             ],
+            self::LawCategory => [
+                [
+                    'code' => 'DCT001',
+                    'name' => 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', 'academic'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT002',
+                    'name' => 'ด้านกิจการนิสิต',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านกิจการนิสิต', 'student-affairs'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT003',
+                    'name' => 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', 'research-innovation'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT004',
+                    'name' => 'ด้านบริการวิชาการ',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านบริการวิชาการ', 'academic-service'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT005',
+                    'name' => 'ด้านการทะนุบำรุงศิลปวัฒนธรรม',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการทะนุบำรุงศิลปวัฒนธรรม'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT006',
+                    'name' => 'ด้านโครงสร้างองค์กรและระบบการบริหาร',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านโครงสร้างองค์กรและระบบการบริหาร', 'organization-admin'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT007',
+                    'name' => 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', 'hr-discipline'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT008',
+                    'name' => 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', 'finance-assets-risk'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT009',
+                    'name' => 'ด้านการพัฒนารายได้',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการพัฒนารายได้'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT010',
+                    'name' => 'ด้านการรักษาพยาบาล',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการรักษาพยาบาล'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT011',
+                    'name' => 'ด้านการบริการเฉพาะด้าน เช่น ทันตกรรม',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านการบริการเฉพาะด้าน เช่น ทันตกรรม'],
+                    'attrs' => [],
+                ],
+                [
+                    'code' => 'DCT012',
+                    'name' => 'ด้านอื่น ๆ',
+                    'description' => '',
+                    'is_system' => false,
+                    'aliases' => ['ด้านอื่น ๆ', 'other'],
+                    'attrs' => [],
+                ],
+            ],
         };
     }
 
@@ -210,6 +311,7 @@ enum MasterDataKind: string
                 'attrs.family_code' => ['required', 'string', 'max:32'],
                 'attrs.requires_issuer' => ['nullable', 'boolean'],
             ],
+            self::LawCategory,
             self::Issuer => [],
         };
     }
