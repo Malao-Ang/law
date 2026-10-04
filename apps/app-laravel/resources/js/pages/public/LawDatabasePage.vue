@@ -361,7 +361,7 @@
                     </span>
                     <span v-if="law.law_group">
                       <v-icon size="13" icon="mdi-sitemap-outline" />
-                      {{ law.law_group }}
+                      {{ lawCategories.categoryLabel(law.law_group) }}
                     </span>
                     <span v-if="law.signer_group">
                       <v-icon size="13" icon="mdi-folder-outline" />
@@ -475,6 +475,7 @@ import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
+import { createLawCategoryCatalog } from '../../composables/useLawCategory';
 
 const PER_PAGE = 20;
 
@@ -560,18 +561,8 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 
 const lawStatus = useLawStatus();
 const lawTypes = createLawTypeCatalog();
+const lawCategories = createLawCategoryCatalog();
 const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
-
-const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
-  academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
-  'student-affairs': 'ด้านกิจการนิสิต',
-  'research-innovation': 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
-  'academic-service': 'ด้านบริการวิชาการ',
-  'organization-admin': 'ด้านโครงสร้างองค์กรและระบบการบริหาร',
-  'hr-discipline': 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
-  'finance-assets-risk': 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
-  other: 'ด้านอื่น ๆ',
-};
 
 type SortValue = 'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest';
 
@@ -673,7 +664,9 @@ const typeFilters = computed(() => {
     count: counts.get(family.code) ?? 0,
   }));
 });
-const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
+const groupFilters = computed(() =>
+  mapFacetOptions(stableFacet('law_group'), (value) => lawCategories.categoryLabel(value)),
+);
 const agencyFilters = computed(() => {
   const allowed = new Set((lookupFacets.value?.agency ?? []).map((b) => b.value));
   // ponytail: whitelist by current lookups so removed agencies don't bleed in from old documents
@@ -1062,7 +1055,7 @@ function expandLawTypeFilterValues(values: string[]): string[] {
 }
 
 function normalizeLawGroupValue(value: string): string {
-  return LAW_GROUP_ALIAS_VALUES[value] ?? value;
+  return lawCategories.normalizeCategory(value) || value;
 }
 
 function uniqueStrings(values: string[]): string[] {

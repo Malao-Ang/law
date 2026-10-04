@@ -81,7 +81,8 @@ export type LookupData = {
   change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];
   change_status_details: (SelectableOption & { source?: string })[];
   agencies: SelectableOption[];
-  law_groups: SelectableOption[];
+  law_groups: (SelectableOption & { code: string; sort_order?: number })[];
+  law_groups_all?: (SelectableOption & { code: string; sort_order?: number })[];
   law_sources: SelectableOption[];
 };
 

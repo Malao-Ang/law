@@ -397,8 +397,10 @@ import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
+import { createLawCategoryCatalog } from '../../composables/useLawCategory';
 
 const { typeLabel } = useLawType();
+const { categoryLabel, categoryLabels } = createLawCategoryCatalog();
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
@@ -531,8 +533,8 @@ const agencyLabel = computed(() => {
 });
 
 const lawGroupLabel = computed(() => {
-  if (meta.value.law_groups?.length) return meta.value.law_groups.join(', ');
-  return meta.value.law_group || '—';
+  if (meta.value.law_groups?.length) return categoryLabels(meta.value.law_groups).join(', ');
+  return categoryLabel(meta.value.law_group) || '—';
 });
 
 const updatedAtLabel = computed(() => {
