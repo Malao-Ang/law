@@ -170,7 +170,7 @@ class MasterDataStore
             }
 
             if (($items[$index]['is_system'] ?? false) === true && ! $active) {
-                throw new MasterDataConflict('system item cannot be deactivated');
+                throw new MasterDataConflict('รายการของระบบไม่สามารถปิดใช้งานได้');
             }
 
             $items[$index]['is_active'] = $active;
@@ -187,7 +187,7 @@ class MasterDataStore
         $this->seedIfEmpty($kind);
 
         if (! $kind->deletable()) {
-            throw new MasterDataConflict('delete not allowed');
+            throw new MasterDataConflict('ไม่อนุญาตให้ลบรายการ');
         }
 
         $deleted = false;
@@ -201,7 +201,7 @@ class MasterDataStore
             }
 
             if (($items[$index]['is_system'] ?? false) === true) {
-                throw new MasterDataConflict('system item cannot be deleted');
+                throw new MasterDataConflict('รายการของระบบไม่สามารถลบได้');
             }
 
             array_splice($items, $index, 1);
@@ -411,7 +411,7 @@ class MasterDataStore
 
             if ($this->normalizeName((string) ($item['name'] ?? '')) === $needle) {
                 throw ValidationException::withMessages([
-                    'name' => ['This name is already in use.'],
+                    'name' => ['ชื่อนี้ถูกใช้งานแล้ว'],
                 ]);
             }
         }
@@ -476,14 +476,14 @@ class MasterDataStore
         $family = $this->find(MasterDataKind::LawFamily, $familyCode);
         if ($family === null) {
             throw ValidationException::withMessages([
-                'attrs.family_code' => ['The selected family code is invalid.'],
+                'attrs.family_code' => ['ไม่พบกลุ่มประเภทที่เลือก'],
             ]);
         }
 
         $requiresIssuer = filter_var($attrs['requires_issuer'] ?? false, FILTER_VALIDATE_BOOL);
         if ($requiresIssuer && ($family['attrs']['source'] ?? null) !== 'internal') {
             throw ValidationException::withMessages([
-                'attrs.requires_issuer' => ['Issuer is only allowed for internal law families.'],
+                'attrs.requires_issuer' => ['ระบุผู้ออกประกาศได้เฉพาะกลุ่มกฎหมายภายในเท่านั้น'],
             ]);
         }
 
@@ -511,7 +511,7 @@ class MasterDataStore
             $nextRequiresIssuer = filter_var($nextAttrs['requires_issuer'] ?? $existingRequiresIssuer, FILTER_VALIDATE_BOOL);
             if (($existingFamily !== $nextFamily || $existingRequiresIssuer !== $nextRequiresIssuer)
                 && $this->countLawTypeUsage($code) > 0) {
-                throw new MasterDataConflict('law type attributes cannot be changed while in use');
+                throw new MasterDataConflict('มีเอกสารใช้งานประเภทนี้อยู่ ไม่สามารถแก้ไขกลุ่มหรือการระบุผู้ออกประกาศได้');
             }
         }
 
@@ -519,7 +519,7 @@ class MasterDataStore
             $existingSource = (string) ($existing['attrs']['source'] ?? '');
             $nextSource = (string) ($nextAttrs['source'] ?? $existingSource);
             if ($existingSource !== $nextSource && $this->countLawFamilyUsage($code) > 0) {
-                throw new MasterDataConflict('law family source cannot be changed while in use');
+                throw new MasterDataConflict('มีประเภทเอกสารหรือเอกสารใช้งานกลุ่มนี้อยู่ ไม่สามารถแก้ไขที่มาได้');
             }
         }
     }
