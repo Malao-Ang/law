@@ -1,4 +1,5 @@
 import type { DocumentListItem } from '../types/document';
+import { createLawTypeCatalog, legacyIssuerForType } from './useLawType';
 
 const PICKABLE_STATUSES = new Set(['done', 'exported', 'ingested']);
 const RELATION_READY_STEP = 4;
@@ -144,45 +145,32 @@ export function filterByQuery(items: Array<{ title: string }>, query: string): A
 
 export type ParentLawFamily = 'act' | 'regulation' | 'ordinance' | 'announcement';
 
-export function isUniversityAnnouncementType(lawType: string | null | undefined): boolean {
-  const type = (lawType ?? '').trim();
-  if (type === 'ประกาศที่ออกโดยมหาวิทยาลัย') return true;
-  return type.includes('ประกาศ') && type.includes('มหาวิทยาลัย') && !type.includes('สภา');
+const lawTypes = createLawTypeCatalog();
+
+export function isUniversityAnnouncementType(lawType: string | null | undefined, issuer?: string | null): boolean {
+  const issuerCode = lawTypes.issuerItem(issuer)?.code ?? legacyIssuerForType(lawType);
+  return lawTypes.requiresIssuer(lawType) && issuerCode === 'ISS01';
 }
 
-export function isCouncilAnnouncementType(lawType: string | null | undefined): boolean {
-  const type = (lawType ?? '').trim();
-  if (type === 'ประกาศที่ออกโดยสภามหาวิทยาลัย') return true;
-  return type.includes('ประกาศ') && type.includes('สภา');
+export function isCouncilAnnouncementType(lawType: string | null | undefined, issuer?: string | null): boolean {
+  const issuerCode = lawTypes.issuerItem(issuer)?.code ?? legacyIssuerForType(lawType);
+  return lawTypes.requiresIssuer(lawType) && issuerCode === 'ISS02';
 }
 
 export function matchesParentLawFamily(lawType: string | null | undefined, family: ParentLawFamily): boolean {
-  const type = (lawType ?? '').trim();
-  if (!type) return false;
-  if (family === 'regulation') return type.includes('ระเบียบ');
-  if (family === 'ordinance') return type.includes('ข้อบังคับ');
-  if (family === 'announcement') return type.includes('ประกาศ');
-  return type.includes('พระราชบัญญัติ')
-    || type.includes('พระราชกำหนด')
-    || type.includes('กฎกระทรวง')
-    || type.includes('ประกาศกระทรวง')
-    || type.includes('พ.ร.บ')
-    || type.includes('พ.ร.ก')
-    || type.includes('กฎหมายภายนอก')
-    || type === 'phrb'
-    || type === 'prb'
-    || type === 'phrk'
-    || type === 'kot-krathruang'
-    || type === 'kotmai-krw'
-    || type === 'prakat-krw'
-    || type === 'kotmai-phaainok';
+  const familyCode = lawTypes.typeFamily(lawType);
+  if (!familyCode) return false;
+  if (family === 'regulation') return familyCode === 'LFM02';
+  if (family === 'ordinance') return familyCode === 'LFM01';
+  if (family === 'announcement') return familyCode === 'LFM03';
+  return lawTypes.typeSource(lawType) === 'external';
 }
 
-export function allowedParentFamiliesForChild(childLawType: string | null | undefined): ParentLawFamily[] | null {
-  if (isCouncilAnnouncementType(childLawType)) {
+export function allowedParentFamiliesForChild(childLawType: string | null | undefined, issuer?: string | null): ParentLawFamily[] | null {
+  if (isCouncilAnnouncementType(childLawType, issuer)) {
     return ['act', 'regulation', 'ordinance', 'announcement'];
   }
-  if (isUniversityAnnouncementType(childLawType)) {
+  if (isUniversityAnnouncementType(childLawType, issuer)) {
     return ['regulation', 'ordinance'];
   }
   return null;
@@ -191,10 +179,11 @@ export function allowedParentFamiliesForChild(childLawType: string | null | unde
 export function parentDocumentsForChildType(
   documents: DocumentListItem[],
   childLawType: string | null | undefined,
+  issuer?: string | null,
   excludeDocumentId?: string | null,
   keepDocumentIds: string[] = [],
 ): DocumentListItem[] {
-  const families = allowedParentFamiliesForChild(childLawType);
+  const families = allowedParentFamiliesForChild(childLawType, issuer);
   const keep = new Set(keepDocumentIds.map((id) => id.trim()).filter(Boolean));
 
   return documents.filter((doc) => {

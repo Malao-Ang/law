@@ -4,6 +4,7 @@ import FilterTypeBadge from './FilterTypeBadge.vue';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import type { LawSuggestion } from '../../types/lawSearch';
+import { useLawType } from '../../composables/useLawType';
 
 const emit = defineEmits<{
   search: [query: string, types: string[], groups: string[]];
@@ -16,6 +17,7 @@ const queryInput = ref<{ focus?: () => void } | null>(null);
 
 // Live near-word suggestions (the suggest endpoint already falls back to fuzzy).
 const searchStore = useLawSearchStore();
+const lawTypes = useLawType();
 const searchFocused = ref(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,14 +73,10 @@ onBeforeUnmount(() => {
   searchStore.clearSuggestions();
 });
 
-const typeOptions = ['ทั้งหมด', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'กฎหมายภายนอก'];
-
-const typeToValue: Record<string, string> = {
-  'กฎหมายภายนอก': 'kotmai-phaainok',
-  'ข้อบังคับ': 'kho-bangkhab',
-  'ระเบียบ': 'rabiap',
-  'ประกาศ': 'prakat',
-};
+const typeOptions = computed(() => ['ทั้งหมด', ...lawTypes.familiesOrdered.value.map((family) => family.title)]);
+const typeToValue = computed<Record<string, string>>(() =>
+  Object.fromEntries(lawTypes.familiesOrdered.value.map((family) => [family.title, family.code])),
+);
 
 const groupFilters = [
   { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร' },
@@ -94,7 +92,7 @@ const groupFilters = [
 const popularTags = ['อัตราเบิกค่าใช้จ่ายเดินทาง', 'กองทุนสร้างเสริมสุขภาพ', 'โครงสร้างสถาบันวิจัย'];
 
 function emitSearch(): void {
-  const types = selectedType.value === 'ทั้งหมด' ? [] : [typeToValue[selectedType.value] ?? selectedType.value];
+  const types = selectedType.value === 'ทั้งหมด' ? [] : [typeToValue.value[selectedType.value] ?? selectedType.value];
   emit('search', query.value, types, selectedGroups.value);
 }
 

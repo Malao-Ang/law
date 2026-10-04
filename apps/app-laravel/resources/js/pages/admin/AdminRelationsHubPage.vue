@@ -393,6 +393,7 @@ import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { createLawTypeCatalog } from '../../composables/useLawType';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
@@ -426,6 +427,7 @@ interface ChangeLogEntry {
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 const { statusColor } = useLawStatus();
+const lawTypes = createLawTypeCatalog();
 
 // ── Table state ───────────────────────────────────────────
 const PAGE_SIZE = 20;
@@ -479,14 +481,11 @@ const sortOptions = [
   { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
-// ── Type colors (same as AdminLawListPage) ─────────────────
-const TYPE_META: Record<string, { color: string }> = {
-  กฎหมายภายนอก: { color: 'doc-phaainok' },
-  ข้อบังคับ: { color: 'doc-kho-bangkhab' },
-  ระเบียบ: { color: 'doc-rabiap' },
-  ประกาศ: { color: 'doc-prakat' },
-  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat' },
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat' },
+const FAMILY_COLOR_CLASS: Record<string, string> = {
+  LFM04: 'doc-phaainok',
+  LFM01: 'doc-kho-bangkhab',
+  LFM02: 'doc-rabiap',
+  LFM03: 'doc-prakat',
 };
 
 // ── Derived table rows ─────────────────────────────────────
@@ -601,7 +600,7 @@ function formatDateTime(date: Date): string {
 
 // ── Table helpers ─────────────────────────────────────────
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
+  return FAMILY_COLOR_CLASS[lawTypes.typeFamily(type)] ?? 'grey';
 }
 
 function workflowStageColor(stage: string): string {

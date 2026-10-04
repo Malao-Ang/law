@@ -68,7 +68,8 @@ export type LawTypeCatalogInput = {
 
 function readArray<T>(value: Ref<T[]> | T[] | undefined, fallback: T[]): T[] {
   if (!value) return fallback;
-  return Array.isArray(value) ? value : value.value;
+  const items = Array.isArray(value) ? value : value.value;
+  return items.length > 0 ? items : fallback;
 }
 
 function normalize(value: string | null | undefined): string {
