@@ -257,8 +257,11 @@ class MasterDataStore
 
         $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind): void {
             $items = $this->itemsFromData($data);
+            $needsUpgrade = $this->seedUpgradesNeeded($kind, $items);
             $items = [...$items, ...$this->missingSeeds($kind, $items)];
-            $this->applySeedUpgrades($kind, $items);
+            if ($needsUpgrade) {
+                $this->applySeedUpgrades($kind, $items);
+            }
             $data = ['items' => $this->sortItems($items)];
         });
     }
@@ -284,22 +287,11 @@ class MasterDataStore
             return false;
         }
 
+        // Phase-2 stores carry attrs.requires_issuer on every law type; the upgrade removes it
+        // and nothing writes it again. Checking names/sort orders here would undo admin
+        // renames and reorders on the next read.
         foreach ($items as $item) {
-            if (($item['code'] ?? null) === 'LTY01') {
-                if (($item['name'] ?? null) !== "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}") {
-                    return true;
-                }
-                if (($item['aliases'] ?? []) !== ["\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}", "\u{0E04}\u{0E33}\u{0E2A}\u{0E31}\u{0E48}\u{0E07}"]) {
-                    return true;
-                }
-            }
-
             if (array_key_exists('requires_issuer', (array) ($item['attrs'] ?? []))) {
-                return true;
-            }
-
-            if (in_array(($item['code'] ?? null), ['LTY02', 'LTY03', 'LTY04', 'LTY05', 'LTY06', 'LTY07', 'LTY08'], true)
-                && (int) ($item['sort_order'] ?? 0) < 3) {
                 return true;
             }
         }

@@ -166,4 +166,22 @@ class LawTypeMasterDataSeedTest extends TestCase
         $this->assertSame('legacy admin keeps name', $byCode['LTY02']['name']);
         $this->assertArrayNotHasKey('requires_issuer', $byCode['LTY02']['attrs']);
     }
+
+    public function test_reorder_and_rename_survive_the_next_read(): void
+    {
+        /** @var MasterDataStore $store */
+        $store = app(MasterDataStore::class);
+        $store->all(MasterDataKind::LawType);
+
+        $store->reorder(MasterDataKind::LawType, ['LTY03', 'LTY02', 'LTY09', 'LTY01', 'LTY04', 'LTY05', 'LTY06', 'LTY07', 'LTY08']);
+        $store->update(MasterDataKind::LawType, 'LTY01', ['name' => 'ประกาศมหาวิทยาลัย (ชื่อใหม่)']);
+
+        $types = $store->all(MasterDataKind::LawType);
+
+        $this->assertSame(
+            ['LTY03', 'LTY02', 'LTY09', 'LTY01', 'LTY04', 'LTY05', 'LTY06', 'LTY07', 'LTY08'],
+            array_column($types, 'code'),
+        );
+        $this->assertSame('ประกาศมหาวิทยาลัย (ชื่อใหม่)', array_column($types, 'name', 'code')['LTY01']);
+    }
 }
