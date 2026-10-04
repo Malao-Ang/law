@@ -54,7 +54,7 @@ export type DocumentTypeOption = SelectableOption & {
   code: string;
   family_code: string;
   source: LawSource;
-  requires_issuer: boolean;
+  sort_order?: number;
 };
 
 export type LawFamilyOption = SelectableOption & {
@@ -64,18 +64,11 @@ export type LawFamilyOption = SelectableOption & {
   sort_order: number;
 };
 
-export type IssuerOption = SelectableOption & {
-  code: string;
-  sort_order: number;
-};
-
 export type LookupData = {
   document_types: DocumentTypeOption[];
   document_types_all?: DocumentTypeOption[];
   law_families: LawFamilyOption[];
   law_families_all?: LawFamilyOption[];
-  issuers: IssuerOption[];
-  issuers_all?: IssuerOption[];
   statuses: LawStatusOption[];
   statuses_all?: LawStatusOption[];
   change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];

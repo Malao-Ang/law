@@ -21,7 +21,7 @@
       </div>
       <div class="text-caption text-medium-emphasis mt-1 d-flex flex-column ga-1">
         <span v-if="v.promulgation_date"><v-icon icon="mdi-calendar" size="12" /> ประกาศ {{ formatLawDate(v.promulgation_date) }}</span>
-        <span v-if="v.issuer || v.agency"><v-icon icon="mdi-office-building-outline" size="12" /> {{ v.issuer ? issuerLabel(v.issuer) : v.agency }}</span>
+        <span v-if="v.agency"><v-icon icon="mdi-office-building-outline" size="12" /> {{ v.agency }}</span>
       </div>
       <div v-if="v.change_status" class="text-caption mt-1">{{ v.change_status }}</div>
     </button>
@@ -35,10 +35,6 @@ import Swal from 'sweetalert2';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { useLawType } from '../../composables/useLawType';
-
-const { issuerLabel } = useLawType();
-
 const props = defineProps<{ versions: VersionChainItem[]; viewedDocumentId: string }>();
 const router = useRouter();
 const route = useRoute();

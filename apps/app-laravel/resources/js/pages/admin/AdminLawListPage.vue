@@ -157,7 +157,7 @@
               </div>
             </td>
             <td>
-              <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ law.lawType }}</v-chip>
+              <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ lawTypes.typeLabel(law.lawType) }}</v-chip>
             </td>
             <td>
               <v-chip

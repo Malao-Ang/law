@@ -96,7 +96,6 @@
                 :change-status-text="doc.metadata.changeStatus"
                 :use-status="doc.metadata.useStatus"
                 :amended-sections="doc.metadata.affectedSections"
-                :issuer="section.showIssuer ? doc.metadata.issuer : undefined"
                 :department="doc.metadata.ownerAgencyId"
                 :law-group="doc.metadata.documentGroupId"
                 :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -122,7 +121,6 @@
               :change-status-text="doc.metadata.changeStatus"
               :use-status="doc.metadata.useStatus"
               :amended-sections="doc.metadata.affectedSections"
-              :issuer="section.showIssuer ? doc.metadata.issuer : undefined"
               :department="doc.metadata.ownerAgencyId"
               :law-group="doc.metadata.documentGroupId"
               :date="formatThaiDate(doc.metadata.publishedDate)"
@@ -219,7 +217,6 @@ interface TypeSection {
   title: string;
   color: string;
   docs: DocumentVersion[];
-  showIssuer: boolean;
 }
 
 const latestDocs = ref<DocumentVersion[]>([]);
@@ -262,8 +259,7 @@ const typeSections = computed<TypeSection[]>(() => {
         familyCode: family.code,
         title: family.title,
         color: family.color,
-        docs: family.source === 'internal' ? sortByIssuer(docs) : docs,
-        showIssuer: docs.some((doc) => (doc.metadata.issuer ?? '').trim() !== ''),
+        docs: family.code === 'LFM03' ? sortByTypeOrder(docs) : docs,
       };
     });
 });
@@ -278,13 +274,9 @@ function docsByFamily(familyCode: string): DocumentVersion[] {
   return allDocs.value.filter((doc) => lawTypes.typeFamily(doc.metadata.lawTypeName) === familyCode).slice(0, HOME_SECTION_LIMIT);
 }
 
-function issuerRank(doc: DocumentVersion): number {
-  return lawTypes.issuerRank(doc.metadata.issuer);
-}
-
-function sortByIssuer(docs: DocumentVersion[]): DocumentVersion[] {
+function sortByTypeOrder(docs: DocumentVersion[]): DocumentVersion[] {
   return [...docs].sort((a, b) => {
-    const rank = issuerRank(a) - issuerRank(b);
+    const rank = (lawTypes.typeItem(a.metadata.lawTypeName)?.sort_order ?? 9999) - (lawTypes.typeItem(b.metadata.lawTypeName)?.sort_order ?? 9999);
     if (rank !== 0) return rank;
     return (b.metadata.publishedDate?.getTime() ?? 0) - (a.metadata.publishedDate?.getTime() ?? 0);
   });
@@ -309,7 +301,6 @@ function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion
     ownerAgencyId: org,
     publishedDate,
     status: 'published',
-    issuer: law.issuer ?? '',
     changeStatus: law.change_status ?? '',
     useStatus: law.status ?? '',
     affectedSections: law.affected_sections ?? [],
@@ -338,7 +329,6 @@ function buildDocumentVersion(input: {
   ownerAgencyId: string;
   publishedDate: string | Date;
   status?: DocumentVersion['status'];
-  issuer?: string;
   changeStatus?: string;
   useStatus?: string;
   affectedSections?: string[];
@@ -360,7 +350,6 @@ function buildDocumentVersion(input: {
       summary: input.summary,
       publishedDate,
       ownerAgencyId: input.ownerAgencyId,
-      issuer: input.issuer ?? '',
       changeStatus: input.changeStatus ?? '',
       useStatus: input.useStatus ?? '',
       affectedSections: input.affectedSections ?? [],

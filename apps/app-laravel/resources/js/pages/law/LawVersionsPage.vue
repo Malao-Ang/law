@@ -74,8 +74,8 @@
                   <span v-if="v.promulgation_date">
                     <v-icon icon="mdi-calendar" size="11" /> ประกาศ {{ formatLawDate(v.promulgation_date) }}
                   </span>
-                  <span v-if="v.issuer || v.agency">
-                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.issuer ? issuerLabel(v.issuer) : v.agency }}
+                  <span v-if="v.agency">
+                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.agency }}
                   </span>
                   <span v-if="v.change_status" class="text-caption">{{ v.change_status }}</span>
                 </div>
@@ -195,7 +195,7 @@ import ELawFooter from '../../components/shared/ELawFooter.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
 
-const { typeLabel, issuerLabel } = useLawType();
+const { typeLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();

@@ -32,12 +32,6 @@
     <!-- Description -->
     <p v-if="description" class="elaw-card__desc">{{ description }}</p>
 
-    <!-- Issuer (ประกาศ: ออกโดย…) -->
-    <div v-if="issuer" class="elaw-card__issuer">
-      <v-icon icon="mdi-account-tie-outline" size="13" color="#6b7280" />
-      ออกโดย{{ issuerLabel(issuer) }}
-    </div>
-
     <!-- Agency strip (LawInfoStrip style) -->
     <div v-if="departmentLabel" class="elaw-agency-strip">
       <div class="elaw-agency-strip__label">{{ departmentHeading }}</div>
@@ -80,10 +74,6 @@ import {
   type LawTypeCardClass,
 } from './lawBadge';
 import { cardChangeState } from '../../utils/cardChangeState';
-import { useLawType } from '../../composables/useLawType';
-
-const { issuerLabel } = useLawType();
-
 type Visibility = 'public' | 'private' | 'organization';
 
 const props = defineProps<{
@@ -91,7 +81,6 @@ const props = defineProps<{
   docType: DocType;
   lawType?: string;
   description?: string;
-  issuer?: string;
   changeStatusText?: string;
   useStatus?: string;
   department?: string;
@@ -250,16 +239,6 @@ const visibilityIcon = computed(() =>
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.elaw-card__issuer {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 10px;
 }
 
 .elaw-change-tag {
