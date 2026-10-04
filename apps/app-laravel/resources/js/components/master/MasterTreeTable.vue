@@ -103,13 +103,15 @@
             v-show="expandedCodes.includes(row.family.code)"
             :key="type.code"
             class="master-tree__child"
+            :class="{ 'master-tree__child--last': typeIndex === row.types.length - 1 }"
+            :style="{ '--family-color': row.color }"
             :draggable="reorderMode"
             @dragstart="handleDragStart($event, 'type', type.code, row.family.code)"
             @dragover.prevent
             @drop="handleDrop($event, 'type', type.code, row.family.code)"
           >
-            <td class="master-tree__order-cell">{{ familyIndex + 1 }}.{{ typeIndex + 1 }}</td>
-            <td><span class="master-tree__mono">{{ type.code }}</span></td>
+            <td class="master-tree__order-cell master-tree__child-order">{{ familyIndex + 1 }}.{{ typeIndex + 1 }}</td>
+            <td class="master-tree__child-code"><span class="master-tree__mono">{{ type.code }}</span></td>
             <td class="master-tree__child-name">{{ type.name }}</td>
             <td class="text-medium-emphasis">ตามกลุ่ม</td>
             <td class="text-right">
@@ -297,6 +299,13 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 
 .master-tree__group td {
   background: #f8fafc;
+  border-top: 2px solid #d0d5dd;
+  font-weight: 700;
+}
+
+.master-tree__child td {
+  background: #fff;
+  font-weight: 400;
 }
 
 .master-tree__toggle {
@@ -336,8 +345,45 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   width: 10px;
 }
 
+.master-tree__child-order {
+  padding-left: 34px !important;
+  position: relative;
+}
+
+.master-tree__child-order::before {
+  border-left: 2px solid var(--family-color);
+  bottom: 0;
+  content: "";
+  left: 14px;
+  position: absolute;
+  top: 0;
+}
+
+.master-tree__child--last .master-tree__child-order::before {
+  bottom: 50%;
+}
+
+.master-tree__child-order::after {
+  border-top: 2px solid var(--family-color);
+  content: "";
+  left: 14px;
+  position: absolute;
+  top: 50%;
+  width: 12px;
+}
+
+.master-tree__child-code,
 .master-tree__child-name {
-  padding-left: 32px !important;
+  padding-left: 34px !important;
+}
+
+.master-tree__child-code .master-tree__mono {
+  color: #667085;
+  font-weight: 600;
+}
+
+.master-tree__child-name {
+  font-weight: 400;
 }
 
 .master-tree__action-row {
@@ -373,6 +419,17 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 @media (max-width: 900px) {
   .master-tree {
     overflow-x: auto;
+  }
+
+  .master-tree__child-order,
+  .master-tree__child-code,
+  .master-tree__child-name {
+    padding-left: 24px !important;
+  }
+
+  .master-tree__child-order::before,
+  .master-tree__child-order::after {
+    left: 10px;
   }
 }
 </style>
