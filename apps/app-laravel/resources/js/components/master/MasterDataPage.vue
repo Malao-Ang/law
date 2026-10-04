@@ -168,6 +168,10 @@ async function confirmDeactivate(item: Pick<MasterItem, 'name' | 'usage_count'>)
 }
 
 async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
+  if (item.is_system) {
+    return;
+  }
+
   if (!next && !(await confirmDeactivate(item))) {
     return;
   }

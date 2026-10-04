@@ -61,7 +61,8 @@
                 <div v-bind="tipProps">
                   <v-switch
                     v-model="form.is_active"
-                    :disabled="item?.is_system"
+                    :readonly="item?.is_system"
+                    :class="{ 'master-switch--locked': item?.is_system }"
                     color="success"
                     inset
                     hide-details
@@ -151,6 +152,10 @@ function computedEditing() {
 </script>
 
 <style scoped>
+.master-switch--locked :deep(.v-selection-control) {
+  cursor: not-allowed;
+}
+
 .master-dialog {
   overflow: hidden;
 }

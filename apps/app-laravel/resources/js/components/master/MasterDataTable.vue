@@ -84,8 +84,10 @@
                   <div v-bind="tip">
                     <v-switch
                       :model-value="item.is_active"
-                      :disabled="item.is_system || togglingCode === item.code"
+                      :readonly="item.is_system"
+                      :disabled="togglingCode === item.code"
                       :loading="togglingCode === item.code"
+                      :class="{ 'master-switch--locked': item.is_system }"
                       color="success"
                       density="compact"
                       hide-details
@@ -150,6 +152,10 @@ function itemValue(item: MasterItem, key: string): unknown {
 </script>
 
 <style scoped>
+.master-switch--locked :deep(.v-selection-control) {
+  cursor: not-allowed;
+}
+
 .master-table {
   overflow: hidden;
 }
