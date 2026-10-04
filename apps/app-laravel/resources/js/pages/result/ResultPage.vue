@@ -17,7 +17,7 @@
             <div>
               <div class="text-h6 font-weight-bold">{{ docTitle }}</div>
               <div class="text-caption text-medium-emphasis">
-                {{ meta?.law_type || 'เอกสาร' }}<span v-if="meta?.agency"> · {{ meta.agency }}</span>
+                {{ meta?.law_type ? typeLabel(meta.law_type) : 'เอกสาร' }}<span v-if="meta?.agency"> · {{ meta.agency }}</span>
               </div>
             </div>
           </div>
@@ -261,6 +261,9 @@ import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved } from '../../utils/esignStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();

@@ -110,7 +110,7 @@
         <section class="esign-headcard">
           <div class="d-flex flex-wrap ga-2 mb-3">
             <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
-              {{ meta.law_type || 'เอกสาร' }}
+              {{ meta.law_type ? typeLabel(meta.law_type) : 'เอกสาร' }}
             </v-chip>
             <v-chip size="small" :color="ESIGN_STAGE_COLOR[stage]" variant="flat" class="font-weight-bold">
               {{ ESIGN_STAGE_LABEL[stage] }}
@@ -273,7 +273,7 @@
             </div>
             <div class="esign-kv">
               <span>ประเภท</span>
-              <strong>{{ meta.law_type || '—' }}</strong>
+              <strong>{{ meta.law_type ? typeLabel(meta.law_type) : '—' }}</strong>
             </div>
             <div class="esign-kv">
               <span>กลุ่มกฎหมาย</span>
@@ -396,6 +396,9 @@ import Swal from 'sweetalert2';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',

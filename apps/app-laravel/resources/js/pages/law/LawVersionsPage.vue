@@ -24,7 +24,7 @@
       <template v-else>
         <div class="lvp-title mb-6">
           <h1 class="text-h6 font-weight-bold">{{ meta.title || documentStore.review?.source_file }}</h1>
-          <div v-if="meta.law_type" class="text-caption text-medium-emphasis mt-1">{{ meta.law_type }}</div>
+          <div v-if="meta.law_type" class="text-caption text-medium-emphasis mt-1">{{ typeLabel(meta.law_type) }}</div>
           <v-btn
             size="small"
             variant="outlined"
@@ -75,7 +75,7 @@
                     <v-icon icon="mdi-calendar" size="11" /> ประกาศ {{ formatLawDate(v.promulgation_date) }}
                   </span>
                   <span v-if="v.issuer || v.agency">
-                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.issuer || v.agency }}
+                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.issuer ? issuerLabel(v.issuer) : v.agency }}
                   </span>
                   <span v-if="v.change_status" class="text-caption">{{ v.change_status }}</span>
                 </div>
@@ -193,6 +193,9 @@ import { formatThaiDate } from '../../utils/thaiDate';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel, issuerLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();

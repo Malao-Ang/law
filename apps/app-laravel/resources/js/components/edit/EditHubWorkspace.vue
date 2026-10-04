@@ -30,7 +30,7 @@
           <div class="edit-hub-hero">
             <div class="d-flex flex-wrap ga-2 mb-3">
               <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
-                {{ meta.law_type || 'เอกสาร' }}
+                {{ meta.law_type ? typeLabel(meta.law_type) : 'เอกสาร' }}
               </v-chip>
               <v-chip
                 size="small"
@@ -255,6 +255,9 @@ import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 

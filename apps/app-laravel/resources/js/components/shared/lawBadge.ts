@@ -69,6 +69,14 @@ export const LAW_TYPE_TO_DOC_TYPE: Record<string, LawTypeCardClass> = {
   command: 'command',
   มติ: 'resolution',
   resolution: 'resolution',
+  LTY01: 'prakat',
+  LTY02: 'rabiap',
+  LTY03: 'kho-bangkhab',
+  LTY04: 'phrk',
+  LTY05: 'prb',
+  LTY06: 'kotmai-krw',
+  LTY07: 'prakat-krw',
+  LTY08: 'kotmai-phaainok',
 };
 
 const CHANGE_STATUS_BADGES: Record<ChangeStatus, StatusBadge> = {

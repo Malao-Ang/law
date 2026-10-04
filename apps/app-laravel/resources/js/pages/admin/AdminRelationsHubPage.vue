@@ -81,7 +81,7 @@
             </td>
             <td>
               <v-chip v-if="doc.lawType" size="small" variant="flat" :color="typeColor(doc.lawType)" rounded="pill" class="font-weight-bold text-white">
-                {{ doc.lawType }}
+                {{ typeLabel(doc.lawType) }}
               </v-chip>
             </td>
             <td>
@@ -396,6 +396,8 @@ import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
+
+const { typeLabel } = useLawType();
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {

@@ -165,7 +165,7 @@
         <div class="rel-root__title mb-3">{{ selectedRow.title }}</div>
         <div class="d-flex flex-wrap ga-2 mb-4">
           <v-chip v-if="selectedRow.lawType" size="small" variant="tonal" color="grey" rounded="lg">
-            {{ selectedRow.lawType }}
+            {{ typeLabel(selectedRow.lawType) }}
           </v-chip>
           <v-chip v-if="selectedRow.isParent" size="small" variant="tonal" color="grey" rounded="lg">
             กฎหมายแม่
@@ -386,6 +386,9 @@ import {
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 const PAGE_SIZE = 20;
 

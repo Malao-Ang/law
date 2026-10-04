@@ -35,7 +35,7 @@
     <!-- Issuer (ประกาศ: ออกโดย…) -->
     <div v-if="issuer" class="elaw-card__issuer">
       <v-icon icon="mdi-account-tie-outline" size="13" color="#6b7280" />
-      ออกโดย{{ issuer }}
+      ออกโดย{{ issuerLabel(issuer) }}
     </div>
 
     <!-- Agency strip (LawInfoStrip style) -->
@@ -80,6 +80,9 @@ import {
   type LawTypeCardClass,
 } from './lawBadge';
 import { cardChangeState } from '../../utils/cardChangeState';
+import { useLawType } from '../../composables/useLawType';
+
+const { issuerLabel } = useLawType();
 
 type Visibility = 'public' | 'private' | 'organization';
 
