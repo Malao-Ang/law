@@ -38,10 +38,9 @@ class StoreDocumentRequest extends FormRequest
             'scan_extraction_mode' => ['nullable', 'in:local,gemini,landingai'],
             'extraction_engine' => ['nullable', 'in:standard,fast'],
             'document_type' => ['nullable', 'in:new,old'],
-            'source' => ['nullable', 'required_if:document_type,old', 'in:internal,external'],
+            'source' => ['nullable', 'in:internal,external'],
             'law_type' => [
                 'nullable',
-                'required_if:document_type,old',
                 function (string $attribute, mixed $value, \Closure $fail, mixed $validator): void {
                     if ($value === null || $value === '') {
                         return;
@@ -50,7 +49,7 @@ class StoreDocumentRequest extends FormRequest
                     $lawTypes = app(LawTypes::class);
                     $match = $lawTypes->resolve($value);
                     if ($match === null || ! (bool) ($match['is_active'] ?? false)) {
-                        $fail('Invalid law type.');
+                        $fail('ประเภทกฎหมายไม่ถูกต้อง');
 
                         return;
                     }
@@ -58,7 +57,7 @@ class StoreDocumentRequest extends FormRequest
                     $data = method_exists($validator, 'getData') ? $validator->getData() : [];
                     $source = $data['source'] ?? $this->input('source');
                     if ($source !== null && $lawTypes->sourceOf($value) !== $source) {
-                        $fail('Law type source does not match the selected source.');
+                        $fail('ประเภทกฎหมายไม่ตรงกับแหล่งที่มาที่เลือก');
                     }
                 },
             ],
