@@ -97,7 +97,6 @@ class LawIndexer
         $lawType = $lawTypes->resolve($meta['law_type'] ?? '');
         $lawTypeCode = (string) ($lawType['code'] ?? ($meta['law_type'] ?? ''));
         $lawFamilyCode = (string) ($lawType['attrs']['family_code'] ?? '');
-        $issuer = $lawTypes->issuerResolve($meta['issuer'] ?? '');
         $lawCategories = $this->lawCategories ?? app(LawCategories::class);
         $lawGroupValues = is_array($meta['law_groups'] ?? null) ? $meta['law_groups'] : [];
         if ($lawGroupValues === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
@@ -119,7 +118,7 @@ class LawIndexer
             'law_type'       => $lawTypeCode !== '' ? $lawTypeCode : null,
             'law_family'     => $lawFamilyCode !== '' ? $lawFamilyCode : null,
             'law_type_label' => $lawType === null ? ($meta['law_type'] ?? null) : (string) ($lawType['name'] ?? ''),
-            'issuer'         => $issuer === null ? ($meta['issuer'] ?? null) : (string) ($issuer['code'] ?? ''),
+            'issuer'         => null,
             'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
             'change_status'  => $meta['change_status'] ?? null,
             'agency'         => $meta['agency'] ?? null,

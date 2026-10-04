@@ -31,10 +31,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             }
         }
         if (is_array($lawMeta) && array_key_exists('issuer', $lawMeta)) {
-            $resolved = app(LawTypes::class)->issuerResolve($lawMeta['issuer']);
-            if ($resolved !== null) {
-                $lawMeta['issuer'] = (string) $resolved['code'];
-            }
+            unset($lawMeta['issuer']);
         }
         if (is_array($lawMeta) && (array_key_exists('law_groups', $lawMeta) || array_key_exists('law_group', $lawMeta))) {
             $lawMeta = $this->normalizeLawCategoryFields($lawMeta);
@@ -89,7 +86,6 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.change_details.*' => ['nullable', 'string', 'max:120'],
             'law_meta.agency' => ['nullable', 'string', 'max:255'],
             'law_meta.signer_group' => ['nullable', 'string', 'max:255'],
-            'law_meta.issuer' => ['nullable', 'string', 'max:120'],
             'law_meta.promulgation_date' => ['nullable', 'string', 'max:120'],
             'law_meta.effective_date' => ['nullable', 'string', 'max:120'],
             'law_meta.gazette_reference' => ['nullable', 'string', 'max:255'],
@@ -155,20 +151,6 @@ class UpdateDocumentReviewRequest extends FormRequest
                 $validator->errors()->add('law_meta.source', 'Law type source does not match.');
             }
 
-            $issuer = trim((string) ($lawMeta['issuer'] ?? ''));
-            if ($lawTypes->requiresIssuer($lawTypeValue)) {
-                if ($issuer === '') {
-                    $validator->errors()->add('law_meta.issuer', 'Issuer is required for this law type.');
-                } elseif ($lawTypes->issuerResolve($issuer) === null) {
-                    $validator->errors()->add('law_meta.issuer', 'Invalid issuer.');
-                }
-
-                return;
-            }
-
-            if ($issuer !== '') {
-                $validator->errors()->add('law_meta.issuer', 'Issuer must be empty for this law type.');
-            }
         });
     }
 

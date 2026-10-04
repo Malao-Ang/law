@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 class LawMetaIssuerTest extends TestCase
 {
-    public function test_issuer_persists_via_document_review(): void
+    public function test_incoming_issuer_is_ignored_by_document_review(): void
     {
         $store = app(ReviewStore::class);
         $documentId = 'law_meta_issuer_'.uniqid();
@@ -21,11 +21,12 @@ class LawMetaIssuerTest extends TestCase
         ]);
 
         $this->putJson("/api/documents/{$documentId}/document-review", [
-            'law_meta' => ['law_type' => 'ประกาศ', 'issuer' => 'สภามหาวิทยาลัย'],
+            'law_meta' => ['law_type' => 'LTY09', 'issuer' => 'สภามหาวิทยาลัย'],
         ])->assertOk();
 
         $doc = $store->getReviewDocument($documentId);
-        $this->assertSame('ISS02', $doc['law_meta']['issuer']);
+        $this->assertArrayHasKey('issuer', $doc['law_meta']);
+        $this->assertNull($doc['law_meta']['issuer']);
     }
 
     public function test_issuer_defaults_to_null_when_absent(): void
@@ -42,7 +43,7 @@ class LawMetaIssuerTest extends TestCase
         ]);
 
         $this->putJson("/api/documents/{$documentId}/document-review", [
-            'law_meta' => ['law_type' => 'ระเบียบ'],
+            'law_meta' => ['law_type' => 'LTY02'],
         ])->assertOk();
 
         $doc = $store->getReviewDocument($documentId);
