@@ -501,8 +501,8 @@ class MasterDataStore
             'sort_order' => array_key_exists('sort_order', $payload) && $payload['sort_order'] !== null
                 ? (int) $payload['sort_order']
                 : (int) ($existing['sort_order'] ?? $this->nextSortOrder($items)),
-            'aliases' => $this->normalizeStringList($payload['aliases'] ?? $existing['aliases'] ?? []),
-            'attrs' => $this->normalizeAttrs($kind, $payload, $existing, (bool) $defaults['is_system']),
+            'aliases' => $this->normalizeAliases($kind, $payload, $existing, (string) $defaults['code'], $items),
+            'attrs' => $this->normalizeAttrs($kind, $payload, $existing, (bool) $defaults['is_system'], $items, (string) $defaults['code']),
             'created_at' => (string) $defaults['created_at'],
             'updated_at' => (string) $defaults['updated_at'],
         ];
@@ -513,7 +513,7 @@ class MasterDataStore
      * @param  array<string, mixed>  $existing
      * @return array<string, mixed>
      */
-    private function normalizeAttrs(MasterDataKind $kind, array $payload, array $existing, bool $isSystem): array
+    private function normalizeAttrs(MasterDataKind $kind, array $payload, array $existing, bool $isSystem, array $items = [], string $code = ''): array
     {
         $attrs = is_array($payload['attrs'] ?? null) ? $payload['attrs'] : (array) ($existing['attrs'] ?? []);
 
@@ -528,6 +528,7 @@ class MasterDataStore
             ],
             MasterDataKind::LawType => $this->normalizeLawTypeAttrs($attrs),
             MasterDataKind::LawCategory => [],
+            MasterDataKind::LegalStructure => $this->normalizeLegalStructureAttrs($attrs, $existing, $items, $code, $isSystem),
         };
     }
 
@@ -548,6 +549,90 @@ class MasterDataStore
         return [
             'family_code' => $familyCode,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @param  array<string, mixed>  $existing
+     * @param  list<array<string, mixed>>  $items
+     * @return array{family_codes: list<string>, file_types: list<string>, is_head: bool, counts_as_section: bool, is_required: bool, color: string, export_key: string}
+     */
+    private function normalizeLegalStructureAttrs(array $attrs, array $existing, array $items, string $code, bool $isSystem): array
+    {
+        $familyCodes = [];
+        foreach ((array) ($attrs['family_codes'] ?? []) as $familyCode) {
+            $familyCode = $this->normalizeCode((string) $familyCode);
+            if ($familyCode !== '' && ! in_array($familyCode, $familyCodes, true)) {
+                $familyCodes[] = $familyCode;
+            }
+        }
+        if ($familyCodes === []) {
+            throw ValidationException::withMessages([
+                'attrs.family_codes' => ['เลือกประเภทเอกสารที่รองรับอย่างน้อย 1 กลุ่ม'],
+            ]);
+        }
+
+        foreach ($familyCodes as $familyCode) {
+            if ($this->find(MasterDataKind::LawFamily, $familyCode) === null) {
+                throw ValidationException::withMessages([
+                    'attrs.family_codes' => ['ไม่พบกลุ่มประเภทเอกสารที่เลือก'],
+                ]);
+            }
+        }
+
+        $fileTypes = [];
+        foreach ((array) ($attrs['file_types'] ?? []) as $fileType) {
+            $fileType = mb_strtolower(trim((string) $fileType));
+            if (in_array($fileType, ['word', 'pdf'], true) && ! in_array($fileType, $fileTypes, true)) {
+                $fileTypes[] = $fileType;
+            } elseif ($fileType !== '') {
+                throw ValidationException::withMessages([
+                    'attrs.file_types' => ['เลือกชนิดไฟล์ที่รองรับอย่างน้อย 1 ชนิด'],
+                ]);
+            }
+        }
+        if ($fileTypes === []) {
+            throw ValidationException::withMessages([
+                'attrs.file_types' => ['เลือกชนิดไฟล์ที่รองรับอย่างน้อย 1 ชนิด'],
+            ]);
+        }
+
+        $existingExportKey = trim((string) ($existing['attrs']['export_key'] ?? ''));
+        $exportKey = $this->normalizeCode((string) ($attrs['export_key'] ?? $existingExportKey ?: $code));
+        if ($isSystem && $existingExportKey !== '' && $exportKey !== $existingExportKey) {
+            throw ValidationException::withMessages([
+                'attrs.export_key' => ['รหัสส่งออกของรายการระบบไม่สามารถแก้ไขได้'],
+            ]);
+        }
+        $this->assertUniqueLegalStructureExportKey($items, $exportKey, $code);
+
+        return [
+            'family_codes' => $familyCodes,
+            'file_types' => $fileTypes,
+            'is_head' => array_key_exists('is_head', $attrs) ? (bool) $attrs['is_head'] : (bool) ($existing['attrs']['is_head'] ?? true),
+            'counts_as_section' => array_key_exists('counts_as_section', $attrs) ? (bool) $attrs['counts_as_section'] : (bool) ($existing['attrs']['counts_as_section'] ?? false),
+            'is_required' => array_key_exists('is_required', $attrs) ? (bool) $attrs['is_required'] : (bool) ($existing['attrs']['is_required'] ?? false),
+            'color' => trim((string) ($attrs['color'] ?? $existing['attrs']['color'] ?? 'blue-grey')) ?: 'blue-grey',
+            'export_key' => $exportKey,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function assertUniqueLegalStructureExportKey(array $items, string $exportKey, string $ignoreCode): void
+    {
+        foreach ($items as $item) {
+            if ((string) ($item['code'] ?? '') === $ignoreCode) {
+                continue;
+            }
+
+            if ($this->normalizeCode((string) ($item['attrs']['export_key'] ?? '')) === $exportKey) {
+                throw ValidationException::withMessages([
+                    'attrs.export_key' => ['รหัสส่งออกซ้ำกับรายการอื่น'],
+                ]);
+            }
+        }
     }
 
     /**
@@ -616,6 +701,35 @@ class MasterDataStore
         $color = trim((string) $value);
 
         return preg_match('/^#[0-9A-Fa-f]{6}$/', $color) === 1 ? mb_strtoupper($color) : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $existing
+     * @param  list<array<string, mixed>>  $items
+     * @return list<string>
+     */
+    private function normalizeAliases(MasterDataKind $kind, array $payload, array $existing, string $code, array $items): array
+    {
+        $aliases = $this->normalizeStringList($payload['aliases'] ?? $existing['aliases'] ?? []);
+        if ($kind !== MasterDataKind::LegalStructure) {
+            return $aliases;
+        }
+
+        $attrs = $this->normalizeAttrs(
+            $kind,
+            $payload,
+            $existing,
+            (bool) ($existing['is_system'] ?? $payload['is_system'] ?? false),
+            $items,
+            $code,
+        );
+        $exportKey = (string) ($attrs['export_key'] ?? '');
+        if ($exportKey !== '' && ! in_array($exportKey, $aliases, true)) {
+            array_unshift($aliases, $exportKey);
+        }
+
+        return array_values(array_unique($aliases));
     }
 
     /**

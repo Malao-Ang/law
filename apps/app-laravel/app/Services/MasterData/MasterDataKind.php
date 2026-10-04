@@ -25,6 +25,7 @@ enum MasterDataKind: string
     case LawFamily = 'law_family';
     case LawType = 'law_type';
     case LawCategory = 'law_category';
+    case LegalStructure = 'legal_structure';
 
     public function prefix(): string
     {
@@ -33,12 +34,13 @@ enum MasterDataKind: string
             self::LawFamily => 'LFM',
             self::LawType => 'LTY',
             self::LawCategory => 'DCT',
+            self::LegalStructure => 'LST',
         };
     }
 
     public function codePad(): int
     {
-        return $this === self::LawCategory ? 3 : 2;
+        return in_array($this, [self::LawCategory, self::LegalStructure], true) ? 3 : 2;
     }
 
     public function deletable(): bool
@@ -53,6 +55,7 @@ enum MasterDataKind: string
             self::LawFamily => 'กลุ่มประเภท',
             self::LawType => 'ประเภทเอกสาร',
             self::LawCategory => 'หมวดเอกสาร',
+            self::LegalStructure => 'โครงสร้างกฎหมาย',
         };
     }
 
@@ -295,6 +298,92 @@ enum MasterDataKind: string
                     'attrs' => [],
                 ],
             ],
+            self::LegalStructure => [
+                [
+                    'code' => 'LST001',
+                    'name' => 'ชื่อประกาศ',
+                    'description' => 'ระบุชื่อของเอกสารกฎหมาย',
+                    'aliases' => ['TITLE'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'indigo', 'export_key' => 'TITLE'],
+                ],
+                [
+                    'code' => 'LST002',
+                    'name' => 'คำปรารภ',
+                    'description' => '',
+                    'aliases' => ['PREAMBLE'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'success', 'export_key' => 'PREAMBLE'],
+                ],
+                [
+                    'code' => 'LST003',
+                    'name' => 'บทอาศัยอำนาจ',
+                    'description' => '',
+                    'aliases' => ['AUTHORITY'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'deep-purple', 'export_key' => 'AUTHORITY'],
+                ],
+                [
+                    'code' => 'LST004',
+                    'name' => 'ข้อ',
+                    'description' => '',
+                    'aliases' => ['CLAUSE', 'ARTICLE', 'PARAGRAPH', 'ITEM'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => true, 'is_required' => false, 'color' => 'orange', 'export_key' => 'CLAUSE'],
+                ],
+                [
+                    'code' => 'LST005',
+                    'name' => 'วันบังคับใช้',
+                    'description' => '',
+                    'aliases' => ['EFFECTIVE_DATE'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'teal', 'export_key' => 'EFFECTIVE_DATE'],
+                ],
+                [
+                    'code' => 'LST006',
+                    'name' => 'บทยกเลิก',
+                    'description' => '',
+                    'aliases' => ['REPEAL'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'red', 'export_key' => 'REPEAL'],
+                ],
+                [
+                    'code' => 'LST007',
+                    'name' => 'บทนิยาม',
+                    'description' => '',
+                    'aliases' => ['DEFINITION_SECTION'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'amber-darken-2', 'export_key' => 'DEFINITION_SECTION'],
+                ],
+                [
+                    'code' => 'LST008',
+                    'name' => 'คำนิยาม',
+                    'description' => '',
+                    'aliases' => ['DEFINITION'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => false, 'counts_as_section' => false, 'is_required' => false, 'color' => 'amber', 'export_key' => 'DEFINITION'],
+                ],
+                [
+                    'code' => 'LST009',
+                    'name' => 'บทรักษาการ',
+                    'description' => '',
+                    'aliases' => ['CUSTODIAN'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'brown', 'export_key' => 'CUSTODIAN'],
+                ],
+                [
+                    'code' => 'LST010',
+                    'name' => 'บทเฉพาะกาล',
+                    'description' => '',
+                    'aliases' => ['TRANSITIONAL_PROVISION'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'cyan', 'export_key' => 'TRANSITIONAL_PROVISION'],
+                ],
+                [
+                    'code' => 'LST011',
+                    'name' => 'มาตรา',
+                    'description' => '',
+                    'aliases' => ['SECTION'],
+                    'attrs' => ['family_codes' => ['LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => true, 'is_required' => false, 'color' => 'blue-grey', 'export_key' => 'SECTION'],
+                ],
+                [
+                    'code' => 'LST012',
+                    'name' => 'หมวด/ส่วน',
+                    'description' => '',
+                    'aliases' => ['CHAPTER', 'BOOK', 'PART'],
+                    'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'blue', 'export_key' => 'CHAPTER'],
+                ],
+            ],
         };
     }
 
@@ -315,6 +404,17 @@ enum MasterDataKind: string
                 'attrs.family_code' => ['required', 'string', 'max:32'],
             ],
             self::LawCategory => [],
+            self::LegalStructure => [
+                'attrs.family_codes' => ['nullable', 'array'],
+                'attrs.family_codes.*' => ['string', 'max:32'],
+                'attrs.file_types' => ['nullable', 'array'],
+                'attrs.file_types.*' => ['string', 'max:16'],
+                'attrs.is_head' => ['nullable', 'boolean'],
+                'attrs.counts_as_section' => ['nullable', 'boolean'],
+                'attrs.is_required' => ['nullable', 'boolean'],
+                'attrs.color' => ['nullable', 'string', 'max:64'],
+                'attrs.export_key' => ['nullable', 'string', 'max:64'],
+            ],
         };
     }
 }
