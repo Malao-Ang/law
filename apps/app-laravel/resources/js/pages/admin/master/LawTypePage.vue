@@ -280,11 +280,13 @@ const filteredRows = computed(() => {
     })
     .filter((row): row is MasterTreeRow => row !== null);
 
-  if (needle) {
-    expandedCodes.value = new Set([...expandedCodes.value, ...result.map((row) => row.family.code)]);
-  }
-
   return result;
+});
+
+// Auto-expand groups that match the search (kept out of the computed to avoid side effects).
+watch(filteredRows, (result) => {
+  if (!query.value.trim()) return;
+  expandedCodes.value = new Set([...expandedCodes.value, ...result.map((row) => row.family.code)]);
 });
 
 const statCards = computed(() => {
