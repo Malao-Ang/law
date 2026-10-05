@@ -624,6 +624,40 @@ class ReviewStore
     }
 
     /**
+     * Rewrite every block's meta.chunk_type under the review lock. The mapper receives the
+     * current value and returns the new one (return the same value to leave it untouched).
+     * Only meta.chunk_type is touched.
+     *
+     * @param  callable(string): string  $mapper
+     * @return int number of blocks changed
+     */
+    public function mapBlockChunkTypes(string $documentId, callable $mapper): int
+    {
+        $changed = 0;
+
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($mapper, &$changed): void {
+            foreach (($document['pages'] ?? []) as $pageIndex => $page) {
+                if (! is_array($page) || ! is_array($page['blocks'] ?? null)) {
+                    continue;
+                }
+                foreach ($page['blocks'] as $blockIndex => $block) {
+                    $current = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($current === '') {
+                        continue;
+                    }
+                    $next = $mapper($current);
+                    if ($next !== $current) {
+                        $document['pages'][$pageIndex]['blocks'][$blockIndex]['meta']['chunk_type'] = $next;
+                        $changed++;
+                    }
+                }
+            }
+        });
+
+        return $changed;
+    }
+
+    /**
      * Create an empty review doc for a historical (old) PDF so the metadata
      * wizard can run immediately, before background OCR indexing completes.
      *
