@@ -52,6 +52,14 @@ enum MasterDataKind: string
         return false;
     }
 
+    /**
+     * Kinds that drive relation logic (relation graph, same-level replacement) are view-only.
+     */
+    public function readOnly(): bool
+    {
+        return in_array($this, [self::ChangeStatus, self::ChangeDetail], true);
+    }
+
     public function label(): string
     {
         return match ($this) {
