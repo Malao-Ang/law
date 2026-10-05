@@ -42,6 +42,42 @@ sections, and unit words, but it does not auto-select `LTY01` or `LTY09`.
 - For old/imported documents, a stored `source` can be used as fallback while the user selects a
   valid type.
 
+## Legal Structure Headings
+
+RAG section heads store `block.meta.chunk_type` as a legal-structure master-data code (`LSTxxx`).
+The old uppercase keys are legacy aliases only; new writes should persist the `LST` code.
+
+| code | title | families | file types | head | counts as section | export key |
+|---|---|---|---|---|---|---|
+| `LST001` | ชื่อประกาศ | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `TITLE` |
+| `LST002` | คำปรารภ | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `PREAMBLE` |
+| `LST003` | บทอาศัยอำนาจ | `LFM01`, `LFM02`, `LFM03` | `word`, `pdf` | yes | no | `AUTHORITY` |
+| `LST004` | ข้อ | `LFM01`, `LFM02`, `LFM03` | `word`, `pdf` | yes | yes | `CLAUSE` |
+| `LST005` | วันบังคับใช้ | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `EFFECTIVE_DATE` |
+| `LST006` | บทยกเลิก | `LFM01`, `LFM02` | `word`, `pdf` | yes | no | `REPEAL` |
+| `LST007` | บทนิยาม | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `DEFINITION_SECTION` |
+| `LST008` | คำนิยาม | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | no | no | `DEFINITION` |
+| `LST009` | บทรักษาการ | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `CUSTODIAN` |
+| `LST010` | บทเฉพาะกาล | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `TRANSITIONAL_PROVISION` |
+| `LST011` | มาตรา | `LFM04` | `word`, `pdf` | yes | yes | `SECTION` |
+| `LST012` | หมวด/ส่วน | `LFM01`, `LFM02`, `LFM03`, `LFM04` | `word`, `pdf` | yes | no | `CHAPTER` |
+
+Legal-structure attrs:
+
+| attr | meaning |
+|---|---|
+| `family_codes` | Law families where the heading is available. `LST004` is internal families only; `LST011` is external law only. |
+| `file_types` | Supported source file families: `word` for `doc`/`docx`, `pdf` for `pdf`, `pdf_text`, `pdf_scan`, `pdf_mixed`. |
+| `is_head` | Whether the type starts a RAG section. |
+| `counts_as_section` | Whether law-info section count includes this head. |
+| `is_required` | If true, the RAG step blocks “next” until this supported heading exists and its head block has non-empty text. |
+| `color` | Vuetify color used for chips. |
+| `export_key` | Legacy/export key included in RAG export metadata. |
+
+Legacy aliases resolve as follows: `ARTICLE`, `PARAGRAPH`, `ITEM`, and `CLAUSE` -> `LST004`;
+`SECTION` -> `LST011`; `CHAPTER`, `BOOK`, and `PART` -> `LST012`; the other old keys map to
+their matching seed rows above.
+
 ## Singular And Array Pairs
 
 | Canonical array | Legacy mirror |
@@ -72,6 +108,11 @@ publishing sets legal `status` to in-force and sets `published_date`.
 `php artisan master-data:migrate law-type` treats bare `ประกาศ` and legacy `LTY01` without a known
 legacy issuer as `NEEDS_FORM`: it reports document id + title and exits successfully without writing
 a guessed type. Users must choose either `LTY01` or `LTY09` in the law-info form.
+
+`php artisan master-data:migrate legal-structure --dry-run` audits stored `block.meta.chunk_type`
+values and reports the target `LST` code. Run without `--dry-run` to rewrite legacy values in review
+documents. Use `--map="legacy value=LSTxxx"` for project-specific legacy labels; unmapped values abort
+without writing.
 
 Legacy mappings that are still deterministic:
 

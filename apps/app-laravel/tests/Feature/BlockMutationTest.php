@@ -316,4 +316,36 @@ class BlockMutationTest extends TestCase
         $this->assertEquals('b1', $blocks[0]['block_id']);
         $this->assertEquals('New block', $blocks[1]['approved_text']);
     }
+
+    public function test_patch_chunk_type_accepts_code_and_legacy_key_and_stores_code(): void
+    {
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b1", ['page_no' => 1, 'chunk_type' => 'TITLE'])->assertOk();
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b2", ['page_no' => 1, 'chunk_type' => 'LST004'])->assertOk();
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b3", ['page_no' => 1, 'chunk_type' => 'CHAPTER'])->assertOk();
+
+        $blocks = $this->store->getReviewDocument($this->docId)['pages'][0]['blocks'];
+        $this->assertSame('LST001', $blocks[0]['meta']['chunk_type'] ?? null);
+        $this->assertSame('LST004', $blocks[1]['meta']['chunk_type'] ?? null);
+        $this->assertSame('LST012', $blocks[2]['meta']['chunk_type'] ?? null);
+
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b1", ['page_no' => 1, 'chunk_type' => null])->assertOk();
+        $blocks = $this->store->getReviewDocument($this->docId)['pages'][0]['blocks'];
+        $this->assertNull($blocks[0]['meta']['chunk_type'] ?? null);
+    }
+
+    public function test_patch_chunk_type_rejects_unknown_and_inactive_structures(): void
+    {
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b1", ['page_no' => 1, 'chunk_type' => 'NOT_A_STRUCTURE'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.chunk_type.0', 'ไม่พบโครงสร้างกฎหมายที่เลือก');
+
+        $created = $this->postJson('/api/master-data/legal_structure', [
+            'name' => 'โครงสร้างทดสอบ',
+            'attrs' => ['family_codes' => ['LFM01'], 'file_types' => ['word']],
+        ])->assertCreated()->json('code');
+
+        // New items are created inactive.
+        $this->patchJson("/api/documents/{$this->docId}/blocks/b1", ['page_no' => 1, 'chunk_type' => $created])
+            ->assertStatus(422);
+    }
 }

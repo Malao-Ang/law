@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LegalStructures;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -620,6 +621,40 @@ class ReviewStore
     {
         $this->syncDocumentReview($document);
         $this->blob->write('review', $documentId, $document);
+    }
+
+    /**
+     * Rewrite every block's meta.chunk_type under the review lock. The mapper receives the
+     * current value and returns the new one (return the same value to leave it untouched).
+     * Only meta.chunk_type is touched.
+     *
+     * @param  callable(string): string  $mapper
+     * @return int number of blocks changed
+     */
+    public function mapBlockChunkTypes(string $documentId, callable $mapper): int
+    {
+        $changed = 0;
+
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($mapper, &$changed): void {
+            foreach (($document['pages'] ?? []) as $pageIndex => $page) {
+                if (! is_array($page) || ! is_array($page['blocks'] ?? null)) {
+                    continue;
+                }
+                foreach ($page['blocks'] as $blockIndex => $block) {
+                    $current = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($current === '') {
+                        continue;
+                    }
+                    $next = $mapper($current);
+                    if ($next !== $current) {
+                        $document['pages'][$pageIndex]['blocks'][$blockIndex]['meta']['chunk_type'] = $next;
+                        $changed++;
+                    }
+                }
+            }
+        });
+
+        return $changed;
     }
 
     /**
@@ -2053,8 +2088,7 @@ class ReviewStore
                     continue;
                 }
 
-                $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
-                if (in_array($chunkType, ['BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM'], true)) {
+                if (app(LegalStructures::class)->countsAsSection($block['meta']['chunk_type'] ?? null)) {
                     $count++;
                 }
             }

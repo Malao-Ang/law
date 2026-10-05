@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
+use App\Services\MasterData\LegalStructures;
 use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
 use App\Services\ReviewStore;
@@ -13,15 +14,18 @@ use Illuminate\Console\Command;
 class MigrateMasterDataCommand extends Command
 {
     protected $signature = 'master-data:migrate
-        {kind : Migration kind. Supported: enforcement-status, law-type, law-category}
+        {kind : Migration kind. Supported: enforcement-status, law-type, law-category, legal-structure}
         {--dry-run : Audit without writing}
         {--map=* : Extra mapping in the form "legacy value=STA0x"}';
 
     protected $description = 'Migrate legacy data values to master data codes.';
 
-    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, LawCategories $lawCategories, ReviewStore $reviewStore): int
+    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, LawCategories $lawCategories, ReviewStore $reviewStore, LegalStructures $legalStructures): int
     {
         $kind = (string) $this->argument('kind');
+        if (in_array($kind, ['legal-structure', 'legal_structure'], true)) {
+            return $this->migrateLegalStructures($masterData, $legalStructures, $reviewStore);
+        }
         if (in_array($kind, ['law-type', 'law_type'], true)) {
             return $this->migrateLawTypes($masterData, $lawTypes, $reviewStore);
         }
@@ -30,7 +34,7 @@ class MigrateMasterDataCommand extends Command
         }
 
         if (! in_array($kind, ['enforcement-status', 'enforcement_status'], true)) {
-            $this->error('Unknown migration kind. Supported: enforcement-status, law-type, law-category');
+            $this->error('Unknown migration kind. Supported: enforcement-status, law-type, law-category, legal-structure');
 
             return self::FAILURE;
         }
@@ -256,6 +260,99 @@ class MigrateMasterDataCommand extends Command
         }
 
         return $map;
+    }
+
+    private function migrateLegalStructures(MasterDataStore $masterData, LegalStructures $legalStructures, ReviewStore $reviewStore): int
+    {
+        $masterData->seedIfEmpty(MasterDataKind::LegalStructure);
+
+        $extraMap = [];
+        foreach ((array) $this->option('map') as $entry) {
+            $parts = explode('=', (string) $entry, 2);
+            $target = count($parts) === 2 ? $legalStructures->resolve(trim($parts[1])) : null;
+            if ($target === null) {
+                $this->error('Invalid --map value. Use "legacy value=LSTxxx".');
+
+                return self::FAILURE;
+            }
+            $extraMap[trim($parts[0])] = (string) $target['code'];
+        }
+
+        $resolve = function (string $value) use ($extraMap, $legalStructures): ?string {
+            if (isset($extraMap[$value])) {
+                return $extraMap[$value];
+            }
+            $item = $legalStructures->resolve($value);
+
+            return $item === null ? null : (string) $item['code'];
+        };
+
+        $audit = [];
+        $unmapped = [];
+        $documentsToPatch = [];
+        $blockChanges = 0;
+
+        foreach ($reviewStore->listDocuments() as $row) {
+            $documentId = (string) ($row['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+            try {
+                $document = $reviewStore->getReviewDocument($documentId);
+            } catch (\RuntimeException) {
+                continue;
+            }
+
+            foreach (($document['pages'] ?? []) as $page) {
+                foreach ((array) ($page['blocks'] ?? []) as $block) {
+                    $raw = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($raw === '') {
+                        continue;
+                    }
+                    $code = $resolve($raw);
+                    $audit[$raw]['target'] = $code ?? 'UNMAPPED';
+                    $audit[$raw]['count'] = ($audit[$raw]['count'] ?? 0) + 1;
+                    if ($code === null) {
+                        $unmapped[$raw][$documentId] = true;
+
+                        continue;
+                    }
+                    if ($code !== $raw) {
+                        $documentsToPatch[$documentId] = true;
+                        $blockChanges++;
+                    }
+                }
+            }
+        }
+
+        $this->renderAudit($audit);
+
+        if ($unmapped !== []) {
+            $this->error('UNMAPPED legal structure value(s) found.');
+            foreach ($unmapped as $value => $documentIds) {
+                $this->line($value.': '.implode(', ', array_keys($documentIds)));
+            }
+
+            return self::FAILURE;
+        }
+
+        if ((bool) $this->option('dry-run')) {
+            $this->info("Dry run: {$blockChanges} block(s) in ".count($documentsToPatch).' document(s) would be updated.');
+
+            return self::SUCCESS;
+        }
+
+        $changed = 0;
+        foreach (array_keys($documentsToPatch) as $documentId) {
+            $changed += $reviewStore->mapBlockChunkTypes(
+                $documentId,
+                static fn (string $value): string => $resolve($value) ?? $value,
+            );
+        }
+
+        $this->info("{$changed} block(s) in ".count($documentsToPatch).' document(s) updated.');
+
+        return self::SUCCESS;
     }
 
     private function migrateLawCategories(MasterDataStore $masterData, LawCategories $lawCategories, ReviewStore $reviewStore): int

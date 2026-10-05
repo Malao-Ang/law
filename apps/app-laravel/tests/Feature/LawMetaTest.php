@@ -276,6 +276,46 @@ class LawMetaTest extends TestCase
         $this->assertSame(2, $doc['law_meta']['section_count']);
     }
 
+    public function test_section_count_skips_chapters_and_counts_codes(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_lawmeta_chapter_'.uniqid();
+        $block = static fn (string $bid, int $order, string $text, string $chunkType): array => [
+            'block_id' => $bid,
+            'type' => 'paragraph',
+            'reading_order' => $order,
+            'raw_text' => $text,
+            'normalized_text' => $text,
+            'ai_suggested_text' => $text,
+            'approved_text' => $text,
+            'confidence' => 1.0,
+            'needs_review' => false,
+            'flags' => [],
+            'meta' => ['chunk_type' => $chunkType, 'layout' => ['tabs' => []], 'formatting' => []],
+        ];
+
+        $store->writeReviewDocument($id, [
+            'document_id' => $id,
+            'source_file' => 'x.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 4, 'review_required_count' => 0],
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    $block('p1-b0001', 1, 'หมวด 1', 'CHAPTER'),
+                    $block('p1-b0002', 2, 'ส่วนที่ 1', 'LST012'),
+                    $block('p1-b0003', 3, 'ข้อ 1', 'LST004'),
+                    $block('p1-b0004', 4, 'มาตรา 2', 'SECTION'),
+                ],
+            ]],
+        ]);
+
+        $this->putJson("/api/documents/{$id}/document-review", ['law_meta' => ['section_count' => 999]])
+            ->assertOk()
+            ->assertJsonPath('law_meta.section_count', 2);
+    }
+
     public function test_keywords_longer_than_limit_are_rejected(): void
     {
         $store = app(ReviewStore::class);

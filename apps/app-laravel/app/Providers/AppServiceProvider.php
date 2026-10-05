@@ -9,6 +9,7 @@ use App\Services\MasterData\CompositeUsageCounter;
 use App\Services\MasterData\EnforcementStatusUsageCounter;
 use App\Services\MasterData\LawCategoryUsageCounter;
 use App\Services\MasterData\LawFamilyUsageCounter;
+use App\Services\MasterData\LegalStructureUsageCounter;
 use App\Services\MasterData\LawTypeUsageCounter;
 use App\Services\MasterData\MasterDataStore;
 use App\Services\MasterData\UsageCounter;
@@ -80,6 +81,7 @@ class AppServiceProvider extends ServiceProvider
             $this->app->make(LawTypeUsageCounter::class),
             $this->app->make(LawCategoryUsageCounter::class),
             $this->app->make(LawFamilyUsageCounter::class),
+            $this->app->make(LegalStructureUsageCounter::class),
         ]));
 
         $this->app->bind(DocumentExportService::class, fn (): DocumentExportService => new DocumentExportService(

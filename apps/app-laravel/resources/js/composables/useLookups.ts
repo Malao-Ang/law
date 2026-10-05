@@ -3,6 +3,7 @@ import {
   getLookups,
   type DocumentTypeOption,
   type LawFamilyOption,
+  type LegalStructureOption,
   type LawStatusOption,
   type LookupData,
   type SelectableOption,
@@ -19,6 +20,8 @@ const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
 const lawGroups = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
 const lawGroupsAll = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
+const legalStructures = ref<LegalStructureOption[]>([]);
+const legalStructuresAll = ref<LegalStructureOption[]>([]);
 const lawSources = ref<SelectableOption[]>([]);
 let loaded = false;
 let inFlight: Promise<void> | null = null;
@@ -39,6 +42,8 @@ async function load(): Promise<void> {
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
       lawGroupsAll.value = data.law_groups_all ?? data.law_groups;
+      legalStructures.value = data.legal_structures ?? [];
+      legalStructuresAll.value = data.legal_structures_all ?? data.legal_structures ?? [];
       lawSources.value = data.law_sources;
       loaded = true;
     }).finally(() => {
@@ -67,6 +72,8 @@ export function useLookups() {
     agencies,
     lawGroups,
     lawGroupsAll,
+    legalStructures,
+    legalStructuresAll,
     lawSources,
     load,
     reload,
