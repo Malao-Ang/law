@@ -70,14 +70,23 @@
                 </template>
                 <v-list density="compact" :min-width="180">
                   <v-list-item
-                    v-for="ct in HEAD_CHUNK_TYPES"
-                    :key="ct"
-                    :title="CHUNK_TYPE_LABELS[ct]"
-                    :active="normalizeChunkType(section.headBlock.meta.chunk_type) === ct"
-                    @click="setChunkType(section.headBlock, ct)"
+                    v-for="structure in headTypeOptions"
+                    :key="structure.code"
+                    :title="structure.title"
+                    :active="storedChunkType(section.headBlock) === structure.code"
+                    @click="setChunkType(section.headBlock, structure.code)"
                   />
                 </v-list>
               </v-menu>
+              <v-chip
+                v-if="unsupportedChunkType(section)"
+                size="x-small"
+                color="warning"
+                variant="tonal"
+                class="font-weight-bold"
+              >
+                ไม่รองรับประเภทเอกสารนี้
+              </v-chip>
             </div>
             <div class="rag-sec__flow">
               <div
@@ -209,10 +218,10 @@ import type { DocumentBlock } from '../../types/document';
 import AppShell from '../shared/AppShell.vue';
 import WorkflowFooterBar from '../shared/WorkflowFooterBar.vue';
 import { buildSections, suggestChunkType, type LawSection } from '../../composables/useLawSections';
+import { useLawType } from '../../composables/useLawType';
+import { useLegalStructure } from '../../composables/useLegalStructure';
 import BlockFlow from '../shared/BlockFlow.vue';
 import SplitBlockDialog from './SplitBlockDialog.vue';
-import { HEAD_CHUNK_TYPES, CHUNK_TYPE_LABELS, CHUNK_TYPE_COLORS, normalizeChunkType } from '../../types/chunkType';
-import type { ChunkType } from '../../types/chunkType';
 import Swal from 'sweetalert2';
 import { updateRagSkipped } from '../../api/client';
 
@@ -223,11 +232,18 @@ const composeStore = useComposeStore();
 const blockStore = useBlockStore();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
+const lawTypes = useLawType();
+const legalStructures = useLegalStructure();
 
 type PageBlocks = { page_no: number; blocks: DocumentBlock[] };
 type HistoryEntry = { id: string; label: string; snapshot: PageBlocks[] };
 
 const sections = computed(() => buildSections(composeStore.review));
+const documentFamilyCode = computed(() => lawTypes.typeFamily(composeStore.review?.law_meta?.law_type));
+const documentFileType = computed(() => legalStructures.fileTypeOf(composeStore.review?.source_type));
+const headTypeOptions = computed(() =>
+  legalStructures.optionsFor(documentFamilyCode.value, documentFileType.value).filter((item) => item.is_head),
+);
 
 watch(() => composeStore.error, (err) => {
   if (err) {
@@ -235,24 +251,36 @@ watch(() => composeStore.error, (err) => {
   }
 });
 
-function containerType(section: LawSection): ChunkType | null {
-  const stored = normalizeChunkType(section.headBlock.meta.chunk_type);
+function storedChunkType(block: DocumentBlock): string {
+  return legalStructures.normalize(block.meta.chunk_type);
+}
+
+function containerType(section: LawSection): string | null {
+  const stored = storedChunkType(section.headBlock);
   if (stored) return stored;
-  if (section.isHeader) return 'TITLE';
-  return suggestChunkType(section.headBlock);
+  if (section.isHeader) return headTypeOptions.value.some((item) => item.code === 'LST001') ? 'LST001' : null;
+  const suggested = suggestChunkType(section.headBlock);
+  if (suggested && legalStructures.supports(suggested, documentFamilyCode.value, documentFileType.value)) return suggested;
+  return null;
 }
 
 function containerTypeLabel(section: LawSection): string {
   const ct = containerType(section);
-  if (!ct) return 'เลือกประเภท...';
-  const label = CHUNK_TYPE_LABELS[ct];
+  if (!ct) return 'เลือกโครงสร้าง...';
+  const label = legalStructures.label(ct);
   return section.headBlock.meta.chunk_type ? label : `${label} (แนะนำ)`;
 }
 
 function containerTypeColor(section: LawSection): string | undefined {
   const ct = containerType(section);
   if (!ct) return undefined;
-  return section.headBlock.meta.chunk_type ? CHUNK_TYPE_COLORS[ct] : 'grey';
+  return section.headBlock.meta.chunk_type ? legalStructures.color(ct) : 'grey';
+}
+
+function unsupportedChunkType(section: LawSection): boolean {
+  const stored = storedChunkType(section.headBlock);
+  if (!stored || !documentFamilyCode.value || !documentFileType.value) return false;
+  return !legalStructures.supports(stored, documentFamilyCode.value, documentFileType.value);
 }
 
 const allBlocks = computed<DocumentBlock[]>(() =>
@@ -328,6 +356,23 @@ async function goToLawInfo(): Promise<void> {
     } else if (swalResult.dismiss === Swal.DismissReason.cancel) {
       await skipRagStep(true);
     }
+    return;
+  }
+
+  const missingRequired = legalStructures
+    .optionsFor(documentFamilyCode.value, documentFileType.value)
+    .filter((structure) => structure.is_required)
+    .filter((structure) => !sections.value.some((section) =>
+      storedChunkType(section.headBlock) === structure.code && blockText(section.headBlock).trim() !== '',
+    ));
+  if (missingRequired.length > 0) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'ยังไม่มีหัวข้อบังคับ',
+      html: missingRequired.map((structure) => `• ${escapeForHtml(structure.title)}`).join('<br>'),
+      confirmButtonText: 'ตกลง',
+      confirmButtonColor: '#1a3673',
+    });
     return;
   }
 
@@ -438,11 +483,15 @@ async function reloadBlocks(): Promise<void> {
 }
 
 // A head chunk-type to assign when a block should start a section.
-function headTypeFor(block: DocumentBlock): ChunkType {
-  return suggestChunkType(block) ?? 'CLAUSE';
+function headTypeFor(block: DocumentBlock): string {
+  const suggested = suggestChunkType(block);
+  if (suggested && legalStructures.supports(suggested, documentFamilyCode.value, documentFileType.value)) {
+    return suggested;
+  }
+  return headTypeOptions.value[0]?.code ?? 'LST004';
 }
 
-async function persistChunkType(block: DocumentBlock, chunkType: ChunkType | null): Promise<void> {
+async function persistChunkType(block: DocumentBlock, chunkType: string | null): Promise<void> {
   const pageNo = blockPage.value.get(block.block_id) ?? 1;
   await blockStore.patchChunkType(props.documentId, block, pageNo, chunkType);
 }
@@ -507,7 +556,7 @@ async function onLineSplitConfirm(pieces: string[]): Promise<void> {
 
 async function splitBlock(block: DocumentBlock): Promise<void> {
   if (blockBusy.value) return;
-  const isHead = !!block.meta.chunk_type && (HEAD_CHUNK_TYPES as readonly string[]).includes(normalizeChunkType(block.meta.chunk_type) ?? '');
+  const isHead = !!block.meta.chunk_type && legalStructures.isHead(block.meta.chunk_type);
 
   if (isHead) {
     // Splitting a header detaches its body: the header stays its own section and

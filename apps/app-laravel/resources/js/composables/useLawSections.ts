@@ -1,6 +1,7 @@
 import type { DocumentBlock, LawRelation, ReviewDocument } from '../types/document';
-import { CHUNK_TYPE_LABELS, HEAD_CHUNK_TYPES, normalizeChunkType } from '../types/chunkType';
 import type { ChunkType } from '../types/chunkType';
+import { normalizeChunkType } from '../types/chunkType';
+import { createLegalStructureCatalog } from './useLegalStructure';
 import { createLawTypeCatalog } from './useLawType';
 
 export interface LawSection {
@@ -21,10 +22,10 @@ export interface TocGroup {
 const HEAD_RE = /^(คำปรารภ|บทเฉพาะกาล|หมวด\s*[๐-๙0-9]+|ส่วนที่\s*[๐-๙0-9]+|มาตรา\s*[๐-๙0-9]+(?:\/[๐-๙0-9]+)?|ข้อ\s*[๐-๙0-9]+(?:\.[๐-๙0-9]+)*)/u;
 const CHAPTER_RE = /^(หมวด|ส่วนที่|บทเฉพาะกาล)\s*/u;
 const lawTypes = createLawTypeCatalog();
+const legalStructures = createLegalStructureCatalog();
 
 // Structural heading chunk-types: assigning one makes a block a section head,
 // so the following blocks group under it without merging text.
-const HEAD_CHUNK_TYPE_SET = new Set<string>(HEAD_CHUNK_TYPES);
 
 // A block that "displays as a divider": its text is only a run of dashes/underscores.
 const DIVIDER_RE = /^[-–—_─]{2,}\s*$/u;
@@ -43,7 +44,7 @@ function headerRegionEnd(blocks: DocumentBlock[]): number {
   if (!blocks.slice(0, dividerIdx + 1).some((b) => b.type === 'image')) return -1;
   for (let i = 1; i <= dividerIdx; i += 1) {
     const ct = normalizeChunkType(blocks[i].meta?.chunk_type);
-    if (ct && HEAD_CHUNK_TYPE_SET.has(ct)) return i - 1;
+    if (ct && legalStructures.isHead(ct)) return i - 1;
   }
   return dividerIdx;
 }
@@ -60,7 +61,7 @@ function legalMarkerText(block: DocumentBlock): string | null {
 
 function isHead(block: DocumentBlock): boolean {
   const ct = block.meta?.chunk_type;
-  if (ct) return HEAD_CHUNK_TYPE_SET.has(normalizeChunkType(ct) ?? ''); // explicit type wins both ways
+  if (ct) return legalStructures.isHead(ct); // explicit type wins both ways
 
   if (legalMarkerText(block)) return true;
 
@@ -71,22 +72,23 @@ function isHead(block: DocumentBlock): boolean {
 
 // Content-word → chunk type. First matching rule wins; null when nothing matches.
 const SUGGEST_RULES: ReadonlyArray<[RegExp, ChunkType]> = [
-  [/^ชื่อประกาศ/u, 'TITLE'],
-  [/^คำปรารภ/u, 'PREAMBLE'],
-  [/^บทนิยาม/u, 'DEFINITION_SECTION'],
-  [/^บทเฉพาะกาล/u, 'TRANSITIONAL_PROVISION'],
-  [/อาศัยอำนาจ/u, 'AUTHORITY'],
-  [/(วันบังคับใช้|บังคับใช้|ใช้บังคับ)/u, 'EFFECTIVE_DATE'],
-  [/(ให้ยกเลิก|ยกเลิก)/u, 'REPEAL'],
-  [/รักษาการ/u, 'CUSTODIAN'],
-  [/^คำนิยาม/u, 'DEFINITION'],
-  [/^นิยาม/u, 'DEFINITION'],
-  [/^มาตรา\s*[๐-๙0-9]/u, 'CLAUSE'],
-  [/^ข้อ\s*[๐-๙0-9]/u, 'CLAUSE'],
+  [/^ชื่อประกาศ/u, 'LST001'],
+  [/^คำปรารภ/u, 'LST002'],
+  [/^บทนิยาม/u, 'LST007'],
+  [/^บทเฉพาะกาล/u, 'LST010'],
+  [/อาศัยอำนาจ/u, 'LST003'],
+  [/(วันบังคับใช้|บังคับใช้|ใช้บังคับ)/u, 'LST005'],
+  [/(ให้ยกเลิก|ยกเลิก)/u, 'LST006'],
+  [/รักษาการ/u, 'LST009'],
+  [/^คำนิยาม/u, 'LST008'],
+  [/^นิยาม/u, 'LST008'],
+  [/^มาตรา\s*[๐-๙0-9]/u, 'LST011'],
+  [/^ข้อ\s*[๐-๙0-9]/u, 'LST004'],
 ];
 
 export function suggestChunkType(block: DocumentBlock): ChunkType | null {
-  if (legalMarkerText(block)) return 'CLAUSE';
+  const marker = legalMarkerText(block);
+  if (marker) return marker.startsWith('มาตรา') ? 'LST011' : 'LST004';
 
   const text = blockText(block);
   for (const [re, type] of SUGGEST_RULES) {
@@ -104,7 +106,7 @@ function markerFor(block: DocumentBlock): string {
   if (marker) return marker.replace(/\s+/g, ' ').trim();
 
   const ct = normalizeChunkType(block.meta?.chunk_type);
-  if (ct) return CHUNK_TYPE_LABELS[ct];
+  if (ct) return legalStructures.label(ct);
   if (block.type === 'title') return 'ชื่อประกาศ';
 
   return blockText(block).slice(0, 24);

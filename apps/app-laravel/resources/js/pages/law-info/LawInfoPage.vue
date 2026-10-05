@@ -295,9 +295,9 @@ import { useLookups } from '../../composables/useLookups';
 import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useLegalStructure } from '../../composables/useLegalStructure';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
-import { normalizeChunkType } from '../../types/chunkType';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import { useSnackbarStore } from '../../stores/snackbarStore';
@@ -313,6 +313,7 @@ const isOld = computed(() => documentStore.review?.law_meta?.document_type === '
 const { statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
 const lawTypes = useLawType();
 const lawCategories = useLawCategory();
+const legalStructures = useLegalStructure();
 const { draftCode, isRepealed } = useLawStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
@@ -537,7 +538,7 @@ function blockText(block: DocumentBlock): string {
 }
 
 function isClauseBlock(block: DocumentBlock): boolean {
-  if (normalizeChunkType(block.meta?.chunk_type) === 'CLAUSE') return true;
+  if (legalStructures.countsAsSection(block.meta?.chunk_type)) return true;
 
   const markerType = block.meta?.list_marker?.type;
   if (markerType === 'legal-มาตรา' || markerType === 'legal-ข้อ') return true;
