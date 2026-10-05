@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
@@ -14,6 +15,7 @@ class LawIndexer
         private readonly ReviewStore $store,
         private readonly ?LawTypes $lawTypes = null,
         private readonly ?LawCategories $lawCategories = null,
+        private readonly ?ChangeStatuses $changeStatuses = null,
     ) {}
 
     /** Extract a 4-digit year from a freeform date string (Buddhist or Gregorian). */
@@ -104,6 +106,9 @@ class LawIndexer
         }
         $lawGroupCodes = $lawCategories->codesOf($lawGroupValues);
         $lawGroupLabels = $lawCategories->labelsOf($lawGroupCodes);
+        $changeStatuses = $this->changeStatuses ?? app(ChangeStatuses::class);
+        $changeStatus = $changeStatuses->resolve($meta['change_status'] ?? null);
+        $changeStatusCode = (string) ($changeStatus['code'] ?? ($meta['change_status'] ?? ''));
 
         return [
             'law_id'         => $documentId,
@@ -120,7 +125,8 @@ class LawIndexer
             'law_type_label' => $lawType === null ? ($meta['law_type'] ?? null) : (string) ($lawType['name'] ?? ''),
             'issuer'         => null,
             'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
-            'change_status'  => $meta['change_status'] ?? null,
+            'change_status'  => $changeStatusCode !== '' ? $changeStatusCode : null,
+            'change_status_label' => $changeStatus === null ? ($meta['change_status'] ?? null) : (string) ($changeStatus['name'] ?? ''),
             'agency'         => $meta['agency'] ?? null,
             'agencies'       => $meta['agencies'] ?? [],
             'law_group'      => $lawGroupCodes[0] ?? null,

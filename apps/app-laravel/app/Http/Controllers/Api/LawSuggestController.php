@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSuggestRequest;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
@@ -18,6 +19,7 @@ class LawSuggestController extends Controller
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
         private readonly LawCategories $lawCategories,
+        private readonly ChangeStatuses $changeStatuses,
     ) {}
 
     public function suggest(LawSuggestRequest $request, LawSuggestService $service, ReviewStore $store): JsonResponse
@@ -128,7 +130,7 @@ class LawSuggestController extends Controller
             (string) ($row['title'] ?? ''),
             (string) ($row['law_type'] ?? ''),
             (string) ($row['meta_status'] ?? ''),
-            (string) ($row['change_status'] ?? ''),
+            $this->changeStatuses->labelOf($row['change_status'] ?? ''),
             (string) ($row['signer_group'] ?? ''),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
             ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
@@ -140,7 +142,7 @@ class LawSuggestController extends Controller
         $keywords = array_values(array_unique(array_filter([
             ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
-            (string) ($row['change_status'] ?? ''),
+            $this->changeStatuses->labelOf($row['change_status'] ?? ''),
         ], static fn (string $value): bool => trim($value) !== '')));
 
         $rawType = (string) ($row['law_type'] ?? '');

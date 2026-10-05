@@ -395,7 +395,7 @@ enum MasterDataKind: string
                     'code' => 'CHG01',
                     'name' => 'กฎหมายใหม่',
                     'description' => '',
-                    'aliases' => ['กฎหมายใหม่'],
+                    'aliases' => ['กฎหมายใหม่', 'กฎหมายล่าสุด'],
                     'attrs' => ['source' => 'both', 'has_details' => false, 'role' => 'new'],
                 ],
                 [

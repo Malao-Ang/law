@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\MasterDataKind;
@@ -35,6 +36,9 @@ class UpdateDocumentReviewRequest extends FormRequest
         }
         if (is_array($lawMeta) && (array_key_exists('law_groups', $lawMeta) || array_key_exists('law_group', $lawMeta))) {
             $lawMeta = $this->normalizeLawCategoryFields($lawMeta);
+        }
+        if (is_array($lawMeta) && (array_key_exists('change_status', $lawMeta) || array_key_exists('change_details', $lawMeta))) {
+            $lawMeta = $this->normalizeChangeStatusFields($lawMeta);
         }
 
         $payload = [
@@ -209,6 +213,55 @@ class UpdateDocumentReviewRequest extends FormRequest
 
         $lawMeta['law_groups'] = $codes;
         $lawMeta['law_group'] = $codes[0] ?? '';
+
+        return $lawMeta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $lawMeta
+     * @return array<string, mixed>
+     */
+    private function normalizeChangeStatusFields(array $lawMeta): array
+    {
+        /** @var ChangeStatuses $changeStatuses */
+        $changeStatuses = app(ChangeStatuses::class);
+
+        if (array_key_exists('change_status', $lawMeta)) {
+            $raw = trim((string) ($lawMeta['change_status'] ?? ''));
+            if ($raw !== '') {
+                $resolved = $changeStatuses->resolve($raw);
+                if ($resolved === null) {
+                    throw ValidationException::withMessages([
+                        'law_meta.change_status' => ['ไม่พบสถานะการเปลี่ยนแปลงที่เลือก'],
+                    ]);
+                }
+                $lawMeta['change_status'] = (string) ($resolved['code'] ?? '');
+            }
+        }
+
+        if (array_key_exists('change_details', $lawMeta)) {
+            $details = is_array($lawMeta['change_details']) ? $lawMeta['change_details'] : [$lawMeta['change_details']];
+            $codes = [];
+            foreach ($details as $detail) {
+                $raw = trim((string) $detail);
+                if ($raw === '') {
+                    continue;
+                }
+
+                $resolved = $changeStatuses->resolveDetail($raw);
+                if ($resolved === null) {
+                    throw ValidationException::withMessages([
+                        'law_meta.change_details' => ['ไม่พบรายละเอียดการเปลี่ยนแปลงที่เลือก'],
+                    ]);
+                }
+
+                $code = (string) ($resolved['code'] ?? '');
+                if ($code !== '' && ! in_array($code, $codes, true)) {
+                    $codes[] = $code;
+                }
+            }
+            $lawMeta['change_details'] = $codes;
+        }
 
         return $lawMeta;
     }

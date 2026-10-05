@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LegalStructures;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
@@ -949,7 +950,7 @@ class ReviewStore
         }
 
         $changeStatus = trim((string) (($document['law_meta']['change_status'] ?? '') ?: ''));
-        if (! in_array($changeStatus, ['ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ'], true)) {
+        if (app(ChangeStatuses::class)->role($changeStatus) !== 'whole') {
             return [];
         }
 
@@ -1072,14 +1073,10 @@ class ReviewStore
             return false;
         }
 
-        $changeA = trim((string) ($a['change_status'] ?? ''));
-        $changeB = trim((string) ($b['change_status'] ?? ''));
-        $amendmentChanges = [
-            'ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ',
-            'ปรับปรุงรายข้อ', 'ปรับปรุงรายมาตรา', 'ยกเลิกรายมาตรา',
-        ];
+        $changeA = app(ChangeStatuses::class)->role($a['change_status'] ?? '');
+        $changeB = app(ChangeStatuses::class)->role($b['change_status'] ?? '');
 
-        return in_array($changeA, $amendmentChanges, true) || in_array($changeB, $amendmentChanges, true);
+        return in_array($changeA, ['whole', 'section'], true) || in_array($changeB, ['whole', 'section'], true);
     }
 
     private function regulationFamilyKey(string $title): string
@@ -1105,6 +1102,7 @@ class ReviewStore
             $document['law_meta'] = array_merge($document['law_meta'], $fields);
             $this->ensureLawMetaDefaults($document);
         });
+        Cache::forget('law-meta-list');
     }
 
     /**

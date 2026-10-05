@@ -135,10 +135,10 @@ class LawMetaTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.change_status', 'กฎหมายล่าสุด');
+        $response->assertJsonPath('law_meta.change_status', 'CHG01');
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('กฎหมายล่าสุด', $doc['law_meta']['change_status']);
+        $this->assertSame('CHG01', $doc['law_meta']['change_status']);
     }
 
     public function test_public_access_scope_clears_permission_groups(): void

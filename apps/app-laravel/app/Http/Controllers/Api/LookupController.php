@@ -18,6 +18,8 @@ class LookupController extends Controller
         $allLawTypes = $this->masterData->all(MasterDataKind::LawType);
         $allLawCategories = $this->masterData->all(MasterDataKind::LawCategory);
         $allLegalStructures = $this->masterData->all(MasterDataKind::LegalStructure);
+        $allChangeStatuses = $this->masterData->all(MasterDataKind::ChangeStatus);
+        $allChangeDetails = $this->masterData->all(MasterDataKind::ChangeDetail);
 
         return response()->json([
             'document_types' => $this->lawTypeItems(array_values(array_filter($allLawTypes, static fn (array $item): bool => (bool) ($item['is_active'] ?? false))), $allLawFamilies),
@@ -26,8 +28,10 @@ class LookupController extends Controller
             'law_families_all' => $this->lawFamilyItems($allLawFamilies),
             'statuses' => $this->statusItems(array_values(array_filter($allStatusItems, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'statuses_all' => $this->statusItems($allStatusItems),
-            'change_status_types' => config('lookups.change_status_types'),
-            'change_status_details' => config('lookups.change_status_details'),
+            'change_status_types' => $this->changeStatusItems(array_values(array_filter($allChangeStatuses, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
+            'change_status_types_all' => $this->changeStatusItems($allChangeStatuses),
+            'change_status_details' => $this->changeDetailItems(array_values(array_filter($allChangeDetails, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
+            'change_status_details_all' => $this->changeDetailItems($allChangeDetails),
             'agencies' => config('lookups.agencies'),
             'law_groups' => $this->lawCategoryItems(array_values(array_filter($allLawCategories, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'law_groups_all' => $this->lawCategoryItems($allLawCategories),
@@ -101,6 +105,39 @@ class LookupController extends Controller
             'value' => (string) ($item['code'] ?? ''),
             'code' => (string) ($item['code'] ?? ''),
             'sort_order' => (int) ($item['sort_order'] ?? 0),
+        ], $items);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function changeStatusItems(array $items): array
+    {
+        return array_map(static fn (array $item): array => [
+            'title' => (string) ($item['name'] ?? ''),
+            'value' => (string) ($item['code'] ?? ''),
+            'code' => (string) ($item['code'] ?? ''),
+            'source' => (string) ($item['attrs']['source'] ?? 'both'),
+            'has_details' => (bool) ($item['attrs']['has_details'] ?? false),
+            'role' => (string) ($item['attrs']['role'] ?? 'general'),
+        ], $items);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function changeDetailItems(array $items): array
+    {
+        return array_map(static fn (array $item): array => [
+            'title' => (string) ($item['name'] ?? ''),
+            'value' => (string) ($item['code'] ?? ''),
+            'code' => (string) ($item['code'] ?? ''),
+            'source' => (string) ($item['attrs']['source'] ?? 'both'),
+            'role' => (string) ($item['attrs']['role'] ?? 'general'),
+            'color' => $item['attrs']['color'] ?? null,
+            'icon' => $item['attrs']['icon'] ?? null,
         ], $items);
     }
 
