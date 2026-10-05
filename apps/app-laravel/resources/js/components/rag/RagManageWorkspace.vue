@@ -241,9 +241,35 @@ type HistoryEntry = { id: string; label: string; snapshot: PageBlocks[] };
 const sections = computed(() => buildSections(composeStore.review));
 const documentFamilyCode = computed(() => lawTypes.typeFamily(composeStore.review?.law_meta?.law_type));
 const documentFileType = computed(() => legalStructures.fileTypeOf(composeStore.review?.source_type));
-const headTypeOptions = computed(() =>
-  legalStructures.optionsFor(documentFamilyCode.value, documentFileType.value).filter((item) => item.is_head),
+// Before law-info is filled the document has no law_type yet: fall back to every family of the
+// document's source (or all families), and to both file types when the source type is unknown.
+const candidateFamilyCodes = computed<string[]>(() => {
+  if (documentFamilyCode.value) return [documentFamilyCode.value];
+  const source = composeStore.review?.law_meta?.source;
+  return lawTypes.familiesOrdered.value
+    .filter((family) => !source || family.source === source)
+    .map((family) => family.code);
+});
+const candidateFileTypes = computed(() =>
+  documentFileType.value ? [documentFileType.value] : (['word', 'pdf'] as const),
 );
+const documentOptions = computed(() => {
+  const seen = new Set<string>();
+  return legalStructures.items.value.filter((item) => {
+    if (seen.has(item.code)) return false;
+    const ok = candidateFamilyCodes.value.some((family) =>
+      candidateFileTypes.value.some((fileType) => legalStructures.supports(item.code, family, fileType)),
+    );
+    if (ok) seen.add(item.code);
+    return ok;
+  });
+});
+const headTypeOptions = computed(() => documentOptions.value.filter((item) => item.is_head));
+
+function supportedForDocument(code: string | null | undefined): boolean {
+  const normalized = legalStructures.normalize(code);
+  return documentOptions.value.some((item) => item.code === normalized);
+}
 
 watch(() => composeStore.error, (err) => {
   if (err) {
@@ -260,7 +286,7 @@ function containerType(section: LawSection): string | null {
   if (stored) return stored;
   if (section.isHeader) return headTypeOptions.value.some((item) => item.code === 'LST001') ? 'LST001' : null;
   const suggested = suggestChunkType(section.headBlock);
-  if (suggested && legalStructures.supports(suggested, documentFamilyCode.value, documentFileType.value)) return suggested;
+  if (suggested && supportedForDocument(suggested)) return suggested;
   return null;
 }
 
@@ -279,8 +305,8 @@ function containerTypeColor(section: LawSection): string | undefined {
 
 function unsupportedChunkType(section: LawSection): boolean {
   const stored = storedChunkType(section.headBlock);
-  if (!stored || !documentFamilyCode.value || !documentFileType.value) return false;
-  return !legalStructures.supports(stored, documentFamilyCode.value, documentFileType.value);
+  if (!stored) return false;
+  return !supportedForDocument(stored);
 }
 
 const allBlocks = computed<DocumentBlock[]>(() =>
@@ -485,7 +511,7 @@ async function reloadBlocks(): Promise<void> {
 // A head chunk-type to assign when a block should start a section.
 function headTypeFor(block: DocumentBlock): string {
   const suggested = suggestChunkType(block);
-  if (suggested && legalStructures.supports(suggested, documentFamilyCode.value, documentFileType.value)) {
+  if (suggested && supportedForDocument(suggested)) {
     return suggested;
   }
   return headTypeOptions.value[0]?.code ?? 'LST004';
