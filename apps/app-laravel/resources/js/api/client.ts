@@ -64,6 +64,18 @@ export type LawFamilyOption = SelectableOption & {
   sort_order: number;
 };
 
+export type LegalStructureOption = SelectableOption & {
+  code: string;
+  family_codes: string[];
+  file_types: Array<'word' | 'pdf'>;
+  is_head: boolean;
+  counts_as_section: boolean;
+  is_required: boolean;
+  color: string;
+  export_key: string;
+  sort_order: number;
+};
+
 export type LookupData = {
   document_types: DocumentTypeOption[];
   document_types_all?: DocumentTypeOption[];
@@ -76,6 +88,8 @@ export type LookupData = {
   agencies: SelectableOption[];
   law_groups: (SelectableOption & { code: string; sort_order?: number })[];
   law_groups_all?: (SelectableOption & { code: string; sort_order?: number })[];
+  legal_structures?: LegalStructureOption[];
+  legal_structures_all?: LegalStructureOption[];
   law_sources: SelectableOption[];
 };
 
