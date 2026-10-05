@@ -251,6 +251,9 @@ class ReviewStore
                     'raw_meta_status' => (string) ($meta['status'] ?? ''),
                     'meta_status' => LawMetaNormalizer::statusCode($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
+                    'change_details' => is_array($meta['change_details'] ?? null)
+                        ? array_values(array_filter($meta['change_details'], 'is_string'))
+                        : [],
                     'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
                     'law_groups' => $groups,
                     'agencies' => $agencies,
@@ -621,6 +624,7 @@ class ReviewStore
     {
         $this->syncDocumentReview($document);
         $this->blob->write('review', $documentId, $document);
+        Cache::forget('law-meta-list');
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
+use App\Services\MasterData\ChangeStatusUsageCounter;
 use App\Services\MasterData\CompositeUsageCounter;
 use App\Services\MasterData\EnforcementStatusUsageCounter;
 use App\Services\MasterData\LawCategoryUsageCounter;
@@ -82,6 +83,7 @@ class AppServiceProvider extends ServiceProvider
             $this->app->make(LawCategoryUsageCounter::class),
             $this->app->make(LawFamilyUsageCounter::class),
             $this->app->make(LegalStructureUsageCounter::class),
+            $this->app->make(ChangeStatusUsageCounter::class),
         ]));
 
         $this->app->bind(DocumentExportService::class, fn (): DocumentExportService => new DocumentExportService(
