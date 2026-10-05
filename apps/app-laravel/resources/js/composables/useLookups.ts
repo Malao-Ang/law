@@ -15,8 +15,10 @@ const lawFamilies = ref<LawFamilyOption[]>([]);
 const lawFamiliesAll = ref<LawFamilyOption[]>([]);
 const statuses = ref<LawStatusOption[]>([]);
 const statusesAll = ref<LawStatusOption[]>([]);
-const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
-const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
+const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean; role?: string })[]>([]);
+const changeStatusTypesAll = ref<(SelectableOption & { source?: string; has_details?: boolean; role?: string })[]>([]);
+const changeStatusDetails = ref<(SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[]>([]);
+const changeStatusDetailsAll = ref<(SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
 const lawGroups = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
 const lawGroupsAll = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
@@ -38,7 +40,9 @@ async function load(): Promise<void> {
       statuses.value = data.statuses;
       statusesAll.value = data.statuses_all ?? data.statuses;
       changeStatusTypes.value = data.change_status_types;
+      changeStatusTypesAll.value = data.change_status_types_all ?? data.change_status_types;
       changeStatusDetails.value = data.change_status_details;
+      changeStatusDetailsAll.value = data.change_status_details_all ?? data.change_status_details;
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
       lawGroupsAll.value = data.law_groups_all ?? data.law_groups;
@@ -68,7 +72,9 @@ export function useLookups() {
     statuses,
     statusesAll,
     changeStatusTypes,
+    changeStatusTypesAll,
     changeStatusDetails,
+    changeStatusDetailsAll,
     agencies,
     lawGroups,
     lawGroupsAll,
