@@ -1,5 +1,5 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="640" @update:model-value="$emit('update:modelValue', Boolean($event))">
+  <v-dialog :model-value="modelValue" :max-width="maxWidth" @update:model-value="$emit('update:modelValue', Boolean($event))">
     <v-card rounded="xl" class="master-dialog">
       <div class="master-dialog__header">
         <div class="min-width-0">
@@ -13,7 +13,7 @@
         <section class="master-dialog__section">
           <div class="master-dialog__section-title">
             <v-icon icon="mdi-pencil" size="18" color="admin-primary" />
-            <span>ข้อมูลพื้นฐาน</span>
+            <span>{{ basicSectionTitle }}</span>
           </div>
           <v-text-field
             :model-value="item?.code ?? nextCode"
@@ -24,10 +24,12 @@
             bg-color="grey-lighten-4"
             variant="outlined"
             density="comfortable"
+            :placeholder="codePlaceholder"
           />
           <v-text-field
             v-model="form.name"
             :label="`${fieldLabels.name}*`"
+            :placeholder="namePlaceholder"
             :rules="[requiredRule]"
             :error-messages="fieldError('name')"
             variant="outlined"
@@ -36,13 +38,16 @@
           <v-textarea
             v-model="form.description"
             label="คำอธิบาย"
+            :placeholder="descriptionPlaceholder"
             rows="3"
             :error-messages="fieldError('description')"
             variant="outlined"
             density="comfortable"
           />
-          <slot name="attrs" :form="form" :item="item" />
+          <slot name="attrs" :form="form" :item="item" :errors="errors ?? {}" />
         </section>
+
+        <slot name="after-basic" :form="form" :item="item" :errors="errors ?? {}" />
 
         <section class="master-dialog__section">
           <div class="master-dialog__section-title">
@@ -114,6 +119,11 @@ const props = defineProps<{
   fieldLabels: { code: string; name: string };
   loading?: boolean;
   errors?: Record<string, string[]>;
+  maxWidth?: string | number;
+  basicSectionTitle?: string;
+  codePlaceholder?: string;
+  namePlaceholder?: string;
+  descriptionPlaceholder?: string;
 }>();
 
 const emit = defineEmits<{
@@ -129,6 +139,8 @@ const form = reactive<UpsertMasterItemPayload>({
 });
 
 const editing = computedEditing();
+const maxWidth = computed(() => props.maxWidth ?? 640);
+const basicSectionTitle = computed(() => props.basicSectionTitle ?? 'ข้อมูลพื้นฐาน');
 const requiredRule = (value: string) => !!value?.trim() || 'กรุณากรอกข้อมูล';
 
 watch(() => [props.modelValue, props.item] as const, () => {

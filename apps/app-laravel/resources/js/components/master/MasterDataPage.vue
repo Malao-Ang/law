@@ -71,10 +71,18 @@
       :field-labels="fieldLabels"
       :loading="saving"
       :errors="fieldErrors"
+      :max-width="dialogMaxWidth"
+      :basic-section-title="basicSectionTitle"
+      :code-placeholder="codePlaceholder"
+      :name-placeholder="namePlaceholder"
+      :description-placeholder="descriptionPlaceholder"
       @save="handleSave"
     >
-      <template #attrs="{ form }">
-        <slot name="attrs" :form="form" :item="editingItem" />
+      <template #attrs="{ form, errors }">
+        <slot name="attrs" :form="form" :item="editingItem" :errors="errors" />
+      </template>
+      <template #after-basic="{ form, errors }">
+        <slot name="after-basic" :form="form" :item="editingItem" :errors="errors" />
       </template>
     </MasterItemDialog>
 
@@ -112,6 +120,11 @@ const props = defineProps<{
   dialogSubtitle: string;
   fieldLabels: { code: string; name: string };
   embedded?: boolean;
+  dialogMaxWidth?: string | number;
+  basicSectionTitle?: string;
+  codePlaceholder?: string;
+  namePlaceholder?: string;
+  descriptionPlaceholder?: string;
 }>();
 
 const master = useMasterData(props.kind);

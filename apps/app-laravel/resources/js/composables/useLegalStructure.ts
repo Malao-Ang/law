@@ -35,11 +35,20 @@ function sortLegalStructures(items: LegalStructureOption[]): LegalStructureOptio
 }
 
 function fallbackItem(code: string): LegalStructureOption | null {
-  return FALLBACK_LEGAL_STRUCTURES.find((item) => item.code === code) ?? null;
+  const item = FALLBACK_LEGAL_STRUCTURES.find((candidate) => candidate.code === code);
+  return item ? toLegalStructureOption(item) : null;
+}
+
+function toLegalStructureOption(item: typeof FALLBACK_LEGAL_STRUCTURES[number]): LegalStructureOption {
+  return {
+    ...item,
+    family_codes: [...item.family_codes],
+    file_types: [...item.file_types],
+  };
 }
 
 export function createLegalStructureCatalog(input: LegalStructureCatalogInput = {}) {
-  const fallback = FALLBACK_LEGAL_STRUCTURES.map((item) => ({ ...item }));
+  const fallback = FALLBACK_LEGAL_STRUCTURES.map(toLegalStructureOption);
   const activeItems = computed(() => sortLegalStructures(readArray(input.items, fallback)));
   const allItems = computed(() => sortLegalStructures(readArray(input.itemsAll, activeItems.value)));
 
