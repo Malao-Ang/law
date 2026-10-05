@@ -84,6 +84,7 @@ const SUGGEST_RULES: ReadonlyArray<[RegExp, ChunkType]> = [
   [/^นิยาม/u, 'LST008'],
   [/^มาตรา\s*[๐-๙0-9]/u, 'LST011'],
   [/^ข้อ\s*[๐-๙0-9]/u, 'LST004'],
+  [/^(หมวด|ส่วนที่)\s*[๐-๙0-9]/u, 'LST012'],
 ];
 
 export function suggestChunkType(block: DocumentBlock): ChunkType | null {

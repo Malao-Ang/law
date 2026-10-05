@@ -1,6 +1,6 @@
 // ponytail: dev-only assertion — no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/composables/useLawSections.check.ts
-import { buildSections } from './useLawSections';
+import { buildSections, suggestChunkType } from './useLawSections';
 import type { DocumentBlock, ReviewDocument } from '../types/document';
 
 let n = 0;
@@ -133,6 +133,14 @@ function assert(cond: boolean, msg: string): void {
   assert(s.length === 2, 'legal markers should create two sections, got ' + s.length);
   assert(s[0].badge === 'มาตรา ๓', 'uses legal-มาตรา marker, got ' + s[0].badge);
   assert(s[1].badge === 'ข้อ ๔', 'uses legal-ข้อ marker, got ' + s[1].badge);
+}
+
+// 9. chapter/part headings suggest หมวด/ส่วน (LST012), never ข้อ
+{
+  n = 0;
+  assert(suggestChunkType(mk({ approved_text: 'หมวด ๑' })) === 'LST012', 'หมวด suggests LST012');
+  assert(suggestChunkType(mk({ approved_text: 'ส่วนที่ ๒ งบประมาณ' })) === 'LST012', 'ส่วนที่ suggests LST012');
+  assert(suggestChunkType(mk({ approved_text: 'ข้อ ๕ ให้มี' })) === 'LST004', 'ข้อ still suggests LST004');
 }
 
 console.log('OK: all header-grouping checks passed');
