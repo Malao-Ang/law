@@ -265,7 +265,6 @@ class ReviewStore
                     'keywords' => is_array($meta['keywords'] ?? null)
                         ? array_values(array_filter($meta['keywords'], 'is_string'))
                         : [],
-                    'issuer' => trim((string) ($meta['issuer'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
                     'relations_count' => is_array($review['relations'] ?? null)
                         ? count($review['relations'])
@@ -605,7 +604,6 @@ class ReviewStore
                 'is_current' => $row['document_id'] === $currentId,
                 'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
                 'change_status' => (string) ($row['change_status'] ?? ''),
-                'issuer' => (string) ($row['issuer'] ?? ''),
                 'agency' => $row['agencies'][0] ?? '',
                 'promulgation_date' => (string) ($row['promulgation_date'] ?? ''),
                 'title' => (string) ($row['title'] ?? ''),
@@ -2042,7 +2040,6 @@ class ReviewStore
             'law_groups' => [],
             'agency' => '',
             'signer_group' => null,
-            'issuer' => null,
             'agencies' => [],
             'keywords' => [],
             'promulgation_date' => '',

@@ -11,6 +11,7 @@ use App\Services\MasterData\MasterDataKind;
 use App\Services\MasterData\MasterDataStore;
 use App\Services\ReviewStore;
 use Illuminate\Console\Command;
+use Throwable;
 
 class MigrateMasterDataCommand extends Command
 {
@@ -165,6 +166,14 @@ class MigrateMasterDataCommand extends Command
 
             $rawType = trim((string) ($row['law_type'] ?? ''));
             $rawIssuer = trim((string) ($row['issuer'] ?? ''));
+            if ($rawIssuer === '') {
+                try {
+                    $document = $reviewStore->getReviewDocument($documentId);
+                    $rawIssuer = trim((string) ($document['law_meta']['issuer'] ?? ''));
+                } catch (Throwable) {
+                    $rawIssuer = '';
+                }
+            }
             $mapped = $extraMap[$rawType] ?? null;
             $typeCode = $mapped ?? $this->resolveMigratedLawTypeCode($lawTypes, $rawType, $rawIssuer);
 

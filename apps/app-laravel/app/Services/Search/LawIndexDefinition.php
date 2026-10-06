@@ -28,7 +28,6 @@ class LawIndexDefinition
                     'law_type'      => ['type' => 'keyword'],
                     'law_family'    => ['type' => 'keyword'],
                     'law_type_label' => $textThai(true),
-                    'issuer'        => ['type' => 'keyword'],
                     'status'        => ['type' => 'keyword'],
                     'change_status' => ['type' => 'keyword'],
                     'agency'        => ['type' => 'keyword'],

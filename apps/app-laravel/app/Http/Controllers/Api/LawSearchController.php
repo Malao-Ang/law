@@ -27,34 +27,6 @@ class LawSearchController extends Controller
         private readonly ChangeStatuses $changeStatuses,
     ) {}
 
-    private const EXTERNAL_LAW_TYPE_ALIASES = [
-        'กฎหมายภายนอก',
-        'พระราชบัญญัติ',
-        'พระราชกำหนด',
-        'กฎกระทรวง',
-        'ประกาศกระทรวง',
-        'พ.ร.บ.',
-        'พ.ร.บ',
-        'พรบ',
-        'พ.ร.ก.',
-        'พ.ร.ก',
-        'พรก',
-        'phrb',
-        'prb',
-        'phrk',
-        'kotmai-krung',
-        'kotmai-phaainok',
-        'kot-krathruang',
-        'kotmai-krw',
-        'prakat-krw',
-    ];
-
-    private const EXTERNAL_LAW_GROUP_ALIASES = [
-        'กฎหมายภายนอก',
-        'kotmai-phaainok',
-        'kotmai-krung',
-    ];
-
     public function search(LawSearchRequest $request, LawSearchService $service, LawSuggestService $suggestService, ReviewStore $store): JsonResponse
     {
         $params = $request->validated();
@@ -151,6 +123,7 @@ class LawSearchController extends Controller
         return 'law-search:elastic-unavailable:'.sha1((string) config('search.host').'|'.(string) config('search.index'));
     }
 
+
     /**
      * @param  array<string,mixed>  $row
      * @param  array<string,mixed>|null  $fileRow
@@ -160,13 +133,11 @@ class LawSearchController extends Controller
     {
         if ($fileRow === null) {
             $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
-            $row['issuer'] = null;
 
             return $row;
         }
 
         $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
-        $row['issuer'] = null;
         if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
             $row['title_highlighted'] = $fileRow['title_highlighted'];
         }
@@ -274,8 +245,6 @@ class LawSearchController extends Controller
                 'law_type' => $lawType === null ? $r['law_type'] : (string) ($lawType['name'] ?? $r['law_type']),
                 'law_type_code' => $lawType === null ? (string) ($r['law_type'] ?? '') : (string) ($lawType['code'] ?? ''),
                 'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
-                'issuer' => null,
-                'issuer_code' => null,
                 'status' => $r['meta_status'],
                 'change_status' => $this->changeStatuses->labelOf($r['change_status'] ?? ''),
                 'change_status_code' => $this->changeStatusCode($r['change_status'] ?? ''),
@@ -309,6 +278,7 @@ class LawSearchController extends Controller
         return ['total' => $total, 'results' => $results, 'facets' => $facets, 'meta' => $meta, 'fuzzy' => $usedFuzzy];
     }
 
+
     /**
      * @param  array<string,mixed>  $row
      */
@@ -320,6 +290,7 @@ class LawSearchController extends Controller
                 static fn (mixed $value): bool => trim((string) $value) !== '',
             )) !== [];
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -364,6 +335,7 @@ class LawSearchController extends Controller
 
         return true;
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -428,6 +400,7 @@ class LawSearchController extends Controller
         return false;
     }
 
+
     /**
      * Concatenate a document's searchable metadata into one haystack string.
      *
@@ -453,6 +426,7 @@ class LawSearchController extends Controller
 
         return trim(implode(' ', array_filter($parts, static fn (string $p): bool => trim($p) !== '')));
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -529,6 +503,7 @@ class LawSearchController extends Controller
         ];
     }
 
+
     /**
      * @param  array<string,mixed>  $payload
      * @param  array<string,mixed>  $params
@@ -561,6 +536,7 @@ class LawSearchController extends Controller
         return $payload;
     }
 
+
     /**
      * @return string[]
      */
@@ -591,6 +567,7 @@ class LawSearchController extends Controller
         return array_slice(array_values(array_unique($terms)), 0, 5);
     }
 
+
     /**
      * @param  array<int, array<string,mixed>>  $results
      */
@@ -605,6 +582,7 @@ class LawSearchController extends Controller
             $results,
         )), 2);
     }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $results
@@ -622,6 +600,7 @@ class LawSearchController extends Controller
 
         return count($modes) === 1 ? $modes[0] : 'mixed';
     }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $results
@@ -693,6 +672,7 @@ class LawSearchController extends Controller
         return (2 * $intersection) / (count($leftGrams) + count($rightGrams));
     }
 
+
     /**
      * @return string[]
      */
@@ -711,6 +691,7 @@ class LawSearchController extends Controller
         return $grams;
     }
 
+
     /**
      * Per-request memo of export chunks so content search + snippet building
      * read each export file only once.
@@ -718,6 +699,7 @@ class LawSearchController extends Controller
      * @var array<string, array<int, array<string, mixed>>>
      */
     private array $exportChunkCache = [];
+
 
     /**
      * @return array<int, array<string, mixed>>
@@ -742,6 +724,7 @@ class LawSearchController extends Controller
 
         return $this->exportChunkCache[$documentId];
     }
+
 
     /**
      * Fallback text source: concatenate block text from the review document.
@@ -784,6 +767,7 @@ class LawSearchController extends Controller
 
         return false;
     }
+
 
     /**
      * @return string[]
@@ -830,6 +814,7 @@ class LawSearchController extends Controller
         return [];
     }
 
+
     /**
      * @param  array<string,array<string,mixed>>  $metaById
      * @return list<array{document_id:string,title:string,type:string}>
@@ -864,6 +849,7 @@ class LawSearchController extends Controller
         return array_slice(array_values($items), 0, 3);
     }
 
+
     /**
      * @return list<string>
      */
@@ -894,6 +880,7 @@ class LawSearchController extends Controller
         return array_keys($items);
     }
 
+
     /**
      * @param  array<int, array<string,mixed>>  $results
      * @return array<string, mixed>
@@ -912,6 +899,7 @@ class LawSearchController extends Controller
 
         return $this->computeFileBasedFacets($rows);
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -954,6 +942,7 @@ class LawSearchController extends Controller
 
         return (string) ($this->changeStatuses->resolve($raw)['code'] ?? $raw);
     }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $rows
@@ -1096,7 +1085,6 @@ class LawSearchController extends Controller
         return response()->json($facets);
     }
 
-    /** internal/external for a law_type, from config document_types (legacy กฎหมายภายนอก = external). */
     private function sourceForLawType(string $lawType): string
     {
         return $this->lawTypes->sourceOf($lawType);
@@ -1104,37 +1092,30 @@ class LawSearchController extends Controller
 
     private function canonicalType(string $lawType): string
     {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+        $familyCode = $this->lawTypes->familyOf($lawType);
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_TYPE_ALIASES, true),
-                str_contains($lawType, 'พระราชบัญญัติ'),
-                str_contains($lawType, 'พระราชกำหนด'),
-                str_contains($lawType, 'กฎกระทรวง'),
-                str_contains($lawType, 'ประกาศกระทรวง') => 'kotmai-phaainok',
-            str_contains($lawType, 'ข้อบังคับ'), $lawType === 'kho-bangkhab' => 'kho-bangkhab',
-            str_contains($lawType, 'ระเบียบ'), $lawType === 'rabiap' => 'rabiap',
-            str_contains($lawType, 'ประกาศ'), $lawType === 'prakat', $lawType === 'command', $lawType === 'resolution', str_contains($lawType, 'คำสั่ง'), str_contains($lawType, 'มติ') => 'prakat',
-            default => 'other',
+        return match ($familyCode) {
+            'LFM01' => 'kho-bangkhab',
+            'LFM02' => 'rabiap',
+            'LFM03' => 'prakat',
+            'LFM04' => 'kotmai-phaainok',
+            default => $this->lawTypes->sourceOf($lawType) === 'external' ? 'kotmai-phaainok' : 'other',
         };
     }
 
     private function lawTypeFilterKey(string $lawType): string
     {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+        if ($this->lawTypes->family($lawType) !== null) {
+            return $this->lawTypes->familyOf($lawType) === 'LFM04' ? 'external' : $this->canonicalType($lawType);
+        }
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_GROUP_ALIASES, true) => 'external',
-            str_contains($lawType, 'พระราชบัญญัติ'),
-                in_array($compact, ['พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'], true) => 'external-act',
-            str_contains($lawType, 'พระราชกำหนด'),
-                in_array($compact, ['พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'], true) => 'external-decree',
-            str_contains($lawType, 'กฎกระทรวง'),
-                in_array($compact, ['kot-krathruang', 'kotmai-krw'], true) => 'external-ministerial-rule',
-            str_contains($lawType, 'ประกาศกระทรวง'),
-                $compact === 'prakat-krw' => 'external-ministerial-announcement',
+        $code = (string) ($this->lawTypes->resolve($lawType)['code'] ?? '');
+
+        return match ($code) {
+            'LTY05' => 'external-act',
+            'LTY04' => 'external-decree',
+            'LTY06' => 'external-ministerial-rule',
+            'LTY07' => 'external-ministerial-announcement',
             default => $this->canonicalType($lawType),
         };
     }
@@ -1157,6 +1138,7 @@ class LawSearchController extends Controller
         return $this->highlightNeedles($title, $needles);
     }
 
+
     /**
      * @param  array<int,string>  $needles
      * @return array{string,int}|null
@@ -1176,6 +1158,7 @@ class LawSearchController extends Controller
 
         return null;
     }
+
 
     /**
      * @param  array<int,string>  $needles

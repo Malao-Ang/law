@@ -40,10 +40,10 @@ class LawTypeMasterDataSeedTest extends TestCase
         $this->assertCount(9, $types);
         $this->assertSame(['LTY01', 'LTY09', 'LTY02'], array_slice(array_column($types, 'code'), 0, 3));
         $this->assertSame(self::ANNOUNCEMENT_UNIVERSITY, $types[0]['name']);
-        $this->assertSame([self::ANNOUNCEMENT_UNIVERSITY, self::COMMAND], $types[0]['aliases']);
+        $this->assertSame([self::ANNOUNCEMENT_UNIVERSITY, self::COMMAND, 'command'], $types[0]['aliases']);
         $this->assertSame(self::ANNOUNCEMENT_COUNCIL, $types[1]['name']);
-        $this->assertSame([self::ANNOUNCEMENT_COUNCIL, self::RESOLUTION], $types[1]['aliases']);
-        $this->assertSame([self::ACT, self::ACT_ABBR, self::ACT_ABBR_COMPACT], $types[5]['aliases']);
+        $this->assertSame([self::ANNOUNCEMENT_COUNCIL, self::RESOLUTION, 'resolution'], $types[1]['aliases']);
+        $this->assertSame([self::ACT, self::ACT_ABBR, "\u{0E1E}.\u{0E23}.\u{0E1A}", self::ACT_ABBR_COMPACT, 'phrb', 'prb', 'external-act'], $types[5]['aliases']);
         $this->assertSame([self::EXTERNAL_FAMILY], $types[8]['aliases']);
         $this->assertSame(['family_code' => 'LFM03'], $types[0]['attrs']);
         $this->assertSame(['family_code' => 'LFM03'], $types[1]['attrs']);
@@ -159,7 +159,7 @@ class LawTypeMasterDataSeedTest extends TestCase
         $byCode = array_column($types, null, 'code');
 
         $this->assertSame(self::ANNOUNCEMENT_UNIVERSITY, $byCode['LTY01']['name']);
-        $this->assertSame([self::ANNOUNCEMENT_UNIVERSITY, self::COMMAND], $byCode['LTY01']['aliases']);
+        $this->assertSame([self::ANNOUNCEMENT_UNIVERSITY, self::COMMAND, 'command'], $byCode['LTY01']['aliases']);
         $this->assertArrayNotHasKey('requires_issuer', $byCode['LTY01']['attrs']);
         $this->assertSame('LTY09', $types[1]['code']);
         $this->assertSame(self::ANNOUNCEMENT_COUNCIL, $byCode['LTY09']['name']);

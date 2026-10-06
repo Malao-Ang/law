@@ -4,7 +4,6 @@ export interface VersionChainItem {
   is_current: boolean;
   status: string;
   change_status: string;
-  issuer?: string | null;
   agency: string;
   promulgation_date: string;
   title: string;

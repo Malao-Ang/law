@@ -64,16 +64,16 @@
 import { computed } from 'vue';
 import DocBadge from './DocBadge.vue';
 import {
-  LAW_TYPE_TO_BADGE,
-  LAW_TYPE_TO_DOC_TYPE,
   changeStatusToBadge,
   docTypeToBadge,
+  lawTypeToBadge,
   type ChangeStatus,
   type DocType,
   type LawTypeBadge,
   type LawTypeCardClass,
 } from './lawBadge';
 import { cardChangeState } from '../../utils/cardChangeState';
+import { useLawType } from '../../composables/useLawType';
 type Visibility = 'public' | 'private' | 'organization';
 
 const props = defineProps<{
@@ -96,13 +96,7 @@ const props = defineProps<{
 
 defineEmits<{ click: [] }>();
 
-const typeLabels: Record<DocType, string> = {
-  rabiap: 'ระเบียบ',
-  'kho-bangkhab': 'ข้อบังคับ',
-  prakat: 'ประกาศ',
-  'kotmai-phaainok': 'กฎหมายภายนอก',
-  other: 'อื่น ๆ',
-};
+const lawTypes = useLawType();
 
 const changeState = computed(() => cardChangeState(props.changeStatusText, props.useStatus));
 const affectedSectionLabel = computed(() => {
@@ -115,13 +109,17 @@ const affectedSectionLabel = computed(() => {
 const departmentLabel = computed(() => affectedSectionLabel.value || props.department || '');
 const departmentHeading = computed(() => affectedSectionLabel.value ? 'ข้อ/มาตราที่เกี่ยวข้อง' : 'หน่วยงานที่รับผิดชอบ');
 
-const typeLabel = computed(() => typeLabels[props.docType] ?? 'เอกสาร');
+const typeLabel = computed(() => lawTypes.familyItem(props.docType)?.title ?? 'เอกสาร');
 const typeBadge = computed<LawTypeBadge | null>(() => {
-  if (props.lawType) return LAW_TYPE_TO_BADGE[props.lawType] ?? docTypeToBadge(props.docType);
+  if (props.lawType) return lawTypeToBadge(props.lawType) ?? docTypeToBadge(props.docType);
   return docTypeToBadge(props.docType);
 });
 const cardTypeClass = computed<LawTypeCardClass>(() => {
-  if (props.lawType) return LAW_TYPE_TO_DOC_TYPE[props.lawType] ?? props.docType;
+  const familyCode = lawTypes.typeFamily(props.lawType ?? props.docType);
+  if (familyCode === 'LFM01') return 'kho-bangkhab';
+  if (familyCode === 'LFM02') return 'rabiap';
+  if (familyCode === 'LFM03') return 'prakat';
+  if (familyCode === 'LFM04') return 'kotmai-phaainok';
   return props.docType;
 });
 const statusBadge = computed(() => (props.changeStatus ? changeStatusToBadge(props.changeStatus) : null));

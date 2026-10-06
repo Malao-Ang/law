@@ -50,6 +50,30 @@ const LEGACY_TYPE_ALIASES: Record<string, string> = {
   'กฎหมายภายนอกอื่น ๆ': 'LTY08',
 };
 
+const LEGACY_TYPE_SLUG_ALIASES: Record<string, string> = {
+  phrb: 'LTY05',
+  prb: 'LTY05',
+  'external-act': 'LTY05',
+  phrk: 'LTY04',
+  'external-decree': 'LTY04',
+  'kot-krathruang': 'LTY06',
+  'kotmai-krw': 'LTY06',
+  'external-ministerial-rule': 'LTY06',
+  'prakat-krw': 'LTY07',
+  'external-ministerial-announcement': 'LTY07',
+  command: UNIVERSITY_ANNOUNCEMENT_CODE,
+  resolution: COUNCIL_ANNOUNCEMENT_CODE,
+};
+
+const LEGACY_FAMILY_ALIASES: Record<string, string> = {
+  'kho-bangkhab': 'LFM01',
+  rabiap: 'LFM02',
+  prakat: ANNOUNCEMENT_FAMILY_CODE,
+  'kotmai-phaainok': EXTERNAL_FAMILY_CODE,
+  'kotmai-krung': EXTERNAL_FAMILY_CODE,
+  external: EXTERNAL_FAMILY_CODE,
+};
+
 export type LawTypeCatalogInput = {
   documentTypes?: Ref<DocumentTypeOption[]> | DocumentTypeOption[];
   lawFamilies?: Ref<LawFamilyOption[]> | LawFamilyOption[];
@@ -84,7 +108,7 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
   const typeItem = (value: string | null | undefined): DocumentTypeOption | null => {
     const text = normalize(value);
     if (!text || text === UNSPECIFIED_ANNOUNCEMENT) return null;
-    const code = LEGACY_TYPE_ALIASES[text] ?? text;
+    const code = LEGACY_TYPE_SLUG_ALIASES[text] ?? LEGACY_TYPE_ALIASES[text] ?? text;
     return documentTypes.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
   };
 
@@ -92,7 +116,7 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
     const text = normalize(value);
     if (!text) return null;
     const type = typeItem(text);
-    const code = text === UNSPECIFIED_ANNOUNCEMENT ? ANNOUNCEMENT_FAMILY_CODE : (type?.family_code ?? text);
+    const code = LEGACY_FAMILY_ALIASES[text] ?? (text === UNSPECIFIED_ANNOUNCEMENT ? ANNOUNCEMENT_FAMILY_CODE : (type?.family_code ?? text));
     return lawFamilies.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
   };
 
