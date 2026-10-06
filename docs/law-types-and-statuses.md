@@ -1,7 +1,7 @@
 # ประเภทกฎหมายและสถานะ
 
 เอกสารนี้สรุปค่าหลักที่ใช้กับ `LawMeta` สำหรับผู้เขียนและผู้พัฒนา อ่านคู่กับ
-[`law-metadata-reference.md`](law-metadata-reference.md) เมื่อต้องตัดสินว่า field ใดเป็น canonical
+[`law-metadata-reference.md`](law-metadata-reference.md#master-data) เมื่อต้องตัดสินว่า field ใดเป็น canonical
 หรือ derived
 
 ## ประเภทเอกสาร
@@ -106,7 +106,10 @@ Alias สำคัญ: `ยกเลิกทั้งฉบับ` -> `CHG02`, 
 Migration:
 
 ```bash
-php artisan master-data:migrate change-status [--dry-run] [--map="legacy=CHGxx"]
+php artisan master-data:migrate change-status --dry-run
+php artisan master-data:migrate change-status
+# Add explicit legacy mappings only when the dry run reports an unmapped value:
+php artisan master-data:migrate change-status --dry-run --map="legacy=CHGxx"
 ```
 
 ## ตัวอย่าง

@@ -5,6 +5,31 @@ Canonical reference for document type/status fields on `LawMeta`
 Every field below names its single source of truth; anything marked derived or legacy mirror must not
 be treated as authoritative.
 
+## Master data
+
+Metadata option lists that used to live in config are now master data stored in Mongo (`mongo.blob.master`) and read through the master-data services. Codes are canonical on writes; labels, aliases, and legacy URL slugs are accepted only as compatibility input.
+
+| kind | code prefix | notes | admin page |
+|---|---|---|---|
+| `enforcement_status` | `STA` | legal status values for `LawMeta.status` | `/admin/master-data/enforcement-statuses` |
+| `law_family` | `LFM` | family/source/color/unit grouping for law types | `/admin/master-data/law-types` |
+| `law_type` | `LTY` | document type values saved in `law_meta.law_type` | `/admin/master-data/law-types` |
+| `law_category` | `DCT` | category/group values saved in `law_groups` | `/admin/master-data/law-categories` |
+| `legal_structure` | `LST` | RAG heading/chunk types | `/admin/master-data/legal-structures` |
+| `change_status` | `CHG` | read-only change-status axis | `/admin/master-data/change-statuses` |
+| `change_detail` | `CHD` | read-only change-detail values | `/admin/master-data/change-details` |
+
+`change_status` and `change_detail` are read-only because relation behavior depends on `attrs.role`; do not add, edit, deactivate, or reorder them through the admin API. Other kinds may be administered from their pages, but code prefixes remain fixed.
+
+Alias rule: never persist aliases as canonical values. Services may accept Thai names, old English aliases, legacy slugs, and admin-added aliases, but storage and new examples should use codes. Seed upgrades may add missing seed aliases to existing rows idempotently; they must not remove admin-added aliases or rewrite names.
+
+Runbook:
+
+1. Back up Mongo first: `mongodump --db poc --archive=backups/poc-master-data-$(date +%Y%m%d%H%M%S).archive --gzip`.
+2. Audit a kind: `php artisan master-data:migrate <kind> --dry-run`.
+3. Apply only after reviewing the dry run: `php artisan master-data:migrate <kind>`.
+4. Refresh search after metadata changes: `php artisan laws:reindex --fresh`.
+
 ## Document Kind
 
 | Field | Meaning | Source of truth |

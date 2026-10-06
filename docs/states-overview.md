@@ -167,6 +167,6 @@ e-Sign `waiting`, pipeline `done` พร้อมกันได้ (แกน�
 
 - ค่าออปชันทั้งหมด (law_type / status / agency / group …): [`docs/law-types-and-statuses.md`](law-types-and-statuses.md)
 - กติกา field ไหน canonical / derived / mirror: [`docs/law-metadata-reference.md`](law-metadata-reference.md)
-- source of truth ของออปชัน: `apps/app-laravel/config/lookups.php`
+- source of truth for master-data options: [`docs/law-metadata-reference.md#master-data`](law-metadata-reference.md#master-data)
 - ชนิดฝั่ง frontend: `apps/app-laravel/resources/js/types/document.ts`
 - e-Sign stage: `apps/app-laravel/resources/js/composables/useEsignStage.ts`
