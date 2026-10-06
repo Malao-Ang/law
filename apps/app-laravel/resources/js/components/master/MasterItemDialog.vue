@@ -49,7 +49,7 @@
 
         <slot name="after-basic" :form="form" :item="item" :errors="errors ?? {}" />
 
-        <section class="master-dialog__section">
+        <section v-if="editing" class="master-dialog__section">
           <div class="master-dialog__section-title">
             <v-icon icon="mdi-eye-outline" size="18" color="admin-primary" />
             <span>สถานะการใช้งาน</span>
@@ -66,7 +66,7 @@
                 <div v-bind="tipProps">
                   <v-switch
                     v-model="form.is_active"
-                    :readonly="item?.is_system || !editing"
+                    :readonly="item?.is_system"
                     :class="{ 'master-switch--locked': item?.is_system }"
                     color="success"
                     inset
@@ -75,9 +75,6 @@
                 </div>
               </template>
             </v-tooltip>
-            <p v-if="!editing" class="text-caption text-medium-emphasis mb-0">
-              บันทึกแล้วจะเปิดใช้งานได้จากตาราง
-            </p>
           </div>
         </section>
       </v-card-text>
