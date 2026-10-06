@@ -25,7 +25,7 @@
       />
     </div>
 
-    <v-list nav density="comfortable" class="pt-2">
+    <v-list nav density="comfortable" class="pt-2 app-drawer__nav">
       <template v-for="group in resolvedNavGroups" :key="group.label">
         <v-list-subheader v-if="!rail" class="text-caption font-weight-bold">
           {{ group.label }}
@@ -211,6 +211,13 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
 .app-drawer :deep(.v-navigation-drawer__content) {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.app-drawer__nav {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .app-drawer__header {
