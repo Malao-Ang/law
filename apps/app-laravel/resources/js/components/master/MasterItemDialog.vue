@@ -54,16 +54,7 @@
             <v-icon icon="mdi-eye-outline" size="18" color="admin-primary" />
             <span>สถานะการใช้งาน</span>
           </div>
-          <v-alert
-            v-if="!editing"
-            type="info"
-            variant="tonal"
-            density="compact"
-            icon="mdi-power"
-          >
-            รายการใหม่จะถูกสร้างในสถานะ <strong>ปิดใช้งาน</strong> เปิดใช้งานได้ภายหลังจากตาราง
-          </v-alert>
-          <div v-else class="master-dialog__active-card">
+          <div class="master-dialog__active-card">
             <div>
               <div class="text-body-2 font-weight-bold">เปิดใช้งาน</div>
               <div class="text-caption text-medium-emphasis">
@@ -75,7 +66,7 @@
                 <div v-bind="tipProps">
                   <v-switch
                     v-model="form.is_active"
-                    :readonly="item?.is_system"
+                    :readonly="item?.is_system || !editing"
                     :class="{ 'master-switch--locked': item?.is_system }"
                     color="success"
                     inset
@@ -84,6 +75,9 @@
                 </div>
               </template>
             </v-tooltip>
+            <p v-if="!editing" class="text-caption text-medium-emphasis mb-0">
+              บันทึกแล้วจะเปิดใช้งานได้จากตาราง
+            </p>
           </div>
         </section>
       </v-card-text>
@@ -233,7 +227,8 @@ function computedEditing() {
   border: 1px solid #eaecf0;
   border-radius: 12px;
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   justify-content: space-between;
   padding: 14px 16px;
 }

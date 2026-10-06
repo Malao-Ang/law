@@ -58,7 +58,7 @@
         <div class="legal-structure-dialog__section-title">2. ประเภทเอกสารที่รองรับ</div>
         <p class="legal-structure-dialog__hint">เลือกประเภทเอกสารที่ต้องการให้แสดงหัวข้อโครงสร้างนี้</p>
         <div class="legal-structure-dialog__links">
-          <v-btn variant="outlined" size="small" density="compact" @click="selectAllFamilies(form)">เลือกทั้งหมด</v-btn>
+          <v-btn variant="text" size="small" density="compact" color="admin-primary" @click="selectAllFamilies(form)">เลือกทั้งหมด</v-btn>
           <v-btn variant="text" size="small" density="compact" @click="clearFamilies(form)">ล้างการเลือก</v-btn>
         </div>
         <div class="legal-structure-dialog__checkboxes">
