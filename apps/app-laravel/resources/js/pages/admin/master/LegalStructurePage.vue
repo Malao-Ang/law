@@ -269,6 +269,7 @@ function usageRemovalWarning(form: UpsertMasterItemPayload, item: MasterItem | n
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  padding: 2px 0;
 }
 
 .legal-structure-dialog__section {

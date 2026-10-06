@@ -170,6 +170,8 @@ function itemValue(item: MasterItem, key: string): unknown {
 }
 
 .master-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
   vertical-align: middle;
 }
 
