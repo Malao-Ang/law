@@ -132,8 +132,12 @@ class MasterDataStore
                 ? $payload['attrs']
                 : (array) ($existing['attrs'] ?? []);
 
-            if (($existing['is_system'] ?? false) === true && isset($existing['attrs']['role'])) {
-                $attrs['role'] = $existing['attrs']['role'];
+            if (($existing['is_system'] ?? false) === true) {
+                if (in_array($kind, [MasterDataKind::ChangeStatus, MasterDataKind::ChangeDetail], true)) {
+                    $attrs = (array) ($existing['attrs'] ?? []);
+                } elseif (isset($existing['attrs']['role'])) {
+                    $attrs['role'] = $existing['attrs']['role'];
+                }
             }
 
             $this->assertAttrsMayChange($kind, $existing, $attrs);
@@ -528,8 +532,62 @@ class MasterDataStore
             ],
             MasterDataKind::LawType => $this->normalizeLawTypeAttrs($attrs),
             MasterDataKind::LawCategory => [],
+            MasterDataKind::ChangeStatus => $this->normalizeChangeStatusAttrs($attrs, $existing, $isSystem),
+            MasterDataKind::ChangeDetail => $this->normalizeChangeDetailAttrs($attrs, $existing, $isSystem),
             MasterDataKind::LegalStructure => $this->normalizeLegalStructureAttrs($attrs, $existing, $items, $code, $isSystem),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @param  array<string, mixed>  $existing
+     * @return array{source: string, has_details: bool, role: string}
+     */
+    private function normalizeChangeStatusAttrs(array $attrs, array $existing, bool $isSystem): array
+    {
+        if (! $isSystem) {
+            return [
+                'source' => 'both',
+                'has_details' => false,
+                'role' => 'general',
+            ];
+        }
+
+        $attrs = $attrs !== [] ? $attrs : (array) ($existing['attrs'] ?? []);
+
+        return [
+            'source' => in_array(($attrs['source'] ?? null), ['internal', 'external', 'both'], true) ? $attrs['source'] : 'both',
+            'has_details' => (bool) ($attrs['has_details'] ?? false),
+            'role' => in_array(($attrs['role'] ?? null), ['new', 'whole', 'section', 'general'], true) ? $attrs['role'] : 'general',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @param  array<string, mixed>  $existing
+     * @return array{source: string, has_details: bool, role: string, color: ?string, icon: ?string}
+     */
+    private function normalizeChangeDetailAttrs(array $attrs, array $existing, bool $isSystem): array
+    {
+        if (! $isSystem) {
+            return [
+                'source' => 'both',
+                'has_details' => false,
+                'role' => 'general',
+                'color' => null,
+                'icon' => null,
+            ];
+        }
+
+        $attrs = $attrs !== [] ? $attrs : (array) ($existing['attrs'] ?? []);
+
+        return [
+            'source' => in_array(($attrs['source'] ?? null), ['internal', 'external', 'both'], true) ? $attrs['source'] : 'both',
+            'has_details' => (bool) ($attrs['has_details'] ?? false),
+            'role' => in_array(($attrs['role'] ?? null), ['repeals', 'amends', 'general'], true) ? $attrs['role'] : 'general',
+            'color' => isset($attrs['color']) ? trim((string) $attrs['color']) : null,
+            'icon' => isset($attrs['icon']) ? trim((string) $attrs['icon']) : null,
+        ];
     }
 
     /**

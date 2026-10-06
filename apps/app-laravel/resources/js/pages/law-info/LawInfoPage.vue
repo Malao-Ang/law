@@ -296,6 +296,7 @@ import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLegalStructure } from '../../composables/useLegalStructure';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import { useDocumentStore } from '../../stores/documentStore';
 import type { DocumentBlock, LawMeta, ReviewDocument } from '../../types/document';
 import AppShell from '../../components/shared/AppShell.vue';
@@ -315,6 +316,7 @@ const lawTypes = useLawType();
 const lawCategories = useLawCategory();
 const legalStructures = useLegalStructure();
 const { draftCode, isRepealed } = useLawStatus();
+const _changeStatus = useChangeStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
   [/ข้อบังคับ/u, 'LTY03'],
@@ -401,7 +403,7 @@ const changeStatusTypeItems = computed(() => {
   const items = changeStatusTypes.value.filter((t) => matchesSource(t.source));
   const current = form.value.change_status?.trim() ?? '';
   if (current && !items.some((item) => item.value === current)) {
-    return [{ title: current, value: current }, ...items];
+    return [{ title: _changeStatus.label(current), value: current }, ...items];
   }
   return items;
 });

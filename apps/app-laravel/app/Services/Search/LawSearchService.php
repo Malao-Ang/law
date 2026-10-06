@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 
@@ -45,14 +46,17 @@ class LawSearchService
 
     private readonly LawTypes $lawTypes;
     private readonly LawCategories $lawCategories;
+    private readonly ChangeStatuses $changeStatuses;
 
     public function __construct(
         private readonly ElasticClient $client,
         ?LawTypes $lawTypes = null,
         ?LawCategories $lawCategories = null,
+        ?ChangeStatuses $changeStatuses = null,
     ) {
         $this->lawTypes = $lawTypes ?? app(LawTypes::class);
         $this->lawCategories = $lawCategories ?? app(LawCategories::class);
+        $this->changeStatuses = $changeStatuses ?? app(ChangeStatuses::class);
     }
 
     /**
@@ -349,6 +353,8 @@ class LawSearchService
                     $values = $this->expandLawFamilyFilterValues($values);
                 } elseif ($field === 'law_group') {
                     $values = $this->expandLawCategoryFilterValues($values);
+                } elseif ($field === 'change_status') {
+                    $values = $this->expandChangeStatusFilterValues($values);
                 }
                 $filterClauses[] = ['terms' => [$field => $values]];
             }
@@ -471,6 +477,21 @@ class LawSearchService
         return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
     }
 
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandChangeStatusFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $status = $this->changeStatuses->resolve($value);
+            $expanded[] = $status === null ? trim((string) $value) : (string) $status['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
+    }
+
     private function canonicalLawType(string $lawType): string
     {
         $lawType = trim($lawType);
@@ -568,7 +589,8 @@ class LawSearchService
                 'law_family' => $source['law_family'] ?? ($type['attrs']['family_code'] ?? null),
                 'issuer' => null,
                 'status' => $source['status'] ?? null,
-                'change_status' => $source['change_status'] ?? null,
+                'change_status' => $source['change_status_label'] ?? $this->changeStatuses->labelOf($source['change_status'] ?? ''),
+                'change_status_code' => (string) ($source['change_status'] ?? ''),
                 'summary' => $source['summary'] ?? null,
                 'published_date' => $source['published_date'] ?? null,
                 'agency' => $source['agency'] ?? null,
@@ -588,7 +610,9 @@ class LawSearchService
         $facets = [];
         foreach (self::TERM_FILTERS as $field) {
             $facets[$field] = array_map(
-                fn (array $bucket): array => ['value' => (string) $bucket['key'], 'count' => (int) $bucket['doc_count']],
+                fn (array $bucket): array => $field === 'change_status'
+                    ? ['value' => (string) $bucket['key'], 'label' => $this->changeStatuses->labelOf($bucket['key'] ?? ''), 'count' => (int) $bucket['doc_count']]
+                    : ['value' => (string) $bucket['key'], 'count' => (int) $bucket['doc_count']],
                 $raw['aggregations'][$field]['buckets'] ?? [],
             );
         }

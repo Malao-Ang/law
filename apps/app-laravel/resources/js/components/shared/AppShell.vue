@@ -172,6 +172,7 @@ const defaultNavGroups: NavGroup[] = [
       { label: 'ประเภทเอกสาร', icon: 'mdi-file-document-outline', to: '/admin/master/law-types', section: 'ข้อมูลเอกสาร' },
       { label: 'หมวดเอกสาร', icon: 'mdi-folder-outline', to: '/admin/master/categories', section: 'ข้อมูลเอกสาร' },
       { label: 'โครงสร้างกฎหมาย', icon: 'mdi-file-tree', to: '/admin/master/legal-structures', section: 'โครงสร้างและความสัมพันธ์' },
+      { label: 'สถานะการเปลี่ยนแปลง', icon: 'mdi-history', to: '/admin/master/change-status', section: 'สถานะกฎหมาย' },
       { label: 'สถานะการบังคับใช้', icon: 'mdi-shield-check-outline', to: '/admin/master/enforcement-status', section: 'สถานะกฎหมาย' },
     ],
   },

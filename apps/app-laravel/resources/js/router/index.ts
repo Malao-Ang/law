@@ -15,6 +15,7 @@ const EnforcementStatusPage = () => import('../pages/admin/master/EnforcementSta
 const LawTypePage = () => import('../pages/admin/master/LawTypePage.vue');
 const LawCategoryPage = () => import('../pages/admin/master/LawCategoryPage.vue');
 const LegalStructurePage = () => import('../pages/admin/master/LegalStructurePage.vue');
+const ChangeStatusPage = () => import('../pages/admin/master/ChangeStatusPage.vue');
 const UploadPage = () => import('../pages/UploadPage.vue');
 const ReviewPage = () => import('../pages/review/ReviewPage.vue');
 const ComposePage = () => import('../pages/compose/ComposePage.vue');
@@ -47,6 +48,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/master/law-types', name: 'admin-master-law-types', component: LawTypePage, meta: { bareLayout: true } },
   { path: '/admin/master/categories', name: 'admin-master-categories', component: LawCategoryPage, meta: { bareLayout: true } },
   { path: '/admin/master/legal-structures', name: 'admin-master-legal-structures', component: LegalStructurePage, meta: { bareLayout: true } },
+  { path: '/admin/master/change-status', name: 'admin-master-change-status', component: ChangeStatusPage, meta: { bareLayout: true } },
   { path: '/admin/master/enforcement-status', name: 'admin-master-enforcement-status', component: EnforcementStatusPage, meta: { bareLayout: true } },
   { path: '/upload', name: 'upload-legacy', component: UploadPage },
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },

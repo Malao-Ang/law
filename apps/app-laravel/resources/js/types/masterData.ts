@@ -1,13 +1,16 @@
 import type { LawSource } from '../api/client';
 
-export type MasterKind = 'enforcement_status' | 'law_family' | 'law_type' | 'law_category' | 'legal_structure';
+export type MasterKind = 'enforcement_status' | 'law_family' | 'law_type' | 'law_category' | 'legal_structure' | 'change_status' | 'change_detail';
 
 export type MasterItemAttrs = Record<string, unknown> & {
   color?: string | null;
-  source?: LawSource;
+  source?: LawSource | 'both';
   family_code?: string;
   family_codes?: string[];
   file_types?: Array<'word' | 'pdf'>;
+  has_details?: boolean;
+  role?: string;
+  icon?: string | null;
   is_head?: boolean;
   counts_as_section?: boolean;
   is_required?: boolean;

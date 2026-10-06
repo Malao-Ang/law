@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use Illuminate\Foundation\Http\FormRequest;
@@ -45,6 +46,13 @@ class LawSearchRequest extends FormRequest
             $filters['law_group'] = array_values(array_unique(array_map(
                 static fn (mixed $group): string => (string) ($categories->resolve($group)['code'] ?? trim((string) $group)),
                 $filters['law_group'],
+            )));
+        }
+        if (is_array($filters) && is_array($filters['change_status'] ?? null)) {
+            $changeStatuses = app(ChangeStatuses::class);
+            $filters['change_status'] = array_values(array_unique(array_map(
+                static fn (mixed $status): string => (string) ($changeStatuses->resolve($status)['code'] ?? trim((string) $status)),
+                $filters['change_status'],
             )));
         }
 

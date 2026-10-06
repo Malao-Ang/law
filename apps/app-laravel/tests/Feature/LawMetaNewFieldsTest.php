@@ -21,11 +21,13 @@ class LawMetaNewFieldsTest extends TestCase
         ]);
 
         $this->putJson("/api/documents/{$documentId}/document-review", [
-            'law_meta' => ['change_status' => 'amended', 'signer_group' => 'คณะกรรมการ ก'],
-        ])->assertOk();
+            'law_meta' => ['change_status' => 'ปรับปรุงทั้งฉบับ', 'signer_group' => 'คณะกรรมการ ก'],
+        ])
+            ->assertOk()
+            ->assertJsonPath('law_meta.change_status', 'CHG02');
 
         $doc = $store->getReviewDocument($documentId);
-        $this->assertSame('amended', $doc['law_meta']['change_status']);
+        $this->assertSame('CHG02', $doc['law_meta']['change_status']);
         $this->assertSame('คณะกรรมการ ก', $doc['law_meta']['signer_group']);
     }
 

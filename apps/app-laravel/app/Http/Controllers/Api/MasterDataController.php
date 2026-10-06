@@ -45,6 +45,9 @@ class MasterDataController extends Controller
         if ($masterKind === null) {
             return $this->unknownKind();
         }
+        if ($masterKind->readOnly()) {
+            return $this->readOnlyKind();
+        }
 
         return response()->json($this->store->create($masterKind, $request->validated()), 201);
     }
@@ -54,6 +57,9 @@ class MasterDataController extends Controller
         $masterKind = $this->kind($kind);
         if ($masterKind === null) {
             return $this->unknownKind();
+        }
+        if ($masterKind->readOnly()) {
+            return $this->readOnlyKind();
         }
 
         $validated = $request->validate([
@@ -87,6 +93,9 @@ class MasterDataController extends Controller
         if ($masterKind === null) {
             return $this->unknownKind();
         }
+        if ($masterKind->readOnly()) {
+            return $this->readOnlyKind();
+        }
 
         try {
             $item = $this->store->update($masterKind, $code, $request->validated());
@@ -106,6 +115,9 @@ class MasterDataController extends Controller
         $masterKind = $this->kind($kind);
         if ($masterKind === null) {
             return $this->unknownKind();
+        }
+        if ($masterKind->readOnly()) {
+            return $this->readOnlyKind();
         }
 
         $validated = $request->validate([
@@ -131,6 +143,9 @@ class MasterDataController extends Controller
         if ($masterKind === null) {
             return $this->unknownKind();
         }
+        if ($masterKind->readOnly()) {
+            return $this->readOnlyKind();
+        }
 
         try {
             $deleted = $this->store->delete($masterKind, $code);
@@ -153,6 +168,11 @@ class MasterDataController extends Controller
     private function unknownKind(): JsonResponse
     {
         return response()->json(['message' => 'Unknown master data kind'], 404);
+    }
+
+    private function readOnlyKind(): JsonResponse
+    {
+        return response()->json(['message' => 'รายการนี้เป็นข้อมูลของระบบ ดูได้อย่างเดียว'], 403);
     }
 
     /**

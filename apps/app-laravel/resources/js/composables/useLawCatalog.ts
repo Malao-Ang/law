@@ -1,5 +1,6 @@
 import type { DocumentListItem } from '../types/document';
 import { createLawTypeCatalog } from './useLawType';
+import { createChangeStatusCatalog } from './useChangeStatus';
 
 const PICKABLE_STATUSES = new Set(['done', 'exported', 'ingested']);
 const RELATION_READY_STEP = 4;
@@ -37,13 +38,7 @@ export function rootDocuments(
   });
 }
 
-const SAME_LEVEL_EDITION_STATUSES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-  'ปรับปรุงรายข้อ',
-  'ปรับปรุงรายมาตรา',
-  'ยกเลิกรายมาตรา',
-]);
+const _changeStatus = createChangeStatusCatalog({ types: [], typesAll: [], details: [], detailsAll: [] });
 
 export function documentsWithoutParent(
   documents: DocumentListItem[],
@@ -53,8 +48,8 @@ export function documentsWithoutParent(
     if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
     if (!isPickableDocument(doc)) return false;
     if (parentIdsOf(doc).length > 0) return false;
-    const changeStatus = doc.change_status?.trim() ?? '';
-    return !SAME_LEVEL_EDITION_STATUSES.has(changeStatus);
+    const cs = doc.change_status?.trim() ?? '';
+    return !_changeStatus.isWhole(cs) && !_changeStatus.isSection(cs);
   });
 }
 

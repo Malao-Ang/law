@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\LegalStructures;
@@ -14,15 +15,18 @@ use Illuminate\Console\Command;
 class MigrateMasterDataCommand extends Command
 {
     protected $signature = 'master-data:migrate
-        {kind : Migration kind. Supported: enforcement-status, law-type, law-category, legal-structure}
+        {kind : Migration kind. Supported: enforcement-status, law-type, law-category, legal-structure, change-status}
         {--dry-run : Audit without writing}
         {--map=* : Extra mapping in the form "legacy value=STA0x"}';
 
     protected $description = 'Migrate legacy data values to master data codes.';
 
-    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, LawCategories $lawCategories, ReviewStore $reviewStore, LegalStructures $legalStructures): int
+    public function handle(MasterDataStore $masterData, EnforcementStatuses $statuses, LawTypes $lawTypes, LawCategories $lawCategories, ReviewStore $reviewStore, LegalStructures $legalStructures, ChangeStatuses $changeStatuses): int
     {
         $kind = (string) $this->argument('kind');
+        if (in_array($kind, ['change-status', 'change_status'], true)) {
+            return $this->migrateChangeStatuses($masterData, $changeStatuses, $reviewStore);
+        }
         if (in_array($kind, ['legal-structure', 'legal_structure'], true)) {
             return $this->migrateLegalStructures($masterData, $legalStructures, $reviewStore);
         }
@@ -34,7 +38,7 @@ class MigrateMasterDataCommand extends Command
         }
 
         if (! in_array($kind, ['enforcement-status', 'enforcement_status'], true)) {
-            $this->error('Unknown migration kind. Supported: enforcement-status, law-type, law-category, legal-structure');
+            $this->error('Unknown migration kind. Supported: enforcement-status, law-type, law-category, legal-structure, change-status');
 
             return self::FAILURE;
         }
@@ -444,6 +448,170 @@ class MigrateMasterDataCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function migrateChangeStatuses(MasterDataStore $masterData, ChangeStatuses $changeStatuses, ReviewStore $reviewStore): int
+    {
+        $masterData->seedIfEmpty(MasterDataKind::ChangeStatus);
+        $masterData->seedIfEmpty(MasterDataKind::ChangeDetail);
+
+        $extraMap = $this->parseChangeStatusMapOptions($changeStatuses);
+        if ($extraMap === null) {
+            return self::FAILURE;
+        }
+
+        $audit = [];
+        $unmapped = [];
+        $patches = [];
+
+        foreach ($reviewStore->listLawMeta() as $row) {
+            $documentId = (string) ($row['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+
+            $patch = [];
+            $rowUnmapped = false;
+
+            $rawStatus = trim((string) ($row['change_status'] ?? ''));
+            if ($rawStatus !== '') {
+                $statusCode = $this->resolveMigratedChangeStatusCode($changeStatuses, $extraMap, $rawStatus);
+                if ($statusCode === null) {
+                    $audit[$rawStatus]['target'] = 'UNMAPPED';
+                    $audit[$rawStatus]['count'] = ($audit[$rawStatus]['count'] ?? 0) + 1;
+                    $unmapped[$rawStatus][] = $documentId;
+                    $rowUnmapped = true;
+                } else {
+                    $audit[$rawStatus]['target'] = $statusCode;
+                    $audit[$rawStatus]['count'] = ($audit[$rawStatus]['count'] ?? 0) + 1;
+                    if ($rawStatus !== $statusCode) {
+                        $patch['change_status'] = $statusCode;
+                    }
+                }
+            }
+
+            $rawDetails = [];
+            foreach ((array) ($row['change_details'] ?? []) as $detail) {
+                $raw = trim((string) $detail);
+                if ($raw !== '') {
+                    $rawDetails[] = $raw;
+                }
+            }
+
+            if ($rawDetails !== []) {
+                $detailCodes = [];
+                foreach ($rawDetails as $rawDetail) {
+                    $detailCode = $this->resolveMigratedChangeDetailCode($changeStatuses, $extraMap, $rawDetail);
+                    if ($detailCode === null) {
+                        $audit[$rawDetail]['target'] = 'UNMAPPED';
+                        $audit[$rawDetail]['count'] = ($audit[$rawDetail]['count'] ?? 0) + 1;
+                        $unmapped[$rawDetail][] = $documentId;
+                        $rowUnmapped = true;
+
+                        continue;
+                    }
+
+                    $audit[$rawDetail]['target'] = $detailCode;
+                    $audit[$rawDetail]['count'] = ($audit[$rawDetail]['count'] ?? 0) + 1;
+                    if (! in_array($detailCode, $detailCodes, true)) {
+                        $detailCodes[] = $detailCode;
+                    }
+                }
+
+                if (! $rowUnmapped && $rawDetails !== $detailCodes) {
+                    $patch['change_details'] = $detailCodes;
+                }
+            }
+
+            if (! $rowUnmapped && $patch !== []) {
+                $patches[$documentId] = $patch;
+            }
+        }
+
+        $this->renderAudit($audit);
+
+        if ($unmapped !== []) {
+            $this->error('UNMAPPED change status value(s) found.');
+            foreach ($unmapped as $value => $documentIds) {
+                $this->line($value.': '.implode(', ', array_unique($documentIds)));
+            }
+
+            return self::FAILURE;
+        }
+
+        if ((bool) $this->option('dry-run')) {
+            $this->info('Dry run: '.$this->patchCountLabel($patches).' would be updated.');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($patches as $documentId => $patch) {
+            $reviewStore->patchLawMeta($documentId, $patch);
+        }
+
+        $this->info($this->patchCountLabel($patches).' updated.');
+        foreach (array_keys($patches) as $documentId) {
+            $this->call('laws:reindex', ['--id' => $documentId]);
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private function parseChangeStatusMapOptions(ChangeStatuses $changeStatuses): ?array
+    {
+        $map = [];
+        foreach ((array) $this->option('map') as $entry) {
+            $parts = explode('=', (string) $entry, 2);
+            if (count($parts) !== 2) {
+                $this->error('Invalid --map value. Use "legacy value=CHGxx" or "legacy value=CHDxx".');
+
+                return null;
+            }
+
+            [$legacy, $target] = $parts;
+            $target = trim($target);
+            $resolved = $changeStatuses->resolve($target) ?? $changeStatuses->resolveDetail($target);
+            if ($resolved === null) {
+                $this->error("Invalid --map target: {$target}");
+
+                return null;
+            }
+
+            $map[trim($legacy)] = (string) $resolved['code'];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<string, string>  $extraMap
+     */
+    private function resolveMigratedChangeStatusCode(ChangeStatuses $changeStatuses, array $extraMap, string $raw): ?string
+    {
+        if (isset($extraMap[$raw])) {
+            return str_starts_with($extraMap[$raw], 'CHG') ? $extraMap[$raw] : null;
+        }
+
+        $status = $changeStatuses->resolve($raw);
+
+        return $status === null ? null : (string) $status['code'];
+    }
+
+    /**
+     * @param  array<string, string>  $extraMap
+     */
+    private function resolveMigratedChangeDetailCode(ChangeStatuses $changeStatuses, array $extraMap, string $raw): ?string
+    {
+        if (isset($extraMap[$raw])) {
+            return str_starts_with($extraMap[$raw], 'CHD') ? $extraMap[$raw] : null;
+        }
+
+        $detail = $changeStatuses->resolveDetail($raw);
+
+        return $detail === null ? null : (string) $detail['code'];
     }
 
     private function resolveMigratedLawTypeCode(LawTypes $lawTypes, string $rawType, string $rawIssuer): ?string

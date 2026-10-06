@@ -3,6 +3,7 @@ import { parentIdsOf } from './useLawCatalog';
 import { formatThaiDate } from '../utils/thaiDate';
 import { useLawStatus } from './useLawStatus';
 import { createLawTypeCatalog } from './useLawType';
+import { createChangeStatusCatalog } from './useChangeStatus';
 
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
@@ -10,6 +11,8 @@ export const MAX_DEPTH = 6;
 export const SAME_LEVEL_PREVIEW_COUNT = 5;
 
 const lawTypes = createLawTypeCatalog();
+// Singleton change-status catalog using fallback seeds (no runtime /api/lookups call here).
+const changeStatus = createChangeStatusCatalog({ types: [], typesAll: [], details: [], detailsAll: [] });
 const FAMILY_COLOR_CLASS: Record<string, string> = {
   LFM01: 'doc-kho-bangkhab',
   LFM02: 'doc-rabiap',
@@ -190,44 +193,28 @@ export function rememberRecentId(documentId: string): void {
   localStorage.setItem(SHOW_REL_RECENT_KEY, JSON.stringify(next));
 }
 
-export const SAME_LEVEL_CHANGE_STATUSES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-]);
-
-export const WHOLE_EDITION_CHANGES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-]);
-
-export const SECTION_EDITION_CHANGES = new Set([
-  'ปรับปรุงรายข้อ',
-  'ปรับปรุงรายมาตรา',
-  'ยกเลิกรายมาตรา',
-]);
-
-export function isSameLevelChange(changeStatus: string): boolean {
-  return SAME_LEVEL_CHANGE_STATUSES.has(changeStatus.trim());
+export function isSameLevelChange(value: string): boolean {
+  return changeStatus.isWhole(value);
 }
 
-export function isWholeEditionChange(changeStatus: string): boolean {
-  return WHOLE_EDITION_CHANGES.has(changeStatus.trim());
+export function isWholeEditionChange(value: string): boolean {
+  return changeStatus.isWhole(value);
 }
 
-export function isSectionEditionChange(changeStatus: string): boolean {
-  return SECTION_EDITION_CHANGES.has(changeStatus.trim());
+export function isSectionEditionChange(value: string): boolean {
+  return changeStatus.isSection(value);
 }
 
-export function isNewLawChange(changeStatus: string): boolean {
-  return changeStatus.trim() === 'กฎหมายใหม่';
+export function isNewLawChange(value: string): boolean {
+  return changeStatus.isNew(value);
 }
 
-export function isAmendmentChange(changeStatus: string): boolean {
-  return isSameLevelChange(changeStatus) || isSectionEditionChange(changeStatus);
+export function isAmendmentChange(value: string): boolean {
+  return changeStatus.isWhole(value) || changeStatus.isSection(value);
 }
 
-export function versionNodeSize(changeStatus: string): 'big' | 'small' {
-  return isSectionEditionChange(changeStatus) ? 'small' : 'big';
+export function versionNodeSize(value: string): 'big' | 'small' {
+  return changeStatus.isSection(value) ? 'small' : 'big';
 }
 
 export const SAME_LEVEL_RELATION_TYPES = new Set<RelationType>([

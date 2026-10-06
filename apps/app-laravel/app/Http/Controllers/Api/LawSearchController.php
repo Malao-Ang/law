@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
@@ -23,6 +24,7 @@ class LawSearchController extends Controller
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
         private readonly LawCategories $lawCategories,
+        private readonly ChangeStatuses $changeStatuses,
     ) {}
 
     private const EXTERNAL_LAW_TYPE_ALIASES = [
@@ -275,7 +277,8 @@ class LawSearchController extends Controller
                 'issuer' => null,
                 'issuer_code' => null,
                 'status' => $r['meta_status'],
-                'change_status' => $r['change_status'],
+                'change_status' => $this->changeStatuses->labelOf($r['change_status'] ?? ''),
+                'change_status_code' => $this->changeStatusCode($r['change_status'] ?? ''),
                 'summary' => null,
                 'published_date' => $r['published_date'] ?? null,
                 'agency' => $r['agencies'][0] ?? null,
@@ -328,7 +331,12 @@ class LawSearchController extends Controller
             return false;
         }
 
-        foreach (['change_status', 'signer_group'] as $field) {
+        $wantChangeStatus = $filters['change_status'] ?? null;
+        if (! empty($wantChangeStatus) && ! in_array($this->changeStatusCode($row['change_status'] ?? ''), (array) $wantChangeStatus, true)) {
+            return false;
+        }
+
+        foreach (['signer_group'] as $field) {
             $want = $filters[$field] ?? null;
             if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
                 return false;
@@ -895,7 +903,7 @@ class LawSearchController extends Controller
         $rows = array_map(static fn (array $r): array => [
             'law_type' => (string) ($r['law_type'] ?? ''),
             'meta_status' => (string) ($r['status'] ?? ''),
-            'change_status' => (string) ($r['change_status'] ?? ''),
+            'change_status' => (string) ($r['change_status_code'] ?? $r['change_status'] ?? ''),
             'signer_group' => (string) ($r['signer_group'] ?? ''),
             'agencies' => array_values(array_filter([(string) ($r['agency'] ?? '')])),
             'law_groups' => array_values(array_filter((array) ($r['law_group_codes'] ?? [(string) ($r['law_group'] ?? '')]))),
@@ -937,6 +945,16 @@ class LawSearchController extends Controller
         return (string) ($this->lawCategories->resolve($raw)['code'] ?? $raw);
     }
 
+    private function changeStatusCode(mixed $value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        return (string) ($this->changeStatuses->resolve($raw)['code'] ?? $raw);
+    }
+
     /**
      * @param  array<int, array<string,mixed>>  $rows
      * @return array<string, mixed>
@@ -949,14 +967,18 @@ class LawSearchController extends Controller
         foreach ($termFields as $key => $field) {
             $counts = [];
             foreach ($rows as $r) {
-                $v = (string) ($r[$field] ?? '');
+                $v = $key === 'change_status'
+                    ? $this->changeStatusCode($r[$field] ?? '')
+                    : (string) ($r[$field] ?? '');
                 if ($v !== '') {
                     $counts[$v] = ($counts[$v] ?? 0) + 1;
                 }
             }
             arsort($counts);
             $facets[$key] = array_values(array_map(
-                fn (string $v, int $c): array => ['value' => $v, 'count' => $c],
+                fn (string $v, int $c): array => $key === 'change_status'
+                    ? ['value' => $v, 'label' => $this->changeStatuses->labelOf($v), 'count' => $c]
+                    : ['value' => $v, 'count' => $c],
                 array_keys($counts), array_values($counts),
             ));
         }
@@ -1020,14 +1042,16 @@ class LawSearchController extends Controller
                     $parentIds[$parentId] = true;
                 }
             }
-            $cs = (string) ($row['change_status'] ?? '');
-            if (isset($changeCounts[$cs])) {
-                $changeCounts[$cs]++;
+            $changeRole = $this->changeStatuses->role($row['change_status'] ?? '');
+            if ($changeRole === 'new') {
+                $changeCounts['new']++;
+            } elseif (in_array($changeRole, ['whole', 'section'], true)) {
+                $changeCounts['amended']++;
             }
 
             $this->tally($termCounts['law_type'], $row['law_type'] ?? '');
             $this->tally($termCounts['status'], $row['meta_status'] ?? '');
-            $this->tally($termCounts['change_status'], $row['change_status'] ?? '');
+            $this->tally($termCounts['change_status'], $this->changeStatusCode($row['change_status'] ?? ''));
             $this->tally($termCounts['signer_group'], $row['signer_group'] ?? '');
 
             foreach ((array) ($row['agencies'] ?? []) as $agency) {
@@ -1047,7 +1071,9 @@ class LawSearchController extends Controller
         foreach ($termCounts as $field => $counts) {
             arsort($counts);
             $facets[$field] = array_values(array_map(
-                fn (string $value, int $count): array => ['value' => $value, 'count' => $count],
+                fn (string $value, int $count): array => $field === 'change_status'
+                    ? ['value' => $value, 'label' => $this->changeStatuses->labelOf($value), 'count' => $count]
+                    : ['value' => $value, 'count' => $count],
                 array_keys($counts),
                 array_values($counts),
             ));

@@ -83,8 +83,10 @@ export type LookupData = {
   law_families_all?: LawFamilyOption[];
   statuses: LawStatusOption[];
   statuses_all?: LawStatusOption[];
-  change_status_types: (SelectableOption & { source?: string; has_details?: boolean })[];
-  change_status_details: (SelectableOption & { source?: string })[];
+  change_status_types: (SelectableOption & { source?: string; has_details?: boolean; role?: string })[];
+  change_status_types_all?: (SelectableOption & { source?: string; has_details?: boolean; role?: string })[];
+  change_status_details: (SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[];
+  change_status_details_all?: (SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[];
   agencies: SelectableOption[];
   law_groups: (SelectableOption & { code: string; sort_order?: number })[];
   law_groups_all?: (SelectableOption & { code: string; sort_order?: number })[];

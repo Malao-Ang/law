@@ -73,6 +73,42 @@ legacy issuer ที่ชัดเจน แต่จะรายงานเ�
 ทั้ง 4 แกนเป็นอิสระต่อกัน ยกเว้นขั้น publish หลัง e-sign ที่ตั้ง `status` เป็นมีผลบังคับใช้และเติม
 `published_date`
 
+## สถานะการเปลี่ยนแปลง
+
+`change_status` และ `change_details` เป็น master data แบบอ่านอย่างเดียว เพราะระบบความสัมพันธ์อ่าน
+`attrs.role` เพื่อคำนวณพฤติกรรม ห้ามเพิ่ม แก้ไข ปิดใช้งาน หรือจัดลำดับผ่าน API; write endpoints ของ
+`change_status` และ `change_detail` จะตอบ 403
+
+`change_status`:
+
+| code | ชื่อ | ใช้กับ | มีรายละเอียดย่อย | role |
+|---|---|---|---|---|
+| `CHG01` | กฎหมายใหม่ | ทั้งหมด | ไม่ใช่ | `new` |
+| `CHG02` | ปรับปรุงทั้งฉบับ | ทั้งหมด | ไม่ใช่ | `whole` |
+| `CHG03` | ปรับปรุงรายข้อ | กฎหมายภายใน | ใช่ | `section` |
+| `CHG04` | ปรับปรุงรายมาตรา | กฎหมายภายนอก | ใช่ | `section` |
+
+`change_detail`:
+
+| code | ชื่อ | ใช้กับ | มีรายละเอียดย่อย | role |
+|---|---|---|---|---|
+| `CHD01` | ยกเลิกข้อ | กฎหมายภายใน | ไม่ใช่ | `repeals` |
+| `CHD02` | ยกเลิกมาตรา | กฎหมายภายนอก | ไม่ใช่ | `repeals` |
+| `CHD03` | เพิ่มข้อความ | ทั้งหมด | ไม่ใช่ | `amends` |
+| `CHD04` | แก้ไขข้อความ | ทั้งหมด | ไม่ใช่ | `amends` |
+
+Alias สำคัญ: `ยกเลิกทั้งฉบับ` -> `CHG02`, `ยกเลิกรายมาตรา` -> `CHG04`, `กฎหมายล่าสุด` -> `CHG01`,
+`ยกเลิก` -> `CHD01`, `เพิ่ม` -> `CHD03`, `แก้ไข` -> `CHD04`
+
+กติกาความสัมพันธ์อ่านจาก `role` เท่านั้น ไม่อ่านชื่อภาษาไทยโดยตรง ส่วน `relations[].change_detail`
+ยังเป็นข้อความตามเดิมสำหรับบันทึกรายละเอียดของความสัมพันธ์ ไม่ถูกบังคับให้เป็น `CHDxx`
+
+Migration:
+
+```bash
+php artisan master-data:migrate change-status [--dry-run] [--map="legacy=CHGxx"]
+```
+
 ## ตัวอย่าง
 
 ```jsonc
@@ -83,7 +119,7 @@ legacy issuer ที่ชัดเจน แต่จะรายงานเ�
   "status": "STA01",
   "published_date": "2026-01-19",
   "access_scope": "public",
-  "change_status": "กฎหมายใหม่",
+  "change_status": "CHG01",
   "agencies": ["มหาวิทยาลัยบูรพา"],
   "law_groups": ["DCT006"]
 }
@@ -97,8 +133,8 @@ legacy issuer ที่ชัดเจน แต่จะรายงานเ�
   "status": "STA03",
   "published_date": "",
   "access_scope": "private",
-  "change_status": "ปรับปรุงรายข้อ",
-  "change_details": ["ยกเลิกข้อ", "แก้ไขข้อความ"],
+  "change_status": "CHG03",
+  "change_details": ["CHD01", "CHD04"],
   "agencies": ["สภามหาวิทยาลัยบูรพา"],
   "law_groups": ["DCT007"]
 }

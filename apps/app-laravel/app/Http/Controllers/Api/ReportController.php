@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
@@ -21,6 +22,7 @@ class ReportController extends Controller
         private readonly EnforcementStatuses $enforcementStatuses,
         private readonly LawTypes $lawTypes,
         private readonly LawCategories $lawCategories,
+        private readonly ChangeStatuses $changeStatuses,
     ) {}
 
     public function summary(Request $request): JsonResponse
@@ -245,7 +247,8 @@ class ReportController extends Controller
                 'agency' => ($r['agencies'][0] ?? '') ?: 'ไม่ระบุ',
                 'status' => $r['status'],
                 'meta_status' => trim((string) ($r['meta_status'] ?? '')),
-                'change_status' => trim((string) ($r['change_status'] ?? '')),
+                'change_status' => $this->changeStatuses->labelOf($r['change_status'] ?? ''),
+                'change_status_code' => (string) ($this->changeStatuses->resolve($r['change_status'] ?? '')['code'] ?? trim((string) ($r['change_status'] ?? ''))),
                 'published_date' => trim((string) ($r['published_date'] ?? '')),
                 'source' => trim((string) ($r['source'] ?? '')),
                 'document_type' => trim((string) ($r['document_type'] ?? 'new')),

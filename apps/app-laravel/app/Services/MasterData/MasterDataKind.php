@@ -26,6 +26,8 @@ enum MasterDataKind: string
     case LawType = 'law_type';
     case LawCategory = 'law_category';
     case LegalStructure = 'legal_structure';
+    case ChangeStatus = 'change_status';
+    case ChangeDetail = 'change_detail';
 
     public function prefix(): string
     {
@@ -35,6 +37,8 @@ enum MasterDataKind: string
             self::LawType => 'LTY',
             self::LawCategory => 'DCT',
             self::LegalStructure => 'LST',
+            self::ChangeStatus => 'CHG',
+            self::ChangeDetail => 'CHD',
         };
     }
 
@@ -48,6 +52,14 @@ enum MasterDataKind: string
         return false;
     }
 
+    /**
+     * Kinds that drive relation logic (relation graph, same-level replacement) are view-only.
+     */
+    public function readOnly(): bool
+    {
+        return in_array($this, [self::ChangeStatus, self::ChangeDetail], true);
+    }
+
     public function label(): string
     {
         return match ($this) {
@@ -56,6 +68,8 @@ enum MasterDataKind: string
             self::LawType => 'ประเภทเอกสาร',
             self::LawCategory => 'หมวดเอกสาร',
             self::LegalStructure => 'โครงสร้างกฎหมาย',
+            self::ChangeStatus => 'สถานะการเปลี่ยนแปลง',
+            self::ChangeDetail => 'รายละเอียดการเปลี่ยนแปลง',
         };
     }
 
@@ -384,6 +398,66 @@ enum MasterDataKind: string
                     'attrs' => ['family_codes' => ['LFM01', 'LFM02', 'LFM03', 'LFM04'], 'file_types' => ['word', 'pdf'], 'is_head' => true, 'counts_as_section' => false, 'is_required' => false, 'color' => 'blue', 'export_key' => 'CHAPTER'],
                 ],
             ],
+            self::ChangeStatus => [
+                [
+                    'code' => 'CHG01',
+                    'name' => 'กฎหมายใหม่',
+                    'description' => '',
+                    'aliases' => ['กฎหมายใหม่', 'กฎหมายล่าสุด'],
+                    'attrs' => ['source' => 'both', 'has_details' => false, 'role' => 'new'],
+                ],
+                [
+                    'code' => 'CHG02',
+                    'name' => 'ปรับปรุงทั้งฉบับ',
+                    'description' => '',
+                    'aliases' => ['ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ'],
+                    'attrs' => ['source' => 'both', 'has_details' => false, 'role' => 'whole'],
+                ],
+                [
+                    'code' => 'CHG03',
+                    'name' => 'ปรับปรุงรายข้อ',
+                    'description' => '',
+                    'aliases' => ['ปรับปรุงรายข้อ'],
+                    'attrs' => ['source' => 'internal', 'has_details' => true, 'role' => 'section'],
+                ],
+                [
+                    'code' => 'CHG04',
+                    'name' => 'ปรับปรุงรายมาตรา',
+                    'description' => '',
+                    'aliases' => ['ปรับปรุงรายมาตรา', 'ยกเลิกรายมาตรา'],
+                    'attrs' => ['source' => 'external', 'has_details' => true, 'role' => 'section'],
+                ],
+            ],
+            self::ChangeDetail => [
+                [
+                    'code' => 'CHD01',
+                    'name' => 'ยกเลิกข้อ',
+                    'description' => '',
+                    'aliases' => ['ยกเลิกข้อ', 'ยกเลิก'],
+                    'attrs' => ['source' => 'internal', 'role' => 'repeals', 'color' => 'error', 'icon' => 'mdi-cancel'],
+                ],
+                [
+                    'code' => 'CHD02',
+                    'name' => 'ยกเลิกมาตรา',
+                    'description' => '',
+                    'aliases' => ['ยกเลิกมาตรา'],
+                    'attrs' => ['source' => 'external', 'role' => 'repeals', 'color' => 'error', 'icon' => 'mdi-cancel'],
+                ],
+                [
+                    'code' => 'CHD03',
+                    'name' => 'เพิ่มข้อความ',
+                    'description' => '',
+                    'aliases' => ['เพิ่มข้อความ', 'เพิ่ม'],
+                    'attrs' => ['source' => 'both', 'role' => 'amends', 'color' => 'success', 'icon' => 'mdi-plus'],
+                ],
+                [
+                    'code' => 'CHD04',
+                    'name' => 'แก้ไขข้อความ',
+                    'description' => '',
+                    'aliases' => ['แก้ไขข้อความ', 'แก้ไข'],
+                    'attrs' => ['source' => 'both', 'role' => 'amends', 'color' => 'teal', 'icon' => 'mdi-pencil'],
+                ],
+            ],
         };
     }
 
@@ -404,6 +478,7 @@ enum MasterDataKind: string
                 'attrs.family_code' => ['required', 'string', 'max:32'],
             ],
             self::LawCategory => [],
+            self::ChangeStatus, self::ChangeDetail => [],
             self::LegalStructure => [
                 'attrs.family_codes' => ['nullable', 'array'],
                 'attrs.family_codes.*' => ['string', 'max:32'],
