@@ -4,7 +4,7 @@
       <thead>
         <tr>
           <th class="master-table__index">ลำดับ</th>
-          <th class="master-table__code">รหัส</th>
+          <th class="master-table__code">{{ codeColumnTitle || 'รหัส' }}</th>
           <th
             v-for="column in columns"
             :key="column.key"
@@ -67,7 +67,7 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip text="แก้ไข" location="top">
+              <v-tooltip v-if="!readonly" text="แก้ไข" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
@@ -79,7 +79,7 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip :text="item.is_system ? 'สถานะของระบบ' : (item.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน')" location="top">
+              <v-tooltip v-if="!readonly" :text="item.is_system ? 'สถานะของระบบ' : (item.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน')" location="top">
                 <template #activator="{ props: tip }">
                   <div v-bind="tip">
                     <v-switch
@@ -133,6 +133,8 @@ const props = defineProps<{
   total: number;
   pageCount: number;
   togglingCode?: string | null;
+  readonly?: boolean;
+  codeColumnTitle?: string;
 }>();
 
 defineEmits<{

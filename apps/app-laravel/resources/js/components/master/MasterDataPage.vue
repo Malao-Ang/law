@@ -1,12 +1,12 @@
 <template>
   <component :is="embedded ? 'div' : AppShell" v-bind="shellProps">
-    <template v-if="!embedded" #title-actions>
+    <template v-if="!embedded && !readonly" #title-actions>
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
         {{ addLabel }}
       </v-btn>
     </template>
 
-    <div v-if="embedded" class="master-page__embedded-actions">
+    <div v-if="embedded && !readonly" class="master-page__embedded-actions">
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
         {{ addLabel }}
       </v-btn>
@@ -51,6 +51,8 @@
         :total="master.total.value"
         :page-count="master.pageCount.value"
         :toggling-code="togglingCode"
+        :readonly="readonly"
+        :code-column-title="codeColumnTitle"
         @view="openView"
         @edit="openEdit"
         @toggle="handleToggle"
@@ -86,7 +88,15 @@
       </template>
     </MasterItemDialog>
 
+    <slot
+      v-if="$slots['view-dialog']"
+      name="view-dialog"
+      :open="viewOpen"
+      :item="viewItem"
+      :close="closeView"
+    />
     <MasterItemViewDialog
+      v-else
       v-model="viewOpen"
       :title="title"
       :item="viewItem"
@@ -125,6 +135,8 @@ const props = defineProps<{
   codePlaceholder?: string;
   namePlaceholder?: string;
   descriptionPlaceholder?: string;
+  readonly?: boolean;
+  codeColumnTitle?: string;
 }>();
 
 const master = useMasterData(props.kind);
@@ -169,6 +181,10 @@ function openEdit(item: MasterItem): void {
 function openView(item: MasterItem): void {
   viewItem.value = item;
   viewOpen.value = true;
+}
+
+function closeView(): void {
+  viewOpen.value = false;
 }
 
 async function confirmDeactivate(item: Pick<MasterItem, 'name' | 'usage_count'>): Promise<boolean> {
