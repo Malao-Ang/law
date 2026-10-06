@@ -211,6 +211,7 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
 .app-drawer :deep(.v-navigation-drawer__content) {
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
 }
 
