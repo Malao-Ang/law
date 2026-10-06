@@ -69,7 +69,6 @@ export interface LawSearchResult {
   snippets: string[];
   keywords?: string[];
   source?: 'internal' | 'external';
-  issuer?: string | null;
 }
 
 export interface FacetBucket {

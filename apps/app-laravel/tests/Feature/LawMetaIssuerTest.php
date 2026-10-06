@@ -25,11 +25,10 @@ class LawMetaIssuerTest extends TestCase
         ])->assertOk();
 
         $doc = $store->getReviewDocument($documentId);
-        $this->assertArrayHasKey('issuer', $doc['law_meta']);
-        $this->assertNull($doc['law_meta']['issuer']);
+        $this->assertArrayNotHasKey('issuer', $doc['law_meta']);
     }
 
-    public function test_issuer_defaults_to_null_when_absent(): void
+    public function test_issuer_key_is_absent_when_not_sent(): void
     {
         $store = app(ReviewStore::class);
         $documentId = 'law_meta_issuer_default_'.uniqid();
@@ -47,7 +46,6 @@ class LawMetaIssuerTest extends TestCase
         ])->assertOk();
 
         $doc = $store->getReviewDocument($documentId);
-        $this->assertArrayHasKey('issuer', $doc['law_meta']);
-        $this->assertNull($doc['law_meta']['issuer']);
+        $this->assertArrayNotHasKey('issuer', $doc['law_meta']);
     }
 }

@@ -123,7 +123,6 @@ class LawIndexer
             'law_type'       => $lawTypeCode !== '' ? $lawTypeCode : null,
             'law_family'     => $lawFamilyCode !== '' ? $lawFamilyCode : null,
             'law_type_label' => $lawType === null ? ($meta['law_type'] ?? null) : (string) ($lawType['name'] ?? ''),
-            'issuer'         => null,
             'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
             'change_status'  => $changeStatusCode !== '' ? $changeStatusCode : null,
             'change_status_label' => $changeStatus === null ? ($meta['change_status'] ?? null) : (string) ($changeStatus['name'] ?? ''),

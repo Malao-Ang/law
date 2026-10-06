@@ -133,13 +133,11 @@ class LawSearchController extends Controller
     {
         if ($fileRow === null) {
             $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
-            $row['issuer'] = null;
 
             return $row;
         }
 
         $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
-        $row['issuer'] = null;
         if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
             $row['title_highlighted'] = $fileRow['title_highlighted'];
         }
@@ -247,8 +245,6 @@ class LawSearchController extends Controller
                 'law_type' => $lawType === null ? $r['law_type'] : (string) ($lawType['name'] ?? $r['law_type']),
                 'law_type_code' => $lawType === null ? (string) ($r['law_type'] ?? '') : (string) ($lawType['code'] ?? ''),
                 'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
-                'issuer' => null,
-                'issuer_code' => null,
                 'status' => $r['meta_status'],
                 'change_status' => $this->changeStatuses->labelOf($r['change_status'] ?? ''),
                 'change_status_code' => $this->changeStatusCode($r['change_status'] ?? ''),
