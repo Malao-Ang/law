@@ -460,8 +460,7 @@ import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import {
-  LAW_TYPE_TO_BADGE,
-  LAW_TYPE_TO_DOC_TYPE,
+  lawTypeToBadge,
   type ChangeStatus,
   type LawTypeBadge,
   type LawTypeCardClass,
@@ -479,74 +478,6 @@ import { createLawTypeCatalog } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 
 const PER_PAGE = 20;
-
-const LAW_TYPE_LABELS: Record<string, string> = {
-  phrb: 'กฎหมายภายนอก',
-  'พ.ร.บ.': 'กฎหมายภายนอก',
-  พระราชกำหนด: 'กฎหมายภายนอก',
-  พระราชบัญญัติ: 'กฎหมายภายนอก',
-  กฎกระทรวง: 'กฎหมายภายนอก',
-  ประกาศกระทรวง: 'กฎหมายภายนอก',
-  'kotmai-krung': 'กฎหมายภายนอก',
-  'kotmai-phaainok': 'กฎหมายภายนอก',
-  กฎหมายภายนอก: 'กฎหมายภายนอก',
-  'kho-bangkhab': 'ข้อบังคับ',
-  ข้อบังคับ: 'ข้อบังคับ',
-  rabiap: 'ระเบียบ',
-  ระเบียบ: 'ระเบียบ',
-  prakat: 'ประกาศ',
-  ประกาศ: 'ประกาศ',
-  command: 'ประกาศ',
-  คำสั่ง: 'ประกาศ',
-  resolution: 'ประกาศ',
-  มติ: 'ประกาศ',
-};
-
-const CHANGE_STATUS_LABELS: Record<string, string> = {
-  new: 'ออกใหม่',
-  amended: 'แก้ไขเพิ่มเติม',
-  repealed: 'ยกเลิก',
-  consolidated: 'ฉบับรวม',
-};
-
-const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
-  phrb: 'kotmai-phaainok',
-  'พ.ร.บ.': 'kotmai-phaainok',
-  พระราชกำหนด: 'kotmai-phaainok',
-  พระราชบัญญัติ: 'kotmai-phaainok',
-  กฎกระทรวง: 'kotmai-phaainok',
-  ประกาศกระทรวง: 'kotmai-phaainok',
-  'kotmai-krung': 'kotmai-phaainok',
-  'kotmai-phaainok': 'kotmai-phaainok',
-  กฎหมายภายนอก: 'kotmai-phaainok',
-  'kho-bangkhab': 'kho-bangkhab',
-  ข้อบังคับ: 'kho-bangkhab',
-  rabiap: 'rabiap',
-  ระเบียบ: 'rabiap',
-  prakat: 'prakat',
-  ประกาศ: 'prakat',
-  command: 'prakat',
-  คำสั่ง: 'prakat',
-  resolution: 'prakat',
-  มติ: 'prakat',
-};
-
-const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
-  'kotmai-phaainok': [
-    'kotmai-phaainok',
-    'kotmai-krung',
-    'phrb',
-    'พ.ร.บ.',
-    'พระราชกำหนด',
-    'พระราชบัญญัติ',
-    'กฎกระทรวง',
-    'ประกาศกระทรวง',
-    'กฎหมายภายนอก',
-  ],
-  'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
-  rabiap: ['rabiap', 'ระเบียบ'],
-  prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ', 'ประกาศที่ออกโดยมหาวิทยาลัย', 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
-};
 
 const CHILD_CHIP_LABELS: Record<string, string> = {
   LFM04: 'กฎหมายภายนอก',
@@ -1047,9 +978,7 @@ function lookupDataToFacets(data: LookupData): LawSearchFacets {
 
 function canonicalLawTypeValue(value: string): string {
   const familyCode = lawTypes.typeFamily(value) || lawTypes.familyItem(value)?.code;
-  if (familyCode) return familyCode;
-  const legacy = LAW_TYPE_CANONICAL_VALUES[value];
-  return legacy ? canonicalLawTypeValue(legacy) : value;
+  return familyCode || value;
 }
 
 function expandLawTypeFilterValues(values: string[]): string[] {
@@ -1066,12 +995,12 @@ function uniqueStrings(values: string[]): string[] {
 
 function lawTypeLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุประเภท';
-  return lawTypes.familyItem(value)?.title ?? lawTypes.typeLabel(value) ?? LAW_TYPE_LABELS[value] ?? value;
+  return lawTypes.familyItem(value)?.title ?? lawTypes.typeLabel(value) ?? value;
 }
 
 function changeStatusLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุสถานะ';
-  return CHANGE_STATUS_LABELS[value] ?? changeStatusCatalog.label(value);
+  return changeStatusCatalog.label(value);
 }
 
 function statusLabel(value: string | null): string {
@@ -1094,7 +1023,7 @@ function toDocType(lawType: string | null | undefined): LawTypeCardClass {
   if (familyCode === 'LFM02') return 'rabiap';
   if (familyCode === 'LFM03') return 'prakat';
   if (familyCode === 'LFM04') return 'kotmai-phaainok';
-  return LAW_TYPE_TO_DOC_TYPE[lawType ?? ''] ?? 'other';
+  return 'other';
 }
 
 function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
@@ -1162,7 +1091,7 @@ function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | nul
   if (familyCode === 'LFM01') return 'ข้อบังคับ';
   if (familyCode === 'LFM02') return 'ระเบียบ';
   if (familyCode === 'LFM03') return 'ประกาศ';
-  return LAW_TYPE_TO_BADGE[lawType] ?? null;
+  return lawTypeToBadge(lawType);
 }
 
 function useStatusClass(status: string | null | undefined): string {

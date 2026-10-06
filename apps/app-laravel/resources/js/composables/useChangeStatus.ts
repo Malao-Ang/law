@@ -54,6 +54,10 @@ const TYPE_ALIASES = new Map<string, string>([
   ['ยกเลิกรายมาตรา',  'CHG04'],
   // Alias that appeared in data
   ['กฎหมายล่าสุด',    'CHG01'],
+  ['new', 'CHG01'],
+  ['amended', 'CHG04'],
+  ['repealed', 'CHG04'],
+  ['consolidated', 'CHG02'],
 ]);
 
 const DETAIL_ALIASES = new Map<string, string>([
