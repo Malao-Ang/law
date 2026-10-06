@@ -158,8 +158,8 @@ class LawTypeMasterDataSeedTest extends TestCase
         $types = $store->all(MasterDataKind::LawType);
         $byCode = array_column($types, null, 'code');
 
-        $this->assertSame(self::ANNOUNCEMENT, $byCode['LTY01']['name']);
-        $this->assertSame([self::ANNOUNCEMENT, self::ANNOUNCEMENT_UNIVERSITY, self::ANNOUNCEMENT_COUNCIL, self::COMMAND, self::RESOLUTION, 'command'], $byCode['LTY01']['aliases']);
+        $this->assertSame(self::ANNOUNCEMENT_UNIVERSITY, $byCode['LTY01']['name']);
+        $this->assertSame([self::ANNOUNCEMENT_UNIVERSITY, self::COMMAND, 'command'], $byCode['LTY01']['aliases']);
         $this->assertArrayNotHasKey('requires_issuer', $byCode['LTY01']['attrs']);
         $this->assertSame('LTY09', $types[1]['code']);
         $this->assertSame(self::ANNOUNCEMENT_COUNCIL, $byCode['LTY09']['name']);

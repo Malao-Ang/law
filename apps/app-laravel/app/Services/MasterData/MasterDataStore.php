@@ -329,6 +329,15 @@ class MasterDataStore
 
         foreach ($items as &$item) {
             $code = (string) ($item['code'] ?? '');
+            // Phase-2 stores (still carrying attrs.requires_issuer) had LTY01 = plain ประกาศ.
+            if ($kind === MasterDataKind::LawType && $code === 'LTY01'
+                && array_key_exists('requires_issuer', (array) ($item['attrs'] ?? []))) {
+                $item['name'] = "\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}";
+                $item['aliases'] = ["\u{0E1B}\u{0E23}\u{0E30}\u{0E01}\u{0E32}\u{0E28}\u{0E17}\u{0E35}\u{0E48}\u{0E2D}\u{0E2D}\u{0E01}\u{0E42}\u{0E14}\u{0E22}\u{0E21}\u{0E2B}\u{0E32}\u{0E27}\u{0E34}\u{0E17}\u{0E22}\u{0E32}\u{0E25}\u{0E31}\u{0E22}", "\u{0E04}\u{0E33}\u{0E2A}\u{0E31}\u{0E48}\u{0E07}"];
+                $item['sort_order'] = 1;
+                $item['updated_at'] = now()->toIso8601String();
+            }
+
             $aliases = (array) ($item['aliases'] ?? []);
             foreach ($seedAliases[$code] ?? [] as $alias) {
                 if (! in_array($alias, $aliases, true)) {
