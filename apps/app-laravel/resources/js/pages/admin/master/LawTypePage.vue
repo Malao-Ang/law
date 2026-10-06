@@ -133,13 +133,33 @@
           <v-alert type="info" variant="tonal" density="compact" icon="mdi-format-list-numbered">
             หน่วยนับตามที่มา: {{ unitLabel(familyForm.source) }}
           </v-alert>
-          <v-text-field
-            v-model="familyForm.color"
-            label="สีป้าย"
-            type="color"
-            variant="outlined"
-            :error-messages="fieldErrors['attrs.color']"
-          />
+          <div class="color-picker-field">
+            <p class="color-picker-field__label">สีป้าย</p>
+            <div class="color-picker-field__swatches">
+              <button
+                v-for="swatch in COLOR_SWATCHES"
+                :key="swatch"
+                type="button"
+                class="color-picker-field__swatch"
+                :class="{ 'is-selected': familyForm.color === swatch }"
+                :style="{ background: swatch }"
+                @click="familyForm.color = swatch"
+              />
+            </div>
+            <v-text-field
+              v-model="familyForm.color"
+              variant="outlined"
+              density="compact"
+              hide-details
+              placeholder="#23469B"
+              class="color-picker-field__input"
+              :error-messages="fieldErrors['attrs.color']"
+            >
+              <template #prepend-inner>
+                <span class="color-picker-field__preview" :style="{ background: familyForm.color }" />
+              </template>
+            </v-text-field>
+          </div>
         </v-card-text>
         <v-divider />
         <v-card-actions class="justify-end pa-4">
@@ -242,6 +262,11 @@ const familyDialogOpen = ref(false);
 const typeDialogOpen = ref(false);
 const editingFamily = ref<MasterItem | null>(null);
 const editingType = ref<MasterItem | null>(null);
+
+const COLOR_SWATCHES = [
+  '#23469B', '#1976D2', '#2E7D32', '#388E3C',
+  '#C62828', '#6A1B9A', '#E65100', '#37474F',
+];
 
 const familyForm = reactive({
   name: '',
@@ -629,6 +654,41 @@ async function handleToggleType(type: MasterItem, next: boolean): Promise<void> 
 </script>
 
 <style scoped>
+.color-picker-field__label {
+  color: #475467;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.color-picker-field__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.color-picker-field__swatch {
+  border-radius: 50%;
+  cursor: pointer;
+  height: 32px;
+  width: 32px;
+  border: 2px solid transparent;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.color-picker-field__swatch:hover { transform: scale(1.1); }
+.color-picker-field__swatch.is-selected {
+  border-color: #1f2933;
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.color-picker-field__preview {
+  border-radius: 50%;
+  display: inline-block;
+  height: 18px;
+  width: 18px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.color-picker-field__input { max-width: 160px; }
+
 .law-type-tree-page__title-actions {
   align-items: center;
   display: flex;

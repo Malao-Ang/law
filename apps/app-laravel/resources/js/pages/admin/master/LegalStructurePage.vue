@@ -58,59 +58,54 @@
         <div class="legal-structure-dialog__section-title">2. ประเภทเอกสารที่รองรับ</div>
         <p class="legal-structure-dialog__hint">เลือกประเภทเอกสารที่ต้องการให้แสดงหัวข้อโครงสร้างนี้</p>
         <div class="legal-structure-dialog__links">
-          <button type="button" @click="selectAllFamilies(form)">เลือกทั้งหมด</button>
-          <button type="button" @click="clearFamilies(form)">ล้างการเลือก</button>
+          <v-btn variant="outlined" size="small" density="compact" @click="selectAllFamilies(form)">เลือกทั้งหมด</v-btn>
+          <v-btn variant="text" size="small" density="compact" @click="clearFamilies(form)">ล้างการเลือก</v-btn>
         </div>
-        <div class="legal-structure-dialog__chips">
-          <v-chip
+        <div class="legal-structure-dialog__checkboxes">
+          <v-checkbox
             v-for="family in activeFamilies"
             :key="family.code"
-            :color="isFamilySelected(form, family.code) ? 'admin-primary' : undefined"
-            :variant="isFamilySelected(form, family.code) ? 'tonal' : 'outlined'"
-            class="legal-structure-dialog__choice"
-            @click="toggleFamily(form, family.code)"
-          >
-            {{ family.title }}
-          </v-chip>
+            :model-value="isFamilySelected(form, family.code)"
+            :label="family.title"
+            density="compact"
+            hide-details
+            color="admin-primary"
+            @update:model-value="toggleFamily(form, family.code)"
+          />
         </div>
         <div v-if="errors['attrs.family_codes']" class="text-caption text-error">
           {{ errors['attrs.family_codes'][0] }}
         </div>
 
         <div class="legal-structure-dialog__subhead">ชนิดไฟล์ที่รองรับ</div>
-        <div class="legal-structure-dialog__chips">
-          <v-chip
+        <div class="legal-structure-dialog__checkboxes">
+          <v-checkbox
             v-for="fileType in fileTypeOptions"
             :key="fileType.value"
-            :color="isFileTypeSelected(form, fileType.value) ? 'admin-primary' : undefined"
-            :variant="isFileTypeSelected(form, fileType.value) ? 'tonal' : 'outlined'"
-            class="legal-structure-dialog__choice"
-            @click="toggleFileType(form, fileType.value)"
-          >
-            {{ fileType.title }}
-          </v-chip>
+            :model-value="isFileTypeSelected(form, fileType.value)"
+            :label="fileType.title"
+            density="compact"
+            hide-details
+            color="admin-primary"
+            @update:model-value="toggleFileType(form, fileType.value)"
+          />
         </div>
         <div v-if="errors['attrs.file_types']" class="text-caption text-error">
           {{ errors['attrs.file_types'][0] }}
         </div>
 
         <div class="legal-structure-dialog__subhead">เงื่อนไข*</div>
-        <div class="legal-structure-dialog__toggle">
-          <button
-            type="button"
-            :class="{ 'is-active': requiredValue(form) }"
-            @click="setRequired(form, true)"
-          >
-            บังคับ
-          </button>
-          <button
-            type="button"
-            :class="{ 'is-active': !requiredValue(form) }"
-            @click="setRequired(form, false)"
-          >
-            ไม่บังคับ
-          </button>
-        </div>
+        <v-radio-group
+          :model-value="requiredValue(form) ? 'required' : 'optional'"
+          inline
+          hide-details
+          color="admin-primary"
+          density="compact"
+          @update:model-value="(v) => setRequired(form, v === 'required')"
+        >
+          <v-radio label="บังคับ" value="required" />
+          <v-radio label="ไม่บังคับ" value="optional" />
+        </v-radio-group>
         <p class="legal-structure-dialog__hint">* หัวข้อบังคับ: ผู้ใช้ต้องกรอกเนื้อหาก่อนบันทึกเอกสาร</p>
 
         <v-alert
@@ -294,44 +289,12 @@ function usageRemovalWarning(form: UpsertMasterItemPayload, item: MasterItem | n
 
 .legal-structure-dialog__links {
   display: flex;
-  gap: 14px;
-}
-
-.legal-structure-dialog__links button {
-  color: rgb(var(--v-theme-admin-primary));
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.legal-structure-dialog__chips {
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
-.legal-structure-dialog__choice {
-  cursor: pointer;
-}
-
-.legal-structure-dialog__toggle {
-  background: #eef2f7;
-  border-radius: 10px;
-  display: grid;
-  gap: 6px;
-  grid-template-columns: 1fr 1fr;
-  padding: 6px;
-}
-
-.legal-structure-dialog__toggle button {
-  border-radius: 8px;
-  color: #667085;
-  font-weight: 800;
-  min-height: 42px;
-}
-
-.legal-structure-dialog__toggle button.is-active {
-  background: #fff;
-  color: rgb(var(--v-theme-admin-primary));
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+.legal-structure-dialog__checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 24px;
 }
 </style>

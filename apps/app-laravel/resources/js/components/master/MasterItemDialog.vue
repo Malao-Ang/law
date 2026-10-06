@@ -175,6 +175,9 @@ function computedEditing() {
 }
 
 .master-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90dvh;
   overflow: hidden;
 }
 
@@ -205,6 +208,7 @@ function computedEditing() {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
   padding: 8px 22px 22px;
 }
 
