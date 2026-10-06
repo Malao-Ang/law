@@ -103,6 +103,37 @@ contain Thai names or older slugs; `useLawCategory` normalizes them.
 These axes are independent. The only documented coupled transition is publish: after e-sign,
 publishing sets legal `status` to in-force and sets `published_date`.
 
+## Change Status Master Data
+
+`law_meta.change_status` stores a `change_status` master-data code (`CHGxx`). `law_meta.change_details`
+stores an array of `change_detail` codes (`CHDxx`) when the selected status has details.
+
+`change_status` rows:
+
+| code | title | source | has_details | role |
+|---|---|---|---|---|
+| `CHG01` | กฎหมายใหม่ | `both` | no | `new` |
+| `CHG02` | ปรับปรุงทั้งฉบับ | `both` | no | `whole` |
+| `CHG03` | ปรับปรุงรายข้อ | `internal` | yes | `section` |
+| `CHG04` | ปรับปรุงรายมาตรา | `external` | yes | `section` |
+
+`change_detail` rows:
+
+| code | title | source | has_details | role |
+|---|---|---|---|---|
+| `CHD01` | ยกเลิกข้อ | `internal` | no | `repeals` |
+| `CHD02` | ยกเลิกมาตรา | `external` | no | `repeals` |
+| `CHD03` | เพิ่มข้อความ | `both` | no | `amends` |
+| `CHD04` | แก้ไขข้อความ | `both` | no | `amends` |
+
+Aliases resolve before saving: `ยกเลิกทั้งฉบับ` -> `CHG02`, `ยกเลิกรายมาตรา` -> `CHG04`,
+`กฎหมายล่าสุด` -> `CHG01`, `ยกเลิก` -> `CHD01`, `เพิ่ม` -> `CHD03`, and `แก้ไข` -> `CHD04`.
+
+CHG/CHD master data is read-only because relation behavior reads `attrs.role`. The admin API returns
+403 for POST, PUT, active PATCH, and reorder PATCH on `change_status` and `change_detail`. Relation
+logic must read `role`, not Thai labels. `relations[].change_detail` remains free text for relation
+notes/history and is not rewritten by this master-data migration.
+
 ## Migration Guardrail
 
 `php artisan master-data:migrate law-type` treats bare `ประกาศ` and legacy `LTY01` without a known
@@ -113,6 +144,10 @@ a guessed type. Users must choose either `LTY01` or `LTY09` in the law-info form
 values and reports the target `LST` code. Run without `--dry-run` to rewrite legacy values in review
 documents. Use `--map="legacy value=LSTxxx"` for project-specific legacy labels; unmapped values abort
 without writing.
+
+`php artisan master-data:migrate change-status [--dry-run] [--map="legacy=CHGxx"]` audits and rewrites
+`law_meta.change_status` and `law_meta.change_details[]` to CHG/CHD codes. Use `--dry-run` before
+writing; unmapped values abort without writing.
 
 Legacy mappings that are still deterministic:
 
