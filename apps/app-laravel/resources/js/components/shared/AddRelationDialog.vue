@@ -163,6 +163,7 @@ import {
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import LawRelationColumnPicker from './LawRelationColumnPicker.vue';
 
 const props = defineProps<{
@@ -186,9 +187,9 @@ const pickerTarget = ref<LawRelationTarget | null>(null);
 const changeDetail = ref<string | null>(null);
 const existingRelations = computed(() => props.existingRelations ?? []);
 const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
+const _cs = useChangeStatus();
 const showChangeDetails = computed(() =>
-  props.scope === 'section'
-  && (props.changeStatus === 'ปรับปรุงรายข้อ' || props.changeStatus === 'ปรับปรุงรายมาตรา'),
+  props.scope === 'section' && _cs.isSection(props.changeStatus ?? ''),
 );
 
 const form = ref<LawRelation>({

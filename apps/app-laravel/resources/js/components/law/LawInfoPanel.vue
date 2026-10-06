@@ -15,7 +15,7 @@
         </div>
         <div v-if="showChangeStatus" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">สถานะการเปลี่ยนแปลง</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.change_status }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ changeStatusLabel(meta.change_status) }}</span>
         </div>
         <div v-if="meta.promulgation_date" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">วันที่ประกาศ</span>
@@ -160,9 +160,11 @@ import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 
 const { typeLabel } = useLawType();
 const { categoryLabel, categoryLabels } = useLawCategory();
+const { label: changeStatusLabel, isNew: isNewStatus } = useChangeStatus();
 
 interface SectionRelationGroup {
   type: RelationType;
@@ -203,8 +205,8 @@ const sectionRelationSummaries = computed(() => props.sectionRelationSummaries ?
 const { isInForce, isRepealed, statusLabel } = useLawStatus();
 
 const showChangeStatus = computed(() => {
-  const changeStatus = props.meta.change_status?.trim();
-  return !!changeStatus && changeStatus !== 'กฎหมายใหม่';
+  const cs = props.meta.change_status?.trim();
+  return !!cs && !isNewStatus(cs);
 });
 
 function formatLawDate(value: string | null | undefined): string {

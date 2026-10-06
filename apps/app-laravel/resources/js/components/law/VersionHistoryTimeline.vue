@@ -23,7 +23,7 @@
         <span v-if="v.promulgation_date"><v-icon icon="mdi-calendar" size="12" /> ประกาศ {{ formatLawDate(v.promulgation_date) }}</span>
         <span v-if="v.agency"><v-icon icon="mdi-office-building-outline" size="12" /> {{ v.agency }}</span>
       </div>
-      <div v-if="v.change_status" class="text-caption mt-1">{{ v.change_status }}</div>
+      <div v-if="v.change_status" class="text-caption mt-1">{{ changeStatusLabel(v.change_status) }}</div>
     </button>
   </div>
 </template>
@@ -35,10 +35,12 @@ import Swal from 'sweetalert2';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 const props = defineProps<{ versions: VersionChainItem[]; viewedDocumentId: string }>();
 const router = useRouter();
 const route = useRoute();
 const { inForceCode, statusLabel } = useLawStatus();
+const { label: changeStatusLabel } = useChangeStatus();
 
 // versions arrive oldest -> newest; show newest first (matches the mockup v3/v2/v1).
 const ordered = computed(() => [...props.versions].reverse());

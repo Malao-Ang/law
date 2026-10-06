@@ -18,6 +18,9 @@ import {
   previewSameLevelItems,
   SAME_LEVEL_PREVIEW_COUNT,
   versionNodeSize,
+  isNewLawChange,
+  isSectionEditionChange,
+  isWholeEditionChange,
   type ShowRelRow,
 } from './useShowRelations';
 import type { LawRelation } from '../types/document';
@@ -469,5 +472,18 @@ assert(
 );
 assert(previewSameLevelItems(previewSource, true).join(',') === previewSource.join(','), 'expanded same-level list shows every item');
 assert(previewSameLevelItems(previewSource.slice(0, SAME_LEVEL_PREVIEW_COUNT), false).length === SAME_LEVEL_PREVIEW_COUNT, 'short same-level list stays intact');
+
+// change status codes, names and legacy aliases give the same answers
+for (const [value, whole, section, isNew] of [
+  ['CHG01', false, false, true], ['กฎหมายใหม่', false, false, true],
+  ['CHG02', true, false, false], ['ปรับปรุงทั้งฉบับ', true, false, false], ['ยกเลิกทั้งฉบับ', true, false, false],
+  ['CHG03', false, true, false], ['ปรับปรุงรายข้อ', false, true, false],
+  ['CHG04', false, true, false], ['ปรับปรุงรายมาตรา', false, true, false], ['ยกเลิกรายมาตรา', false, true, false],
+] as const) {
+  assert(isWholeEditionChange(value) === whole, `${value} whole`);
+  assert(isSectionEditionChange(value) === section, `${value} section`);
+  assert(isNewLawChange(value) === isNew, `${value} new`);
+}
+assert(versionNodeSize('CHG03') === 'small' && versionNodeSize('CHG02') === 'big', 'node size by code');
 
 console.log('useShowRelations.check.ts: all passed');

@@ -77,7 +77,7 @@
                   <span v-if="v.agency">
                     <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.agency }}
                   </span>
-                  <span v-if="v.change_status" class="text-caption">{{ v.change_status }}</span>
+                  <span v-if="v.change_status" class="text-caption">{{ changeStatusLabel(v.change_status) }}</span>
                 </div>
 
                 <div class="d-flex ga-2 flex-wrap">
@@ -194,6 +194,7 @@ import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 
 const { typeLabel } = useLawType();
 
@@ -202,6 +203,7 @@ const router = useRouter();
 const versionStore = useVersionStore();
 const documentStore = useDocumentStore();
 const { inForceCode, statusLabel } = useLawStatus();
+const { label: changeStatusLabel } = useChangeStatus();
 
 watch(() => props.documentId, (id) => {
   void versionStore.fetch(id);

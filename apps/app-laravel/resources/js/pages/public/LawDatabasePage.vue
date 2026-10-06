@@ -474,6 +474,7 @@ import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 
@@ -560,6 +561,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 };
 
 const lawStatus = useLawStatus();
+const changeStatusCatalog = useChangeStatus();
 const lawTypes = createLawTypeCatalog();
 const lawCategories = useLawCategory();
 const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
@@ -1069,7 +1071,7 @@ function lawTypeLabel(value: string | null): string {
 
 function changeStatusLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุสถานะ';
-  return CHANGE_STATUS_LABELS[value] ?? value;
+  return CHANGE_STATUS_LABELS[value] ?? changeStatusCatalog.label(value);
 }
 
 function statusLabel(value: string | null): string {

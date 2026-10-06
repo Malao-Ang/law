@@ -394,10 +394,12 @@ import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog } from '../../composables/useLawType';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
 const { typeLabel } = useLawType();
+const changeStatusCS = useChangeStatus();
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {
@@ -560,9 +562,7 @@ watch([search, filterStatus, sortOrder], () => { page.value = 1; });
 // ── Relations computed (from staged pendingRelations) ──────
 const relations = computed<LawRelation[]>(() => pendingRelations.value);
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
-const showSectionRelations = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
-);
+const showSectionRelations = computed(() => changeStatusCS.isSection(changeStatus.value ?? ''));
 const sections = computed(() => buildSections(documentStore.review));
 const sectionLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(sections.value.map((s) => [s.id, s.badge])),

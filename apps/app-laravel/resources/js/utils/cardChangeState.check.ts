@@ -22,4 +22,10 @@ assert(cardChangeState('กฎหมายใหม่', 'STA01').variant === 'n
 assert(cardChangeState('', '').variant === 'new', 'empty → new');
 assert(cardChangeState(null, null).variant === 'new', 'null → new');
 
+// codes behave like the Thai names
+assert(cardChangeState('CHG04', 'STA01').variant === 'revise', 'CHG04 code → revise');
+assert(cardChangeState('CHG04', 'STA01').label === 'ปรับปรุงรายมาตรา', 'CHG04 code shows Thai label');
+assert(cardChangeState('CHG02', 'STA01').label === 'ปรับปรุงทั้งฉบับ', 'CHG02 code shows Thai label');
+assert(cardChangeState('CHG01', 'STA01').variant === 'new', 'CHG01 code → new');
+
 console.log('cardChangeState.check: all assertions passed');
