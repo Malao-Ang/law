@@ -33,34 +33,13 @@ class LegalStructureUsageCounter implements UsageCounter
         }
 
         $counts = [];
-        foreach ($this->reviewStore->listDocuments() as $row) {
-            $documentId = (string) ($row['document_id'] ?? '');
-            if ($documentId === '') {
-                continue;
-            }
-
+        foreach ($this->reviewStore->blockChunkTypesByDocument() as $chunkTypes) {
             $seen = [];
-            try {
-                $document = $this->reviewStore->getReviewDocument($documentId);
-            } catch (\RuntimeException) {
-                continue;
-            }
-
-            foreach (($document['pages'] ?? []) as $page) {
-                if (! is_array($page)) {
-                    continue;
-                }
-
-                foreach (($page['blocks'] ?? []) as $block) {
-                    if (! is_array($block)) {
-                        continue;
-                    }
-
-                    $item = $this->legalStructures->resolve($block['meta']['chunk_type'] ?? null);
-                    $code = (string) ($item['code'] ?? '');
-                    if ($code !== '') {
-                        $seen[$code] = true;
-                    }
+            foreach ($chunkTypes as $chunkType) {
+                $item = $this->legalStructures->resolve($chunkType);
+                $code = (string) ($item['code'] ?? '');
+                if ($code !== '') {
+                    $seen[$code] = true;
                 }
             }
 

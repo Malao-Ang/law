@@ -684,6 +684,41 @@ class ReviewStore
     }
 
     /**
+     * Raw chunk_type values per document, read without syncing review HTML.
+     *
+     * @return array<string, list<string>>
+     */
+    public function blockChunkTypesByDocument(): array
+    {
+        $result = [];
+        foreach ($this->blob->allStatuses() as $status) {
+            $documentId = (string) ($status['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+
+            $document = $this->blob->read('review', $documentId);
+            if ($document === null) {
+                continue;
+            }
+
+            $types = [];
+            foreach ((array) ($document['pages'] ?? []) as $page) {
+                foreach ((array) (is_array($page) ? ($page['blocks'] ?? []) : []) as $block) {
+                    $type = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($type !== '') {
+                        $types[$type] = true;
+                    }
+                }
+            }
+
+            $result[$documentId] = array_keys($types);
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getReviewDocument(string $documentId): array
