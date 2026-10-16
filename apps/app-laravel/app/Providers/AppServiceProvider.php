@@ -18,6 +18,7 @@ use App\Services\Permissions\PermissionStore;
 use App\Services\ReviewStore;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Foundation\Vite;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use MongoDB\Client;
 
@@ -102,5 +103,13 @@ class AppServiceProvider extends ServiceProvider
         // containerized Laravel app share it. (The Docker volume path only worked
         // when Vite ran inside a container.)
         $this->app->make(Vite::class)->useHotFile(public_path('hot'));
+
+        // Behind a TLS-terminating reverse proxy the request arrives as plain HTTP
+        // with an internal Host, so build asset URLs from APP_URL instead.
+        $appUrl = (string) config('app.url');
+        if ($this->app->isProduction() && str_starts_with($appUrl, 'https://')) {
+            URL::forceRootUrl($appUrl);
+            URL::forceScheme('https');
+        }
     }
 }
