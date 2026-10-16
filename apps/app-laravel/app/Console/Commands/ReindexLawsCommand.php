@@ -24,6 +24,7 @@ class ReindexLawsCommand extends Command
         if ($this->option('fresh')) {
             $client->deleteIndex();
             $this->info('Dropped existing index.');
+            sleep(2); // allow the cluster to process the deletion before creating
         }
 
         if (! $client->indexExists()) {
