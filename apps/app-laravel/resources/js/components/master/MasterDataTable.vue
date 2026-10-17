@@ -136,7 +136,6 @@ const props = defineProps<{
   togglingCode?: string | null;
   readonly?: boolean;
   codeColumnTitle?: string;
-  lockInUse?: boolean;
   switchEpoch?: number;
 }>();
 
@@ -154,7 +153,7 @@ const to = computed(() => Math.min(offset.value + props.items.length, props.tota
 function switchTooltip(item: MasterItem): string {
   if (item.is_system) return 'สถานะของระบบ';
   if (!item.is_active) return 'เปิดใช้งาน';
-  if (props.lockInUse && (item.usage_count ?? 0) > 0) return `มีเอกสารใช้งาน ${item.usage_count} รายการ`;
+  if ((item.usage_count ?? 0) > 0) return `มีเอกสารใช้งาน ${item.usage_count} รายการ`;
 
   return 'ปิดใช้งาน';
 }

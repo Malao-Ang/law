@@ -15,7 +15,6 @@
     name-placeholder="เช่น ชื่อประกาศ"
     description-placeholder="ระบุรายละเอียดหรือคำอธิบายเพิ่มเติม (ถ้ามี)"
     dialog-max-width="820"
-    lock-in-use
   >
     <template #item.name="{ item }">
       <div class="legal-structure-page__name-cell">

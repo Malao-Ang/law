@@ -53,7 +53,6 @@
         :toggling-code="togglingCode"
         :readonly="readonly"
         :code-column-title="codeColumnTitle"
-        :lock-in-use="lockInUse"
         :switch-epoch="switchEpoch"
         @view="openView"
         @edit="openEdit"
@@ -104,31 +103,22 @@
       :item="viewItem"
       :field-labels="fieldLabels"
     />
-
-    <v-snackbar v-model="lockNoticeOpen" color="warning" location="top" :timeout="4000">
-      {{ IN_USE_MESSAGE }}
-      <template #actions>
-        <v-btn variant="text" @click="lockNoticeOpen = false">ปิด</v-btn>
-      </template>
-    </v-snackbar>
   </component>
 </template>
 
 <script setup lang="ts">
-import Swal from 'sweetalert2';
 import { computed, onMounted, ref } from 'vue';
 import AppShell from '../shared/AppShell.vue';
 import MasterDataTable from './MasterDataTable.vue';
 import MasterItemDialog from './MasterItemDialog.vue';
 import MasterItemViewDialog from './MasterItemViewDialog.vue';
+import { alertInUse, confirmDeactivate, isLockedByUsage } from './masterDialogs';
 import MasterStatCards from './MasterStatCards.vue';
 import { useMasterData } from '../../composables/useMasterData';
 import type { ApiRequestError } from '../../api/client';
 import type { MasterItem, MasterKind, UpsertMasterItemPayload } from '../../types/masterData';
 
-const IN_USE_MESSAGE = 'มีเอกสารใช้งานโครงสร้างนี้อยู่ จึงไม่สามารถปิดใช้งานได้';
-
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   kind: MasterKind;
   title: string;
   subtitle: string;
@@ -148,8 +138,7 @@ const props = withDefaults(defineProps<{
   descriptionPlaceholder?: string;
   readonly?: boolean;
   codeColumnTitle?: string;
-  lockInUse?: boolean;
-}>(), { lockInUse: false });
+}>();
 
 const master = useMasterData(props.kind);
 const dialogOpen = ref(false);
@@ -160,7 +149,6 @@ const saving = ref(false);
 const togglingCode = ref<string | null>(null);
 const fieldErrors = ref<Record<string, string[]>>({});
 const switchEpoch = ref(0);
-const lockNoticeOpen = ref(false);
 
 const resolvedBreadcrumbs = computed(() => props.breadcrumbs ?? ['จัดการข้อมูลระบบ', props.title]);
 const shellProps = computed(() => props.embedded ? {} : {
@@ -201,36 +189,13 @@ function closeView(): void {
   viewOpen.value = false;
 }
 
-async function confirmDeactivate(item: Pick<MasterItem, 'name' | 'usage_count'>): Promise<boolean> {
-  const result = await Swal.fire({
-    icon: 'warning',
-    title: `ปิดใช้งาน "${item.name}"?`,
-    html: `รายการนี้จะไม่แสดงเป็นตัวเลือกในระบบ<br>เอกสารที่ใช้อยู่ ${(item.usage_count ?? 0).toLocaleString('th-TH')} รายการจะยังคงแสดงค่าเดิม`,
-    showCancelButton: true,
-    confirmButtonText: 'ปิดใช้งาน',
-    cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#b42318',
-    cancelButtonColor: '#64748b',
-  });
-
-  return result.isConfirmed;
-}
-
-function isLockedByUsage(item: Pick<MasterItem, 'usage_count'>): boolean {
-  return props.lockInUse && (item.usage_count ?? 0) > 0;
-}
-
-function showInUseNotice(): void {
-  lockNoticeOpen.value = true;
-}
-
 async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
   if (item.is_system) {
     return;
   }
 
   if (!next && isLockedByUsage(item)) {
-    showInUseNotice();
+    await alertInUse(item);
     switchEpoch.value++;
     return;
   }
@@ -254,7 +219,7 @@ async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
 async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   if (editingItem.value?.is_active && payload.is_active === false) {
     if (isLockedByUsage(editingItem.value)) {
-      showInUseNotice();
+      await alertInUse(editingItem.value);
       return;
     }
 

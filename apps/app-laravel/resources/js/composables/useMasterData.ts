@@ -6,8 +6,10 @@ import {
   setMasterActive,
   updateMaster,
 } from '../api/masterData';
+import { alertError } from '../components/master/masterDialogs';
 import { useLookups } from './useLookups';
 import { useSnackbarStore } from '../stores/snackbarStore';
+import type { ApiRequestError } from '../api/client';
 import type {
   MasterActiveFilter,
   MasterItem,
@@ -80,9 +82,18 @@ export function useMasterData(kind: MasterKind) {
   }
 
   async function save(payload: UpsertMasterItemPayload, code?: string): Promise<MasterItem> {
-    const saved = code
-      ? await updateMaster(kind, code, payload)
-      : await createMaster(kind, payload);
+    let saved: MasterItem;
+    try {
+      saved = code
+        ? await updateMaster(kind, code, payload)
+        : await createMaster(kind, payload);
+    } catch (err) {
+      const apiError = err as ApiRequestError;
+      if (Object.keys(apiError.errors ?? {}).length === 0) {
+        await alertError(apiError instanceof Error ? apiError.message : 'บันทึกข้อมูลไม่สำเร็จ');
+      }
+      throw err;
+    }
     snackbar.success('บันทึกข้อมูลแล้ว');
     await fetch();
     await lookups.reload();
@@ -100,7 +111,7 @@ export function useMasterData(kind: MasterKind) {
       await lookups.reload();
     } catch (err) {
       item.is_active = previous;
-      snackbar.error(err instanceof Error ? err.message : 'เปลี่ยนสถานะไม่สำเร็จ');
+      await alertError(err instanceof Error ? err.message : 'เปลี่ยนสถานะไม่สำเร็จ');
       throw err;
     }
   }

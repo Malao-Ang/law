@@ -182,12 +182,18 @@ class MasterDataController extends Controller
 
     private function deactivationBlockedByUsage(MasterDataKind $kind, string $code): bool
     {
-        if ($kind !== MasterDataKind::LegalStructure) {
+        $lockedKinds = [
+            MasterDataKind::LegalStructure,
+            MasterDataKind::LawCategory,
+            MasterDataKind::LawFamily,
+            MasterDataKind::LawType,
+        ];
+        if (! in_array($kind, $lockedKinds, true)) {
             return false;
         }
 
         $item = $this->store->find($kind, $code);
-        if ($item === null || ($item['is_active'] ?? false) !== true) {
+        if ($item === null || ($item['is_active'] ?? false) !== true || ($item['is_system'] ?? false) === true) {
             return false;
         }
 
@@ -196,7 +202,7 @@ class MasterDataController extends Controller
 
     private function inUseConflict(): JsonResponse
     {
-        return response()->json(['message' => 'มีเอกสารใช้งานโครงสร้างนี้อยู่ จึงไม่สามารถปิดใช้งานได้'], 409);
+        return response()->json(['message' => 'มีเอกสารใช้งานรายการนี้อยู่ จึงไม่สามารถปิดใช้งานได้'], 409);
     }
 
     private function readOnlyKind(): JsonResponse

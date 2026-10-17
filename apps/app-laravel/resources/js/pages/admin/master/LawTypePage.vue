@@ -82,6 +82,7 @@
         :expanded-codes="[...expandedCodes]"
         :loading="familyMaster.loading.value || typeMaster.loading.value"
         :toggling-code="togglingCode"
+        :switch-epoch="switchEpoch"
         :reorder-mode="reorderMode"
         @toggle-expand="toggleExpand"
         @add-type="openCreateType"
@@ -222,11 +223,11 @@
 </template>
 
 <script setup lang="ts">
-import Swal from 'sweetalert2';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterTreeTable from '../../../components/master/MasterTreeTable.vue';
+import { alertInUse, confirmDeactivate, isLockedByUsage } from '../../../components/master/masterDialogs';
 import { useMasterData } from '../../../composables/useMasterData';
 import { useSnackbarStore } from '../../../stores/snackbarStore';
 import { flattenTypeOrder, moveByDrag, moveWithin } from '../../../utils/treeOrder';
@@ -251,6 +252,7 @@ const sourceFilter = ref<'all' | LawSource>('all');
 const activeFilter = ref<MasterActiveFilter>('all');
 const expandedCodes = ref<Set<string>>(new Set());
 const togglingCode = ref<string | null>(null);
+const switchEpoch = ref(0);
 const saving = ref(false);
 const fieldErrors = ref<Record<string, string[]>>({});
 const reorderMode = ref(false);
@@ -615,27 +617,23 @@ onBeforeRouteLeave(() => {
   return window.confirm('ยังไม่ได้บันทึกลำดับ ต้องการออกจากหน้านี้หรือไม่');
 });
 
-async function confirmDeactivate(item: MasterItem): Promise<boolean> {
-  const result = await Swal.fire({
-    icon: 'warning',
-    title: `ปิดใช้งาน "${item.name}"?`,
-    html: `รายการนี้จะไม่แสดงเป็นตัวเลือกในระบบ<br>เอกสารที่ใช้อยู่ ${(item.usage_count ?? 0).toLocaleString('th-TH')} รายการจะยังคงแสดงค่าเดิม`,
-    showCancelButton: true,
-    confirmButtonText: 'ปิดใช้งาน',
-    cancelButtonText: 'ยกเลิก',
-    confirmButtonColor: '#b42318',
-    cancelButtonColor: '#64748b',
-  });
-  return result.isConfirmed;
-}
-
 async function handleToggleFamily(family: MasterItem, next: boolean): Promise<void> {
   if (isSystemFamily(family)) return;
-  if (!next && !(await confirmDeactivate(family))) return;
+  if (!next && isLockedByUsage(family)) {
+    await alertInUse(family);
+    switchEpoch.value++;
+    return;
+  }
+  if (!next && !(await confirmDeactivate(family))) {
+    switchEpoch.value++;
+    return;
+  }
   togglingCode.value = family.code;
   try {
     await familyMaster.toggleActive(family, next);
     await typeMaster.fetch();
+  } catch {
+    switchEpoch.value++;
   } finally {
     togglingCode.value = null;
   }
@@ -643,10 +641,20 @@ async function handleToggleFamily(family: MasterItem, next: boolean): Promise<vo
 
 async function handleToggleType(type: MasterItem, next: boolean): Promise<void> {
   if (type.is_system) return;
-  if (!next && !(await confirmDeactivate(type))) return;
+  if (!next && isLockedByUsage(type)) {
+    await alertInUse(type);
+    switchEpoch.value++;
+    return;
+  }
+  if (!next && !(await confirmDeactivate(type))) {
+    switchEpoch.value++;
+    return;
+  }
   togglingCode.value = type.code;
   try {
     await typeMaster.toggleActive(type, next);
+  } catch {
+    switchEpoch.value++;
   } finally {
     togglingCode.value = null;
   }
