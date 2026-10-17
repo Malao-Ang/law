@@ -79,10 +79,11 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="!readonly" :text="item.is_system ? 'สถานะของระบบ' : (item.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน')" location="top">
+              <v-tooltip v-if="!readonly" :text="switchTooltip(item)" location="top">
                 <template #activator="{ props: tip }">
                   <div v-bind="tip">
                     <v-switch
+                      :key="`${item.code}-${switchEpoch ?? 0}`"
                       :model-value="item.is_active"
                       :readonly="item.is_system"
                       :disabled="togglingCode === item.code"
@@ -135,6 +136,8 @@ const props = defineProps<{
   togglingCode?: string | null;
   readonly?: boolean;
   codeColumnTitle?: string;
+  lockInUse?: boolean;
+  switchEpoch?: number;
 }>();
 
 defineEmits<{
@@ -147,6 +150,14 @@ defineEmits<{
 const offset = computed(() => (props.page - 1) * props.perPage);
 const from = computed(() => (props.total === 0 ? 0 : offset.value + 1));
 const to = computed(() => Math.min(offset.value + props.items.length, props.total));
+
+function switchTooltip(item: MasterItem): string {
+  if (item.is_system) return 'สถานะของระบบ';
+  if (!item.is_active) return 'เปิดใช้งาน';
+  if (props.lockInUse && (item.usage_count ?? 0) > 0) return `มีเอกสารใช้งาน ${item.usage_count} รายการ`;
+
+  return 'ปิดใช้งาน';
+}
 
 function itemValue(item: MasterItem, key: string): unknown {
   return item[key as keyof MasterItem];

@@ -53,6 +53,8 @@
         :toggling-code="togglingCode"
         :readonly="readonly"
         :code-column-title="codeColumnTitle"
+        :lock-in-use="lockInUse"
+        :switch-epoch="switchEpoch"
         @view="openView"
         @edit="openEdit"
         @toggle="handleToggle"
@@ -102,6 +104,13 @@
       :item="viewItem"
       :field-labels="fieldLabels"
     />
+
+    <v-snackbar v-model="lockNoticeOpen" color="warning" location="top" :timeout="4000">
+      {{ IN_USE_MESSAGE }}
+      <template #actions>
+        <v-btn variant="text" @click="lockNoticeOpen = false">ปิด</v-btn>
+      </template>
+    </v-snackbar>
   </component>
 </template>
 
@@ -117,7 +126,9 @@ import { useMasterData } from '../../composables/useMasterData';
 import type { ApiRequestError } from '../../api/client';
 import type { MasterItem, MasterKind, UpsertMasterItemPayload } from '../../types/masterData';
 
-const props = defineProps<{
+const IN_USE_MESSAGE = 'มีเอกสารใช้งานโครงสร้างนี้อยู่ จึงไม่สามารถปิดใช้งานได้';
+
+const props = withDefaults(defineProps<{
   kind: MasterKind;
   title: string;
   subtitle: string;
@@ -137,7 +148,8 @@ const props = defineProps<{
   descriptionPlaceholder?: string;
   readonly?: boolean;
   codeColumnTitle?: string;
-}>();
+  lockInUse?: boolean;
+}>(), { lockInUse: false });
 
 const master = useMasterData(props.kind);
 const dialogOpen = ref(false);
@@ -147,6 +159,8 @@ const viewItem = ref<MasterItem | null>(null);
 const saving = ref(false);
 const togglingCode = ref<string | null>(null);
 const fieldErrors = ref<Record<string, string[]>>({});
+const switchEpoch = ref(0);
+const lockNoticeOpen = ref(false);
 
 const resolvedBreadcrumbs = computed(() => props.breadcrumbs ?? ['จัดการข้อมูลระบบ', props.title]);
 const shellProps = computed(() => props.embedded ? {} : {
@@ -202,18 +216,36 @@ async function confirmDeactivate(item: Pick<MasterItem, 'name' | 'usage_count'>)
   return result.isConfirmed;
 }
 
+function isLockedByUsage(item: Pick<MasterItem, 'usage_count'>): boolean {
+  return props.lockInUse && (item.usage_count ?? 0) > 0;
+}
+
+function showInUseNotice(): void {
+  lockNoticeOpen.value = true;
+}
+
 async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
   if (item.is_system) {
     return;
   }
 
+  if (!next && isLockedByUsage(item)) {
+    showInUseNotice();
+    switchEpoch.value++;
+    return;
+  }
+
   if (!next && !(await confirmDeactivate(item))) {
+    switchEpoch.value++;
     return;
   }
 
   togglingCode.value = item.code;
   try {
     await master.toggleActive(item, next);
+  } catch {
+    // useMasterData already reported the API error (including 409); just resync the switch.
+    switchEpoch.value++;
   } finally {
     togglingCode.value = null;
   }
@@ -221,6 +253,11 @@ async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
 
 async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   if (editingItem.value?.is_active && payload.is_active === false) {
+    if (isLockedByUsage(editingItem.value)) {
+      showInUseNotice();
+      return;
+    }
+
     const confirmed = await confirmDeactivate(editingItem.value);
     if (!confirmed) return;
   }

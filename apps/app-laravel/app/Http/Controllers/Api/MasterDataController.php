@@ -97,8 +97,14 @@ class MasterDataController extends Controller
             return $this->readOnlyKind();
         }
 
+        $validated = $request->validated();
+        if (array_key_exists('is_active', $validated) && ! $validated['is_active']
+            && $this->deactivationBlockedByUsage($masterKind, $code)) {
+            return $this->inUseConflict();
+        }
+
         try {
-            $item = $this->store->update($masterKind, $code, $request->validated());
+            $item = $this->store->update($masterKind, $code, $validated);
         } catch (MasterDataConflict $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         }
@@ -123,6 +129,10 @@ class MasterDataController extends Controller
         $validated = $request->validate([
             'is_active' => ['required', 'boolean'],
         ]);
+
+        if (! $validated['is_active'] && $this->deactivationBlockedByUsage($masterKind, $code)) {
+            return $this->inUseConflict();
+        }
 
         try {
             $item = $this->store->setActive($masterKind, $code, (bool) $validated['is_active']);
@@ -168,6 +178,25 @@ class MasterDataController extends Controller
     private function unknownKind(): JsonResponse
     {
         return response()->json(['message' => 'Unknown master data kind'], 404);
+    }
+
+    private function deactivationBlockedByUsage(MasterDataKind $kind, string $code): bool
+    {
+        if ($kind !== MasterDataKind::LegalStructure) {
+            return false;
+        }
+
+        $item = $this->store->find($kind, $code);
+        if ($item === null || ($item['is_active'] ?? false) !== true) {
+            return false;
+        }
+
+        return $this->usageCounter->count($kind, (string) ($item['code'] ?? $code)) > 0;
+    }
+
+    private function inUseConflict(): JsonResponse
+    {
+        return response()->json(['message' => 'มีเอกสารใช้งานโครงสร้างนี้อยู่ จึงไม่สามารถปิดใช้งานได้'], 409);
     }
 
     private function readOnlyKind(): JsonResponse

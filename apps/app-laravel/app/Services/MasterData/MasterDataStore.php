@@ -283,10 +283,32 @@ class MasterDataStore
     }
 
     /**
+     * @return list<string>
+     */
+    private function seedCodes(MasterDataKind $kind): array
+    {
+        return array_map(
+            fn (array $seed): string => $this->normalizeCode((string) ($seed['code'] ?? '')),
+            $kind->seed(),
+        );
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $items
      */
     private function seedUpgradesNeeded(MasterDataKind $kind, array $items): bool
     {
+        if ($kind === MasterDataKind::LegalStructure) {
+            $seedCodes = $this->seedCodes($kind);
+            foreach ($items as $item) {
+                if (in_array((string) ($item['code'] ?? ''), $seedCodes, true) && ($item['is_system'] ?? false) === true) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         if (! in_array($kind, [MasterDataKind::LawFamily, MasterDataKind::LawType], true)) {
             return false;
         }
@@ -318,6 +340,19 @@ class MasterDataStore
      */
     private function applySeedUpgrades(MasterDataKind $kind, array &$items): void
     {
+        if ($kind === MasterDataKind::LegalStructure) {
+            $seedCodes = $this->seedCodes($kind);
+            foreach ($items as &$item) {
+                if (in_array((string) ($item['code'] ?? ''), $seedCodes, true) && ($item['is_system'] ?? false) === true) {
+                    $item['is_system'] = false;
+                    $item['updated_at'] = now()->toIso8601String();
+                }
+            }
+            unset($item);
+
+            return;
+        }
+
         if (! in_array($kind, [MasterDataKind::LawFamily, MasterDataKind::LawType], true)) {
             return;
         }
@@ -687,7 +722,8 @@ class MasterDataStore
 
         $existingExportKey = trim((string) ($existing['attrs']['export_key'] ?? ''));
         $exportKey = $this->normalizeCode((string) ($attrs['export_key'] ?? $existingExportKey ?: $code));
-        if ($isSystem && $existingExportKey !== '' && $exportKey !== $existingExportKey) {
+        $lockedExportKey = $isSystem || in_array($code, $this->seedCodes(MasterDataKind::LegalStructure), true);
+        if ($lockedExportKey && $existingExportKey !== '' && $exportKey !== $existingExportKey) {
             throw ValidationException::withMessages([
                 'attrs.export_key' => ['รหัสส่งออกของรายการระบบไม่สามารถแก้ไขได้'],
             ]);
