@@ -54,7 +54,7 @@
               {{ item.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
             </v-chip>
           </td>
-          <td>
+          <td class="master-table__actions-cell">
             <div class="master-table__action-row">
               <v-tooltip text="ดูรายละเอียด" location="top">
                 <template #activator="{ props: tip }">
@@ -173,11 +173,19 @@ function itemValue(item: MasterItem, key: string): unknown {
 }
 
 .master-table__status {
-  width: 132px;
+  width: 112px;
 }
 
+/* Wide enough for view + edit + lock slot + switch, so the switch is never clipped. */
 .master-table__actions {
-  width: 172px;
+  min-width: 196px;
+  white-space: nowrap;
+  width: 196px;
+}
+
+.master-table td.master-table__actions-cell {
+  padding-inline-end: 12px;
+  white-space: nowrap;
 }
 
 .master-table__code-chip {
@@ -187,7 +195,9 @@ function itemValue(item: MasterItem, key: string): unknown {
 .master-table__action-row {
   align-items: center;
   display: flex;
+  flex-wrap: nowrap;
   gap: 2px;
+  justify-content: flex-end;
   min-height: 40px;
 }
 

@@ -139,9 +139,9 @@ const statLabels = {
 };
 
 const columns = [
-  { key: 'name', title: 'ชื่อหัวข้อ', width: '260px' },
-  { key: 'family_codes', title: 'ประเภทเอกสารที่รองรับ', width: '300px' },
-  { key: 'file_types', title: 'ชนิดไฟล์', width: '180px' },
+  { key: 'name', title: 'ชื่อหัวข้อ', width: '180px' },
+  { key: 'family_codes', title: 'ประเภทเอกสารที่รองรับ', width: '240px' },
+  { key: 'file_types', title: 'ชนิดไฟล์', width: '140px' },
 ];
 
 const fileTypeOptions: Array<{ title: string; value: LegalFileType }> = [
