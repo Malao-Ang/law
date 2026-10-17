@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 class LegalStructureToggleLockTest extends TestCase
 {
-    private const IN_USE_MESSAGE = 'มีเอกสารใช้งานโครงสร้างนี้อยู่ จึงไม่สามารถปิดใช้งานได้';
+    private const IN_USE_MESSAGE = 'มีเอกสารใช้งานรายการนี้อยู่ จึงไม่สามารถปิดใช้งานได้';
 
     protected function setUp(): void
     {
