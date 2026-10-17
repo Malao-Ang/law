@@ -79,25 +79,14 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="!readonly" :text="switchTooltip(item)" location="top">
-                <template #activator="{ props: tip }">
-                  <div v-bind="tip">
-                    <v-switch
-                      :key="`${item.code}-${switchEpoch ?? 0}`"
-                      :model-value="item.is_active"
-                      :readonly="item.is_system"
-                      :disabled="togglingCode === item.code"
-                      :loading="togglingCode === item.code"
-                      :class="{ 'master-switch--locked': item.is_system }"
-                      color="success"
-                      density="compact"
-                      hide-details
-                      inset
-                      @update:model-value="$emit('toggle', item, Boolean($event))"
-                    />
-                  </div>
-                </template>
-              </v-tooltip>
+              <MasterToggleCell
+                v-if="!readonly"
+                :item="item"
+                :kind="kind"
+                :busy="togglingCode === item.code"
+                :epoch="switchEpoch"
+                @toggle="$emit('toggle', item, $event)"
+              />
             </div>
           </td>
         </tr>
@@ -123,9 +112,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { MasterItem } from '../../types/masterData';
+import MasterToggleCell from './MasterToggleCell.vue';
+import type { MasterItem, MasterKind } from '../../types/masterData';
 
 const props = defineProps<{
+  kind: MasterKind;
   items: MasterItem[];
   columns: { key: string; title: string; width?: string; align?: 'start' | 'end' | 'center' }[];
   loading: boolean;
@@ -150,24 +141,12 @@ const offset = computed(() => (props.page - 1) * props.perPage);
 const from = computed(() => (props.total === 0 ? 0 : offset.value + 1));
 const to = computed(() => Math.min(offset.value + props.items.length, props.total));
 
-function switchTooltip(item: MasterItem): string {
-  if (item.is_system) return 'สถานะของระบบ';
-  if (!item.is_active) return 'เปิดใช้งาน';
-  if ((item.usage_count ?? 0) > 0) return `มีเอกสารใช้งาน ${item.usage_count} รายการ`;
-
-  return 'ปิดใช้งาน';
-}
-
 function itemValue(item: MasterItem, key: string): unknown {
   return item[key as keyof MasterItem];
 }
 </script>
 
 <style scoped>
-.master-switch--locked :deep(.v-selection-control) {
-  cursor: not-allowed;
-}
-
 .master-table {
   overflow: hidden;
 }

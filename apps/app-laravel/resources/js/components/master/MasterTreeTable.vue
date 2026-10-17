@@ -81,24 +81,14 @@
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editFamily', row.family)" />
                   </template>
                 </v-tooltip>
-                <v-tooltip :text="familyTooltip(row)" location="top">
-                  <template #activator="{ props: tip }">
-                    <div v-bind="tip">
-                      <v-switch
-                        :key="`${row.family.code}-${switchEpoch ?? 0}`"
-                        :model-value="row.family.is_active"
-                        :readonly="row.locked"
-                        :disabled="togglingCode === row.family.code"
-                        :loading="togglingCode === row.family.code"
-                        color="success"
-                        density="compact"
-                        hide-details
-                        inset
-                        @update:model-value="$emit('toggleFamily', row.family, Boolean($event))"
-                      />
-                    </div>
-                  </template>
-                </v-tooltip>
+                <MasterToggleCell
+                  :item="row.family"
+                  kind="law_family"
+                  :system="row.locked"
+                  :busy="togglingCode === row.family.code"
+                  :epoch="switchEpoch"
+                  @toggle="$emit('toggleFamily', row.family, $event)"
+                />
                 </template>
               </div>
             </td>
@@ -129,7 +119,7 @@
                 variant="tonal"
                 color="admin-primary"
                 prepend-icon="mdi-file-document-outline"
-                :to="`/admin/laws?type=${encodeURIComponent(type.code)}`"
+                :to="usageLink('law_type', type.code, type.usage_count) ?? undefined"
               >
                 {{ (type.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
               </v-chip>
@@ -169,24 +159,13 @@
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editType', type)" />
                   </template>
                 </v-tooltip>
-                <v-tooltip :text="typeTooltip(type)" location="top">
-                  <template #activator="{ props: tip }">
-                    <div v-bind="tip">
-                      <v-switch
-                        :key="`${type.code}-${switchEpoch ?? 0}`"
-                        :model-value="type.is_active"
-                        :readonly="type.is_system"
-                        :disabled="togglingCode === type.code"
-                        :loading="togglingCode === type.code"
-                        color="success"
-                        density="compact"
-                        hide-details
-                        inset
-                        @update:model-value="$emit('toggleType', type, Boolean($event))"
-                      />
-                    </div>
-                  </template>
-                </v-tooltip>
+                <MasterToggleCell
+                  :item="type"
+                  kind="law_type"
+                  :busy="togglingCode === type.code"
+                  :epoch="switchEpoch"
+                  @toggle="$emit('toggleType', type, $event)"
+                />
                 </template>
               </div>
             </td>
@@ -199,6 +178,8 @@
 
 <script setup lang="ts">
 import type { LawSource } from '../../api/client';
+import MasterToggleCell from './MasterToggleCell.vue';
+import { usageLink } from './masterLock';
 import type { MasterItem } from '../../types/masterData';
 
 interface MasterTreeRow {
@@ -238,24 +219,6 @@ type DragPayload = {
   familyCode?: string;
 };
 
-
-function inUseTooltip(item: MasterItem): string | null {
-  return item.is_active && (item.usage_count ?? 0) > 0 ? `มีเอกสารใช้งาน ${item.usage_count} รายการ` : null;
-}
-
-function familyTooltip(row: MasterTreeRow): string {
-  if (row.locked) return 'กลุ่มระบบ';
-  if (!row.family.is_active) return 'เปิดใช้งาน';
-
-  return inUseTooltip(row.family) ?? 'ปิดใช้งาน';
-}
-
-function typeTooltip(type: MasterItem): string {
-  if (type.is_system) return 'สถานะของระบบ';
-  if (!type.is_active) return 'เปิดใช้งาน';
-
-  return inUseTooltip(type) ?? 'ปิดใช้งาน';
-}
 
 function sourceLabel(source: LawSource): string {
   return source === 'external' ? 'ภายนอก' : 'ภายใน';
