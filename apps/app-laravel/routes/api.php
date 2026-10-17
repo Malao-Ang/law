@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\RelatedDocumentsZipController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\WordExportController;
+use App\Http\Middleware\NotInProduction;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -84,13 +85,13 @@ Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentF
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
 
-// MinIO test endpoints (dev/debug only) — not registered in production.
-if (app()->environment('local')) {
-    Route::get('/test/minio/bucket', [MinioTestController::class, 'bucket']);
-    Route::get('/test/minio', [MinioTestController::class, 'index']);
-    Route::post('/test/minio/upload', [MinioTestController::class, 'upload']);
-    Route::post('/test/minio/presign', [MinioTestController::class, 'presign']);
-}
+// MinIO test endpoints (dev/debug only) — 404 in production.
+Route::middleware(NotInProduction::class)->prefix('test/minio')->group(function (): void {
+    Route::get('/bucket', [MinioTestController::class, 'bucket']);
+    Route::get('/', [MinioTestController::class, 'index']);
+    Route::post('/upload', [MinioTestController::class, 'upload']);
+    Route::post('/presign', [MinioTestController::class, 'presign']);
+});
 
 Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, 'receive'])
     ->name('pipeline.callback');
