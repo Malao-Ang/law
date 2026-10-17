@@ -53,23 +53,31 @@
     <template #append>
       <v-divider />
       <div class="app-drawer__user" :class="{ 'app-drawer__user--rail': rail }">
-        <v-badge dot color="success" location="bottom end" offset-x="2" offset-y="2">
+        <v-badge dot :color="auth.isAuthenticated ? 'success' : 'grey'" location="bottom end" offset-x="2" offset-y="2">
           <v-avatar color="secondary" size="36" class="flex-shrink-0">
-            <span class="text-caption font-weight-bold">AD</span>
+            <span class="text-caption font-weight-bold">{{ userInitials }}</span>
           </v-avatar>
         </v-badge>
         <Transition name="fade-slide">
           <div v-if="!rail" class="min-width-0 flex-1">
-            <p class="text-body-2 font-weight-bold mb-0 text-truncate">ผู้ดูแลระบบ</p>
-            <p class="text-caption text-medium-emphasis mb-0">Admin</p>
+            <template v-if="auth.isAuthenticated">
+              <p class="text-body-2 font-weight-bold mb-0 text-truncate" data-testid="shell-user-name">{{ auth.user?.name }}</p>
+              <p class="text-caption text-medium-emphasis mb-0 text-truncate" data-testid="shell-user-role">{{ auth.roleLabel }}</p>
+            </template>
+            <router-link v-else to="/login" class="text-body-2 font-weight-bold" data-testid="shell-login-link">
+              เข้าสู่ระบบ
+            </router-link>
           </div>
         </Transition>
         <v-btn
-          v-if="!rail"
+          v-if="!rail && auth.isAuthenticated"
           icon="mdi-logout"
           variant="text"
           size="small"
           class="flex-shrink-0"
+          title="ออกจากระบบ"
+          data-testid="shell-logout"
+          @click="auth.logout()"
         />
       </div>
     </template>
@@ -126,6 +134,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '../../stores/authStore';
 
 const RAIL_KEY = 'lawspace.nav.rail';
 
@@ -146,6 +155,15 @@ const props = defineProps<{
 
 const router = useRouter();
 const route = useRoute();
+const auth = useAuthStore();
+
+const userInitials = computed(() => {
+  const name = auth.user?.name?.trim();
+  if (!name) return '?';
+  const parts = name.split(/\s+/);
+  const chars = parts.length > 1 ? [parts[0], parts[parts.length - 1]].map((p) => Array.from(p)[0]) : Array.from(name).slice(0, 2);
+  return chars.join('').toUpperCase();
+});
 const rail = ref(localStorage.getItem(RAIL_KEY) === '1');
 watch(rail, (v) => localStorage.setItem(RAIL_KEY, v ? '1' : '0'));
 

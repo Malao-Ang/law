@@ -52,8 +52,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 function logout(): void {
-  auth.logout();
-  router.push('/');
+  void auth.logout('/');
 }
 </script>
 

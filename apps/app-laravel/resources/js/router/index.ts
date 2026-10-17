@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { useAuthStore } from '../stores/authStore';
 
 // Use dynamic imports (route-level code splitting)
 const PublicHomePage = () => import('../pages/public/PublicHomePage.vue');
@@ -81,4 +82,21 @@ export const router = createRouter({
     }
     return { top: 0 };
   },
+});
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+  await auth.fetchMe();
+
+  if (!auth.authEnforced) return true;
+
+  const guarded = to.path.startsWith('/admin') || to.path.startsWith('/documents');
+  if (guarded && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } };
+  }
+  if (guarded && !auth.isAdminRole) {
+    return { path: '/' };
+  }
+
+  return true;
 });

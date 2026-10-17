@@ -95,21 +95,61 @@ export type LookupData = {
   law_sources: SelectableOption[];
 };
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+let unauthorizedHandler: (() => void) | null = null;
+let csrfPending: Promise<void> | null = null;
+
+/** Called when a non-auth API call returns 401 (session ended). */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+function readXsrfToken(): string {
+  const match = /(?:^|;\s*)XSRF-TOKEN=([^;]+)/.exec(document.cookie);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+/** Makes sure the XSRF-TOKEN cookie exists (Sanctum SPA CSRF cookie). */
+export async function ensureCsrfCookie(force = false): Promise<void> {
+  if (!force && readXsrfToken() !== '') return;
+  csrfPending ??= fetch('/sanctum/csrf-cookie', { credentials: 'include', headers: { Accept: 'application/json' } })
+    .then(() => undefined)
+    .finally(() => {
+      csrfPending = null;
+    });
+  await csrfPending;
+}
+
+/** Headers a state-changing same-origin request needs: X-XSRF-TOKEN from the cookie. */
+export async function csrfHeaders(method: string): Promise<Record<string, string>> {
+  if (SAFE_METHODS.has(method.toUpperCase())) return {};
+  await ensureCsrfCookie();
+  const token = readXsrfToken();
+  return token ? { 'X-XSRF-TOKEN': token } : {};
+}
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
-  const response = await fetch(input, {
-    headers: isFormData
-      ? {
-          Accept: 'application/json',
-          ...(init?.headers ?? {}),
-        }
-      : {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...(init?.headers ?? {}),
-        },
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+
+  const send = async (): Promise<Response> => fetch(input, {
+    credentials: 'include',
     ...init,
+    headers: {
+      Accept: 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(await csrfHeaders(method)),
+      ...(init?.headers ?? {}),
+    },
   });
+
+  let response = await send();
+  if (response.status === 419) {
+    await ensureCsrfCookie(true);
+    response = await send();
+  }
 
   if (!response.ok) {
     const fallback = `HTTP ${response.status}`;
@@ -128,7 +168,15 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     const error = new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback) as ApiRequestError;
     error.status = response.status;
     error.errors = payload?.errors;
+
+    if (response.status === 401 && !url.startsWith('/api/auth/')) {
+      unauthorizedHandler?.();
+    }
     throw error;
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;
@@ -326,7 +374,8 @@ async function downloadBinaryExport(
 ): Promise<void> {
   const response = await fetch(path, {
     method: 'POST',
-    headers: { Accept: accept },
+    credentials: 'include',
+    headers: { Accept: accept, ...(await csrfHeaders('POST')) },
   });
 
   if (!response.ok) {
