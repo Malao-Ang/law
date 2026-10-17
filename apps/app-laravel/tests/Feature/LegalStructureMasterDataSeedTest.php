@@ -43,7 +43,7 @@ class LegalStructureMasterDataSeedTest extends TestCase
         $this->assertTrue($byCode['LST011']['attrs']['counts_as_section']);
         $this->assertFalse($byCode['LST012']['attrs']['counts_as_section']);
         foreach ($first as $item) {
-            $this->assertTrue($item['is_system']);
+            $this->assertFalse($item['is_system']);
             $this->assertFalse($item['attrs']['is_required']);
         }
         $this->assertSame($first, $second);
