@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Auth\MongoUserStore;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
@@ -69,6 +70,17 @@ class AppServiceProvider extends ServiceProvider
 
             return new MongoBlobStore($client->$database->selectCollection('master_data'));
         });
+
+        $this->app->singleton('mongo.blob.users', function (): MongoBlobStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new MongoBlobStore($client->$database->selectCollection('users'));
+        });
+
+        $this->app->when(MongoUserStore::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.users'));
 
         $this->app->when(PermissionStore::class)
             ->needs(MongoBlobStore::class)

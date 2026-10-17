@@ -61,6 +61,12 @@ return [
             'provision_key' => env('BUU_PROVISION_LDAP_LOGIN', ''),
         ],
 
+        'ums.person' => [
+            'path' => 'service-api/ums.SPerson',
+            'scope' => 'read',
+            'provision_key' => env('BUU_PROVISION_UMS_PERSON', ''),
+        ],
+
         'minio.list' => [
             'path' => 'service-api/minio.GetFilesList',
             'scope' => 'read',
