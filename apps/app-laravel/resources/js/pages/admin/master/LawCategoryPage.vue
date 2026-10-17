@@ -18,7 +18,7 @@
         color="admin-primary"
         variant="tonal"
         prepend-icon="mdi-file-document-outline"
-        :to="`/admin/laws?category=${item.code}`"
+        :to="usageLink('law_category', item.code, item.usage_count) ?? undefined"
       >
         {{ (item.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
       </v-chip>
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import MasterDataPage from '../../../components/master/MasterDataPage.vue';
+import { usageLink } from '../../../components/master/masterLock';
 
 const statLabels = {
   total: 'หมวดเอกสารทั้งหมด',

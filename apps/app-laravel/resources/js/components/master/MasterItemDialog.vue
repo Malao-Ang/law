@@ -61,20 +61,28 @@
                 เปิดใช้งานเพื่อแสดงเป็นตัวเลือกในระบบ
               </div>
             </div>
-            <v-tooltip :disabled="!item?.is_system" text="สถานะของระบบ" location="top">
-              <template #activator="{ props: tipProps }">
-                <div v-bind="tipProps">
-                  <v-switch
-                    v-model="form.is_active"
-                    :readonly="item?.is_system"
-                    :class="{ 'master-switch--locked': item?.is_system }"
-                    color="success"
-                    inset
-                    hide-details
-                  />
-                </div>
-              </template>
-            </v-tooltip>
+            <div class="master-dialog__switch" :class="{ 'master-dialog__switch--locked': lock }">
+              <div class="master-dialog__switch-row">
+                <v-icon v-if="lock" icon="mdi-lock" size="14" class="master-dialog__lock" />
+                <v-switch
+                  :model-value="lock ? true : form.is_active"
+                  :readonly="!!lock"
+                  :aria-disabled="lock ? 'true' : undefined"
+                  :aria-label="lock ? lockLabel : undefined"
+                  color="success"
+                  inset
+                  hide-details
+                  @update:model-value="onActiveChange"
+                />
+              </div>
+            </div>
+          </div>
+          <div v-if="lock" class="master-dialog__lock-note" data-test="lock-note">
+            <v-icon icon="mdi-lock" size="14" />
+            <div>
+              <div class="font-weight-bold">{{ lock.reason }}</div>
+              <div>{{ lock.hint }}</div>
+            </div>
           </div>
         </section>
       </v-card-text>
@@ -99,12 +107,14 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue';
-import type { MasterItem, UpsertMasterItemPayload } from '../../types/masterData';
+import { lockAriaLabel, lockReason } from './masterLock';
+import type { MasterItem, MasterKind, UpsertMasterItemPayload } from '../../types/masterData';
 
 const props = defineProps<{
   modelValue: boolean;
   title: string;
   subtitle: string;
+  kind?: MasterKind;
   item?: MasterItem | null;
   nextCode: string;
   fieldLabels: { code: string; name: string };
@@ -132,6 +142,8 @@ const form = reactive<UpsertMasterItemPayload>({
 const editing = computedEditing();
 const maxWidth = computed(() => props.maxWidth ?? 640);
 const basicSectionTitle = computed(() => props.basicSectionTitle ?? 'ข้อมูลพื้นฐาน');
+const lock = computed(() => (props.item && props.kind ? lockReason(props.item, props.kind) : null));
+const lockLabel = computed(() => (props.item && props.kind ? lockAriaLabel(props.item, props.kind) : ''));
 const requiredRule = (value: string) => !!value?.trim() || 'กรุณากรอกข้อมูล';
 
 watch(() => [props.modelValue, props.item] as const, () => {
@@ -141,6 +153,11 @@ watch(() => [props.modelValue, props.item] as const, () => {
   form.is_active = props.item?.is_active ?? false;
   form.attrs = { ...(props.item?.attrs ?? {}) };
 }, { immediate: true });
+
+function onActiveChange(value: unknown): void {
+  if (lock.value) return;
+  form.is_active = Boolean(value);
+}
 
 function fieldError(field: string): string[] {
   return props.errors?.[field] ?? [];
@@ -161,8 +178,36 @@ function computedEditing() {
 </script>
 
 <style scoped>
-.master-switch--locked :deep(.v-selection-control) {
+.master-dialog__switch-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.master-dialog__lock {
+  color: #475467;
   cursor: not-allowed;
+}
+
+.master-dialog__switch--locked :deep(.v-switch) {
+  opacity: 0.55;
+}
+
+.master-dialog__switch--locked :deep(.v-selection-control),
+.master-dialog__switch--locked :deep(input) {
+  cursor: not-allowed;
+}
+
+.master-dialog__lock-note {
+  align-items: flex-start;
+  background: #f2f4f7;
+  border-radius: 8px;
+  color: #475467;
+  display: flex;
+  font-size: 13px;
+  gap: 8px;
+  line-height: 1.5;
+  padding: 10px 12px;
 }
 
 .master-dialog {

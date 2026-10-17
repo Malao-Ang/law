@@ -227,7 +227,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterTreeTable from '../../../components/master/MasterTreeTable.vue';
-import { alertInUse, confirmDeactivate, isLockedByUsage } from '../../../components/master/masterDialogs';
+import { confirmDeactivate } from '../../../components/master/masterDialogs';
+import { isLocked } from '../../../components/master/masterLock';
 import { useMasterData } from '../../../composables/useMasterData';
 import { useSnackbarStore } from '../../../stores/snackbarStore';
 import { flattenTypeOrder, moveByDrag, moveWithin } from '../../../utils/treeOrder';
@@ -618,9 +619,7 @@ onBeforeRouteLeave(() => {
 });
 
 async function handleToggleFamily(family: MasterItem, next: boolean): Promise<void> {
-  if (isSystemFamily(family)) return;
-  if (!next && isLockedByUsage(family)) {
-    await alertInUse(family);
+  if (isSystemFamily(family) || (!next && isLocked(family, 'law_family'))) {
     switchEpoch.value++;
     return;
   }
@@ -640,9 +639,7 @@ async function handleToggleFamily(family: MasterItem, next: boolean): Promise<vo
 }
 
 async function handleToggleType(type: MasterItem, next: boolean): Promise<void> {
-  if (type.is_system) return;
-  if (!next && isLockedByUsage(type)) {
-    await alertInUse(type);
+  if (!next && isLocked(type, 'law_type')) {
     switchEpoch.value++;
     return;
   }
