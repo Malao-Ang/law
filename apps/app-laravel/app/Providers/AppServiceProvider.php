@@ -14,6 +14,7 @@ use App\Services\MasterData\LawFamilyUsageCounter;
 use App\Services\MasterData\LegalStructureUsageCounter;
 use App\Services\MasterData\LawTypeUsageCounter;
 use App\Services\MasterData\MasterDataStore;
+use App\Services\MasterData\UnitStore;
 use App\Services\MasterData\UsageCounter;
 use App\Services\Permissions\PermissionStore;
 use App\Services\ReviewStore;
@@ -87,6 +88,10 @@ class AppServiceProvider extends ServiceProvider
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.permissions'));
 
         $this->app->when(MasterDataStore::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.master'));
+
+        $this->app->when(UnitStore::class)
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.master'));
 
