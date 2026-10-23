@@ -40,6 +40,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/select-unit', name: 'select-unit', component: () => import('../pages/auth/SelectUnitPage.vue'), meta: { bareLayout: true } },
   { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
+  { path: '/admin/units', name: 'admin-units', component: () => import('../pages/admin/UnitsPage.vue'), meta: { bareLayout: true } },
   { path: '/admin', name: 'admin', component: AdminDashboardPage, meta: { bareLayout: true } },
   { path: '/admin/laws', name: 'admin-laws', component: AdminLawListPage, meta: { bareLayout: true } },
   { path: '/admin/reports', name: 'admin-reports', component: AdminReportPage, meta: { bareLayout: true } },
@@ -96,13 +97,19 @@ router.beforeEach(async (to) => {
     return { path: '/' };
   }
 
+  if (to.path === '/admin/units' && !auth.canManageUnits) {
+    return auth.authEnforced && !auth.isAuthenticated
+      ? { path: '/login', query: { redirect: to.fullPath } }
+      : { path: '/' };
+  }
+
   if (!auth.authEnforced) return true;
 
   const guarded = to.path.startsWith('/admin') || to.path.startsWith('/documents');
   if (guarded && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
-  if (guarded && !auth.isAdminRole) {
+  if (guarded && !auth.isAdminRole && !(to.path === '/admin/units' && auth.canManageUnits)) {
     return { path: '/' };
   }
 

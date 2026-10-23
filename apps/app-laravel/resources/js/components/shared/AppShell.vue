@@ -199,7 +199,7 @@ const defaultNavGroups: NavGroup[] = [
   {
     label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
-      { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
+      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
@@ -211,7 +211,10 @@ const defaultNavGroups: NavGroup[] = [
   },
 ];
 
-const resolvedNavGroups = computed(() => props.navGroups ?? defaultNavGroups);
+const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
+  ...group,
+  items: group.items.filter((item) => item.to !== '/admin/units' || auth.canManageUnits),
+})));
 
 function isActive(item: NavItem): boolean {
   if (!item.to) return false;
