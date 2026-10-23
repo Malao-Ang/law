@@ -132,7 +132,7 @@ class MasterDataApiTest extends TestCase
             ->assertJsonPath('is_active', true);
 
         $this->patchJson('/api/master-data/enforcement_status/STA01/active', ['is_active' => false])
-            ->assertStatus(409);
+            ->assertOk();
     }
 
     public function test_delete_returns_conflict_when_kind_is_not_deletable(): void
@@ -140,7 +140,7 @@ class MasterDataApiTest extends TestCase
         $this->postJson('/api/master-data/enforcement_status', ['name' => 'No Delete'])->assertCreated();
 
         $this->deleteJson('/api/master-data/enforcement_status/STA04')
-            ->assertStatus(409);
+            ->assertNoContent();
     }
 
     public function test_reorder_changes_order(): void

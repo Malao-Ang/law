@@ -58,7 +58,7 @@ class MasterDataController extends Controller
         if ($masterKind === null) {
             return $this->unknownKind();
         }
-        if ($masterKind->readOnly()) {
+        if ($masterKind->readOnly() || $masterKind === MasterDataKind::ChangeStatus) {
             return $this->readOnlyKind();
         }
 
@@ -97,11 +97,11 @@ class MasterDataController extends Controller
             return $this->readOnlyKind();
         }
 
-        $validated = $request->validated();
-        if (array_key_exists('is_active', $validated) && ! $validated['is_active']
-            && $this->deactivationBlockedByUsage($masterKind, $code)) {
-            return $this->inUseConflict();
+        if ($masterKind === MasterDataKind::ChangeStatus) {
+            return response()->json(['message' => 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่'], 403);
         }
+
+        $validated = $request->validated();
 
         try {
             $item = $this->store->update($masterKind, $code, $validated);
@@ -154,9 +154,6 @@ class MasterDataController extends Controller
             'is_active' => ['required', 'boolean'],
         ]);
 
-        if (! $validated['is_active'] && $this->deactivationBlockedByUsage($masterKind, $code)) {
-            return $this->inUseConflict();
-        }
 
         try {
             $item = $this->store->setActive($masterKind, $code, (bool) $validated['is_active']);
@@ -204,31 +201,6 @@ class MasterDataController extends Controller
         return response()->json(['message' => 'Unknown master data kind'], 404);
     }
 
-    private function deactivationBlockedByUsage(MasterDataKind $kind, string $code): bool
-    {
-        $lockedKinds = [
-            MasterDataKind::LegalStructure,
-            MasterDataKind::LawCategory,
-            MasterDataKind::LawFamily,
-            MasterDataKind::LawType,
-        ];
-        if (! in_array($kind, $lockedKinds, true)) {
-            return false;
-        }
-
-        $item = $this->store->find($kind, $code);
-        if ($item === null || ($item['is_active'] ?? false) !== true || ($item['is_system'] ?? false) === true) {
-            return false;
-        }
-
-        return $this->usageCounter->count($kind, (string) ($item['code'] ?? $code)) > 0;
-    }
-
-    private function inUseConflict(): JsonResponse
-    {
-        return response()->json(['message' => 'มีเอกสารใช้งานรายการนี้อยู่ จึงไม่สามารถปิดใช้งานได้'], 409);
-    }
-
     private function readOnlyKind(): JsonResponse
     {
         return response()->json(['message' => 'รายการนี้เป็นข้อมูลของระบบ ดูได้อย่างเดียว'], 403);
@@ -241,7 +213,8 @@ class MasterDataController extends Controller
     private function withUsage(MasterDataKind $kind, array $item): array
     {
         return array_merge($item, [
-            'usage_count' => $this->usageCounter->count($kind, (string) ($item['code'] ?? '')),
+            'usage_count' => $usage = $this->usageCounter->count($kind, (string) ($item['code'] ?? '')),
+            'can_delete' => $this->store->deletionConflict($kind, $item, $usage, $this->usageCounter) === null,
         ]);
     }
 }

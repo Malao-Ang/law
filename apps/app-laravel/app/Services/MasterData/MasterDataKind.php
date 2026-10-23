@@ -49,7 +49,7 @@ enum MasterDataKind: string
 
     public function deletable(): bool
     {
-        return false;
+        return $this !== self::ChangeDetail;
     }
 
     /**
@@ -57,7 +57,7 @@ enum MasterDataKind: string
      */
     public function readOnly(): bool
     {
-        return in_array($this, [self::ChangeStatus, self::ChangeDetail], true);
+        return $this === self::ChangeDetail;
     }
 
     public function label(): string

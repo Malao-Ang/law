@@ -391,6 +391,8 @@
 </template>
 
 <script setup lang="ts">
+import { useLookups } from '../../composables/useLookups';
+import { useLawType } from '../../composables/useLawType';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { downloadPublishedPdf, fetchReportSummary, fetchReview, fetchIncomingRelationDocumentIds, relatedDocumentsZipUrl } from '../../api/client';
@@ -490,6 +492,9 @@ const sortOptions = [
   { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
+const { typeLabel, typeItem } = useLawType();
+const { documentTypes } = useLookups();
+
 const typeOptions = computed(() => {
   const counts = new Map<string, number>();
   for (const row of rows.value) {
@@ -498,8 +503,9 @@ const typeOptions = computed(() => {
   return [
     { label: 'ทุกประเภท', value: null },
     ...[...counts.entries()]
+      .filter(([key]) => documentTypes.value.some((item) => item.code === typeItem(key)?.code || item.title === key))
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => ({ label: key, value: key })),
+      .map(([key]) => ({ label: typeLabel(key), value: key })),
   ];
 });
 

@@ -15,7 +15,7 @@ export type LegalStructureCatalogInput = {
 function readArray<T>(value: Ref<T[]> | T[] | undefined, fallback: T[]): T[] {
   if (!value) return fallback;
   const items = Array.isArray(value) ? value : value.value;
-  return items.length > 0 ? items : fallback;
+  return items;
 }
 
 function normalizeText(value: string | null | undefined): string {

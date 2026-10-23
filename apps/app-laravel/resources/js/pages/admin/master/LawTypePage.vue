@@ -78,6 +78,8 @@
       </v-alert>
 
       <MasterTreeTable
+        @delete-family="handleDeleteFamily"
+        @delete-type="handleDeleteType"
         :rows="tableRows"
         :expanded-codes="[...expandedCodes]"
         :loading="familyMaster.loading.value || typeMaster.loading.value"
@@ -265,8 +267,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterTreeTable from '../../../components/master/MasterTreeTable.vue';
-import { confirmDeactivate } from '../../../components/master/masterDialogs';
-import { isLocked } from '../../../components/master/masterLock';
+import { confirmDeactivate, confirmDelete } from '../../../components/master/masterDialogs';
 import { setFamilySubtypes } from '../../../api/masterData';
 import { useLookups } from '../../../composables/useLookups';
 import { useMasterData } from '../../../composables/useMasterData';
@@ -718,11 +719,27 @@ onBeforeRouteLeave(() => {
   return window.confirm('ยังไม่ได้บันทึกลำดับ ต้องการออกจากหน้านี้หรือไม่');
 });
 
-async function handleToggleFamily(family: MasterItem, next: boolean): Promise<void> {
-  if (isSystemFamily(family) || (!next && isLocked(family, 'law_family'))) {
-    switchEpoch.value++;
-    return;
+async function handleDeleteFamily(item: MasterItem): Promise<void> {
+  if (!item.can_delete || !(await confirmDelete(item))) return;
+  try {
+    await familyMaster.remove(item);
+    await typeMaster.fetch();
+  } catch {
+    // The composable reports the API error.
   }
+}
+
+async function handleDeleteType(item: MasterItem): Promise<void> {
+  if (!item.can_delete || !(await confirmDelete(item))) return;
+  try {
+    await typeMaster.remove(item);
+    await familyMaster.fetch();
+  } catch {
+    // The composable reports the API error.
+  }
+}
+
+async function handleToggleFamily(family: MasterItem, next: boolean): Promise<void> {
   if (!next && !(await confirmDeactivate(family))) {
     switchEpoch.value++;
     return;
@@ -739,10 +756,6 @@ async function handleToggleFamily(family: MasterItem, next: boolean): Promise<vo
 }
 
 async function handleToggleType(type: MasterItem, next: boolean): Promise<void> {
-  if (!next && isLocked(type, 'law_type')) {
-    switchEpoch.value++;
-    return;
-  }
   if (!next && !(await confirmDeactivate(type))) {
     switchEpoch.value++;
     return;

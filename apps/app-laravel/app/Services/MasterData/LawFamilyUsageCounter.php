@@ -34,13 +34,6 @@ class LawFamilyUsageCounter implements UsageCounter
         }
 
         $counts = [];
-        foreach ($this->store->all(MasterDataKind::LawType) as $type) {
-            $familyCode = (string) ($type['attrs']['family_code'] ?? '');
-            if ($familyCode !== '') {
-                $counts[$familyCode] = ($counts[$familyCode] ?? 0) + 1;
-            }
-        }
-
         foreach ($this->reviewStore->listLawMeta() as $row) {
             $familyCode = $this->lawTypes->familyOf($row['law_type'] ?? '');
             if ($familyCode !== null && $familyCode !== '') {

@@ -9,6 +9,10 @@ class UpsertMasterItemRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        if ($this->isMethod('PUT') && $this->route('kind') === MasterDataKind::ChangeStatus->value) {
+            abort(403, 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
+        }
+
         return true;
     }
 

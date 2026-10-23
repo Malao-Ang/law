@@ -27,19 +27,19 @@ class LegalStructureToggleLockTest extends TestCase
             ->assertJsonPath('usage_count', 1);
 
         $this->patchJson('/api/master-data/legal_structure/LST004/active', ['is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
 
         $this->getJson('/api/master-data/legal_structure/LST004')
             ->assertOk()
-            ->assertJsonPath('is_active', true);
+            ->assertJsonPath('is_active', false);
     }
 
     public function test_deactivating_in_use_structure_via_update_is_rejected(): void
     {
         $this->putJson('/api/master-data/legal_structure/LST004', ['name' => 'ข้อ', 'is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
 
         $this->putJson('/api/master-data/legal_structure/LST004', ['name' => 'ข้อ (แก้ไข)', 'is_active' => true])
             ->assertOk()

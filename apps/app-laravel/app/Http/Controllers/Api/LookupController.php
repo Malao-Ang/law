@@ -21,8 +21,10 @@ class LookupController extends Controller
         $allChangeStatuses = $this->masterData->all(MasterDataKind::ChangeStatus);
         $allChangeDetails = $this->masterData->all(MasterDataKind::ChangeDetail);
 
+        $activeFamilies = array_column(array_filter($allLawFamilies, static fn (array $item): bool => (bool) $item['is_active']), 'code');
+
         return response()->json([
-            'document_types' => $this->lawTypeItems(array_values(array_filter($allLawTypes, static fn (array $item): bool => (bool) ($item['is_active'] ?? false))), $allLawFamilies),
+            'document_types' => $this->lawTypeItems(array_values(array_filter($allLawTypes, static fn (array $item): bool => (bool) ($item['is_active'] ?? false) && in_array($item['attrs']['family_code'], $activeFamilies, true))), $allLawFamilies),
             'document_types_all' => $this->lawTypeItems($allLawTypes, $allLawFamilies),
             'law_families' => $this->lawFamilyItems(array_values(array_filter($allLawFamilies, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'law_families_all' => $this->lawFamilyItems($allLawFamilies),

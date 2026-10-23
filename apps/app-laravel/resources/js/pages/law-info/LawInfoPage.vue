@@ -93,8 +93,8 @@
                 required
               >
                 <template #item="{ props: itemProps, item }">
-                  <v-list-subheader v-if="item.raw.option_type === 'subheader'">
-                    {{ item.raw.title }}
+                  <v-list-subheader v-if="item.option_type === 'subheader'">
+                    {{ item.title }}
                   </v-list-subheader>
                   <v-list-item v-else v-bind="itemProps" />
                 </template>
@@ -103,7 +103,7 @@
             <v-col v-if="isEditMode || isOld" cols="12" sm="6">
               <v-autocomplete
                 v-model="form.status"
-                :items="statuses"
+                :items="statusItems"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('สถานะการบังคับใช้')"
@@ -135,7 +135,7 @@
             <v-col cols="12">
               <v-autocomplete
                 v-model="form.law_groups"
-                :items="lawGroups"
+                :items="lawGroupItems"
                 item-title="title"
                 item-value="value"
                 :label="requiredLabel('กลุ่มกฎหมาย')"
@@ -291,7 +291,7 @@ import type { VForm } from 'vuetify/components';
 import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import { fetchActiveChildren, type SelectableOption } from '../../api/client';
-import { useLookups } from '../../composables/useLookups';
+import { useLookups, withInactiveCurrent } from '../../composables/useLookups';
 import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 import { useLawStatus } from '../../composables/useLawStatus';
@@ -311,11 +311,11 @@ const route = useRoute();
 const isEditMode = computed(() => route.query.mode === 'edit');
 const snackbar = useSnackbarStore();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
-const { statuses, changeStatusTypes, agencies, lawGroups, lawSources, load: loadLookups } = useLookups();
+const { statuses, statusesAll, documentTypes, changeStatusTypes, changeStatusTypesAll, agencies, lawGroups, lawGroupsAll, lawSources, load: loadLookups } = useLookups();
 const lawTypes = useLawType();
 const lawCategories = useLawCategory();
 const legalStructures = useLegalStructure();
-const { draftCode, isRepealed } = useLawStatus();
+const { draftCode, isRepealed, statusItem } = useLawStatus();
 const _changeStatus = useChangeStatus();
 const CURRENT_ADMIN_LABEL = 'ผู้ดูแลระบบ (Admin)';
 const LAW_TYPE_INFERENCE_RULES: ReadonlyArray<[RegExp, string]> = [
@@ -354,6 +354,8 @@ function legacyAnnouncementSourceCode(value: unknown): 'ISS01' | 'ISS02' | null 
 }
 
 function normalizeLawTypeForDocument(saved: string, oldDocument: boolean, title: string, legacySource?: unknown): string {
+  const existing = lawTypes.typeItem(saved);
+  if (existing && !documentTypes.value.some((item) => item.code === existing.code)) return existing.code;
   const sourceCode = legacyAnnouncementSourceCode(legacySource);
   if (saved === 'ประกาศ' || saved === 'LTY01') {
     if (sourceCode === 'ISS01') return 'LTY01';
@@ -399,17 +401,18 @@ function matchesSource(optionSource: string | undefined): boolean {
   return optionSource === 'both' || optionSource === undefined || optionSource === lawSourceKind.value;
 }
 
-const changeStatusTypeItems = computed(() => {
-  const items = changeStatusTypes.value.filter((t) => matchesSource(t.source));
-  const current = form.value.change_status?.trim() ?? '';
-  if (current && !items.some((item) => item.value === current)) {
-    return [{ title: _changeStatus.label(current), value: current }, ...items];
-  }
-  return items;
-});
+const savedMeta = computed(() => documentStore.review?.law_meta);
+const statusItems = computed(() => withInactiveCurrent(statuses.value, statusesAll.value,
+  savedMeta.value?.status ? (statusesAll.value.find((item) => item.value === savedMeta.value?.status || item.title === savedMeta.value?.status)?.value ?? savedMeta.value.status) : null));
+const lawGroupItems = computed(() => withInactiveCurrent(lawGroups.value, lawGroupsAll.value,
+  normalizeSelection(savedMeta.value?.law_groups, savedMeta.value?.law_group).map((value) => lawCategories.normalizeCategory(value))));
+const changeStatusTypeItems = computed(() => withInactiveCurrent(
+  changeStatusTypes.value, changeStatusTypesAll.value,
+  _changeStatus.normalize(savedMeta.value?.change_status),
+).filter((item) => matchesSource(item.source)));
 
 const selectedChangeType = computed(() =>
-  changeStatusTypes.value.find((t) => t.value === form.value.change_status),
+  changeStatusTypesAll.value.find((t) => t.value === form.value.change_status),
 );
 
 const changeStatusHasDetails = computed(() => selectedChangeType.value?.has_details === true);
@@ -423,9 +426,10 @@ const filteredDocumentTypes = computed(() => {
   const items = isOld.value
     ? lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || (hasText(form.value.source) && t.source === form.value.source))
     : lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || t.source !== 'external');
-  const current = form.value.law_type?.trim() ?? '';
-  if (isOld.value && current && !items.some((item) => item.option_type !== 'subheader' && item.value === current)) {
-    return [{ title: lawTypes.typeLabel(current), value: current, code: current, family_code: '', source: lawSourceKind.value }, ...items];
+  const current = normalizeSavedLawType(savedMeta.value?.law_type ?? '');
+  const existing = lawTypes.typeItem(current);
+  if (existing && !documentTypes.value.some((item) => item.code === existing.code)) {
+    return [{ ...existing, title: `${existing.title} (ปิดใช้งาน)` }, ...items];
   }
   return items;
 });
@@ -516,6 +520,8 @@ watch(() => documentStore.review, (review) => {
   form.value = {
     ...EMPTY,
     ...(meta ?? {}),
+    status: statusItem(meta?.status)?.code ?? meta?.status ?? draftCode.value,
+    change_status: _changeStatus.normalize(meta?.change_status) || null,
     law_type: normalizedLawType,
     law_group: lawGroups[0] ?? '',
     law_groups: lawGroups,
@@ -727,9 +733,9 @@ watch(() => form.value.source, () => {
   if (!stillValid) form.value.law_type = '';
 });
 
-onMounted(() => {
-  void loadLookups();
-  void documentStore.fetch(props.documentId);
+onMounted(async () => {
+  await loadLookups().catch(() => {});
+  await documentStore.fetch(props.documentId);
 });
 onBeforeUnmount(() => documentStore.reset());
 </script>

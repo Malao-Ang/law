@@ -85,3 +85,13 @@ export function useLookups() {
     reload,
   };
 }
+
+export function withInactiveCurrent<T extends SelectableOption>(active: T[], all: T[], current: string | string[] | null | undefined): T[] {
+  const values = new Set(Array.isArray(current) ? current : [current]);
+  const activeValues = new Set(active.map((item) => item.value));
+  return [
+    ...active,
+    ...all.filter((item) => values.has(item.value) && !activeValues.has(item.value))
+      .map((item) => ({ ...item, title: `${item.title} (ปิดใช้งาน)` })),
+  ];
+}

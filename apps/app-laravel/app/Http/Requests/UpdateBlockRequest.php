@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\LegalStructures;
+use App\Services\ReviewStore;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 
@@ -25,10 +26,25 @@ class UpdateBlockRequest extends FormRequest
                 $data['chunk_type'] = null;
             } else {
                 $item = app(LegalStructures::class)->resolve($chunkType);
-                if ($item === null || ! (bool) ($item['is_active'] ?? false)) {
+                if ($item === null) {
                     throw ValidationException::withMessages([
                         'chunk_type' => ['ไม่พบโครงสร้างกฎหมายที่เลือก'],
                     ]);
+                }
+                if (! $item['is_active']) {
+                    $document = app(ReviewStore::class)->getReviewDocument((string) $this->route('documentId'));
+                    $current = null;
+                    foreach ($document['pages'] ?? [] as $page) {
+                        if ((int) ($page['page_no'] ?? 0) !== (int) $this->input('page_no')) continue;
+                        foreach ($page['blocks'] ?? [] as $block) {
+                            if (($block['block_id'] ?? '') === $this->route('blockId')) {
+                                $current = app(LegalStructures::class)->resolve($block['meta']['chunk_type'] ?? null);
+                            }
+                        }
+                    }
+                    if (($current['code'] ?? null) !== $item['code']) {
+                        throw ValidationException::withMessages(['chunk_type' => ['รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น']]);
+                    }
                 }
                 $data['chunk_type'] = (string) $item['code'];
             }

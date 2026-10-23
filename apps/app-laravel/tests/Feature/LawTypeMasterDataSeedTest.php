@@ -94,7 +94,7 @@ class LawTypeMasterDataSeedTest extends TestCase
         ])->assertStatus(409);
 
         $this->patchJson('/api/master-data/law_family/LFM01/active', ['is_active' => false])
-            ->assertStatus(409);
+            ->assertOk();
 
         $this->deleteJson('/api/master-data/law_type/LTY01')
             ->assertStatus(409);
@@ -117,7 +117,7 @@ class LawTypeMasterDataSeedTest extends TestCase
 
         $this->getJson('/api/master-data/law_family/LFM03')
             ->assertOk()
-            ->assertJsonPath('usage_count', 5);
+            ->assertJsonPath('usage_count', 3);
     }
 
     public function test_existing_phase_two_seeded_store_is_upgraded(): void

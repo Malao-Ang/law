@@ -65,3 +65,7 @@ export function setFamilySubtypes(code: string, hasSubtypes: boolean, primaryNam
     body: JSON.stringify({ has_subtypes: hasSubtypes, primary_name: primaryName }),
   });
 }
+
+export function deleteMaster(kind: MasterKind, code: string): Promise<void> {
+  return jsonRequest<void>(masterPath(kind, code), { method: 'DELETE' });
+}

@@ -30,24 +30,24 @@ class ChangeStatusReadOnlyApiTest extends TestCase
             $before = $this->getJson("/api/master-data/{$kind}/{$code}")->assertOk()->json();
 
             $this->postJson("/api/master-data/{$kind}", ['name' => 'สถานะใหม่'])
-                ->assertStatus(403)
-                ->assertJsonPath('message', 'รายการนี้เป็นข้อมูลของระบบ ดูได้อย่างเดียว');
+                ->assertStatus($kind === 'change_status' ? 201 : 403)
+                ->assertJsonPath($kind === 'change_status' ? 'name' : 'message', $kind === 'change_status' ? 'สถานะใหม่' : 'รายการนี้เป็นข้อมูลของระบบ ดูได้อย่างเดียว');
             $this->putJson("/api/master-data/{$kind}/{$code}", ['name' => 'เปลี่ยนชื่อ'])
                 ->assertStatus(403);
             $this->patchJson("/api/master-data/{$kind}/{$code}/active", ['is_active' => false])
-                ->assertStatus(403);
+                ->assertStatus($kind === 'change_status' ? 200 : 403);
             $this->patchJson("/api/master-data/{$kind}/reorder", ['codes' => [$code]])
                 ->assertStatus(403);
             $this->deleteJson("/api/master-data/{$kind}/{$code}")
-                ->assertStatus(403);
+                ->assertStatus($kind === 'change_status' ? 409 : 403);
 
             $after = $this->getJson("/api/master-data/{$kind}/{$code}")->assertOk()->json();
             $this->assertSame($before['name'], $after['name']);
-            $this->assertSame($before['is_active'], $after['is_active']);
+            $this->assertSame($kind === 'change_status' ? false : $before['is_active'], $after['is_active']);
             $this->assertSame($before['sort_order'], $after['sort_order']);
         }
 
-        $this->assertCount(4, $this->getJson('/api/master-data/change_status')->json('items'));
+        $this->assertCount(5, $this->getJson('/api/master-data/change_status')->json('items'));
     }
 
     public function test_other_kinds_stay_writable(): void

@@ -9,6 +9,8 @@ use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
+use App\Services\MasterData\MasterDataKind;
+use App\Services\MasterData\MasterDataStore;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchQuery;
@@ -993,7 +995,7 @@ class LawSearchController extends Controller
         $facets['law_group'] = array_values(array_map(fn ($v, $c) => ['value' => $v, 'count' => $c], array_keys($groupCounts), array_values($groupCounts)));
         $facets['years'] = [];
 
-        return $facets;
+        return $this->activeFacets($facets);
     }
 
     public function facets(ReviewStore $store): JsonResponse
@@ -1082,7 +1084,31 @@ class LawSearchController extends Controller
             'child_laws' => $childCount,
         ];
 
-        return response()->json($facets);
+        return response()->json($this->activeFacets($facets));
+    }
+
+    private function activeFacets(array $facets): array
+    {
+        $store = app(MasterDataStore::class);
+        foreach ([
+            'law_type' => MasterDataKind::LawType,
+            'status' => MasterDataKind::EnforcementStatus,
+            'change_status' => MasterDataKind::ChangeStatus,
+            'law_group' => MasterDataKind::LawCategory,
+        ] as $field => $kind) {
+            $facets[$field] = array_values(array_filter($facets[$field] ?? [], function (array $bucket) use ($store, $kind): bool {
+                $item = $store->resolve($kind, (string) ($bucket['value'] ?? ''));
+                if ($item !== null && ! $item['is_active']) return false;
+                if ($kind === MasterDataKind::LawType) {
+                    $family = $item !== null
+                        ? $store->find(MasterDataKind::LawFamily, $item['attrs']['family_code'])
+                        : $store->resolve(MasterDataKind::LawFamily, (string) ($bucket['value'] ?? ''));
+                    if ($family !== null && ! $family['is_active']) return false;
+                }
+                return true;
+            }));
+        }
+        return $facets;
     }
 
     private function sourceForLawType(string $lawType): string
