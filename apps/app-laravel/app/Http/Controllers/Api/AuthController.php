@@ -77,9 +77,44 @@ class AuthController extends Controller
         $person = $this->ums->findByLogin($username, $fullname);
         $email = is_string($result['email'] ?? null) ? trim($result['email']) : '';
 
+        RateLimiter::clear($throttleKey);
+
+        return $this->completeLogin($request, $username, ['name' => $fullname, 'email' => $email], $person);
+    }
+
+    public function config(): JsonResponse
+    {
+        return response()->json(['dev_login' => (bool) config('auth_ldap.dev_login')]);
+    }
+
+    public function devLogin(Request $request): JsonResponse
+    {
+        abort_unless(config('auth_ldap.dev_login'), 404);
+        $data = $request->validate(['username' => ['string', 'max:64']], [
+            'username.string' => 'ชื่อผู้ใช้ไม่ถูกต้อง',
+            'username.max' => 'ชื่อผู้ใช้ยาวเกินกำหนด',
+        ]);
+        $username = MongoUserStore::key($data['username'] ?? '');
+        abort_if($username === '', 422, 'กรุณากรอกชื่อผู้ใช้');
+        Log::channel('auth')->warning('auth.dev_login', ['username' => $username, 'ip' => $request->ip()]);
+        if (! $request->hasSession()) {
+            return response()->json(['message' => 'ไม่สามารถเริ่มเซสชันได้ กรุณาโหลดหน้าเว็บใหม่'], 419);
+        }
+        try {
+            $person = $this->ums->findByLogin($username, '');
+        } catch (\Throwable $exception) {
+            Log::channel('auth')->warning('auth.dev_login.ums_unavailable', ['username' => $username]);
+            $person = null;
+        }
+
+        return $this->completeLogin($request, $username, ['name' => $person['name'] ?? $username], $person);
+    }
+
+    private function completeLogin(Request $request, string $username, array $profile, ?array $person): JsonResponse
+    {
         $user = $this->users->upsertFromLogin(
             $username,
-            ['name' => $fullname, 'email' => $email],
+            $profile,
             $person,
             in_array($username, (array) config('auth_ldap.super_admins', []), true),
         );
@@ -90,7 +125,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'บัญชีนี้ถูกปิดการใช้งาน'], 403);
         }
 
-        RateLimiter::clear($throttleKey);
         $this->currentUser->login($request, $username);
         $this->audit($username, 'success', $request);
 

@@ -9,6 +9,8 @@
 return [
 
     /** When false, /api/auth/* works but guarded API routes and the SPA router do not force login. */
+    'dev_login' => filter_var(env('AUTH_DEV_LOGIN', false), FILTER_VALIDATE_BOOLEAN),
+
     'enforced' => filter_var(env('AUTH_ENFORCED', false), FILTER_VALIDATE_BOOLEAN),
 
     /** Usernames that always get role super_admin on login (comma separated). */
