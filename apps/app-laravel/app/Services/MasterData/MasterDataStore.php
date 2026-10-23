@@ -13,6 +13,9 @@ class MasterDataStore
 
     private bool $initializingLawCatalog = false;
 
+    /** @var array<string, array<string, list<string>>> normalized seed aliases per kind (seeds are static) */
+    private array $seedAliasCache = [];
+
     public function __construct(private readonly MongoBlobStore $blob) {}
 
     /**
@@ -311,6 +314,18 @@ class MasterDataStore
      */
     private function missingSeeds(MasterDataKind $kind, array $items): array
     {
+        // Normalizing seeds validates attrs against other kinds (slow); skip it when every seed code exists.
+        $hasMissing = false;
+        foreach ($kind->seed() as $seed) {
+            if ($this->itemIndex($items, $this->normalizeCode((string) ($seed['code'] ?? ''))) === null) {
+                $hasMissing = true;
+                break;
+            }
+        }
+        if (! $hasMissing) {
+            return [];
+        }
+
         return array_values(array_filter(
             $this->normalizeSeedItems($kind, $kind->seed()),
             fn (array $seed): bool => $this->itemIndex($items, (string) $seed['code']) === null,
@@ -326,6 +341,22 @@ class MasterDataStore
             fn (array $seed): string => $this->normalizeCode((string) ($seed['code'] ?? '')),
             $kind->seed(),
         );
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function seedAliases(MasterDataKind $kind): array
+    {
+        if (! isset($this->seedAliasCache[$kind->value])) {
+            $aliases = [];
+            foreach ($this->normalizeSeedItems($kind, $kind->seed()) as $seed) {
+                $aliases[(string) ($seed['code'] ?? '')] = (array) ($seed['aliases'] ?? []);
+            }
+            $this->seedAliasCache[$kind->value] = $aliases;
+        }
+
+        return $this->seedAliasCache[$kind->value];
     }
 
     /**
@@ -348,10 +379,7 @@ class MasterDataStore
             return false;
         }
 
-        $seedAliases = [];
-        foreach ($this->normalizeSeedItems($kind, $kind->seed()) as $seed) {
-            $seedAliases[(string) ($seed['code'] ?? '')] = (array) ($seed['aliases'] ?? []);
-        }
+        $seedAliases = $this->seedAliases($kind);
 
         foreach ($items as $item) {
             $code = (string) ($item['code'] ?? '');
@@ -392,10 +420,7 @@ class MasterDataStore
             return;
         }
 
-        $seedAliases = [];
-        foreach ($this->normalizeSeedItems($kind, $kind->seed()) as $seed) {
-            $seedAliases[(string) ($seed['code'] ?? '')] = (array) ($seed['aliases'] ?? []);
-        }
+        $seedAliases = $this->seedAliases($kind);
 
         foreach ($items as &$item) {
             $code = (string) ($item['code'] ?? '');
