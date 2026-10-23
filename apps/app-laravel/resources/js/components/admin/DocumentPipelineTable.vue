@@ -66,6 +66,12 @@
         </v-tooltip>
       </template>
 
+      <template #item.ownership="{ item }">
+        <div class="text-caption">ผู้อัปโหลด: {{ item.uploadedBy }}</div>
+        <div class="text-caption">ผู้รับผิดชอบ: {{ item.responsible }}</div>
+        <div v-if="item.coEditors" class="text-caption">ผู้รับผิดชอบร่วม: {{ item.coEditors }}</div>
+        <div class="text-caption">หน่วยงาน: {{ item.ownerUnitCode }}</div>
+      </template>
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
           {{ typeLabel(item.lawType) }}
@@ -128,6 +134,7 @@
             color="admin-primary"
             :title="rowActionLabel(item) || 'ดูเอกสาร'"
             :aria-label="rowActionLabel(item) || 'ดูเอกสาร'"
+            :disabled="!canRunAction(item)"
             @click="runAction(item)"
           >{{ rowActionLabel(item) || 'ดูเอกสาร' }}</v-btn>
 
@@ -139,7 +146,7 @@
             color="error"
             title="ลบประวัติอัปโหลด"
             :loading="deletingId === item.documentId"
-            :disabled="deletingId !== null && deletingId !== item.documentId"
+            :disabled="!item.can?.delete || (deletingId !== null && deletingId !== item.documentId)"
             @click="confirmDelete(item)"
           >ลบ</v-btn>
 
@@ -151,7 +158,7 @@
             color="error"
             title="ลบประวัติอัปโหลด"
             :loading="deletingId === item.documentId"
-            :disabled="deletingId !== null && deletingId !== item.documentId"
+            :disabled="!item.can?.delete || (deletingId !== null && deletingId !== item.documentId)"
             @click="confirmDelete(item)"
           />
 
@@ -186,6 +193,11 @@ const { typeLabel } = useLawType();
 interface Row {
   no: number;
   documentId: string;
+  can?: import('../../types/document').DocumentCapabilities;
+  uploadedBy: string;
+  responsible: string;
+  coEditors: string;
+  ownerUnitCode: string;
   title: string;
   updatedAt: string;
   stage: StageKey;            // still drives the action button column
@@ -235,6 +247,7 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
+  { title: 'เจ้าของเอกสาร', key: 'ownership', sortable: false },
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
   { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
@@ -271,6 +284,11 @@ const rows = computed<Row[]>(() =>
     return {
       no: index + 1,
       documentId: doc.document_id,
+      can: doc.can,
+      uploadedBy: doc.uploaded_by?.name || doc.uploaded_by?.username || 'ไม่ระบุ',
+      responsible: doc.responsible?.name || doc.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด',
+      coEditors: (doc.co_editors ?? []).map(person => person.name || person.username).join(', '),
+      ownerUnitCode: doc.owner_unit_code || 'ไม่ระบุ',
       title: doc.title || doc.document_id,
       updatedAt: formatDate(doc.updated_at),
       stage,
@@ -295,6 +313,18 @@ function actionLabel(stage: StageKey): string {
 function setStage(documentId: string, stage: StageKey): void {
   localStages.value = { ...localStages.value, [documentId]: stage };
   writeStage(documentId, stage);
+}
+
+function canRunAction(row: Row): boolean {
+  if (isOldInfoStage(row)) return Boolean(row.can?.edit);
+  const action = STAGE_MAP[row.stage].action;
+  if (action.type === 'route') {
+    const path = action.to(row.documentId);
+    if (path.includes('/esign')) return Boolean(row.can?.esign || row.can?.cancel_esign || row.can?.publish);
+    if (path.includes('/permissions')) return Boolean(row.can?.publish);
+    if (path.startsWith('/law/') || path.endsWith('/edit') || path.endsWith('/preview')) return true;
+  }
+  return Boolean(row.can?.edit);
 }
 
 function runAction(row: Row): void {

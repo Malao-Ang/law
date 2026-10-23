@@ -318,6 +318,9 @@ class LawSearchService
     {
 
         $filterClauses = [$this->visibleAccessFilter()];
+        if (config('auth_ldap.enforced')) {
+            $filterClauses[] = app(\App\Services\Auth\DocumentAccess::class)->searchVisibilityFilter(request());
+        }
         foreach (self::TERM_FILTERS as $field) {
             if (! empty($filters[$field])) {
                 $values = array_values((array) $filters[$field]);
@@ -555,7 +558,10 @@ class LawSearchService
                 $snippets[] = mb_substr((string) $source['text'], 0, 200);
             }
 
-            $restricted = $this->isRestrictedSource($source);
+            $restricted = config('auth_ldap.enforced')
+                ? ! app(\App\Services\Auth\DocumentAccess::class)->canRead(request(), $source)
+                : $this->isRestrictedSource($source);
+            if (config('auth_ldap.enforced') && ! ($source['is_published'] ?? false) && $restricted) continue;
 
             $titleHighlighted = null;
             $titleHighlightFragments = $hit['highlight']['title'] ?? [];

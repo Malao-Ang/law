@@ -1,5 +1,6 @@
 <template>
-  <div class="upload-form">
+  <div class="upload-form" :inert="auth.authEnforced && !auth.canUpload">
+    <v-alert v-if="auth.authEnforced && !auth.canUpload" type="info" variant="tonal" class="mb-3">คุณไม่มีสิทธิ์อัปโหลดเอกสารในหน่วยงานที่เลือก</v-alert>
     <div v-if="!pendingFile" class="mb-3">
       <div class="text-caption text-medium-emphasis mb-1">ประเภทเอกสาร</div>
       <v-btn-toggle v-model="documentType" mandatory divided density="comfortable" color="admin-primary">
@@ -8,6 +9,7 @@
       </v-btn-toggle>
     </div>
 
+    <v-select v-if="auth.is_super_admin" v-model="ownerUnitCode" :items="units" item-title="name" item-value="code" label="หน่วยงานเจ้าของเอกสาร" variant="outlined" />
     <!-- Step 1: pick file -->
     <v-file-input
       v-if="!pendingFile"
@@ -56,12 +58,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useAuthStore } from '../../stores/authStore';
+import { jsonRequest } from '../../api/client';
+import type { Unit } from '../../types/unit';
 import type { ScanExtractionMode } from '../../types/document';
 import { useUploadStore } from '../../stores/uploadStore';
 
 const emit = defineEmits<{ uploaded: [documentId: string] }>();
 const uploadStore = useUploadStore();
+const auth = useAuthStore();
+const units = ref<Unit[]>([]);
+const ownerUnitCode = ref(auth.active_unit?.code || '');
+onMounted(async () => {
+  if (auth.is_super_admin) {
+    try { units.value = (await jsonRequest<{ items: Unit[] }>('/api/units')).items.filter(u => u.is_active); }
+    catch { error.value = 'ไม่สามารถโหลดหน่วยงานได้'; }
+  }
+});
 
 const fileModel = ref<File | File[] | null>(null);
 const pendingFile = ref<File | null>(null);
@@ -142,7 +156,7 @@ async function doUpload(): Promise<void> {
       pendingFile.value,
       scanMode.value,
       extractionEngine.value,
-      { documentType: documentType.value },
+      { documentType: documentType.value, ownerUnitCode: ownerUnitCode.value },
     );
     emit('uploaded', documentId);
   } catch (err) {

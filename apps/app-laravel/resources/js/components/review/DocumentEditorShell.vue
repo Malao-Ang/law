@@ -192,7 +192,7 @@
       </span>
       <v-spacer />
       <v-btn variant="outlined" class="text-none" @click="emit('close')">ยกเลิก</v-btn>
-      <v-btn color="admin-primary" class="text-none ml-2" :loading="documentStore.saving" @click="saveAndContinue">
+      <v-btn color="admin-primary" class="text-none ml-2" :loading="documentStore.saving" :disabled="props.locked" @click="saveAndContinue">
         บันทึกข้อมูล
       </v-btn>
     </div>

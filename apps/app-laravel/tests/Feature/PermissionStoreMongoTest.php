@@ -8,6 +8,17 @@ use Tests\TestCase;
 
 class PermissionStoreMongoTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Group members are real unit codes (DEP...) and real usernames.
+        $users = app(\App\Services\Auth\MongoUserStore::class);
+        foreach (['user_somchai', 'user_suda', 'user_kanya'] as $username) {
+            $users->upsertFromLogin($username, ['name' => $username], null, false);
+        }
+    }
+
     public function test_directory_seeds_and_returns_units_positions_and_users(): void
     {
         $store = app(PermissionStore::class);
@@ -30,7 +41,7 @@ class PermissionStoreMongoTest extends TestCase
         $created = $store->createGroup([
             'name' => 'กลุ่มสิทธิ์วิชาการ_'.uniqid(),
             'description' => 'ใช้กับเอกสารภายในคณะ',
-            'unit_ids' => ['unit_academic'],
+            'unit_ids' => ['DEP105'],
             'position_ids' => ['position_dean'],
             'user_ids' => ['user_kanya'],
         ]);
@@ -40,7 +51,7 @@ class PermissionStoreMongoTest extends TestCase
         $this->assertNotNull($found);
         $this->assertSame($created['id'], $found['id']);
         $this->assertSame($created['name'], $found['name']);
-        $this->assertSame(['unit_academic'], $found['unit_ids']);
+        $this->assertSame(['DEP105'], $found['unit_ids']);
         $this->assertSame(['position_dean'], $found['position_ids']);
         $this->assertSame(['user_kanya'], $found['user_ids']);
         $this->assertSame(3, $found['counts']['total']);
@@ -54,7 +65,7 @@ class PermissionStoreMongoTest extends TestCase
         $store->createGroup([
             'name' => $name,
             'description' => null,
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => ['DEP101'],
             'position_ids' => [],
             'user_ids' => [],
         ]);
@@ -64,7 +75,7 @@ class PermissionStoreMongoTest extends TestCase
         $store->createGroup([
             'name' => $name,
             'description' => 'duplicate',
-            'unit_ids' => ['unit_finance'],
+            'unit_ids' => ['DEP103'],
             'position_ids' => [],
             'user_ids' => [],
         ]);
@@ -77,7 +88,7 @@ class PermissionStoreMongoTest extends TestCase
         $created = $store->createGroup([
             'name' => 'กลุ่มปรับปรุง_'.uniqid(),
             'description' => 'ก่อนแก้ไข',
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => ['DEP101'],
             'position_ids' => [],
             'user_ids' => ['user_somchai'],
         ]);
@@ -85,7 +96,7 @@ class PermissionStoreMongoTest extends TestCase
         $updated = $store->updateGroup($created['id'], [
             'name' => 'กลุ่มปรับปรุงแล้ว',
             'description' => 'หลังแก้ไข',
-            'unit_ids' => ['unit_legal', 'unit_finance'],
+            'unit_ids' => ['DEP101', 'DEP103'],
             'position_ids' => ['position_legal_officer'],
             'user_ids' => [],
         ]);
@@ -96,7 +107,7 @@ class PermissionStoreMongoTest extends TestCase
         $this->assertNotNull($updated);
         $this->assertIsArray($reloaded);
         $this->assertSame('กลุ่มปรับปรุงแล้ว', $reloaded['name']);
-        $this->assertSame(['unit_legal', 'unit_finance'], $reloaded['unit_ids']);
+        $this->assertSame(['DEP101', 'DEP103'], $reloaded['unit_ids']);
         $this->assertSame(['position_legal_officer'], $reloaded['position_ids']);
         $this->assertSame([], $reloaded['user_ids']);
     }
@@ -108,7 +119,7 @@ class PermissionStoreMongoTest extends TestCase
         $created = $store->createGroup([
             'name' => 'กลุ่มลบ_'.uniqid(),
             'description' => null,
-            'unit_ids' => ['unit_procurement'],
+            'unit_ids' => ['DEP104'],
             'position_ids' => [],
             'user_ids' => [],
         ]);
@@ -125,7 +136,7 @@ class PermissionStoreMongoTest extends TestCase
         $group = $store->createGroup([
             'name' => 'กลุ่มตรวจสอบ_'.uniqid(),
             'description' => null,
-            'unit_ids' => ['unit_science'],
+            'unit_ids' => ['DEP102'],
             'position_ids' => [],
             'user_ids' => [],
         ]);

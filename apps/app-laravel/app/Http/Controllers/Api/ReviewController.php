@@ -40,6 +40,7 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Review document not found.'], 404);
         }
 
+        $review['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $this->reviewStore->getStatus($documentId) ?? []);
         $response = response()->json($this->decorateReviewPayload($documentId, $review));
 
         return $this->withRevalidation($response);
@@ -191,6 +192,8 @@ class ReviewController extends Controller
             throw $exception;
         } catch (ConcurrencyException $exception) {
             return $this->concurrencyResponse();
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+            throw $exception;
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 404);
         }
@@ -216,7 +219,7 @@ class ReviewController extends Controller
             'status' => 'updated',
             'document_review' => $payload['document_review'],
             'compose_state' => $payload['compose_state'],
-            'law_meta' => $payload['law_meta'] ?? [],
+            'law_meta' => array_merge($payload['law_meta'] ?? [], array_intersect_key($this->reviewStore->getStatus($documentId) ?? [], array_flip(\App\Services\Auth\DocumentOwnership::FIELDS))),
             'relations' => $payload['relations'] ?? [],
         ]);
     }

@@ -54,6 +54,12 @@ class LawSearchController extends Controller
         // drops unpublished, draft, or stale-filter docs the ES index may still contain.
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
+            if (config('auth_ldap.enforced')) {
+                if ($this->rowSearchVisible($metaRow) && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])) {
+                    $publishedIds[(string) $metaRow['document_id']] = true;
+                }
+                continue;
+            }
             if (
                 ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
@@ -133,6 +139,13 @@ class LawSearchController extends Controller
      */
     private function overlayCurrentAccessState(array $row, ?array $fileRow): array
     {
+        if (config('auth_ldap.enforced') && $fileRow === null) {
+            $access = app(\App\Services\Auth\DocumentAccess::class);
+            $document = $access->readDocument((string) ($row['law_id'] ?? ''));
+            $row['restricted'] = $document === null || ! $access->canRead(request(), $document);
+            $row['requires_permission'] = $row['restricted'] && $this->hasPermissionGroups($document ?? []);
+            if ($row['restricted']) $row['snippets'] = [];
+        }
         if ($fileRow === null) {
             $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
 
@@ -167,6 +180,7 @@ class LawSearchController extends Controller
         $metaById = array_column($allMeta, null, 'document_id');
         $childTypeIndex = [];
         foreach ($allMeta as $meta) {
+            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($meta)) continue;
             $type = $this->canonicalType((string) ($meta['law_type'] ?? ''));
             foreach (LawMetaNormalizer::parentDocumentIds($meta) as $parentId) {
                 $childTypeIndex[$parentId][$type] = ($childTypeIndex[$parentId][$type] ?? 0) + 1;
@@ -177,13 +191,14 @@ class LawSearchController extends Controller
         $deferredContentRows = [];
         $deferContentSearch = ! $query->isEmpty() && ! $query->isBoolean();
         foreach ($allMeta as $row) {
-            if (($row['status'] ?? '') !== 'ingested') {
+            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($row)) continue;
+            if (! config('auth_ldap.enforced') && ($row['status'] ?? '') !== 'ingested') {
                 continue;
             }
-            if (($row['published_date'] ?? '') === '') {
+            if (! config('auth_ldap.enforced') && ($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if ($this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
+            if (! config('auth_ldap.enforced') && $this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue; // Hide draft documents from public search
             }
 
@@ -234,7 +249,7 @@ class LawSearchController extends Controller
             && ! $query->isEmpty()
             && ! $query->isNegatedOnly();
         $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById, $includeHeavyDetails): array {
-            $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
+            $restricted = $this->rowRestricted($r);
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
 
@@ -260,11 +275,11 @@ class LawSearchController extends Controller
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
-                'related_laws' => $includeHeavyDetails ? $this->relatedLawSummaries($id, $store, $metaById) : [],
-                'affected_sections' => $this->affectedSections($id, $store),
+                'related_laws' => ($includeHeavyDetails && (! config('auth_ldap.enforced') || ! $restricted)) ? $this->relatedLawSummaries($id, $store, $metaById) : [],
+                'affected_sections' => (! config('auth_ldap.enforced') || ! $restricted) ? $this->affectedSections($id, $store) : [],
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
-                'snippets' => ($includeHeavyDetails && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
+                'snippets' => (($includeHeavyDetails || config('auth_ldap.enforced')) && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
                 'keywords' => array_values(array_filter((array) ($r['keywords'] ?? []), 'is_string')),
             ];
         }, $paged);
@@ -291,6 +306,21 @@ class LawSearchController extends Controller
                 $row['permission_group_ids'],
                 static fn (mixed $value): bool => trim((string) $value) !== '',
             )) !== [];
+    }
+
+    private function rowRestricted(array $row): bool
+    {
+        if (! config('auth_ldap.enforced')) return LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument((string) ($row['document_id'] ?? ''));
+        return $document === null || ! $access->canRead(request(), $document);
+    }
+
+    private function rowSearchVisible(array $row): bool
+    {
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument((string) ($row['document_id'] ?? ''));
+        return $document !== null && (\App\Services\Auth\DocumentAccess::isPublished($document) || $access->canRead(request(), $document));
     }
 
 
@@ -450,7 +480,7 @@ class LawSearchController extends Controller
                 ];
             }
 
-            if ($includeContent && LawMetaNormalizer::effectiveVisibility($row) !== 'restricted') {
+            if ($includeContent && ! $this->rowRestricted($row)) {
                 foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
                     $haystack .= ' '.(string) ($chunk['text'] ?? '');
                 }
@@ -473,7 +503,7 @@ class LawSearchController extends Controller
             return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.8];
         }
 
-        $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
+        $restricted = $this->rowRestricted($row);
         if ($includeContent && ! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
             return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.7];
         }
@@ -833,6 +863,7 @@ class LawSearchController extends Controller
             }
 
             $targetId = trim((string) ($rel['target_document_id'] ?? ''));
+            if (config('auth_ldap.enforced') && ($targetId === '' || ! isset($metaById[$targetId]) || ! $this->rowSearchVisible($metaById[$targetId]))) continue;
             $title = trim((string) ($rel['target_title'] ?? ''));
             if ($title === '' && $targetId !== '' && isset($metaById[$targetId])) {
                 $title = trim((string) ($metaById[$targetId]['title'] ?? ''));

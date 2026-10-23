@@ -62,7 +62,10 @@ class LawSuggestService
             '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
-                    'filter' => [[
+                    'filter' => [...(config('auth_ldap.enforced') ? [
+                        ['term' => ['is_published' => true]],
+                        ['bool' => ['must_not' => [['term' => ['access_scope' => 'private']], ['term' => ['visibility' => 'restricted']]]]],
+                    ] : []), [
                         'bool' => [
                             'should' => [
                                 ['term' => ['visibility' => 'public']],
@@ -128,7 +131,10 @@ class LawSuggestService
             '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
-                    'filter' => [[
+                    'filter' => [...(config('auth_ldap.enforced') ? [
+                        ['term' => ['is_published' => true]],
+                        ['bool' => ['must_not' => [['term' => ['access_scope' => 'private']], ['term' => ['visibility' => 'restricted']]]]],
+                    ] : []), [
                         'bool' => [
                             'should' => [
                                 ['term' => ['visibility' => 'public']],

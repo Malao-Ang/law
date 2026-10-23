@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Auth\MongoUserStore;
+use App\Services\Auth\MembershipAuditLog;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
@@ -13,6 +15,7 @@ use App\Services\MasterData\LawFamilyUsageCounter;
 use App\Services\MasterData\LegalStructureUsageCounter;
 use App\Services\MasterData\LawTypeUsageCounter;
 use App\Services\MasterData\MasterDataStore;
+use App\Services\MasterData\UnitStore;
 use App\Services\MasterData\UsageCounter;
 use App\Services\Permissions\PermissionStore;
 use App\Services\ReviewStore;
@@ -70,11 +73,37 @@ class AppServiceProvider extends ServiceProvider
             return new MongoBlobStore($client->$database->selectCollection('master_data'));
         });
 
+        $this->app->singleton('mongo.blob.users', function (): MongoBlobStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new MongoBlobStore($client->$database->selectCollection('users'));
+        });
+
+        $this->app->when(MongoUserStore::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.users'));
+
+        $this->app->singleton('mongo.blob.membership-audit', function (): MongoBlobStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new MongoBlobStore($client->$database->selectCollection('membership_audit_logs'));
+        });
+
+        $this->app->when(MembershipAuditLog::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.membership-audit'));
+
         $this->app->when(PermissionStore::class)
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.permissions'));
 
         $this->app->when(MasterDataStore::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.master'));
+
+        $this->app->when(UnitStore::class)
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.master'));
 

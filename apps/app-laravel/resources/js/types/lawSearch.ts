@@ -60,6 +60,7 @@ export interface LawSearchResult {
   law_group?: string | null;
   signer_group?: string | null;
   restricted?: boolean;
+  can?: { read: boolean };
   requires_permission?: boolean;
   child_types?: Record<string, number>;
   related_laws?: RelatedLawSummary[];

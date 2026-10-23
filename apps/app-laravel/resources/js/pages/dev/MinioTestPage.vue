@@ -40,6 +40,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { csrfHeaders } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const base = window.location.origin;
@@ -81,7 +82,7 @@ const selectedUploadFileInfo = computed(() => {
 });
 
 async function api(method: string, path: string, body?: FormData | Record<string, unknown>) {
-  const opts: RequestInit = { method, headers: {} };
+  const opts: RequestInit = { method, headers: { ...(await csrfHeaders(method)) } };
   if (body instanceof FormData) {
     opts.body = body;
   } else if (body) {

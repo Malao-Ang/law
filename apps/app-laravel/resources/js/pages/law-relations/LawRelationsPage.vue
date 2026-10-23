@@ -12,13 +12,13 @@
       :extra-icon="isOld ? undefined : 'mdi-draw-pen'"
       :next-loading="documentStore.saving && !esignLeaving"
       :extra-loading="!isOld && documentStore.saving && esignLeaving"
-      :next-disabled="documentStore.saving"
-      :extra-disabled="isOld || documentStore.saving"
+      :next-disabled="documentStore.saving || !can.edit"
+      :extra-disabled="isOld || documentStore.saving || !can.edit || !can.esign"
       @back="router.back()"
       @next="saveAndNext"
       @extra="saveAndEsign"
     />
-    <div class="mx-auto relations-page" style="max-width:1400px; padding-bottom:60px">
+    <div class="mx-auto relations-page" :inert="!can.edit" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -206,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -229,6 +230,7 @@ import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();

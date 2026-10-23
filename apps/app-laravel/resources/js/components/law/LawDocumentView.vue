@@ -35,9 +35,9 @@
           <v-btn v-if="!usesOriginalPdfLayout" variant="outlined" size="small"
             :prepend-icon="infoOpen ? 'mdi-eye-off-outline' : 'mdi-card-text-outline'"
             @click="infoOpen = !infoOpen">{{ infoOpen ? 'ซ่อนข้อมูล' : 'เปิดข้อมูล' }}</v-btn>
-          <v-btn variant="outlined" size="small" prepend-icon="mdi-printer-outline"
+          <v-btn v-if="canRead" variant="outlined" size="small" prepend-icon="mdi-printer-outline"
             @click="printPage()">พิมพ์</v-btn>
-          <v-btn variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
+          <v-btn v-if="canRead" variant="outlined" size="small" color="error" prepend-icon="mdi-file-pdf-box"
             :loading="exportingPdf"
             :disabled="exportingPdf"
             @click="downloadPdf()">ดาวน์โหลด PDF</v-btn>
@@ -286,6 +286,8 @@ function documentTarget(targetDocumentId: string | null | undefined): string {
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
 const { documentTypes, load: loadLookups } = useLookups();
+const canRead = computed(() => documentStore.documentId === props.documentId && !!documentStore.review
+  && !documentStore.error && documentStore.review.can?.read !== false);
 const exportingPdf = ref(false);
 const pdfExportError = ref('');
 
@@ -464,7 +466,7 @@ function relationHref(rel: LawRelation): string | null {
 
 
 async function downloadPdf(): Promise<void> {
-  if (exportingPdf.value) return;
+  if (!canRead.value || exportingPdf.value) return;
 
   exportingPdf.value = true;
   pdfExportError.value = '';
@@ -500,6 +502,7 @@ async function downloadPdf(): Promise<void> {
 }
 
 async function printPage(): Promise<void> {
+  if (!canRead.value) return;
   if (usesOriginalPdfLayout.value) {
     // Old/PDF-source: open original file in new tab for printing.
     window.open(fileUrl.value, '_blank');

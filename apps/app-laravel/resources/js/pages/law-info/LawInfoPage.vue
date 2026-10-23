@@ -9,6 +9,7 @@
       :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
       :next-loading="documentStore.saving"
+      :next-disabled="!can.edit"
       @back="router.back()"
       @next="saveAndNext"
     />
@@ -18,7 +19,9 @@
         <span>กำลังโหลด...</span>
       </div>
 
-      <v-form v-else ref="formRef" validate-on="submit lazy">
+      <DocumentCoEditorsCard v-if="!documentStore.loading && documentStore.review" :document-id="documentId" :can="can" @updated="setCan" />
+
+      <v-form v-if="!documentStore.loading" :disabled="!can.edit" ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
@@ -45,6 +48,11 @@
           ประกาศฉบับนี้ยังไม่ระบุผู้ออก กรุณาเลือก "ประกาศที่ออกโดยมหาวิทยาลัย" หรือ "ประกาศที่ออกโดยสภามหาวิทยาลัย"
         </v-alert>
 
+        <v-card flat border rounded="lg" class="pa-4 mb-4">
+          <p>ผู้อัปโหลด: {{ documentStore.review?.law_meta?.uploaded_by?.name || documentStore.review?.law_meta?.uploaded_by?.username || 'ไม่ระบุ' }}</p>
+          <p>ผู้รับผิดชอบ: {{ documentStore.review?.law_meta?.responsible?.name || documentStore.review?.law_meta?.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด' }}</p>
+          <p>หน่วยงานเจ้าของ: {{ documentStore.review?.law_meta?.owner_unit_code || 'ไม่ระบุ' }}</p>
+        </v-card>
         <!-- ข้อมูลพื้นฐาน -->
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-5">
@@ -286,6 +294,8 @@
 </template>
 
 <script setup lang="ts">
+import DocumentCoEditorsCard from '../../components/shared/DocumentCoEditorsCard.vue';
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
 import { useRoute, useRouter } from 'vue-router';
@@ -305,6 +315,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
+const { can, setCan } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const route = useRoute();

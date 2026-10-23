@@ -6,6 +6,17 @@ use Tests\TestCase;
 
 class PermissionGroupApiTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Group members are real unit codes (DEP...) and real usernames.
+        $users = app(\App\Services\Auth\MongoUserStore::class);
+        foreach (['user_somchai', 'user_suda', 'user_kanya'] as $username) {
+            $users->upsertFromLogin($username, ['name' => $username], null, false);
+        }
+    }
+
     public function test_directory_endpoint_returns_units_positions_and_users(): void
     {
         $this->getJson('/api/permission-directory')
@@ -23,7 +34,7 @@ class PermissionGroupApiTest extends TestCase
         $created = $this->postJson('/api/permission-groups', [
             'name' => $name,
             'description' => 'ใช้สำหรับเอกสารอนุมัติงบประมาณและรายงานการเงิน',
-            'unit_ids' => ['unit_finance'],
+            'unit_ids' => ['DEP103'],
             'position_ids' => ['position_finance_director'],
             'user_ids' => ['user_somchai'],
         ])
@@ -38,12 +49,12 @@ class PermissionGroupApiTest extends TestCase
         $this->getJson("/api/permission-groups/{$groupId}")
             ->assertOk()
             ->assertJsonPath('id', $groupId)
-            ->assertJsonPath('units.0.id', 'unit_finance');
+            ->assertJsonPath('units.0.id', 'DEP103');
 
         $this->putJson("/api/permission-groups/{$groupId}", [
             'name' => 'เอกสารการเงินปรับปรุง',
             'description' => 'ปรับสิทธิ์สำหรับเอกสารการเงิน',
-            'unit_ids' => ['unit_finance', 'unit_procurement'],
+            'unit_ids' => ['DEP103', 'DEP104'],
             'position_ids' => [],
             'user_ids' => ['user_suda'],
         ])
@@ -67,7 +78,7 @@ class PermissionGroupApiTest extends TestCase
         $this->postJson('/api/permission-groups', [
             'name' => $name,
             'description' => 'กลุ่มตั้งต้น',
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => ['DEP101'],
             'position_ids' => [],
             'user_ids' => [],
         ])->assertCreated();
@@ -75,7 +86,7 @@ class PermissionGroupApiTest extends TestCase
         $this->postJson('/api/permission-groups', [
             'name' => $name,
             'description' => 'ซ้ำ',
-            'unit_ids' => ['unit_science'],
+            'unit_ids' => ['DEP102'],
             'position_ids' => [],
             'user_ids' => [],
         ])->assertStatus(422);

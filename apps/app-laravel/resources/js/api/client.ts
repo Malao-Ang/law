@@ -98,21 +98,81 @@ export type LookupData = {
   law_sources: SelectableOption[];
 };
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+let unauthorizedHandler: (() => void) | null = null;
+let csrfPending: Promise<void> | null = null;
+
+/** Called when a non-auth API call returns 401 (session ended). */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+function readXsrfToken(): string {
+  const match = /(?:^|;\s*)XSRF-TOKEN=([^;]+)/.exec(document.cookie);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+/** Makes sure the XSRF-TOKEN cookie exists (Sanctum SPA CSRF cookie). */
+export async function ensureCsrfCookie(force = false): Promise<void> {
+  if (!force && readXsrfToken() !== '') return;
+  csrfPending ??= fetch('/sanctum/csrf-cookie', { credentials: 'include', headers: { Accept: 'application/json' } })
+    .then(() => undefined)
+    .finally(() => {
+      csrfPending = null;
+    });
+  await csrfPending;
+}
+
+/** Headers a state-changing same-origin request needs: X-XSRF-TOKEN from the cookie. */
+export async function csrfHeaders(method: string): Promise<Record<string, string>> {
+  if (SAFE_METHODS.has(method.toUpperCase())) return {};
+  await ensureCsrfCookie();
+  const token = readXsrfToken();
+  return token ? { 'X-XSRF-TOKEN': token } : {};
+}
+
+// Multiple workspaces load status, review and versions together.
+const readDeniedDialogs = new Map<string, Promise<void>>();
+async function documentReadDenied(url: string, message: string): Promise<void> {
+  const documentId = /^\/api\/documents\/([^/?]+)/.exec(new URL(url, window.location.origin).pathname)?.[1] ?? '';
+  const existing = readDeniedDialogs.get(documentId);
+  if (existing) return existing;
+  const pending = (async () => {
+    const { router } = await import('../router');
+    const current = router.currentRoute.value;
+    const isCurrentDocument = documentId && decodeURIComponent(documentId) === current.params.documentId;
+    const { alertError } = await import('../components/master/masterDialogs');
+    await alertError(message);
+    if (isCurrentDocument && router.currentRoute.value.fullPath === current.fullPath) {
+      await router.replace(current.path.startsWith('/law/') ? '/database' : '/admin/laws');
+    }
+  })().finally(() => { readDeniedDialogs.delete(documentId); });
+  readDeniedDialogs.set(documentId, pending);
+  return pending;
+}
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
-  const response = await fetch(input, {
-    headers: isFormData
-      ? {
-          Accept: 'application/json',
-          ...(init?.headers ?? {}),
-        }
-      : {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...(init?.headers ?? {}),
-        },
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+
+  const send = async (): Promise<Response> => fetch(input, {
+    credentials: 'include',
     ...init,
+    headers: {
+      Accept: 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(await csrfHeaders(method)),
+      ...(init?.headers ?? {}),
+    },
   });
+
+  let response = await send();
+  if (response.status === 419) {
+    await ensureCsrfCookie(true);
+    response = await send();
+  }
 
   if (!response.ok) {
     const fallback = `HTTP ${response.status}`;
@@ -131,6 +191,18 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     const error = new Error(firstValidationError ?? payload?.message ?? payload?.error ?? fallback) as ApiRequestError;
     error.status = response.status;
     error.errors = payload?.errors;
+
+    if (response.status === 403) {
+      if (method === 'GET' && new URL(url, window.location.origin).pathname.startsWith('/api/documents/')) {
+        await documentReadDenied(url, error.message);
+      } else {
+        const { alertError } = await import('../components/master/masterDialogs');
+        await alertError(error.message);
+      }
+    }
+    if (response.status === 401 && !url.startsWith('/api/auth/')) {
+      unauthorizedHandler?.();
+    }
     throw error;
   }
 
@@ -143,7 +215,7 @@ export async function uploadDocument(
   file: File,
   scanExtractionMode: ScanExtractionMode = 'gemini',
   extractionEngine: 'standard' | 'fast' = 'standard',
-  opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string } = {},
+  opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string; ownerUnitCode?: string } = {},
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
@@ -151,6 +223,7 @@ export async function uploadDocument(
   form.append('extraction_engine', extractionEngine);
   if (opts.documentType) form.append('document_type', opts.documentType);
   if (opts.source) form.append('source', opts.source);
+  if (opts.ownerUnitCode) form.append('owner_unit_code', opts.ownerUnitCode);
   if (opts.lawType) form.append('law_type', opts.lawType);
 
   return jsonRequest<UploadResponse>('/api/documents', {
@@ -331,10 +404,15 @@ async function downloadBinaryExport(
 ): Promise<void> {
   const response = await fetch(path, {
     method: 'POST',
-    headers: { Accept: accept },
+    credentials: 'include',
+    headers: { Accept: accept, ...(await csrfHeaders('POST')) },
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      const { alertError } = await import('../components/master/masterDialogs');
+      await alertError('คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
+    }
     const data = (await response.json().catch(() => ({}))) as ApiErrorPayload;
     throw new Error(data.message ?? `Export failed (${response.status})`);
   }

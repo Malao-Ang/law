@@ -7,8 +7,8 @@
   >
     <template #actions>
       <template v-if="stage === 'draft'">
-        <v-btn variant="outlined" size="small" class="text-none" @click="saveDraft">บันทึกฉบับร่าง</v-btn>
-        <v-btn
+        <v-btn v-show="can.esign" variant="outlined" size="small" class="text-none" @click="saveDraft">บันทึกฉบับร่าง</v-btn>
+        <v-btn v-show="can.esign"
           color="warning"
           size="small"
           prepend-icon="mdi-send-outline"
@@ -18,7 +18,7 @@
         >ส่งไปยังระบบ E-Sign</v-btn>
       </template>
       <template v-else-if="stage === 'waiting'">
-        <v-btn
+        <v-btn v-show="can.cancel_esign"
           color="error"
           size="small"
           variant="flat"
@@ -30,7 +30,7 @@
         </v-btn>
       </template>
       <template v-else-if="stage === 'cancelled'">
-        <v-btn
+        <v-btn v-show="can.esign"
           color="warning"
           size="small"
           prepend-icon="mdi-send-outline"
@@ -46,7 +46,7 @@
           class="text-none"
           @click="openDocPreview"
         >ดูตัวอย่าง</v-btn>
-        <v-btn
+        <v-btn v-show="can.publish"
           v-if="stage === 'signed'"
           color="success"
           size="small"
@@ -225,7 +225,7 @@
           <div class="font-weight-bold mb-1">{{ sideAlert.title }}</div>
           <div class="text-caption" style="white-space: pre-line">{{ sideAlert.body }}</div>
           <div v-if="stage === 'cancelled'" class="d-flex flex-column ga-2 mt-3">
-            <v-btn
+            <v-btn v-show="can.esign"
               color="warning"
               class="text-none"
               prepend-icon="mdi-send-outline"
@@ -234,7 +234,7 @@
             >ส่งอีกครั้ง</v-btn>
           </div>
           <div v-if="stage === 'signed'" class="d-flex flex-column ga-2 mt-3">
-            <v-btn color="success" class="text-none" prepend-icon="mdi-earth" @click="publishOpen = true">เผยแพร่กฎหมาย</v-btn>
+            <v-btn v-show="can.publish" color="success" class="text-none" prepend-icon="mdi-earth" @click="publishOpen = true">เผยแพร่กฎหมาย</v-btn>
             <v-btn
               variant="outlined"
               class="text-none"
@@ -243,7 +243,7 @@
           </div>
           <div v-if="stage === 'published'" class="d-flex flex-column ga-2 mt-3">
             <v-btn color="success" variant="outlined" class="text-none" :to="`/law/${documentId}`" prepend-icon="mdi-earth">ดูหน้าเผยแพร่</v-btn>
-            <v-btn color="error" variant="text" class="text-none" :loading="publishing" @click="setPublished(false)">ยกเลิกการเผยแพร่</v-btn>
+            <v-btn v-show="can.publish" color="error" variant="text" class="text-none" :loading="publishing" @click="setPublished(false)">ยกเลิกการเผยแพร่</v-btn>
           </div>
         </v-alert>
 
@@ -251,8 +251,8 @@
           <div class="d-flex align-center justify-space-between mb-3">
             <div class="text-subtitle-2 font-weight-bold">ข้อมูลผู้ลงนาม</div>
             <div v-if="stage === 'draft' || stage === 'cancelled'" class="d-flex ga-1">
-              <v-btn size="x-small" variant="text" class="text-none" @click="openSignerDialog">เปลี่ยนแปลง</v-btn>
-              <v-btn
+              <v-btn v-show="can.esign" size="x-small" variant="text" class="text-none" @click="openSignerDialog">เปลี่ยนแปลง</v-btn>
+              <v-btn v-show="can.esign"
                 size="x-small"
                 variant="text"
                 color="error"
@@ -280,7 +280,7 @@
           <div v-else class="text-caption text-medium-emphasis text-center py-4">
             ยังไม่มีผู้ลงนาม
             <div v-if="stage === 'draft' || stage === 'cancelled'" class="mt-2">
-              <v-btn size="small" color="admin-primary" class="text-none" @click="openSignerDialog">เลือกผู้ลงนาม</v-btn>
+              <v-btn v-show="can.esign" size="small" color="admin-primary" class="text-none" @click="openSignerDialog">เลือกผู้ลงนาม</v-btn>
             </div>
           </div>
 
@@ -375,6 +375,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { cancelDocumentESign, esignPreviewPdfUrl, fetchStatus, sendDocumentESign } from '../../api/client';
@@ -408,6 +409,7 @@ import {
 import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
+const { can, refreshCan } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const { inForceCode, isDraft } = useLawStatus();
@@ -841,6 +843,7 @@ async function cancelSubmit(): Promise<void> {
   cancelling.value = true;
   try {
     await cancelDocumentESign(props.documentId);
+    await refreshCan();
     session.value = pushActivity({
       ...session.value,
       status: 'draft',
@@ -906,6 +909,7 @@ function applyServerEsignStatus(status: DocumentStatus): void {
 }
 
 async function refreshEsignFromServer(): Promise<void> {
+  await refreshCan();
   const status = await fetchStatus(props.documentId);
   applyServerEsignStatus(status);
   await showStoredEsignPdf(status);

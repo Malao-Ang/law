@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAuthSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,7 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->statefulApi();
+        $middleware->api(append: [\App\Http\Middleware\ValidateActiveUnit::class, \App\Http\Middleware\EnforceDocumentAccess::class]);
+        $middleware->alias([
+            'auth.session' => EnsureAuthSession::class,
+            'doc.read' => \App\Http\Middleware\EnforceDocumentRead::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
