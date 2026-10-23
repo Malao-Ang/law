@@ -71,7 +71,7 @@
                     :disabled="saving || membersLoading || !canEdit(member) || isAdmin(member.role)"
                     @update:model-value="changeAction(member, action.value, Boolean($event))" />
                 </td>
-                <td>{{ sourceLabel(member.source) }}</td>
+                <td>{{ sourceLabel(member.source) }}<p v-if="member.role === 'editor' && !member.actions.includes('upload')" class="text-warning text-caption">หากไม่มีสิทธิ์อัปโหลด สิทธิ์ช่องอื่นจะไม่มีผล</p></td>
                 <td><v-btn v-if="auth.is_super_admin" icon="mdi-account-remove-outline" size="small" variant="text" color="error"
                   :disabled="saving || membersLoading" :aria-label="`ลบสมาชิก ${member.username}`" @click="removeMember(member)" /><span v-else>—</span></td>
               </tr>
@@ -254,7 +254,7 @@ async function updateMember(member: Member | Person, role: UnitRole, memberActio
 async function changeRole(member: Member, role: UnitRole): Promise<void> {
   if (role === member.role || !canEdit(member) || saving.value) return;
   if (isAdmin(role) && !await confirm('ยืนยันการตั้งผู้ดูแลหน่วยงาน', `กำหนดให้ ${member.name || member.username} เป็น${ROLE_LABELS[role]}?`)) { controlRevision.value++; return; }
-  await updateMember(member, role, role === 'user' ? [] : member.actions);
+  await updateMember(member, role, role === 'user' ? [] : member.role === 'user' && role === 'editor' ? ['upload', 'edit'] : member.actions);
 }
 async function changeAction(member: Member, action: UnitAction, checked: boolean): Promise<void> {
   if (!canEdit(member) || isAdmin(member.role)) return;
