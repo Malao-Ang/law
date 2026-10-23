@@ -45,8 +45,8 @@ class LawTypeMasterDataSeedTest extends TestCase
         $this->assertSame([self::ANNOUNCEMENT_COUNCIL, self::RESOLUTION, 'resolution'], $types[1]['aliases']);
         $this->assertSame([self::ACT, self::ACT_ABBR, "\u{0E1E}.\u{0E23}.\u{0E1A}", self::ACT_ABBR_COMPACT, 'phrb', 'prb', 'external-act'], $types[5]['aliases']);
         $this->assertSame([self::EXTERNAL_FAMILY], $types[8]['aliases']);
-        $this->assertSame(['family_code' => 'LFM03'], $types[0]['attrs']);
-        $this->assertSame(['family_code' => 'LFM03'], $types[1]['attrs']);
+        $this->assertSame(['family_code' => 'LFM03', 'is_primary' => true], $types[0]['attrs']);
+        $this->assertSame(['family_code' => 'LFM03', 'is_primary' => false], $types[1]['attrs']);
         $this->assertFalse($types[0]['is_system']);
         foreach ($types as $type) {
             $this->assertArrayNotHasKey('requires_issuer', $type['attrs']);
@@ -124,8 +124,15 @@ class LawTypeMasterDataSeedTest extends TestCase
     {
         /** @var MasterDataStore $store */
         $store = app(MasterDataStore::class);
-        $store->all(MasterDataKind::LawType);
+        $families = $store->all(MasterDataKind::LawFamily);
 
+        // A store from before the shared catalog: families without law_types, types in their own blob.
+        $legacyFamilies = array_map(static function (array $family): array {
+            unset($family['attrs']['has_subtypes']);
+
+            return $family;
+        }, $families);
+        app('mongo.blob.master')->write('data', 'law_family', ['items' => $legacyFamilies]);
         app('mongo.blob.master')->write('data', 'law_type', [
             'items' => [
                 [

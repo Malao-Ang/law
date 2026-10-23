@@ -31,7 +31,7 @@
           >
             <td class="master-tree__order-cell">{{ familyIndex + 1 }}</td>
             <td>
-              <button type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
+              <button v-if="row.family.attrs.has_subtypes !== false" type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
                 <v-icon :icon="expandedCodes.includes(row.family.code) ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
               </button>
               <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
@@ -47,7 +47,14 @@
               </v-chip>
             </td>
             <td>{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
-            <td class="text-right font-weight-bold">{{ row.usage.toLocaleString('th-TH') }}</td>
+            <td class="text-right font-weight-bold">
+              <v-chip
+                v-if="row.family.attrs.has_subtypes === false && row.primary"
+                size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
+                :to="`/admin/laws?type=${encodeURIComponent(row.primary!.code)}`"
+              >{{ (row.primary?.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
+              <template v-else>{{ row.usage.toLocaleString('th-TH') }}</template>
+            </td>
             <td>
               <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
                 {{ row.family.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
@@ -73,7 +80,7 @@
                   <v-icon icon="mdi-drag-vertical" size="20" class="master-tree__drag-handle" />
                 </template>
                 <template v-else>
-                <v-btn size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="$emit('addType', row.family)">
+                <v-btn v-if="row.family.attrs.has_subtypes !== false" size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="$emit('addType', row.family)">
                   ประเภท
                 </v-btn>
                 <v-tooltip text="แก้ไข" location="top">
@@ -94,7 +101,7 @@
             </td>
           </tr>
           <tr
-            v-for="(type, typeIndex) in row.types"
+            v-for="(type, typeIndex) in (row.family.attrs.has_subtypes === false ? [] : row.types)"
             v-show="expandedCodes.includes(row.family.code)"
             :key="type.code"
             class="master-tree__child"
@@ -185,6 +192,7 @@ import type { MasterItem } from '../../types/masterData';
 interface MasterTreeRow {
   family: MasterItem;
   types: MasterItem[];
+  primary?: MasterItem;
   source: LawSource;
   color: string;
   usage: number;
