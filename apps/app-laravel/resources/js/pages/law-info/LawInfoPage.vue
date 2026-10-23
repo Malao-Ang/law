@@ -93,8 +93,8 @@
                 required
               >
                 <template #item="{ props: itemProps, item }">
-                  <v-list-subheader v-if="item.raw.option_type === 'subheader'">
-                    {{ item.raw.title }}
+                  <v-list-subheader v-if="item.option_type === 'subheader'">
+                    {{ item.title }}
                   </v-list-subheader>
                   <v-list-item v-else v-bind="itemProps" />
                 </template>
