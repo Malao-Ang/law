@@ -14,10 +14,10 @@ const EXTERNAL_FAMILY_CODE = 'LFM04';
 const UNSPECIFIED_ANNOUNCEMENT = 'ประกาศ';
 
 const FALLBACK_FAMILIES: LawFamilyOption[] = [
-  { title: 'ข้อบังคับ', value: 'LFM01', code: 'LFM01', source: 'internal', color: '#10B981', sort_order: 1 },
-  { title: 'ระเบียบ', value: 'LFM02', code: 'LFM02', source: 'internal', color: '#3B82F6', sort_order: 2 },
-  { title: UNSPECIFIED_ANNOUNCEMENT, value: ANNOUNCEMENT_FAMILY_CODE, code: ANNOUNCEMENT_FAMILY_CODE, source: 'internal', color: '#FB923C', sort_order: 3 },
-  { title: 'กฎหมายภายนอก', value: EXTERNAL_FAMILY_CODE, code: EXTERNAL_FAMILY_CODE, source: 'external', color: '#854D0E', sort_order: 4 },
+  { title: 'ข้อบังคับ', value: 'LFM01', code: 'LFM01', has_subtypes: false, source: 'internal', color: '#10B981', sort_order: 1 },
+  { title: 'ระเบียบ', value: 'LFM02', code: 'LFM02', has_subtypes: false, source: 'internal', color: '#3B82F6', sort_order: 2 },
+  { title: UNSPECIFIED_ANNOUNCEMENT, value: ANNOUNCEMENT_FAMILY_CODE, code: ANNOUNCEMENT_FAMILY_CODE, has_subtypes: true, source: 'internal', color: '#FB923C', sort_order: 3 },
+  { title: 'กฎหมายภายนอก', value: EXTERNAL_FAMILY_CODE, code: EXTERNAL_FAMILY_CODE, has_subtypes: true, source: 'external', color: '#854D0E', sort_order: 4 },
 ];
 
 const FALLBACK_TYPES: DocumentTypeOption[] = [
@@ -97,10 +97,6 @@ function bySortOrder<T extends { sort_order?: number; title: string; code?: stri
   });
 }
 
-function sameTitle(a: string, b: string): boolean {
-  return normalize(a) === normalize(b);
-}
-
 export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
   const documentTypes = computed(() => bySortOrder(readArray(input.documentTypes, FALLBACK_TYPES)));
   const lawFamilies = computed(() => readArray(input.lawFamilies, FALLBACK_FAMILIES));
@@ -150,8 +146,7 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
   const groupedTypeOptions = computed<GroupedTypeOption[]>(() => {
     const options: GroupedTypeOption[] = [];
     for (const group of typesByFamily.value) {
-      const onlyType = group.types.length === 1 ? group.types[0] : null;
-      if (!onlyType || !sameTitle(onlyType.title, group.family.title)) {
+      if (group.family.has_subtypes !== false) {
         options.push({
           option_type: 'subheader',
           title: group.family.title,
@@ -159,7 +154,10 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
           disabled: true,
         });
       }
-      options.push(...group.types.map((type) => ({ ...type, option_type: 'item' as const })));
+      const types = group.family.has_subtypes === false
+        ? group.types.filter((type) => type.is_primary !== false)
+        : group.types;
+      options.push(...types.map((type) => ({ ...type, option_type: 'item' as const })));
     }
     return options;
   });

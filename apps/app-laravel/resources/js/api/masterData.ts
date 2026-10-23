@@ -58,3 +58,10 @@ export function reorderMaster(kind: MasterKind, codes: string[]): Promise<{ stat
     body: JSON.stringify({ codes }),
   });
 }
+
+export function setFamilySubtypes(code: string, hasSubtypes: boolean, primaryName?: string): Promise<MasterItem> {
+  return jsonRequest<MasterItem>(`${masterPath('law_family', code)}/subtypes`, {
+    method: 'POST',
+    body: JSON.stringify({ has_subtypes: hasSubtypes, primary_name: primaryName }),
+  });
+}

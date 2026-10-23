@@ -53,11 +53,14 @@ export type LawSource = 'internal' | 'external';
 export type DocumentTypeOption = SelectableOption & {
   code: string;
   family_code: string;
+  is_primary?: boolean;
+  has_subtypes?: boolean;
   source: LawSource;
   sort_order?: number;
 };
 
 export type LawFamilyOption = SelectableOption & {
+  has_subtypes?: boolean;
   code: string;
   source: LawSource;
   color: string;
