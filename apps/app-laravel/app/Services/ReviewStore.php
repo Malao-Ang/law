@@ -171,6 +171,7 @@ class ReviewStore
                 'uploaded_by' => $status['uploaded_by'] ?? null,
                 'responsible' => $status['responsible'] ?? null,
                 'owner_unit_code' => $status['owner_unit_code'] ?? null,
+                'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,

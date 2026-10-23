@@ -176,7 +176,6 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
-import { getReviewCached } from '../../stores/reviewCache';
 import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
@@ -391,12 +390,6 @@ async function load(): Promise<void> {
   try {
     const res = await listDocuments();
     docs.value = res.documents ?? [];
-    // The list API omits co-editors; use readable review metadata for their names.
-    await Promise.all(docs.value.filter(doc => doc.can?.read && !['queued', 'processing', 'ingesting', 'failed'].includes(doc.status)).map(async doc => {
-      try {
-        doc.co_editors = (await getReviewCached(doc.document_id)).law_meta.co_editors ?? [];
-      } catch { /* Leave names empty when review metadata is unavailable. */ }
-    }));
   } finally {
     schedulePoll();
   }
