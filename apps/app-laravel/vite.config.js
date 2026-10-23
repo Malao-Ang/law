@@ -5,17 +5,14 @@ import vue from '@vitejs/plugin-vue';
 const port = Number(process.env.PORT || 5173);
 const publicHost = process.env.VITE_DEV_SERVER_HOST || process.env.HMR_HOST || 'localhost';
 const publicPort = Number(process.env.VITE_HOST_PORT || process.env.HMR_PORT || port);
-const appPort = process.env.APP_HOST_PORT || 8000;
 const cacheDir = process.env.VITE_CACHE_DIR || '/tmp/app-laravel-vite-cache';
 
-// Browser treats localhost and 127.0.0.1 as different origins — allow both.
-const corsOrigins = [
-    `http://localhost:${appPort}`,
-    `http://127.0.0.1:${appPort}`,
-];
-if (!corsOrigins.includes(`http://${publicHost}:${appPort}`)) {
-    corsOrigins.push(`http://${publicHost}:${appPort}`);
-}
+// The app is opened on the published port (8500 in Docker, sometimes 8000).
+// Allow that host on any port so the browser can load scripts from this dev server.
+const corsHosts = [...new Set(['localhost', '127.0.0.1', publicHost].filter(Boolean))]
+    .map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+const corsOrigin = new RegExp(`^https?://(?:${corsHosts})(?::\\d+)?$`);
 
 export default defineConfig({
     cacheDir,
@@ -43,7 +40,7 @@ export default defineConfig({
         origin: `http://${publicHost}:${publicPort}`,
         allowedHosts: [publicHost, 'localhost', '127.0.0.1'],
         cors: {
-            origin: corsOrigins,
+            origin: corsOrigin,
         },
         hmr: {
             host: publicHost,

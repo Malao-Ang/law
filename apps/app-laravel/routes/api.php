@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\MinioTestController;
 use App\Http\Controllers\Api\EsignCallbackController;
@@ -26,6 +27,7 @@ Route::get('/health', HealthController::class);
 Route::get('/lookups', LookupController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
+Route::get('/audit-logs', [AuditLogController::class, 'index']);
 Route::get('/oversight/summary', [OversightController::class, 'summary']);
 Route::put('/oversight/{documentId}', [OversightController::class, 'update']);
 Route::post('/laws/search', [LawSearchController::class, 'search']);

@@ -23,6 +23,7 @@ import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestPar
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
 import type { OversightSummary, OversightUpdatePayload, OversightItem } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
+import type { AuditLogResponse } from '../types/auditLog';
 
 type ApiErrorPayload = {
   message?: string;
@@ -46,17 +47,34 @@ export type LookupData = {
   law_sources: SelectableOption[];
 };
 
+function actorHeaders(): Record<string, string> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('elaw_mock_auth');
+    if (!raw) return {};
+    const user = JSON.parse(raw) as { name?: string; role?: string };
+    const headers: Record<string, string> = {};
+    if (user.name) headers['X-Actor-Name'] = encodeURIComponent(user.name);
+    if (user.role) headers['X-Actor-Role'] = encodeURIComponent(user.role);
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const response = await fetch(input, {
     headers: isFormData
       ? {
           Accept: 'application/json',
+          ...actorHeaders(),
           ...(init?.headers ?? {}),
         }
       : {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          ...actorHeaders(),
           ...(init?.headers ?? {}),
         },
     ...init,
@@ -643,6 +661,15 @@ export function updateRagSkipped(documentId: string, ragSkipped: boolean): Promi
     method: 'PATCH',
     body: JSON.stringify({ rag_skipped: ragSkipped }),
   });
+}
+
+export function fetchAuditLogs(params: { action?: string; resource?: string; q?: string } = {}): Promise<AuditLogResponse> {
+  const search = new URLSearchParams();
+  if (params.action) search.set('action', params.action);
+  if (params.resource) search.set('resource', params.resource);
+  if (params.q) search.set('q', params.q);
+  const qs = search.toString();
+  return jsonRequest<AuditLogResponse>(`/api/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchOversightSummary(): Promise<OversightSummary> {

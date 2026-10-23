@@ -9,6 +9,7 @@ const AdminLawListPage = () => import('../pages/admin/AdminLawListPage.vue');
 const AdminUploadPage = () => import('../pages/admin/AdminUploadPage.vue');
 const AdminReportPage = () => import('../pages/admin/AdminReportPage.vue');
 const AdminOversightPage = () => import('../pages/admin/AdminOversightPage.vue');
+const AdminAuditLogPage = () => import('../pages/admin/AdminAuditLogPage.vue');
 const AdminOcrQueuePage = () => import('../pages/admin/AdminOcrQueuePage.vue');
 const AdminRelationsHubPage = () => import('../pages/admin/AdminRelationsHubPage.vue');
 const AdminShowRelationsPage = () => import('../pages/admin/AdminShowRelationsPage.vue');
@@ -38,6 +39,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/laws', name: 'admin-laws', component: AdminLawListPage, meta: { bareLayout: true } },
   { path: '/admin/reports', name: 'admin-reports', component: AdminReportPage, meta: { bareLayout: true } },
   { path: '/admin/oversight', name: 'admin-oversight', component: AdminOversightPage, meta: { bareLayout: true } },
+  { path: '/admin/audit-logs', name: 'admin-audit-logs', component: AdminAuditLogPage, meta: { bareLayout: true } },
   { path: '/admin/upload', name: 'admin-upload', component: AdminUploadPage, meta: { bareLayout: true } },
   { path: '/admin/ocr-queue', name: 'admin-ocr-queue', component: AdminOcrQueuePage, meta: { bareLayout: true } },
   { path: '/admin/relations', name: 'admin-relations', component: AdminRelationsHubPage, meta: { bareLayout: true } },
