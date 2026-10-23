@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\Auth\MongoUserStore;
+use App\Services\Auth\MembershipAuditLog;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
@@ -82,6 +83,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->when(MongoUserStore::class)
             ->needs(MongoBlobStore::class)
             ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.users'));
+
+        $this->app->singleton('mongo.blob.membership-audit', function (): MongoBlobStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new MongoBlobStore($client->$database->selectCollection('membership_audit_logs'));
+        });
+
+        $this->app->when(MembershipAuditLog::class)
+            ->needs(MongoBlobStore::class)
+            ->give(fn (): MongoBlobStore => $this->app->make('mongo.blob.membership-audit'));
 
         $this->app->when(PermissionStore::class)
             ->needs(MongoBlobStore::class)

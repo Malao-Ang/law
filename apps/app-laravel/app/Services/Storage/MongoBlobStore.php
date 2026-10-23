@@ -51,6 +51,17 @@ final class MongoBlobStore
         ]) > 0;
     }
 
+    /** @return list<array<string, mixed>> */
+    public function all(string $kind): array
+    {
+        $rows = [];
+        foreach ($this->collection->find([$kind => ['$exists' => true]], ['projection' => [$kind => 1]]) as $doc) {
+            $rows[] = (array) $doc[$kind];
+        }
+
+        return $rows;
+    }
+
     public function delete(string $id): bool
     {
         $result = $this->collection->deleteOne(['_id' => $id]);

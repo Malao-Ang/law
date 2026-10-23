@@ -70,7 +70,9 @@ class CurrentUser
                 'dep_name' => $user['dep_name'] ?? null,
                 'retired' => (bool) ($user['retired'] ?? false),
             ],
-            'role' => $user['role'] ?? MongoUserStore::ROLE_USER,
+            'role' => ($user['is_super_admin'] ?? false) ? MongoUserStore::ROLE_SUPER_ADMIN : MongoUserStore::ROLE_USER,
+            'is_super_admin' => (bool) ($user['is_super_admin'] ?? false),
+            'memberships' => array_values((array) ($user['memberships'] ?? [])),
             'auth_enforced' => (bool) config('auth_ldap.enforced'),
         ];
     }

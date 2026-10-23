@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Services\Storage\MongoBlobStore;
+use App\Services\MasterData\UnitStore;
 use Illuminate\Support\Carbon;
 
 /**
@@ -32,7 +33,35 @@ class MongoUserStore
 
     private const PROFILE_FIELDS = ['usid', 'psn_id', 'fac_id', 'fac_name', 'dep_id', 'dep_name', 'position', 'retired'];
 
-    public function __construct(private readonly MongoBlobStore $blobs) {}
+    public const ACTIONS = ['upload', 'edit', 'delete', 'esign', 'publish'];
+
+    public function __construct(
+        private readonly MongoBlobStore $blobs,
+        private readonly UnitStore $units,
+        private readonly MembershipAuditLog $audit,
+    ) {}
+
+    public function all(): array
+    {
+        return $this->blobs->all(self::KIND);
+    }
+
+    public static function effectiveActions(array $membership): array
+    {
+        return match ($membership['role'] ?? self::ROLE_USER) {
+            self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN => self::ACTIONS,
+            self::ROLE_EDITOR => array_values(array_intersect(self::ACTIONS, (array) ($membership['actions'] ?? []))),
+            default => [],
+        };
+    }
+
+    public static function membership(string $unitCode, string $role = self::ROLE_USER, array $actions = [], string $source = 'ums', ?string $by = null): array
+    {
+        $membership = ['unit_code' => $unitCode, 'role' => $role, 'actions' => $actions, 'source' => $source, 'granted_by' => $by, 'granted_at' => now()->toIso8601String()];
+        $membership['actions'] = self::effectiveActions($membership);
+
+        return $membership;
+    }
 
     public static function key(string $username): string
     {
@@ -49,7 +78,7 @@ class MongoUserStore
 
     /**
      * Create or refresh a user after a successful LDAP login.
-     * Profile fields come from LDAP/UMS; role and is_disabled are never overwritten from them.
+     * Profile fields come from LDAP/UMS; memberships and is_disabled are retained.
      *
      * @param  array{name?: string, email?: string}  $ldap
      * @param  array<string, mixed>|null  $ums  normalized UMS person, null when not found
@@ -60,8 +89,10 @@ class MongoUserStore
         $key = self::key($username);
         $now = Carbon::now()->toIso8601String();
         $saved = [];
+        $before = [];
 
-        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($key, $ldap, $ums, $superAdmin, $now, &$saved): void {
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($key, $ldap, $ums, $superAdmin, $now, &$saved, &$before): void {
+            $before = $data;
             $isNew = $data === [];
 
             $data['username'] = $key;
@@ -79,20 +110,71 @@ class MongoUserStore
             }
 
             if ($isNew) {
-                $data['role'] = self::ROLE_USER;
                 $data['is_disabled'] = false;
                 $data['created_at'] = $now;
             }
-            if ($superAdmin) {
-                $data['role'] = self::ROLE_SUPER_ADMIN;
+            $data['ums_fac_id'] = $data['fac_id'] ?? null;
+            $data['ums_dep_id'] = $data['dep_id'] ?? null;
+            $unit = $this->units->forAffiliation($data);
+            $memberships = (array) ($data['memberships'] ?? []);
+            if ($unit !== null && ! in_array($unit['code'], array_column($memberships, 'unit_code'), true)) {
+                $role = ! array_key_exists('memberships', $data) && in_array($data['role'] ?? '', [self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN, self::ROLE_EDITOR], true)
+                    ? $data['role'] : self::ROLE_USER;
+                $memberships[] = self::membership($unit['code'], $role);
             }
+            $data['memberships'] = $memberships;
+            $data['is_super_admin'] = $superAdmin;
+            unset($data['role']);
 
             $data['updated_at'] = $now;
             $data['last_login_at'] = $now;
             $saved = $data;
         });
+        $this->auditChanges('system:login', $key, $before, $saved);
 
         return $saved;
+    }
+
+    /** Idempotent conversion; dry-run callers must not call this method. */
+    public function migrateMemberships(string $username): void
+    {
+        $before = $after = [];
+        $key = self::key($username);
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use (&$before, &$after): void {
+            $before = $data;
+            if ($data === [] || ! array_key_exists('role', $data)) {
+                $after = $data;
+
+                return;
+            }
+            $data['ums_fac_id'] = $data['ums_fac_id'] ?? $data['fac_id'] ?? null;
+            $data['ums_dep_id'] = $data['ums_dep_id'] ?? $data['dep_id'] ?? null;
+            $data['is_super_admin'] = (bool) ($data['is_super_admin'] ?? false) || $data['role'] === self::ROLE_SUPER_ADMIN;
+            $data['is_disabled'] = (bool) ($data['is_disabled'] ?? false);
+            $data['memberships'] = (array) ($data['memberships'] ?? []);
+            $unit = $this->units->forAffiliation($data);
+            if ($unit !== null && ! in_array($unit['code'], array_column($data['memberships'], 'unit_code'), true)) {
+                $role = in_array($data['role'], [self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN, self::ROLE_EDITOR], true) ? $data['role'] : self::ROLE_USER;
+                $data['memberships'][] = self::membership($unit['code'], $role);
+            }
+            unset($data['role']);
+            $data['updated_at'] = now()->toIso8601String();
+            $after = $data;
+        });
+        $this->auditChanges('system:migration', $key, $before, $after);
+    }
+
+    private function auditChanges(string $actor, string $username, array $before, array $after): void
+    {
+        $old = array_column((array) ($before['memberships'] ?? []), null, 'unit_code');
+        foreach ((array) ($after['memberships'] ?? []) as $membership) {
+            if (($old[$membership['unit_code']] ?? null) !== $membership) {
+                $this->audit->record($actor, 'membership.upsert', $username, $membership['unit_code'], $old[$membership['unit_code']] ?? null, $membership);
+            }
+        }
+        if ((bool) ($before['is_super_admin'] ?? (($before['role'] ?? '') === self::ROLE_SUPER_ADMIN)) !== (bool) ($after['is_super_admin'] ?? false)) {
+            $this->audit->record($actor, 'super_admin.change', $username, null, (bool) ($before['is_super_admin'] ?? (($before['role'] ?? '') === self::ROLE_SUPER_ADMIN)), (bool) $after['is_super_admin']);
+        }
     }
 
     private function firstFilled(mixed ...$values): ?string
