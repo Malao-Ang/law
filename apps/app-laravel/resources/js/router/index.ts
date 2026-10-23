@@ -37,6 +37,7 @@ const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
+  { path: '/select-unit', name: 'select-unit', component: () => import('../pages/auth/SelectUnitPage.vue'), meta: { bareLayout: true } },
   { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
   { path: '/admin', name: 'admin', component: AdminDashboardPage, meta: { bareLayout: true } },
@@ -86,7 +87,14 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  await auth.fetchMe();
+  await auth.fetchMe(auth.isAuthenticated);
+
+  if (auth.isAuthenticated && auth.needs_unit_selection && to.path !== '/select-unit') {
+    return { path: '/select-unit' };
+  }
+  if (to.path === '/select-unit' && (!auth.isAuthenticated || auth.is_super_admin)) {
+    return { path: '/' };
+  }
 
   if (!auth.authEnforced) return true;
 

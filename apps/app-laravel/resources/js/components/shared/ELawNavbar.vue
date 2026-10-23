@@ -18,6 +18,7 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
+        <ActiveUnitMenu />
         <v-btn
           class="elaw-btn-login text-none"
           :prepend-icon="auth.isAuthenticated ? 'mdi-account-check-outline' : 'mdi-login'"
@@ -44,6 +45,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import ActiveUnitMenu from './ActiveUnitMenu.vue';
 import { useAuthStore } from '../../stores/authStore';
 import MainNav from './MainNav.vue';
 

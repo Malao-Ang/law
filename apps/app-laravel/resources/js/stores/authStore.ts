@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { ensureCsrfCookie, jsonRequest, setUnauthorizedHandler } from '../api/client';
 
+import type { Membership, Unit } from '../types/unit';
+
 const LEGACY_MOCK_KEY = 'elaw_mock_auth';
 
 export type AuthRole = 'super_admin' | 'inner_admin' | 'outer_admin' | 'editor' | 'user';
@@ -30,6 +32,10 @@ interface MePayload {
   user: AuthUser;
   role: AuthRole;
   auth_enforced: boolean;
+  is_super_admin: boolean;
+  memberships: Membership[];
+  active_unit: Unit | null;
+  needs_unit_selection: boolean;
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -37,6 +43,11 @@ export const useAuthStore = defineStore('auth', () => {
   const role = ref<AuthRole | null>(null);
   const authEnforced = ref(false);
   const loaded = ref(false);
+  const is_super_admin = ref(false);
+  const memberships = ref<Membership[]>([]);
+  const active_unit = ref<Unit | null>(null);
+  const needs_unit_selection = ref(false);
+  const canManageUnits = computed(() => is_super_admin.value || memberships.value.some((m) => ['inner_admin', 'outer_admin'].includes(m.role)));
   let pendingFetch: Promise<void> | null = null;
 
   const isAuthenticated = computed(() => user.value !== null);
@@ -47,11 +58,19 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = payload.user;
     role.value = payload.role;
     authEnforced.value = payload.auth_enforced;
+    is_super_admin.value = Boolean(payload.is_super_admin);
+    memberships.value = payload.memberships ?? [];
+    active_unit.value = payload.active_unit ?? null;
+    needs_unit_selection.value = !is_super_admin.value && Boolean(payload.needs_unit_selection);
   }
 
   function clear(): void {
     user.value = null;
     role.value = null;
+    is_super_admin.value = false;
+    memberships.value = [];
+    active_unit.value = null;
+    needs_unit_selection.value = false;
   }
 
   async function fetchMe(force = false): Promise<void> {
@@ -86,6 +105,14 @@ export const useAuthStore = defineStore('auth', () => {
     loaded.value = true;
   }
 
+  async function selectUnit(unit_code: string): Promise<void> {
+    await jsonRequest('/api/auth/active-unit', { method: 'POST', body: JSON.stringify({ unit_code }) });
+    await fetchMe(true);
+    if (needs_unit_selection.value || active_unit.value?.code !== unit_code) {
+      throw new Error('ไม่สามารถเลือกหน่วยงานได้ กรุณาลองอีกครั้ง');
+    }
+  }
+
   async function logout(redirectTo = '/login'): Promise<void> {
     try {
       await jsonRequest<void>('/api/auth/logout', { method: 'POST' });
@@ -108,5 +135,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, logout };
+  return { is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, logout };
 });

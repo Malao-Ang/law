@@ -101,6 +101,7 @@
       </v-breadcrumbs>
       <div class="app-shell__topbar-right">
         <slot name="actions" />
+        <ActiveUnitMenu />
         <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
           <v-btn icon="mdi-bell-outline" variant="text" size="small" />
         </v-badge>
@@ -134,6 +135,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ActiveUnitMenu from './ActiveUnitMenu.vue';
 import { useAuthStore } from '../../stores/authStore';
 
 const RAIL_KEY = 'lawspace.nav.rail';
