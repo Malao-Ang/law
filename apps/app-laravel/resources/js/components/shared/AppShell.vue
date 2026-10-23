@@ -156,6 +156,7 @@ const defaultNavGroups: NavGroup[] = [
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
       { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
+      { label: 'ติดตามกำกับดูแล', icon: 'mdi-bell-ring-outline', to: '/admin/oversight' },
       { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
       { label: 'แสดงความสัมพันธ์', icon: 'mdi-file-tree-outline', to: '/admin/show-relations' },
     ],

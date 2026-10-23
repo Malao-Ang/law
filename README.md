@@ -6,6 +6,8 @@
 
 > 📑 **LawMeta field reference:** ประเภท/สถานะเอกสารมีหลายฟิลด์ที่ทับซ้อนกัน (`law_type`/`source`/`document_type`, คู่เดี่ยว↔อาเรย์, และ 4 แกนสถานะ) — ดูแหล่งความจริงและกฎการใช้งานที่ [`docs/law-metadata-reference.md`](docs/law-metadata-reference.md) ก่อนเพิ่ม logic ที่อ่าน/เขียนฟิลด์เหล่านี้.
 
+> ⏰ **Oversight email cron:** อีเมลเตือน 30/14/7 วันถูกยิงจากบริการ `scheduler` วันละครั้งเวลา 08:00 น. — ดูลำดับไฟล์ วิธีตรวจ และค่าเมลที่ [`docs/oversight-cronjob.md`](docs/oversight-cronjob.md).
+
 ## Tool Stack
 
 ### Runtime
@@ -284,7 +286,8 @@ docker compose down -v
 
 | Path | Purpose |
 | --- | --- |
-| `docker-compose.yml` | Production/runtime service graph for Laravel, queue worker, OCR, PDF, Redis, Elasticsearch, MongoDB |
+| `docker-compose.yml` | Production/runtime service graph for Laravel, queue worker, scheduler, OCR, PDF, Redis, Elasticsearch, MongoDB |
+| `docs/oversight-cronjob.md` | อีเมลเตือนกำกับดูแล: บริการ scheduler, คำสั่ง `oversight:send-reminders`, กติกา 30/14/7 วัน |
 | `docker-compose.dev.yml` | Development override with bind mounts and Vite HMR |
 | `.env.example` | Root compose/runtime env template |
 | `docs/superpowers/plans/` | Implementation notes/plans used during iterative UI/API changes |

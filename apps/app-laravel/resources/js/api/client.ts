@@ -21,6 +21,7 @@
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
+import type { OversightSummary, OversightUpdatePayload, OversightItem } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
 
 type ApiErrorPayload = {
@@ -641,5 +642,16 @@ export function updateRagSkipped(documentId: string, ragSkipped: boolean): Promi
   return jsonRequest<RagSkipResponse>(`/api/documents/${encodeURIComponent(documentId)}/rag-skip`, {
     method: 'PATCH',
     body: JSON.stringify({ rag_skipped: ragSkipped }),
+  });
+}
+
+export function fetchOversightSummary(): Promise<OversightSummary> {
+  return jsonRequest<OversightSummary>('/api/oversight/summary');
+}
+
+export function saveOversight(documentId: string, payload: OversightUpdatePayload): Promise<OversightItem> {
+  return jsonRequest<OversightItem>(`/api/oversight/${encodeURIComponent(documentId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   });
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LawSearchController;
 use App\Http\Controllers\Api\LawSuggestController;
 use App\Http\Controllers\Api\LookupController;
+use App\Http\Controllers\Api\OversightController;
 use App\Http\Controllers\Api\PermissionDirectoryController;
 use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -25,6 +26,8 @@ Route::get('/health', HealthController::class);
 Route::get('/lookups', LookupController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
+Route::get('/oversight/summary', [OversightController::class, 'summary']);
+Route::put('/oversight/{documentId}', [OversightController::class, 'update']);
 Route::post('/laws/search', [LawSearchController::class, 'search']);
 Route::get('/laws/facets', [LawSearchController::class, 'facets']);
 Route::post('/laws/suggest', [LawSuggestController::class, 'suggest']);

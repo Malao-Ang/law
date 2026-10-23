@@ -64,6 +64,19 @@ services:
       - poc_storage:/var/www/html/storage/app/poc
       - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
 
+  scheduler:
+    command: >
+      sh -c "git config --global --add safe.directory '*'
+      && echo 'Waiting for vendor install to complete...'
+      && until [ -f storage/app/poc/.vendor_ready ]; do sleep 2; done
+      && php artisan schedule:work"
+    volumes:
+      - ./apps/app-laravel:/var/www/html
+      - laravel_vendor:/var/www/html/vendor
+      - laravel_bootstrap_cache:/var/www/html/bootstrap/cache
+      - poc_storage:/var/www/html/storage/app/poc
+      - ./apps/app-laravel/docker/opcache.ini:/usr/local/etc/php/conf.d/99-opcache.ini:ro
+
   ocr-service:
     command: >
       sh -c "mkdir -p /data/poc/pages /data/poc/intermediate
