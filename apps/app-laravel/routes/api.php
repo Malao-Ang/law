@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\LawSearchController;
 use App\Http\Controllers\Api\LawSuggestController;
 use App\Http\Controllers\Api\LookupController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\OversightController;
 use App\Http\Controllers\Api\PermissionDirectoryController;
 use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -53,6 +54,8 @@ Route::delete('/units/{code}/members/{username}', [\App\Http\Controllers\Api\Uni
 Route::get('/users/search', \App\Http\Controllers\Api\UserSearchController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
+Route::get('/oversight/summary', [OversightController::class, 'summary'])->middleware('auth.session');
+Route::put('/oversight/{documentId}', [OversightController::class, 'update'])->middleware('auth.session');
 Route::post('/laws/search', [LawSearchController::class, 'search']);
 Route::get('/laws/facets', [LawSearchController::class, 'facets']);
 Route::post('/laws/suggest', [LawSuggestController::class, 'suggest']);
