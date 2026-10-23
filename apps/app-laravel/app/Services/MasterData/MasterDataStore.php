@@ -84,6 +84,10 @@ class MasterDataStore
      */
     public function create(MasterDataKind $kind, array $payload): array
     {
+        if ($kind === MasterDataKind::ChangeStatus) {
+            $payload = array_intersect_key($payload, array_flip(['name', 'description']));
+        }
+
         $this->seedIfEmpty($kind);
 
         $created = null;
@@ -122,6 +126,10 @@ class MasterDataStore
      */
     public function update(MasterDataKind $kind, string $code, array $payload): ?array
     {
+        if ($kind === MasterDataKind::ChangeStatus) {
+            abort(403, 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
+        }
+
         $this->seedIfEmpty($kind);
 
         $updated = null;

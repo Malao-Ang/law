@@ -65,12 +65,16 @@ class ChangeStatusMasterDataSeedTest extends TestCase
 
         $this->assertFalse($store->setActive(MasterDataKind::ChangeStatus, 'CHG02', false)['is_active']);
 
-        $updated = $store->update(MasterDataKind::ChangeStatus, 'CHG02', [
-            'name' => 'ปรับปรุงทั้งฉบับ (แก้ชื่อ)',
-            'attrs' => ['source' => 'external', 'has_details' => true, 'role' => 'general'],
-        ]);
-
-        $this->assertSame('ปรับปรุงทั้งฉบับ (แก้ชื่อ)', $updated['name']);
+        try {
+            $store->update(MasterDataKind::ChangeStatus, 'CHG02', [
+                'name' => 'ปรับปรุงทั้งฉบับ (แก้ชื่อ)',
+                'attrs' => ['source' => 'external', 'has_details' => true, 'role' => 'general'],
+            ]);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            if ($exception->getStatusCode() !== 403) throw $exception;
+        }
+        $updated = $store->find(MasterDataKind::ChangeStatus, 'CHG02');
+        $this->assertSame($before['name'], $updated['name']);
         $this->assertSame($before['attrs'], $updated['attrs']);
     }
 
