@@ -104,6 +104,39 @@ class UmsPersonService
         return is_array($result) ? array_values($result) : [];
     }
 
+    /** Public directory search returns only normalized fields, never raw SPerson rows. */
+    public function searchPeople(string $query): array
+    {
+        $people = [];
+        foreach ($this->queries($query) as [$first, $last]) {
+            foreach ($this->search($first, $last) as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $login = strtolower(trim((string) ($row['uslogin'] ?? '')));
+                if ($login === '') {
+                    continue;
+                }
+                $person = $this->normalize($row, $login);
+                $person['username'] = $login;
+                Cache::put('ums.directory.person.'.$login, $person, 600);
+                $people[$login] = $person;
+                if (count($people) >= 50) {
+                    break 2;
+                }
+            }
+        }
+
+        return array_values($people);
+    }
+
+    public function directoryPerson(string $username): ?array
+    {
+        $person = Cache::get('ums.directory.person.'.strtolower(trim($username)));
+
+        return is_array($person) ? $person : null;
+    }
+
     /**
      * @param  array<string, mixed>  $row
      * @return array{usid: ?string, psn_id: ?string, uslogin: string, name: string, email: ?string, fac_id: ?string, fac_name: ?string, dep_id: ?string, dep_name: ?string, position: ?string, retired: bool}

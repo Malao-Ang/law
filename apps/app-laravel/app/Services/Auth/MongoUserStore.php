@@ -55,6 +55,60 @@ class MongoUserStore
         };
     }
 
+    public static function unitRole(array $user, string $unitCode): ?string
+    {
+        foreach ((array) ($user['memberships'] ?? []) as $membership) {
+            if ($membership['unit_code'] === $unitCode) {
+                return $membership['role'];
+            }
+        }
+
+        return null;
+    }
+
+    /** Check target permissions inside the optimistic lock so retries recheck the current membership. */
+    public function changeMembership(array $actor, string $unitCode, string $username, ?array $change, ?array $person = null): ?array
+    {
+        $super = (bool) ($actor['is_super_admin'] ?? false);
+        $actorRole = self::unitRole($actor, $unitCode);
+        abort_unless($super || $actorRole === self::ROLE_INNER_ADMIN, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
+        abort_if(! $super && ($change === null || ! in_array($change['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'ไม่มีสิทธิ์เพิ่ม ลบสมาชิก หรือกำหนดบทบาทผู้ดูแล');
+        $key = self::key($username);
+        $before = $after = null;
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($actor, $super, $unitCode, $key, $change, $person, &$before, &$after): void {
+            $memberships = (array) ($data['memberships'] ?? []);
+            $index = array_search($unitCode, array_column($memberships, 'unit_code'), true);
+            $before = $index === false ? null : $memberships[$index];
+            abort_if(! $super && ($before === null || ! in_array($before['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'แก้ไขได้เฉพาะสมาชิกเดิมที่เป็นผู้ใช้หรือผู้แก้ไขในหน่วยงานของตนเอง');
+            abort_if($data === [] && ($person === null || $change === null), 404, 'ไม่พบผู้ใช้ กรุณาค้นหาผู้ใช้จาก UMS อีกครั้ง');
+            if ($data === []) {
+                $data = ['username' => $key, 'name' => $person['name'], 'email' => $person['email'],
+                    'is_super_admin' => false, 'is_disabled' => false, 'created_at' => now()->toIso8601String(),
+                    'ums_fac_id' => $person['fac_id'], 'ums_dep_id' => $person['dep_id']];
+                foreach (self::PROFILE_FIELDS as $field) {
+                    $data[$field] = $person[$field] ?? null;
+                }
+            }
+            if ($change === null) {
+                abort_if($index === false, 404, 'ไม่พบสมาชิกในหน่วยงานนี้');
+                unset($memberships[$index]);
+                $after = null;
+            } else {
+                $after = self::membership($unitCode, $change['role'], $change['actions'], $before['source'] ?? 'manual', $actor['username']);
+                if ($index === false) {
+                    $memberships[] = $after;
+                } else {
+                    $memberships[$index] = $after;
+                }
+            }
+            $data['memberships'] = array_values($memberships);
+            $data['updated_at'] = now()->toIso8601String();
+        });
+        $this->audit->record($actor['username'], $change === null ? 'membership.remove' : ($before === null ? 'membership.add' : 'membership.update'), $key, $unitCode, $before, $after);
+
+        return $after;
+    }
+
     public static function membership(string $unitCode, string $role = self::ROLE_USER, array $actions = [], string $source = 'ums', ?string $by = null): array
     {
         $membership = ['unit_code' => $unitCode, 'role' => $role, 'actions' => $actions, 'source' => $source, 'granted_by' => $by, 'granted_at' => now()->toIso8601String()];
@@ -113,18 +167,21 @@ class MongoUserStore
                 $data['is_disabled'] = false;
                 $data['created_at'] = $now;
             }
-            $data['ums_fac_id'] = $data['fac_id'] ?? null;
-            $data['ums_dep_id'] = $data['dep_id'] ?? null;
+            $data['ums_fac_id'] = $ums !== null ? ($data['fac_id'] ?? null) : ($data['ums_fac_id'] ?? $data['fac_id'] ?? null);
+            $data['ums_dep_id'] = $ums !== null ? ($data['dep_id'] ?? null) : ($data['ums_dep_id'] ?? $data['dep_id'] ?? null);
             $unit = $this->units->forAffiliation($data);
             $memberships = (array) ($data['memberships'] ?? []);
             if ($unit !== null && ! in_array($unit['code'], array_column($memberships, 'unit_code'), true)) {
-                $role = ! array_key_exists('memberships', $data) && in_array($data['role'] ?? '', [self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN, self::ROLE_EDITOR], true)
+                $role = in_array($data['role'] ?? '', [self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN, self::ROLE_EDITOR], true)
                     ? $data['role'] : self::ROLE_USER;
                 $memberships[] = self::membership($unit['code'], $role);
             }
             $data['memberships'] = $memberships;
             $data['is_super_admin'] = $superAdmin;
-            unset($data['role']);
+            // Keep an unresolved legacy unit role for a later affiliation lookup/migration.
+            if ($unit !== null || ($data['role'] ?? '') === self::ROLE_SUPER_ADMIN) {
+                unset($data['role']);
+            }
 
             $data['updated_at'] = $now;
             $data['last_login_at'] = $now;
@@ -153,6 +210,7 @@ class MongoUserStore
             $data['is_disabled'] = (bool) ($data['is_disabled'] ?? false);
             $data['memberships'] = (array) ($data['memberships'] ?? []);
             $unit = $this->units->forAffiliation($data);
+            abort_if($unit === null && $data['role'] !== self::ROLE_SUPER_ADMIN, 422, 'ไม่พบสังกัด UMS ของผู้ใช้ จึงยังไม่ย้ายบทบาทเดิม');
             if ($unit !== null && ! in_array($unit['code'], array_column($data['memberships'], 'unit_code'), true)) {
                 $role = in_array($data['role'], [self::ROLE_INNER_ADMIN, self::ROLE_OUTER_ADMIN, self::ROLE_EDITOR], true) ? $data['role'] : self::ROLE_USER;
                 $data['memberships'][] = self::membership($unit['code'], $role);

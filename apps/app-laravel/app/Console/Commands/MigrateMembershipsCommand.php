@@ -24,6 +24,13 @@ class MigrateMembershipsCommand extends Command
 
             return self::SUCCESS;
         }
+        $missing = array_filter($rows, fn (array $user): bool => $user['role'] !== MongoUserStore::ROLE_SUPER_ADMIN
+            && trim((string) ($user['ums_fac_id'] ?? $user['fac_id'] ?? '')) === '');
+        if ($missing !== []) {
+            $this->error('ยังไม่ย้ายข้อมูล เนื่องจากผู้ใช้ต่อไปนี้ไม่มีสังกัด UMS: '.implode(', ', array_column($missing, 'username')));
+
+            return self::FAILURE;
+        }
         $directory = storage_path('app/backups');
         File::ensureDirectoryExists($directory, 0700);
         $path = $directory.'/users-memberships-'.now()->format('Ymd-His').'-'.Str::uuid().'.json';

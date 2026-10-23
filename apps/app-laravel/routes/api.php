@@ -30,6 +30,25 @@ Route::get('/lookups', LookupController::class);
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/me', [AuthController::class, 'me']);
 Route::post('/auth/logout', [AuthController::class, 'logout']);
+Route::post('/auth/active-unit', [AuthController::class, 'activeUnit']);
+
+// Dedicated unit master routes precede the generic single-sequence master controller.
+foreach (['units', 'master-data/unit'] as $unitPrefix) {
+    Route::prefix($unitPrefix)->controller(\App\Http\Controllers\Api\UnitController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::post('/', 'store');
+        Route::get('/{code}', 'show');
+        Route::put('/{code}', 'update');
+        Route::patch('/{code}', 'update');
+        Route::patch('/{code}/active', 'setActive');
+        Route::delete('/{code}', 'destroy');
+    });
+}
+Route::post('/units/sync-faculties', [\App\Http\Controllers\Api\UnitController::class, 'syncFaculties']);
+Route::get('/units/{code}/members', [\App\Http\Controllers\Api\UnitController::class, 'members']);
+Route::put('/units/{code}/members/{username}', [\App\Http\Controllers\Api\UnitController::class, 'updateMember']);
+Route::delete('/units/{code}/members/{username}', [\App\Http\Controllers\Api\UnitController::class, 'removeMember']);
+Route::get('/users/search', \App\Http\Controllers\Api\UserSearchController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
 Route::post('/laws/search', [LawSearchController::class, 'search']);

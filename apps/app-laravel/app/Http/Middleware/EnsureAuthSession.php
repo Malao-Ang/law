@@ -27,16 +27,7 @@ class EnsureAuthSession
             return response()->json(['message' => 'กรุณาเข้าสู่ระบบ'], 401);
         }
 
-        $activeCode = $request->session()->get('active_unit_code');
-        $memberships = (array) ($user['memberships'] ?? []);
-        $membership = count($memberships) === 1 ? $memberships[0] : null;
-        foreach ($memberships as $candidate) {
-            if ($candidate['unit_code'] === $activeCode) {
-                $membership = $candidate;
-                break;
-            }
-        }
-        if (! ($user['is_super_admin'] ?? false) && ($membership['role'] ?? MongoUserStore::ROLE_USER) === MongoUserStore::ROLE_USER) {
+        if ($this->currentUser->role($user, $request) === MongoUserStore::ROLE_USER) {
             return response()->json(['message' => 'ไม่มีสิทธิ์เข้าถึง'], 403);
         }
 

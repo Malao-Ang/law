@@ -94,7 +94,7 @@ class AuthController extends Controller
         $this->currentUser->login($request, $username);
         $this->audit($username, 'success', $request);
 
-        return response()->json($this->currentUser->payload($user));
+        return response()->json($this->currentUser->payload($user, $request));
     }
 
     public function me(Request $request): JsonResponse
@@ -107,7 +107,24 @@ class AuthController extends Controller
             ], 401);
         }
 
-        return response()->json($this->currentUser->payload($user));
+        return response()->json($this->currentUser->payload($user, $request));
+    }
+
+    public function activeUnit(Request $request, \App\Services\MasterData\UnitStore $units): JsonResponse
+    {
+        $user = $this->currentUser->user($request);
+        abort_if($user === null, 401, 'กรุณาเข้าสู่ระบบ');
+        $data = $request->validate(['unit_code' => ['required', 'string', 'regex:/^DEP[0-9]{3}$/']], [
+            'unit_code.required' => 'กรุณาเลือกหน่วยงาน',
+            'unit_code.string' => 'รหัสหน่วยงานไม่ถูกต้อง',
+            'unit_code.regex' => 'รหัสหน่วยงานไม่ถูกต้อง',
+        ]);
+        abort_unless(($user['is_super_admin'] ?? false) || in_array($data['unit_code'], array_column((array) ($user['memberships'] ?? []), 'unit_code'), true), 403, 'ไม่มีสิทธิ์เลือกหน่วยงานนี้');
+        $unit = $units->find($data['unit_code']);
+        abort_if($unit === null || ! $unit['is_active'], 422, 'ไม่พบหน่วยงานหรือหน่วยงานถูกปิดใช้งาน');
+        $request->session()->put(CurrentUser::ACTIVE_UNIT_KEY, $unit['code']);
+
+        return response()->json($this->currentUser->payload($user, $request));
     }
 
     public function logout(Request $request): Response
