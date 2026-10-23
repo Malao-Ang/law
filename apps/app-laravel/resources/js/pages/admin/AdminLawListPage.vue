@@ -65,6 +65,18 @@
         style="max-width: 180px"
       />
       <v-select
+        v-model="filterLawType"
+        :items="lawTypeOptions"
+        item-title="label"
+        item-value="value"
+        label="ประเภทเอกสาร"
+        variant="outlined"
+        density="compact"
+        hide-details
+        rounded="lg"
+        style="max-width: 220px"
+      />
+      <v-select
         v-model="filterCategory"
         :items="categoryOptions"
         item-title="label"
@@ -257,6 +269,7 @@ const summary = ref<ReportSummary>({
 const loading = ref(false);
 const search = ref('');
 const filterType = ref<string | null>(null);
+const filterLawType = ref<string | null>(null);
 const filterCategory = ref<string | null>(null);
 const filterStatus = ref<string | null>(null);
 const sortOrder = ref('newest');
@@ -280,6 +293,11 @@ onMounted(async () => {
   if (typeof categoryParam === 'string' && categoryParam) {
     filterCategory.value = lawCategories.normalizeCategory(categoryParam) || categoryParam;
   }
+  // Prefilter from URL: ?type=LTYxx
+  const typeParam = route.query.type;
+  if (typeof typeParam === 'string' && typeParam) {
+    filterLawType.value = typeParam;
+  }
   loading.value = true;
   try {
     summary.value = await fetchReportSummary();
@@ -288,7 +306,7 @@ onMounted(async () => {
   }
 });
 
-watch([search, filterType, filterCategory, filterStatus, sortOrder], () => {
+watch([search, filterType, filterLawType, filterCategory, filterStatus, sortOrder], () => {
   page.value = 1;
 });
 
@@ -412,6 +430,13 @@ const typeOptions = computed(() => [
   })),
 ]);
 
+const lawTypeOptions = computed(() => [
+  { label: 'ทุกประเภทเอกสาร', value: null },
+  ...lawTypes.typesByFamily.value.flatMap((group) =>
+    group.types.map((type) => ({ label: type.title, value: type.code })),
+  ),
+]);
+
 const categoryOptions = computed(() => [
   { label: 'ทุกหมวด', value: null },
   ...lawCategories.categoryOptions.value.map((cat) => ({
@@ -439,6 +464,7 @@ const sortOptions = [
 const filteredLaws = computed(() => {
   let result = laws.value;
   if (filterType.value) result = result.filter((l) => lawTypes.typeFamily(l.lawType) === filterType.value);
+  if (filterLawType.value) result = result.filter((l) => lawTypes.typeItem(l.lawType)?.code === filterLawType.value);
   if (filterCategory.value) result = result.filter((l) => l.groupCode === filterCategory.value);
   if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
   if (search.value.trim()) {

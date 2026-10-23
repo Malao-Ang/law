@@ -11,6 +11,8 @@ class MasterDataStore
 {
     private const BLOB_KIND = 'data';
 
+    private bool $initializingLawCatalog = false;
+
     public function __construct(private readonly MongoBlobStore $blob) {}
 
     /**
@@ -82,13 +84,16 @@ class MasterDataStore
 
         $created = null;
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $payload, &$created): void {
+        $this->withMasterLock($kind, function (array &$data) use ($kind, $payload, &$created): void {
             $items = $this->sortItems($this->itemsFromData($data));
             $code = $this->nextCode($kind, $items);
             $this->assertUniqueName($items, (string) ($payload['name'] ?? ''));
 
             $timestamp = now()->toIso8601String();
             $payload['is_active'] = false;
+            if ($kind === MasterDataKind::LawFamily) {
+                $payload['attrs']['has_subtypes'] ??= true;
+            }
             $created = $this->normalizeItem($kind, $payload, $items, [
                 'code' => $code,
                 'is_system' => false,
@@ -104,7 +109,7 @@ class MasterDataStore
             throw new \RuntimeException('MasterDataStore: create failed to persist item.');
         }
 
-        return $created;
+        return $this->isLawKind($kind) ? ($this->find($kind, $created['code']) ?? $created) : $created;
     }
 
     /**
@@ -118,7 +123,7 @@ class MasterDataStore
         $updated = null;
         $normalizedCode = $this->normalizeCode($code);
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $normalizedCode, $payload, &$updated): void {
+        $this->withMasterLock($kind, function (array &$data) use ($kind, $normalizedCode, $payload, &$updated): void {
             $items = $this->itemsFromData($data);
             $index = $this->itemIndex($items, $normalizedCode);
             if ($index === null) {
@@ -140,6 +145,11 @@ class MasterDataStore
                 }
             }
 
+            if ($kind === MasterDataKind::LawFamily
+                && isset($attrs['has_subtypes'])
+                && (bool) $attrs['has_subtypes'] !== (bool) $existing['attrs']['has_subtypes']) {
+                throw new MasterDataConflict('กรุณาเปลี่ยนการมีประเภทย่อยผ่านการตั้งค่าประเภทย่อย');
+            }
             $this->assertAttrsMayChange($kind, $existing, $attrs);
 
             $updated = $this->normalizeItem($kind, array_merge($payload, ['attrs' => $attrs]), $items, [
@@ -166,7 +176,7 @@ class MasterDataStore
         $updated = null;
         $normalizedCode = $this->normalizeCode($code);
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($normalizedCode, $active, &$updated): void {
+        $this->withMasterLock($kind, function (array &$data) use ($normalizedCode, $active, &$updated): void {
             $items = $this->itemsFromData($data);
             $index = $this->itemIndex($items, $normalizedCode);
             if ($index === null) {
@@ -197,7 +207,7 @@ class MasterDataStore
         $deleted = false;
         $normalizedCode = $this->normalizeCode($code);
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($normalizedCode, &$deleted): void {
+        $this->withMasterLock($kind, function (array &$data) use ($normalizedCode, &$deleted): void {
             $items = $this->itemsFromData($data);
             $index = $this->itemIndex($items, $normalizedCode);
             if ($index === null) {
@@ -225,7 +235,7 @@ class MasterDataStore
 
         $orderedCodes = array_values(array_unique(array_map(fn (string $code): string => $this->normalizeCode($code), $codes)));
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($orderedCodes): void {
+        $this->withMasterLock($kind, function (array &$data) use ($orderedCodes): void {
             $items = $this->itemsFromData($data);
             $byCode = [];
             foreach ($items as $item) {
@@ -253,13 +263,38 @@ class MasterDataStore
 
     public function seedIfEmpty(MasterDataKind $kind): void
     {
-        if ($this->missingSeeds($kind, $this->readItems($kind)) === []
-            && ! $this->seedUpgradesNeeded($kind, $this->readItems($kind))
-            && $this->blob->read(self::BLOB_KIND, $kind->value) !== null) {
+        if ($this->isLawKind($kind) && ! $this->initializingLawCatalog) {
+            $this->initializingLawCatalog = true;
+            try {
+                $this->seedIfEmpty(MasterDataKind::LawFamily);
+                $this->seedIfEmpty(MasterDataKind::LawType);
+                $families = $this->readItems(MasterDataKind::LawFamily);
+                $types = $this->readItems(MasterDataKind::LawType);
+                $before = [$families, $types];
+                $this->normalizeLawCatalog($families, $types);
+                if ($before !== [$families, $types]) {
+                    $this->blob->withLock(self::BLOB_KIND, MasterDataKind::LawFamily->value, function (array &$data): void {
+                        $families = $this->itemsFromData($data);
+                        $types = array_values((array) ($data['law_types'] ?? []));
+                        $this->normalizeLawCatalog($families, $types);
+                        $data = ['items' => $families, 'law_types' => $types];
+                    });
+                }
+            } finally {
+                $this->initializingLawCatalog = false;
+            }
             return;
         }
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind): void {
+        if ($this->missingSeeds($kind, $this->readItems($kind)) === []
+            && ! $this->seedUpgradesNeeded($kind, $this->readItems($kind))
+            && ($kind === MasterDataKind::LawType
+                ? array_key_exists('law_types', $this->blob->read(self::BLOB_KIND, MasterDataKind::LawFamily->value) ?? [])
+                : $this->blob->read(self::BLOB_KIND, $kind->value) !== null)) {
+            return;
+        }
+
+        $this->withMasterLock($kind, function (array &$data) use ($kind): void {
             $items = $this->itemsFromData($data);
             $needsUpgrade = $this->seedUpgradesNeeded($kind, $items);
             $items = [...$items, ...$this->missingSeeds($kind, $items)];
@@ -412,7 +447,7 @@ class MasterDataStore
     {
         $count = 0;
 
-        $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $force, &$count): void {
+        $this->withMasterLock($kind, function (array &$data) use ($kind, $force, &$count): void {
             $items = $this->itemsFromData($data);
             $seeds = $this->normalizeSeedItems($kind, $kind->seed());
 
@@ -476,6 +511,13 @@ class MasterDataStore
      */
     private function readItems(MasterDataKind $kind): array
     {
+        if ($kind === MasterDataKind::LawType) {
+            $catalog = $this->blob->read(self::BLOB_KIND, MasterDataKind::LawFamily->value) ?? [];
+            if (array_key_exists('law_types', $catalog)) {
+                return array_values((array) $catalog['law_types']);
+            }
+        }
+
         return $this->itemsFromData($this->blob->read(self::BLOB_KIND, $kind->value) ?? []);
     }
 
@@ -594,8 +636,9 @@ class MasterDataStore
             MasterDataKind::LawFamily => [
                 'source' => in_array(($attrs['source'] ?? null), ['internal', 'external'], true) ? $attrs['source'] : 'internal',
                 'color' => $this->normalizeHexColor($attrs['color'] ?? $existing['attrs']['color'] ?? null),
+                'has_subtypes' => (bool) ($attrs['has_subtypes'] ?? $existing['attrs']['has_subtypes'] ?? ! in_array($code, ['LFM01', 'LFM02'], true)),
             ],
-            MasterDataKind::LawType => $this->normalizeLawTypeAttrs($attrs),
+            MasterDataKind::LawType => $this->normalizeLawTypeAttrs(array_merge($attrs, ['is_primary' => $existing['attrs']['is_primary'] ?? false])),
             MasterDataKind::LawCategory => [],
             MasterDataKind::ChangeStatus => $this->normalizeChangeStatusAttrs($attrs, $existing, $isSystem),
             MasterDataKind::ChangeDetail => $this->normalizeChangeDetailAttrs($attrs, $existing, $isSystem),
@@ -671,6 +714,7 @@ class MasterDataStore
 
         return [
             'family_code' => $familyCode,
+            'is_primary' => (bool) ($attrs['is_primary'] ?? false),
         ];
     }
 
@@ -912,6 +956,164 @@ class MasterDataStore
     private function normalizeName(string $name): string
     {
         return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name) ?? $name));
+    }
+
+    private function isLawKind(MasterDataKind $kind): bool
+    {
+        return in_array($kind, [MasterDataKind::LawFamily, MasterDataKind::LawType], true);
+    }
+
+    /** Families and types share one CAS write, including imports from the legacy type blob. */
+    private function withMasterLock(MasterDataKind $kind, callable $callback): void
+    {
+        if (! $this->isLawKind($kind)) {
+            $this->blob->withLock(self::BLOB_KIND, $kind->value, $callback);
+            return;
+        }
+
+        $this->blob->withLock(self::BLOB_KIND, MasterDataKind::LawFamily->value, function (array &$catalog) use ($kind, $callback): void {
+            $families = $this->itemsFromData($catalog);
+            $types = array_key_exists('law_types', $catalog)
+                ? array_values((array) $catalog['law_types'])
+                : $this->itemsFromData($this->blob->read(self::BLOB_KIND, MasterDataKind::LawType->value) ?? []);
+            $data = ['items' => $kind === MasterDataKind::LawFamily ? $families : $types];
+            $callback($data);
+            if ($kind === MasterDataKind::LawType && ! $this->initializingLawCatalog) {
+                foreach ($data['items'] as $type) {
+                    $family = $families[$this->itemIndex($families, $type['attrs']['family_code'])] ?? null;
+                    if ($family === null) {
+                        continue;
+                    }
+                    $oldIndex = $this->itemIndex($types, $type['code']);
+                    $old = $oldIndex === null ? null : $types[$oldIndex];
+                    if (! $family['attrs']['has_subtypes'] && ($old === null
+                        || $old['name'] !== $type['name']
+                        || $old['attrs']['family_code'] !== $type['attrs']['family_code'])) {
+                        throw new MasterDataConflict('กรุณาแก้ไขประเภทหลักผ่านกลุ่ม หรือเปิดการมีประเภทย่อยก่อน');
+                    }
+                    if ($old !== null && $old['attrs']['family_code'] !== $type['attrs']['family_code']) {
+                        $oldFamily = $families[$this->itemIndex($families, $old['attrs']['family_code'])] ?? null;
+                        if (($oldFamily['attrs']['has_subtypes'] ?? true) === false) {
+                            throw new MasterDataConflict('ไม่สามารถย้ายประเภทหลักออกจากกลุ่มที่ไม่มีประเภทย่อยได้');
+                        }
+                    }
+                    if ($family['attrs']['has_subtypes'] && $this->normalizeName($type['name']) === $this->normalizeName($family['name'])
+                        && ($old === null || $old['name'] !== $type['name'] || $old['attrs']['family_code'] !== $type['attrs']['family_code'])) {
+                        throw ValidationException::withMessages(['name' => ['ชื่อประเภทต้องแตกต่างจากชื่อกลุ่ม']]);
+                    }
+                }
+            }
+            if ($kind === MasterDataKind::LawFamily) {
+                $families = $data['items'];
+            } else {
+                $types = $data['items'];
+            }
+            if (! $this->initializingLawCatalog) {
+                $this->normalizeLawCatalog($families, $types, $kind === MasterDataKind::LawFamily);
+            }
+            $catalog = ['items' => $this->sortItems($families), 'law_types' => $this->sortItems($types)];
+        });
+    }
+
+    private function normalizeLawCatalog(array &$families, array &$types, bool $syncStandalone = false): void
+    {
+        foreach ($families as &$family) {
+            $children = $this->sortItems(array_values(array_filter($types,
+                static fn (array $type): bool => ($type['attrs']['family_code'] ?? '') === $family['code'])));
+            $needsNormalization = ! array_key_exists('has_subtypes', $family['attrs']);
+            $family['attrs']['has_subtypes'] ??= ! (count($children) === 1
+                && $this->normalizeName($children[0]['name']) === $this->normalizeName($family['name']));
+            if ($children === [] && ! $family['attrs']['has_subtypes']) {
+                $this->assertUniqueName($types, $family['name']);
+                $timestamp = now()->toIso8601String();
+                $types[] = [
+                    'code' => $this->nextCode(MasterDataKind::LawType, $types),
+                    'name' => $family['name'], 'description' => '', 'aliases' => [],
+                    'is_active' => $family['is_active'], 'is_system' => false,
+                    'sort_order' => $this->nextSortOrder($types),
+                    'attrs' => ['family_code' => $family['code'], 'is_primary' => true],
+                    'created_at' => $timestamp, 'updated_at' => $timestamp,
+                ];
+                $children = [end($types)];
+            }
+            $primary = null;
+            foreach ($children as $child) {
+                if ($child['attrs']['is_primary'] ?? false) {
+                    $primary = $child['code'];
+                    break;
+                }
+            }
+            $primary ??= $children[0]['code'] ?? null;
+            foreach ($types as &$type) {
+                if (($type['attrs']['family_code'] ?? '') !== $family['code']) {
+                    continue;
+                }
+                $type['attrs']['is_primary'] = $type['code'] === $primary;
+                if (! $family['attrs']['has_subtypes'] && $type['attrs']['is_primary'] && ($syncStandalone || $needsNormalization)) {
+                    $this->assertUniqueName($types, $family['name'], $type['code']);
+                    $type['name'] = $family['name'];
+                    $type['is_active'] = $family['is_active'];
+                    $type['updated_at'] = $family['updated_at'];
+                }
+            }
+            unset($type);
+        }
+        unset($family);
+    }
+
+    public function setSubtypes(string $code, bool $hasSubtypes, ?string $primaryName): ?array
+    {
+        $this->seedIfEmpty(MasterDataKind::LawFamily);
+        $updated = null;
+        $code = $this->normalizeCode($code);
+        $this->blob->withLock(self::BLOB_KIND, MasterDataKind::LawFamily->value, function (array &$catalog) use ($code, $hasSubtypes, $primaryName, &$updated): void {
+            $families = $this->itemsFromData($catalog);
+            $types = array_values((array) ($catalog['law_types'] ?? []));
+            $index = $this->itemIndex($families, $code);
+            if ($index === null) {
+                return;
+            }
+            $family = &$families[$index];
+            if ((bool) $family['attrs']['has_subtypes'] === $hasSubtypes) {
+                $updated = $family;
+                return;
+            }
+            $children = array_values(array_filter($types, static fn (array $type): bool => $type['attrs']['family_code'] === $code));
+            if ($hasSubtypes) {
+                $name = trim((string) $primaryName);
+                if ($name === '' || $this->normalizeName($name) === $this->normalizeName($family['name'])) {
+                    throw ValidationException::withMessages(['primary_name' => ['กรุณาตั้งชื่อประเภทหลักให้แตกต่างจากชื่อกลุ่ม']]);
+                }
+                $primary = array_values(array_filter($children, static fn (array $type): bool => $type['attrs']['is_primary']))[0] ?? null;
+            } else {
+                $active = array_values(array_filter($children, static fn (array $type): bool => (bool) $type['is_active']));
+                if (count($active) !== 1) {
+                    throw new MasterDataConflict('ต้องเหลือประเภทย่อยเพียงประเภทเดียวก่อน');
+                }
+                $primary = $active[0];
+                $name = $family['name'];
+            }
+            if ($primary === null) {
+                throw new MasterDataConflict('ไม่พบประเภทหลักของกลุ่ม');
+            }
+            $this->assertUniqueName($types, $name, $primary['code']);
+            $family['attrs']['has_subtypes'] = $hasSubtypes;
+            $family['updated_at'] = now()->toIso8601String();
+            foreach ($types as &$type) {
+                if ($type['attrs']['family_code'] === $code) {
+                    $type['attrs']['is_primary'] = $type['code'] === $primary['code'];
+                    if ($type['attrs']['is_primary']) {
+                        $type['name'] = $name;
+                        $type['updated_at'] = $family['updated_at'];
+                    }
+                }
+            }
+            unset($type);
+            $this->normalizeLawCatalog($families, $types, true);
+            $updated = $family;
+            $catalog = ['items' => $families, 'law_types' => $types];
+        });
+        return $updated;
     }
 
     /**

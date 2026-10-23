@@ -16,10 +16,6 @@ function usageText(item: DialogItem): string {
   return (item.usage_count ?? 0).toLocaleString('th-TH');
 }
 
-export function isLockedByUsage(item: Pick<MasterItem, 'is_system' | 'is_active' | 'usage_count'>): boolean {
-  return !item.is_system && item.is_active && (item.usage_count ?? 0) > 0;
-}
-
 export async function confirmDeactivate(item: DialogItem): Promise<boolean> {
   const result = await Swal.fire({
     icon: 'warning',
@@ -38,8 +34,8 @@ export async function confirmDeactivate(item: DialogItem): Promise<boolean> {
 export async function alertInUse(item: DialogItem): Promise<void> {
   await Swal.fire({
     icon: 'warning',
-    title: `ไม่สามารถปิดใช้งาน "${escapeHtml(item.name)}" ได้`,
-    html: `มีเอกสารใช้งานรายการนี้อยู่ ${usageText(item)} รายการ จึงไม่สามารถปิดใช้งานได้`,
+    title: 'ไม่สามารถปิดใช้งานได้',
+    html: `"${escapeHtml(item.name)}" มีเอกสารใช้งานอยู่ ${usageText(item)} รายการ`,
     confirmButtonText: 'ตกลง',
     confirmButtonColor: '#475467',
   });

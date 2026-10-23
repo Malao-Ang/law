@@ -116,6 +116,30 @@ class MasterDataController extends Controller
         return response()->json($item);
     }
 
+    public function subtypes(Request $request, string $kind, string $code): JsonResponse
+    {
+        if ($kind !== MasterDataKind::LawFamily->value) {
+            return $this->unknownKind();
+        }
+        $validated = $request->validate([
+            'has_subtypes' => ['required', 'boolean'],
+            'primary_name' => ['nullable', 'string', 'max:120'],
+        ], [
+            'has_subtypes.required' => 'กรุณาระบุการมีประเภทย่อย',
+            'has_subtypes.boolean' => 'ค่าการมีประเภทย่อยไม่ถูกต้อง',
+            'primary_name.string' => 'ชื่อประเภทหลักต้องเป็นข้อความ',
+            'primary_name.max' => 'ชื่อประเภทหลักต้องไม่เกิน 120 ตัวอักษร',
+        ]);
+        try {
+            $item = $this->store->setSubtypes($code, (bool) $validated['has_subtypes'], $validated['primary_name'] ?? null);
+        } catch (MasterDataConflict $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+        return $item === null
+            ? response()->json(['message' => 'ไม่พบกลุ่มประเภท'], 404)
+            : response()->json($this->withUsage(MasterDataKind::LawFamily, $item));
+    }
+
     public function setActive(Request $request, string $kind, string $code): JsonResponse
     {
         $masterKind = $this->kind($kind);

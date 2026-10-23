@@ -67,6 +67,8 @@ Route::prefix('master-data/{kind}')->group(function (): void {
     Route::post('/', [MasterDataController::class, 'store'])->middleware('auth.session');
     Route::patch('/reorder', [MasterDataController::class, 'reorder'])->middleware('auth.session');
     Route::get('/{code}', [MasterDataController::class, 'show']);
+    Route::patch('/{code}', [MasterDataController::class, 'update'])->middleware('auth.session');
+    Route::post('/{code}/subtypes', [MasterDataController::class, 'subtypes'])->middleware('auth.session');
     Route::put('/{code}', [MasterDataController::class, 'update'])->middleware('auth.session');
     Route::patch('/{code}/active', [MasterDataController::class, 'setActive'])->middleware('auth.session');
     Route::delete('/{code}', [MasterDataController::class, 'destroy'])->middleware('auth.session');

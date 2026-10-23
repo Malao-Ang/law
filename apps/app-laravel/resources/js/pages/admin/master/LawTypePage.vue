@@ -107,6 +107,7 @@
           <v-btn icon="mdi-close" variant="text" size="small" @click="familyDialogOpen = false" />
         </div>
         <v-card-text class="dialog-body">
+          <v-alert v-if="dialogError" type="error" variant="tonal" density="compact">{{ dialogError }}</v-alert>
           <v-text-field
             :model-value="editingFamily?.code ?? familyMaster.nextCode.value"
             label="รหัส"
@@ -123,6 +124,20 @@
             :error-messages="fieldErrors.name"
             variant="outlined"
           />
+          <v-tooltip :disabled="!subtypesLocked" text="ต้องเหลือประเภทย่อยเพียงประเภทเดียวก่อน" location="top">
+            <template #activator="{ props: tip }">
+              <div v-bind="tip" :tabindex="subtypesLocked ? 0 : undefined">
+                <v-checkbox
+                  v-model="familyForm.has_subtypes"
+                  label="มีประเภทย่อย"
+                  :disabled="subtypesLocked || saving"
+                  hide-details
+                  @update:model-value="onSubtypesChange"
+                />
+              </div>
+            </template>
+          </v-tooltip>
+          <p class="text-caption text-medium-emphasis">ค่าเริ่มต้น: ไม่มีประเภทย่อย — ระบบจะสร้างประเภทเอกสารชื่อเดียวกับกลุ่มให้อัตโนมัติ ติ๊กเมื่อกลุ่มนี้ต้องแยกเป็นหลายประเภท</p>
           <v-select
             v-model="familyForm.source"
             :items="familySourceOptions"
@@ -172,6 +187,28 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="primaryDialogOpen" max-width="620" persistent>
+      <v-card rounded="xl">
+        <v-card-title>ตั้งชื่อประเภทหลัก</v-card-title>
+        <v-card-text class="dialog-body">
+          <v-alert v-if="dialogError" type="error" variant="tonal" density="compact">{{ dialogError }}</v-alert>
+          <p>เอกสาร {{ primaryUsage.toLocaleString('th-TH') }} ฉบับจะอยู่ในประเภทนี้</p>
+          <v-text-field
+            v-model="primaryName"
+            label="ชื่อประเภทหลัก*"
+            hint="ชื่อต้องแตกต่างจากชื่อกลุ่มและประเภทอื่น"
+            persistent-hint
+            :error-messages="fieldErrors.primary_name ?? fieldErrors.name"
+            variant="outlined"
+          />
+        </v-card-text>
+        <v-card-actions class="justify-end pa-4">
+          <v-btn variant="outlined" :disabled="saving" @click="cancelPrimaryDialog">ยกเลิก</v-btn>
+          <v-btn color="admin-primary" :loading="saving" @click="saveFamily">บันทึก</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="typeDialogOpen" max-width="620">
       <v-card rounded="xl">
         <div class="dialog-head">
@@ -182,6 +219,7 @@
           <v-btn icon="mdi-close" variant="text" size="small" @click="typeDialogOpen = false" />
         </div>
         <v-card-text class="dialog-body">
+          <v-alert v-if="dialogError" type="error" variant="tonal" density="compact">{{ dialogError }}</v-alert>
           <v-select
             v-model="typeForm.family_code"
             :items="familyOptions"
@@ -227,7 +265,10 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterTreeTable from '../../../components/master/MasterTreeTable.vue';
-import { alertInUse, confirmDeactivate, isLockedByUsage } from '../../../components/master/masterDialogs';
+import { confirmDeactivate } from '../../../components/master/masterDialogs';
+import { isLocked } from '../../../components/master/masterLock';
+import { setFamilySubtypes } from '../../../api/masterData';
+import { useLookups } from '../../../composables/useLookups';
 import { useMasterData } from '../../../composables/useMasterData';
 import { useSnackbarStore } from '../../../stores/snackbarStore';
 import { flattenTypeOrder, moveByDrag, moveWithin } from '../../../utils/treeOrder';
@@ -237,6 +278,7 @@ import type { MasterActiveFilter, MasterItem, UpsertMasterItemPayload } from '..
 interface MasterTreeRow {
   family: MasterItem;
   types: MasterItem[];
+  primary?: MasterItem;
   source: LawSource;
   color: string;
   usage: number;
@@ -246,6 +288,10 @@ interface MasterTreeRow {
 const familyMaster = useMasterData('law_family');
 const typeMaster = useMasterData('law_type');
 const snackbar = useSnackbarStore();
+const lookups = useLookups();
+const dialogError = ref('');
+const primaryDialogOpen = ref(false);
+const primaryName = ref('');
 
 const query = ref('');
 const sourceFilter = ref<'all' | LawSource>('all');
@@ -271,10 +317,31 @@ const COLOR_SWATCHES = [
 ];
 
 const familyForm = reactive({
+  has_subtypes: false,
   name: '',
   source: 'internal' as LawSource,
   color: '#6B7280',
 });
+
+const editingFamilyTypes = computed(() => typeMaster.items.value.filter((type) => type.attrs.family_code === editingFamily.value?.code));
+const subtypesLocked = computed(() => !!editingFamily.value && editingFamilyTypes.value.filter((type) => type.is_active).length > 1);
+const primaryUsage = computed(() => editingFamilyTypes.value.find((type) => type.attrs.is_primary)?.usage_count ?? 0);
+
+function onSubtypesChange(value: boolean | null): void {
+  if (value && editingFamily.value?.attrs.has_subtypes === false) {
+    primaryName.value = '';
+    dialogError.value = '';
+    fieldErrors.value = {};
+    primaryDialogOpen.value = true;
+  }
+}
+
+function cancelPrimaryDialog(): void {
+  primaryDialogOpen.value = false;
+  familyForm.has_subtypes = false;
+  fieldErrors.value = {};
+  dialogError.value = '';
+}
 
 const typeForm = reactive({
   family_code: '',
@@ -307,6 +374,7 @@ const rows = computed<MasterTreeRow[]>(() =>
       return {
         family,
         types,
+        primary: types.find((type) => type.attrs.is_primary === true),
         source: familySource(family),
         color: String(family.attrs.color || '#6B7280'),
         usage: types.reduce((sum, type) => sum + (type.usage_count ?? 0), 0),
@@ -345,6 +413,7 @@ const reorderRows = computed<MasterTreeRow[]>(() => {
       return {
         family,
         types,
+        primary: types.find((type) => type.attrs.is_primary === true),
         source: familySource(family),
         color: String(family.attrs.color || '#6B7280'),
         usage: types.reduce((sum, type) => sum + (type.usage_count ?? 0), 0),
@@ -381,7 +450,7 @@ const statCards = computed(() => {
 
 const familyOptions = computed(() =>
   familyMaster.items.value
-    .filter((family) => family.is_active || family.code === typeForm.family_code)
+    .filter((family) => family.attrs.has_subtypes !== false && (family.is_active || family.code === typeForm.family_code))
     .sort(bySort)
     .map((family) => ({ title: family.name, value: family.code })),
 );
@@ -453,6 +522,9 @@ function toggleExpand(code: string): void {
 function openCreateFamily(): void {
   editingFamily.value = null;
   fieldErrors.value = {};
+  dialogError.value = '';
+  familyForm.has_subtypes = false;
+  primaryName.value = '';
   familyForm.name = '';
   familyForm.source = 'internal';
   familyForm.color = '#6B7280';
@@ -462,6 +534,9 @@ function openCreateFamily(): void {
 function openEditFamily(family: MasterItem): void {
   editingFamily.value = family;
   fieldErrors.value = {};
+  dialogError.value = '';
+  familyForm.has_subtypes = family.attrs.has_subtypes !== false;
+  primaryName.value = '';
   familyForm.name = family.name;
   familyForm.source = familySource(family);
   familyForm.color = String(family.attrs.color || '#6B7280');
@@ -469,6 +544,7 @@ function openEditFamily(family: MasterItem): void {
 }
 
 function openCreateType(family?: MasterItem): void {
+  dialogError.value = '';
   editingType.value = null;
   fieldErrors.value = {};
   typeForm.family_code = family?.code ?? familyMaster.items.value[0]?.code ?? '';
@@ -477,6 +553,7 @@ function openCreateType(family?: MasterItem): void {
 }
 
 function openEditType(type: MasterItem): void {
+  dialogError.value = '';
   editingType.value = type;
   fieldErrors.value = {};
   typeForm.family_code = String(type.attrs.family_code || '');
@@ -488,6 +565,7 @@ function familyPayload(): UpsertMasterItemPayload {
   return {
     name: familyForm.name,
     attrs: {
+      has_subtypes: editingFamily.value ? editingFamily.value.attrs.has_subtypes : familyForm.has_subtypes,
       source: familyForm.source,
       color: familyForm.color,
     },
@@ -504,20 +582,42 @@ function typePayload(): UpsertMasterItemPayload {
 }
 
 async function saveFamily(): Promise<void> {
+  const editing = editingFamily.value;
+  const enabling = !!editing && editing.attrs.has_subtypes === false && familyForm.has_subtypes;
+  if (enabling) {
+    primaryDialogOpen.value = true;
+    const normalize = (name: string) => name.trim().replace(/\s+/gu, ' ').toLowerCase();
+    if (!primaryName.value.trim() || normalize(primaryName.value) === normalize(familyForm.name)
+      || typeMaster.items.value.some((type) => !editingFamilyTypes.value.some((child) => child.code === type.code && child.attrs.is_primary)
+        && normalize(type.name) === normalize(primaryName.value))) {
+      fieldErrors.value = { primary_name: ['กรุณาตั้งชื่อประเภทหลักให้แตกต่างจากชื่อกลุ่มและประเภทอื่น'] };
+      return;
+    }
+  }
   saving.value = true;
   fieldErrors.value = {};
+  dialogError.value = '';
   try {
-    await familyMaster.save(familyPayload(), editingFamily.value?.code);
+    const saved = await familyMaster.save(familyPayload(), editing?.code);
+    if (editing && (editing.attrs.has_subtypes !== false) !== familyForm.has_subtypes) {
+      await setFamilySubtypes(saved.code, familyForm.has_subtypes, enabling ? primaryName.value : undefined);
+      await familyMaster.fetch();
+      await lookups.reload();
+    }
+    primaryDialogOpen.value = false;
     familyDialogOpen.value = false;
     await typeMaster.fetch();
+    if (!editing && familyForm.has_subtypes) openCreateType(saved);
   } catch (err) {
     fieldErrors.value = (err as ApiRequestError).errors ?? {};
+    dialogError.value = err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ';
   } finally {
     saving.value = false;
   }
 }
 
 async function saveType(): Promise<void> {
+  dialogError.value = '';
   saving.value = true;
   fieldErrors.value = {};
   const previousFamilyCode = editingType.value ? String(editingType.value.attrs.family_code || '') : '';
@@ -530,6 +630,7 @@ async function saveType(): Promise<void> {
     expandedCodes.value = new Set([...expandedCodes.value, typeForm.family_code]);
   } catch (err) {
     fieldErrors.value = (err as ApiRequestError).errors ?? {};
+    dialogError.value = err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ';
   } finally {
     saving.value = false;
   }
@@ -618,9 +719,7 @@ onBeforeRouteLeave(() => {
 });
 
 async function handleToggleFamily(family: MasterItem, next: boolean): Promise<void> {
-  if (isSystemFamily(family)) return;
-  if (!next && isLockedByUsage(family)) {
-    await alertInUse(family);
+  if (isSystemFamily(family) || (!next && isLocked(family, 'law_family'))) {
     switchEpoch.value++;
     return;
   }
@@ -640,9 +739,7 @@ async function handleToggleFamily(family: MasterItem, next: boolean): Promise<vo
 }
 
 async function handleToggleType(type: MasterItem, next: boolean): Promise<void> {
-  if (type.is_system) return;
-  if (!next && isLockedByUsage(type)) {
-    await alertInUse(type);
+  if (!next && isLocked(type, 'law_type')) {
     switchEpoch.value++;
     return;
   }

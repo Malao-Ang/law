@@ -43,6 +43,7 @@
       </v-alert>
 
       <MasterDataTable
+        :kind="kind"
         :items="master.items.value"
         :columns="columns"
         :loading="master.loading.value"
@@ -69,6 +70,7 @@
       v-model="dialogOpen"
       :title="editingItem ? dialogTitle.edit : dialogTitle.create"
       :subtitle="dialogSubtitle"
+      :kind="kind"
       :item="editingItem"
       :next-code="master.nextCode.value"
       :field-labels="fieldLabels"
@@ -112,7 +114,8 @@ import AppShell from '../shared/AppShell.vue';
 import MasterDataTable from './MasterDataTable.vue';
 import MasterItemDialog from './MasterItemDialog.vue';
 import MasterItemViewDialog from './MasterItemViewDialog.vue';
-import { alertInUse, confirmDeactivate, isLockedByUsage } from './masterDialogs';
+import { alertInUse, confirmDeactivate } from './masterDialogs';
+import { isLocked } from './masterLock';
 import MasterStatCards from './MasterStatCards.vue';
 import { useMasterData } from '../../composables/useMasterData';
 import type { ApiRequestError } from '../../api/client';
@@ -190,12 +193,7 @@ function closeView(): void {
 }
 
 async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
-  if (item.is_system) {
-    return;
-  }
-
-  if (!next && isLockedByUsage(item)) {
-    await alertInUse(item);
+  if (!next && isLocked(item, props.kind)) {
     switchEpoch.value++;
     return;
   }
@@ -218,8 +216,8 @@ async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
 
 async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   if (editingItem.value?.is_active && payload.is_active === false) {
-    if (isLockedByUsage(editingItem.value)) {
-      await alertInUse(editingItem.value);
+    if (isLocked(editingItem.value, props.kind)) {
+      if (!editingItem.value.is_system) await alertInUse(editingItem.value);
       return;
     }
 
