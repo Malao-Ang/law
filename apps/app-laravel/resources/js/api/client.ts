@@ -23,6 +23,7 @@ import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestPar
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
 import type { OversightSummary, OversightUpdatePayload, OversightItem } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
+import type { AuditLogResponse } from '../types/auditLog';
 
 type ApiErrorPayload = {
   message?: string;
@@ -779,6 +780,15 @@ export function updateRagSkipped(documentId: string, ragSkipped: boolean): Promi
     method: 'PATCH',
     body: JSON.stringify({ rag_skipped: ragSkipped }),
   });
+}
+
+export function fetchAuditLogs(params: { action?: string; resource?: string; q?: string } = {}): Promise<AuditLogResponse> {
+  const search = new URLSearchParams();
+  if (params.action) search.set('action', params.action);
+  if (params.resource) search.set('resource', params.resource);
+  if (params.q) search.set('q', params.q);
+  const qs = search.toString();
+  return jsonRequest<AuditLogResponse>(`/api/audit-logs${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchOversightSummary(): Promise<OversightSummary> {

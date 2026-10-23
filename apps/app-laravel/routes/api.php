@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\MinioTestController;
 use App\Http\Controllers\Api\EsignCallbackController;
@@ -24,6 +25,8 @@ use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\WordExportController;
 use App\Http\Middleware\NotInProduction;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('auth.session');
 
 Route::get('/health', HealthController::class);
 Route::get('/lookups', LookupController::class);

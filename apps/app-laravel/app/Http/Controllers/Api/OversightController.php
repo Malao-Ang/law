@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateOversightRequest;
+use App\Services\Audit\AuditLogger;
 use App\Services\OversightService;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
 class OversightController extends Controller
 {
-    public function __construct(private readonly OversightService $oversight) {}
+    public function __construct(
+        private readonly OversightService $oversight,
+        private readonly AuditLogger $audit,
+    ) {}
 
     public function summary(): JsonResponse
     {
@@ -28,6 +32,23 @@ class OversightController extends Controller
 
             return response()->json(['message' => 'ไม่พบเอกสาร'], 404);
         }
+
+        $primary = trim((string) ($item['primary']['name'] ?? '')) ?: (string) ($item['primary']['email'] ?? '');
+        $backup = trim((string) ($item['backup']['name'] ?? '')) ?: (string) ($item['backup']['email'] ?? '');
+        $this->audit->record(
+            'update',
+            'oversight',
+            $documentId,
+            'แก้ไขสถานะกำกับดูแล',
+            [
+                'สถานะ: '.(string) ($item['status'] ?? ''),
+                'กำหนดออกประกาศ: '.((string) ($item['publish_due_date'] ?? '') ?: '—'),
+                'ผู้รับผิดชอบหลัก: '.($primary !== '' ? $primary : '—'),
+                'ผู้ประสานงานสำรอง: '.($backup !== '' ? $backup : '—'),
+            ],
+            (string) ($item['title'] ?? $documentId),
+            $documentId,
+        );
 
         return response()->json($item);
     }
