@@ -67,7 +67,7 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="!readonly" text="แก้ไข" location="top">
+              <v-tooltip v-if="!readonly && kind !== 'change_status'" text="แก้ไข" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
@@ -79,6 +79,15 @@
                   />
                 </template>
               </v-tooltip>
+              <v-btn
+                v-if="!readonly && item.can_delete"
+                icon="mdi-delete-outline"
+                variant="text"
+                size="small"
+                color="error"
+                aria-label="ลบ"
+                @click="$emit('delete', item)"
+              />
               <MasterToggleCell
                 v-if="!readonly"
                 :item="item"
@@ -133,6 +142,7 @@ const props = defineProps<{
 defineEmits<{
   view: [item: MasterItem];
   edit: [item: MasterItem];
+  delete: [item: MasterItem];
   toggle: [item: MasterItem, next: boolean];
   'update:page': [page: number];
 }>();
@@ -162,6 +172,7 @@ function itemValue(item: MasterItem, key: string): unknown {
   padding-top: 10px;
   padding-bottom: 10px;
   vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .master-table__index {
@@ -176,7 +187,7 @@ function itemValue(item: MasterItem, key: string): unknown {
   width: 112px;
 }
 
-/* Wide enough for view + edit + lock slot + switch, so the switch is never clipped. */
+/* View, edit, delete and the fixed switch fit in the existing actions width. */
 .master-table__actions {
   min-width: 196px;
   white-space: nowrap;

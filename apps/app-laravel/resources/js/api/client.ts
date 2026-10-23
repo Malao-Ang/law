@@ -134,6 +134,8 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     throw error;
   }
 
+  if (response.status === 204) return undefined as T;
+
   return (await response.json()) as T;
 }
 

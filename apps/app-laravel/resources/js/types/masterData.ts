@@ -27,6 +27,7 @@ export interface MasterItem {
   aliases: string[];
   attrs: MasterItemAttrs;
   usage_count?: number;
+  can_delete?: boolean;
   created_at: string;
   updated_at: string;
 }

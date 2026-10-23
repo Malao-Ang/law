@@ -5,6 +5,11 @@
     subtitle="จัดการสถานะการเปลี่ยนแปลงของเอกสารกฎหมาย"
     show-bell
   >
+    <template #title-actions>
+      <v-btn v-if="tab === 'status'" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="statusPage?.openCreate()">
+        เพิ่มสถานะการเปลี่ยนแปลง
+      </v-btn>
+    </template>
     <div class="change-status-page">
       <v-tabs v-model="tab" color="admin-primary" density="comfortable">
         <v-tab value="status">สถานะการเปลี่ยนแปลง</v-tab>
@@ -14,19 +19,20 @@
       <v-window v-model="tab">
         <v-window-item value="status">
           <MasterDataPage
+            ref="statusPage"
             kind="change_status"
             title="สถานะการเปลี่ยนแปลงกฎหมาย"
             subtitle="จัดการสถานะการเปลี่ยนแปลงของเอกสารกฎหมาย"
-            add-label=""
+            add-label="เพิ่มสถานะการเปลี่ยนแปลง"
             :stat-labels="statLabels"
             :columns="statusColumns"
             search-placeholder="ค้นหาด้วยรหัส หรือชื่อสถานะ..."
-            :dialog-title="{ create: '', edit: '' }"
+            :dialog-title="{ create: 'เพิ่มสถานะการเปลี่ยนแปลง', edit: '' }"
             dialog-subtitle=""
             :field-labels="fieldLabels"
             code-column-title="รหัสสถานะ"
             embedded
-            readonly
+            hide-create-action
           >
             <template #view-dialog="{ open, item, close }">
               <v-dialog :model-value="open" max-width="620" @update:model-value="close">
@@ -167,13 +173,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppShell from '../../../components/shared/AppShell.vue';
 import MasterDataPage from '../../../components/master/MasterDataPage.vue';
 import type { MasterItem } from '../../../types/masterData';
 
 type TabValue = 'status' | 'detail';
+
+const statusPage = ref<InstanceType<typeof MasterDataPage> | null>(null);
 
 const route = useRoute();
 const router = useRouter();

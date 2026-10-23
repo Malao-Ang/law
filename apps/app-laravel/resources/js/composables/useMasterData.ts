@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue';
 import {
   createMaster,
+  deleteMaster,
   listMaster,
   reorderMaster,
   setMasterActive,
@@ -116,6 +117,19 @@ export function useMasterData(kind: MasterKind) {
     }
   }
 
+  async function remove(item: MasterItem): Promise<void> {
+    try {
+      await deleteMaster(kind, item.code);
+      snackbar.success('ลบรายการแล้ว');
+      await fetch();
+      if (page.value > pageCount.value) page.value = pageCount.value;
+      await lookups.reload();
+    } catch (err) {
+      await alertError(err instanceof Error ? err.message : 'ลบรายการไม่สำเร็จ');
+      throw err;
+    }
+  }
+
   async function reorder(codes: string[]): Promise<void> {
     await reorderMaster(kind, codes);
     await fetch();
@@ -138,6 +152,7 @@ export function useMasterData(kind: MasterKind) {
     resetFilters,
     save,
     toggleActive,
+    remove,
     reorder,
   };
 }

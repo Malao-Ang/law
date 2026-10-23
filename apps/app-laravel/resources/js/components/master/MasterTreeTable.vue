@@ -95,10 +95,10 @@
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editFamily', row.family)" />
                   </template>
                 </v-tooltip>
+                <v-btn v-if="row.family.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" @click="$emit('deleteFamily', row.family)" />
                 <MasterToggleCell
                   :item="row.family"
                   kind="law_family"
-                  :system="row.locked"
                   :busy="togglingCode === row.family.code"
                   :epoch="switchEpoch"
                   @toggle="$emit('toggleFamily', row.family, $event)"
@@ -173,6 +173,7 @@
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editType', type)" />
                   </template>
                 </v-tooltip>
+                <v-btn v-if="type.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" @click="$emit('deleteType', type)" />
                 <MasterToggleCell
                   :item="type"
                   kind="law_type"
@@ -220,6 +221,8 @@ const emit = defineEmits<{
   addType: [family: MasterItem];
   editFamily: [family: MasterItem];
   editType: [type: MasterItem];
+  deleteFamily: [family: MasterItem];
+  deleteType: [type: MasterItem];
   toggleFamily: [family: MasterItem, next: boolean];
   toggleType: [type: MasterItem, next: boolean];
   moveFamily: [code: string, dir: 'up' | 'down'];
@@ -280,6 +283,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 
 .master-tree td {
   vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .master-tree__order { width: 74px; }
@@ -287,7 +291,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 .master-tree__source { width: 150px; }
 .master-tree__usage { width: 110px; }
 .master-tree__status { width: 120px; }
-.master-tree__actions { width: 210px; }
+.master-tree__actions { width: 240px; min-width: 240px; }
 
 .master-tree__group td {
   font-weight: 600;
@@ -315,6 +319,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   display: inline-block;
   margin-right: 4px;
   vertical-align: middle;
+  overflow-wrap: anywhere;
   width: 28px;
 }
 
@@ -378,7 +383,9 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 .master-tree__action-row {
   align-items: center;
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   min-height: 40px;
 }
 

@@ -20,7 +20,9 @@ export async function confirmDeactivate(item: DialogItem): Promise<boolean> {
   const result = await Swal.fire({
     icon: 'warning',
     title: `ปิดใช้งาน "${escapeHtml(item.name)}"?`,
-    html: `รายการนี้จะไม่แสดงเป็นตัวเลือกในระบบ<br>เอกสารที่ใช้อยู่ ${usageText(item)} รายการจะยังคงแสดงค่าเดิม`,
+    html: (item.usage_count ?? 0) > 0
+      ? `จะไม่แสดงในตัวกรองการค้นหาและตัวเลือกใหม่ เอกสาร ${usageText(item)} ฉบับที่ใช้อยู่ยังแสดงค่าเดิม`
+      : `รายการนี้จะไม่แสดงเป็นตัวเลือกในระบบ<br>เอกสารที่ใช้อยู่ ${usageText(item)} รายการจะยังคงแสดงค่าเดิม`,
     showCancelButton: true,
     confirmButtonText: 'ปิดใช้งาน',
     cancelButtonText: 'ยกเลิก',
@@ -49,4 +51,17 @@ export async function alertError(message: string): Promise<void> {
     confirmButtonText: 'ตกลง',
     confirmButtonColor: '#475467',
   });
+}
+
+export async function confirmDelete(item: DialogItem): Promise<boolean> {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: `ลบ "${escapeHtml(item.name)}" ถาวร?`,
+    showCancelButton: true,
+    confirmButtonText: 'ลบถาวร',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#b42318',
+    cancelButtonColor: '#64748b',
+  });
+  return result.isConfirmed;
 }

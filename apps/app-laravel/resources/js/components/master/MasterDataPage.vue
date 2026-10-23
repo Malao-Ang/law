@@ -1,12 +1,12 @@
 <template>
   <component :is="embedded ? 'div' : AppShell" v-bind="shellProps">
-    <template v-if="!embedded && !readonly" #title-actions>
+    <template v-if="!embedded && !readonly && !hideCreateAction" #title-actions>
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
         {{ addLabel }}
       </v-btn>
     </template>
 
-    <div v-if="embedded && !readonly" class="master-page__embedded-actions">
+    <div v-if="embedded && !readonly && !hideCreateAction" class="master-page__embedded-actions">
       <v-btn color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="openCreate">
         {{ addLabel }}
       </v-btn>
@@ -57,6 +57,7 @@
         :switch-epoch="switchEpoch"
         @view="openView"
         @edit="openEdit"
+        @delete="handleDelete"
         @toggle="handleToggle"
         @update:page="master.page.value = $event"
       >
@@ -114,8 +115,7 @@ import AppShell from '../shared/AppShell.vue';
 import MasterDataTable from './MasterDataTable.vue';
 import MasterItemDialog from './MasterItemDialog.vue';
 import MasterItemViewDialog from './MasterItemViewDialog.vue';
-import { alertInUse, confirmDeactivate } from './masterDialogs';
-import { isLocked } from './masterLock';
+import { confirmDeactivate, confirmDelete } from './masterDialogs';
 import MasterStatCards from './MasterStatCards.vue';
 import { useMasterData } from '../../composables/useMasterData';
 import type { ApiRequestError } from '../../api/client';
@@ -134,6 +134,7 @@ const props = defineProps<{
   dialogSubtitle: string;
   fieldLabels: { code: string; name: string };
   embedded?: boolean;
+  hideCreateAction?: boolean;
   dialogMaxWidth?: string | number;
   basicSectionTitle?: string;
   codePlaceholder?: string;
@@ -193,11 +194,6 @@ function closeView(): void {
 }
 
 async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
-  if (!next && isLocked(item, props.kind)) {
-    switchEpoch.value++;
-    return;
-  }
-
   if (!next && !(await confirmDeactivate(item))) {
     switchEpoch.value++;
     return;
@@ -214,13 +210,19 @@ async function handleToggle(item: MasterItem, next: boolean): Promise<void> {
   }
 }
 
+async function handleDelete(item: MasterItem): Promise<void> {
+  if (!item.can_delete || !(await confirmDelete(item))) return;
+  try {
+    await master.remove(item);
+  } catch {
+    // The composable reports errors through masterDialogs.
+  }
+}
+
+defineExpose({ openCreate });
+
 async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   if (editingItem.value?.is_active && payload.is_active === false) {
-    if (isLocked(editingItem.value, props.kind)) {
-      if (!editingItem.value.is_system) await alertInUse(editingItem.value);
-      return;
-    }
-
     const confirmed = await confirmDeactivate(editingItem.value);
     if (!confirmed) return;
   }
