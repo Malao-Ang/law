@@ -34,6 +34,7 @@
               <button v-if="row.family.attrs.has_subtypes !== false" type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
                 <v-icon :icon="expandedCodes.includes(row.family.code) ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
               </button>
+              <span v-else class="master-tree__toggle-spacer" aria-hidden="true" />
               <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
                 {{ row.family.code }}
               </v-chip>
@@ -41,7 +42,6 @@
             <td>
               <span class="master-tree__dot" :style="{ background: row.color }" />
               <span class="font-weight-bold">{{ row.family.name }}</span>
-              <span class="text-medium-emphasis ml-2">({{ row.types.length }} ประเภท)</span>
               <v-chip v-if="row.locked" size="x-small" color="success" variant="tonal" class="ml-2" prepend-icon="mdi-lock">
                 ระบบ
               </v-chip>
@@ -53,7 +53,10 @@
                 size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
                 :to="`/admin/laws?type=${encodeURIComponent(row.primary!.code)}`"
               >{{ (row.primary?.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
-              <template v-else>{{ row.usage.toLocaleString('th-TH') }}</template>
+              <v-chip
+                v-else
+                size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
+              >{{ row.usage.toLocaleString('th-TH') }} รายการ</v-chip>
             </td>
             <td>
               <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
@@ -80,9 +83,6 @@
                   <v-icon icon="mdi-drag-vertical" size="20" class="master-tree__drag-handle" />
                 </template>
                 <template v-else>
-                <v-btn v-if="row.family.attrs.has_subtypes !== false" size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="$emit('addType', row.family)">
-                  ประเภท
-                </v-btn>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editFamily', row.family)" />
@@ -175,6 +175,18 @@
                 />
                 </template>
               </div>
+            </td>
+          </tr>
+          <tr
+            v-if="row.family.attrs.has_subtypes !== false && !reorderMode"
+            v-show="expandedCodes.includes(row.family.code)"
+            class="master-tree__child master-tree__add-row"
+          >
+            <td />
+            <td colspan="6" class="master-tree__child-code">
+              <v-btn size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="$emit('addType', row.family)">
+                เพิ่มประเภทใน{{ row.family.name }}
+              </v-btn>
             </td>
           </tr>
         </template>
@@ -297,6 +309,13 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   justify-content: center;
   margin-right: 4px;
   padding: 0;
+  width: 28px;
+}
+
+.master-tree__toggle-spacer {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: middle;
   width: 28px;
 }
 
