@@ -42,9 +42,6 @@
             <td>
               <span class="master-tree__dot" :style="{ background: row.color }" />
               <span class="font-weight-bold">{{ row.family.name }}</span>
-              <v-chip v-if="row.locked" size="x-small" color="success" variant="tonal" class="ml-2" prepend-icon="mdi-lock">
-                ระบบ
-              </v-chip>
             </td>
             <td>{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
             <td class="text-right font-weight-bold">
