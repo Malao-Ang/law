@@ -36,7 +36,7 @@
       <v-card-actions>
         <v-spacer />
         <v-btn :disabled="saving" @click="dialog = false">ยกเลิก</v-btn>
-        <v-btn color="admin-primary" :disabled="!selected || !can.manage_co_editors" :loading="saving" @click="add">บันทึก</v-btn>
+        <v-btn color="admin-primary" :disabled="!selected || selectedActions.length === 0 || !can.manage_co_editors" :loading="saving" @click="add">บันทึก</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
