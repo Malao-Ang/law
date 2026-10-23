@@ -77,12 +77,14 @@ const LEGACY_FAMILY_ALIASES: Record<string, string> = {
 export type LawTypeCatalogInput = {
   documentTypes?: Ref<DocumentTypeOption[]> | DocumentTypeOption[];
   lawFamilies?: Ref<LawFamilyOption[]> | LawFamilyOption[];
+  documentTypesAll?: Ref<DocumentTypeOption[]> | DocumentTypeOption[];
+  lawFamiliesAll?: Ref<LawFamilyOption[]> | LawFamilyOption[];
 };
 
 function readArray<T>(value: Ref<T[]> | T[] | undefined, fallback: T[]): T[] {
   if (!value) return fallback;
   const items = Array.isArray(value) ? value : value.value;
-  return items.length > 0 ? items : fallback;
+  return items;
 }
 
 function normalize(value: string | null | undefined): string {
@@ -101,11 +103,14 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
   const documentTypes = computed(() => bySortOrder(readArray(input.documentTypes, FALLBACK_TYPES)));
   const lawFamilies = computed(() => readArray(input.lawFamilies, FALLBACK_FAMILIES));
 
+  const allTypes = computed(() => readArray(input.documentTypesAll, documentTypes.value));
+  const allFamilies = computed(() => readArray(input.lawFamiliesAll, lawFamilies.value));
+
   const typeItem = (value: string | null | undefined): DocumentTypeOption | null => {
     const text = normalize(value);
     if (!text || text === UNSPECIFIED_ANNOUNCEMENT) return null;
     const code = LEGACY_TYPE_SLUG_ALIASES[text] ?? LEGACY_TYPE_ALIASES[text] ?? text;
-    return documentTypes.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
+    return allTypes.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
   };
 
   const familyItem = (value: string | null | undefined): LawFamilyOption | null => {
@@ -113,7 +118,7 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
     if (!text) return null;
     const type = typeItem(text);
     const code = LEGACY_FAMILY_ALIASES[text] ?? (text === UNSPECIFIED_ANNOUNCEMENT ? ANNOUNCEMENT_FAMILY_CODE : (type?.family_code ?? text));
-    return lawFamilies.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
+    return allFamilies.value.find((item) => item.code === code || item.value === code || item.title === text) ?? null;
   };
 
   const typeLabel = (value: string | null | undefined): string => {
@@ -177,6 +182,7 @@ export function createLawTypeCatalog(input: LawTypeCatalogInput = {}) {
 }
 
 export function useLawType() {
-  const { documentTypes, lawFamilies } = useLookups();
-  return createLawTypeCatalog({ documentTypes, lawFamilies });
+  const { documentTypes, documentTypesAll, lawFamilies, lawFamiliesAll, load } = useLookups();
+  void load().catch(() => {});
+  return createLawTypeCatalog({ documentTypes, documentTypesAll, lawFamilies, lawFamiliesAll });
 }

@@ -70,7 +70,7 @@
                 </template>
                 <v-list density="compact" :min-width="180">
                   <v-list-item
-                    v-for="structure in headTypeOptions"
+                    v-for="structure in optionsForSection(section)"
                     :key="structure.code"
                     :title="structure.title"
                     :active="storedChunkType(section.headBlock) === structure.code"
@@ -266,6 +266,15 @@ const documentOptions = computed(() => {
 });
 const headTypeOptions = computed(() => documentOptions.value.filter((item) => item.is_head));
 
+function optionsForSection(section: LawSection) {
+  const current = storedChunkType(section.headBlock);
+  const item = legalStructures.item(current);
+  if (item && !legalStructures.items.value.some((active) => active.code === item.code)) {
+    return [...headTypeOptions.value, { ...item, title: `${item.title} (ปิดใช้งาน)` }];
+  }
+  return headTypeOptions.value;
+}
+
 function supportedForDocument(code: string | null | undefined): boolean {
   const normalized = legalStructures.normalize(code);
   return documentOptions.value.some((item) => item.code === normalized);
@@ -294,6 +303,9 @@ function containerTypeLabel(section: LawSection): string {
   const ct = containerType(section);
   if (!ct) return 'เลือกโครงสร้าง...';
   const label = legalStructures.label(ct);
+  if (section.headBlock.meta.chunk_type && !legalStructures.items.value.some((item) => item.code === ct)) {
+    return `${label} (ปิดใช้งาน)`;
+  }
   return section.headBlock.meta.chunk_type ? label : `${label} (แนะนำ)`;
 }
 
@@ -306,7 +318,7 @@ function containerTypeColor(section: LawSection): string | undefined {
 function unsupportedChunkType(section: LawSection): boolean {
   const stored = storedChunkType(section.headBlock);
   if (!stored) return false;
-  return !supportedForDocument(stored);
+  return !optionsForSection(section).some((item) => item.code === stored);
 }
 
 const allBlocks = computed<DocumentBlock[]>(() =>

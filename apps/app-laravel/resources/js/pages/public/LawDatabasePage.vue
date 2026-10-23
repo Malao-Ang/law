@@ -474,7 +474,7 @@ import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useChangeStatus } from '../../composables/useChangeStatus';
-import { createLawTypeCatalog } from '../../composables/useLawType';
+import { useLawType } from '../../composables/useLawType';
 import { useLawCategory } from '../../composables/useLawCategory';
 
 const PER_PAGE = 20;
@@ -493,7 +493,7 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
 
 const lawStatus = useLawStatus();
 const changeStatusCatalog = useChangeStatus();
-const lawTypes = createLawTypeCatalog();
+const lawTypes = useLawType();
 const lawCategories = useLawCategory();
 const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
 
@@ -580,7 +580,8 @@ function canonicalFacetOptions(
     if (!canonical || (whitelist && !whitelist.includes(canonical))) continue;
     counts.set(canonical, (counts.get(canonical) ?? 0) + bucket.count);
   }
-  const values = whitelist ?? Array.from(counts.keys());
+  const allowed = new Set((lookupFacets.value?.[key] ?? []).map((bucket) => canonicalize(bucket.value)));
+  const values = (whitelist ?? Array.from(counts.keys())).filter((value) => !lookupFacets.value || allowed.has(value));
   return values.map((value) => ({ label: labelResolver(value), value, count: counts.get(value) ?? 0 }));
 }
 
@@ -598,7 +599,7 @@ const typeFilters = computed(() => {
   }));
 });
 const groupFilters = computed(() =>
-  mapFacetOptions(stableFacet('law_group'), (value) => lawCategories.categoryLabel(value)),
+  mapFacetOptions(stableFacet('law_group').filter((bucket) => !lookupFacets.value || lookupFacets.value.law_group.some((item) => item.value === bucket.value)), (value) => lawCategories.categoryLabel(value)),
 );
 const agencyFilters = computed(() => {
   const allowed = new Set((lookupFacets.value?.agency ?? []).map((b) => b.value));
