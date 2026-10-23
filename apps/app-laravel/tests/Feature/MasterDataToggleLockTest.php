@@ -24,12 +24,12 @@ class MasterDataToggleLockTest extends TestCase
         $this->getJson('/api/master-data/law_category/DCT002')->assertOk()->assertJsonPath('usage_count', 1);
 
         $this->patchJson('/api/master-data/law_category/DCT002/active', ['is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
         $this->putJson('/api/master-data/law_category/DCT002', ['name' => 'ด้านกิจการนิสิต', 'is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
-        $this->getJson('/api/master-data/law_category/DCT002')->assertJsonPath('is_active', true);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
+        $this->getJson('/api/master-data/law_category/DCT002')->assertJsonPath('is_active', false);
 
         $this->patchJson('/api/master-data/law_category/DCT003/active', ['is_active' => true])->assertOk();
         $this->patchJson('/api/master-data/law_category/DCT003/active', ['is_active' => false])
@@ -48,9 +48,9 @@ class MasterDataToggleLockTest extends TestCase
             ->assertJsonPath('usage_count', 1);
 
         $this->patchJson('/api/master-data/law_type/LTY01/active', ['is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
-        $this->getJson('/api/master-data/law_type/LTY01')->assertJsonPath('is_active', true);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
+        $this->getJson('/api/master-data/law_type/LTY01')->assertJsonPath('is_active', false);
 
         $this->patchJson('/api/master-data/law_type/LTY02/active', ['is_active' => false])
             ->assertOk()
@@ -77,12 +77,12 @@ class MasterDataToggleLockTest extends TestCase
 
         $this->patchJson("/api/master-data/law_family/{$withType}/active", ['is_active' => true])->assertOk();
         $this->patchJson("/api/master-data/law_family/{$unused}/active", ['is_active' => true])->assertOk();
-        $this->getJson("/api/master-data/law_family/{$withType}")->assertOk()->assertJsonPath('usage_count', 1);
+        $this->getJson("/api/master-data/law_family/{$withType}")->assertOk()->assertJsonPath('usage_count', 0);
 
         $this->patchJson("/api/master-data/law_family/{$withType}/active", ['is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', self::IN_USE_MESSAGE);
-        $this->getJson("/api/master-data/law_family/{$withType}")->assertJsonPath('is_active', true);
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
+        $this->getJson("/api/master-data/law_family/{$withType}")->assertJsonPath('is_active', false);
 
         $this->patchJson("/api/master-data/law_family/{$unused}/active", ['is_active' => false])
             ->assertOk()
@@ -92,10 +92,10 @@ class MasterDataToggleLockTest extends TestCase
     public function test_system_rows_keep_their_own_deactivation_rules(): void
     {
         $this->patchJson('/api/master-data/law_family/LFM01/active', ['is_active' => false])
-            ->assertStatus(409)
-            ->assertJsonPath('message', 'รายการของระบบไม่สามารถปิดใช้งานได้');
+            ->assertOk()
+            ->assertJsonPath('is_active', false);
         $this->patchJson('/api/master-data/enforcement_status/STA01/active', ['is_active' => false])
-            ->assertStatus(409);
+            ->assertOk();
     }
 
     /**

@@ -63,12 +63,7 @@ class ChangeStatusMasterDataSeedTest extends TestCase
         $store = app(MasterDataStore::class);
         $before = $store->find(MasterDataKind::ChangeStatus, 'CHG02');
 
-        try {
-            $store->setActive(MasterDataKind::ChangeStatus, 'CHG02', false);
-            $this->fail('Expected system change status to reject deactivation.');
-        } catch (MasterDataConflict) {
-            $this->assertTrue(true);
-        }
+        $this->assertFalse($store->setActive(MasterDataKind::ChangeStatus, 'CHG02', false)['is_active']);
 
         $updated = $store->update(MasterDataKind::ChangeStatus, 'CHG02', [
             'name' => 'ปรับปรุงทั้งฉบับ (แก้ชื่อ)',

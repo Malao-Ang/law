@@ -5,6 +5,7 @@ namespace App\Services\MasterData;
 use App\Exceptions\MasterDataConflict;
 use App\Services\ReviewStore;
 use App\Services\Storage\MongoBlobStore;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class MasterDataStore
@@ -186,10 +187,6 @@ class MasterDataStore
                 return;
             }
 
-            if (($items[$index]['is_system'] ?? false) === true && ! $active) {
-                throw new MasterDataConflict('รายการของระบบไม่สามารถปิดใช้งานได้');
-            }
-
             $items[$index]['is_active'] = $active;
             $items[$index]['updated_at'] = now()->toIso8601String();
             $updated = $items[$index];
@@ -210,15 +207,16 @@ class MasterDataStore
         $deleted = false;
         $normalizedCode = $this->normalizeCode($code);
 
-        $this->withMasterLock($kind, function (array &$data) use ($normalizedCode, &$deleted): void {
+        $this->withMasterLock($kind, function (array &$data) use ($kind, $normalizedCode, &$deleted): void {
             $items = $this->itemsFromData($data);
             $index = $this->itemIndex($items, $normalizedCode);
             if ($index === null) {
                 return;
             }
 
-            if (($items[$index]['is_system'] ?? false) === true) {
-                throw new MasterDataConflict('รายการของระบบไม่สามารถลบได้');
+            $conflict = $this->deletionConflict($kind, $items[$index]);
+            if ($conflict !== null) {
+                throw new MasterDataConflict($conflict);
             }
 
             array_splice($items, $index, 1);
@@ -227,6 +225,44 @@ class MasterDataStore
         });
 
         return $deleted;
+    }
+
+    public function deletionConflict(MasterDataKind $kind, array $item, ?int $usage = null, ?UsageCounter $counter = null): ?string
+    {
+        $counter ??= app(UsageCounter::class);
+        if (! $kind->deletable()) {
+            return 'ไม่อนุญาตให้ลบรายการ';
+        }
+        if ($item['is_system'] ?? false) {
+            return 'รายการนี้เป็นข้อมูลของระบบ ลบไม่ได้';
+        }
+        if (($usage ?? $counter->count($kind, $item['code'])) > 0) {
+            return 'มีเอกสารใช้งานรายการนี้อยู่ จึงไม่สามารถลบได้';
+        }
+        if ($kind === MasterDataKind::LawFamily) {
+            foreach ($this->readItems(MasterDataKind::LawType) as $type) {
+                if (($type['attrs']['family_code'] ?? '') !== $item['code']) {
+                    continue;
+                }
+                if (($item['attrs']['has_subtypes'] ?? true) || ! ($type['attrs']['is_primary'] ?? false)) {
+                    return 'กรุณาลบประเภทย่อยในกลุ่มนี้ก่อน';
+                }
+                if ($type['is_system'] ?? false) {
+                    return 'รายการนี้เป็นข้อมูลของระบบ ลบไม่ได้';
+                }
+                if ($counter->count(MasterDataKind::LawType, $type['code']) > 0) {
+                    return 'มีเอกสารใช้งานรายการนี้อยู่ จึงไม่สามารถลบได้';
+                }
+            }
+        }
+        if ($kind === MasterDataKind::LawType && ($item['attrs']['is_primary'] ?? false)) {
+            foreach ($this->readItems(MasterDataKind::LawFamily) as $family) {
+                if ($family['code'] === $item['attrs']['family_code'] && ! $family['attrs']['has_subtypes']) {
+                    return 'กรุณาลบประเภทหลักผ่านกลุ่มประเภท';
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -280,7 +316,7 @@ class MasterDataStore
                         $families = $this->itemsFromData($data);
                         $types = array_values((array) ($data['law_types'] ?? []));
                         $this->normalizeLawCatalog($families, $types);
-                        $data = ['items' => $families, 'law_types' => $types];
+                        $data = array_replace($data, ['items' => $families, 'law_types' => $types]);
                     });
                 }
             } finally {
@@ -314,10 +350,11 @@ class MasterDataStore
      */
     private function missingSeeds(MasterDataKind $kind, array $items): array
     {
+        $deleted = $this->kindData($kind)['deleted_codes'][$kind->value] ?? [];
         // Normalizing seeds validates attrs against other kinds (slow); skip it when every seed code exists.
         $hasMissing = false;
         foreach ($kind->seed() as $seed) {
-            if ($this->itemIndex($items, $this->normalizeCode((string) ($seed['code'] ?? ''))) === null) {
+            if (! in_array($seed['code'], $deleted, true) && $this->itemIndex($items, $this->normalizeCode((string) ($seed['code'] ?? ''))) === null) {
                 $hasMissing = true;
                 break;
             }
@@ -328,7 +365,7 @@ class MasterDataStore
 
         return array_values(array_filter(
             $this->normalizeSeedItems($kind, $kind->seed()),
-            fn (array $seed): bool => $this->itemIndex($items, (string) $seed['code']) === null,
+            fn (array $seed): bool => ! in_array($seed['code'], $deleted, true) && $this->itemIndex($items, (string) $seed['code']) === null,
         ));
     }
 
@@ -590,7 +627,7 @@ class MasterDataStore
      */
     private function nextCode(MasterDataKind $kind, array $items): string
     {
-        $max = 0;
+        $max = (int) ($this->kindData($kind)['last_code_no'][$kind->value] ?? 0);
         foreach ($items as $item) {
             $code = (string) ($item['code'] ?? '');
             if (preg_match('/^'.preg_quote($kind->prefix(), '/').'(\d+)$/', $code, $matches) === 1) {
@@ -992,7 +1029,11 @@ class MasterDataStore
     private function withMasterLock(MasterDataKind $kind, callable $callback): void
     {
         if (! $this->isLawKind($kind)) {
-            $this->blob->withLock(self::BLOB_KIND, $kind->value, $callback);
+            $this->blob->withLock(self::BLOB_KIND, $kind->value, function (array &$data) use ($kind, $callback): void {
+                $before = $data;
+                $callback($data);
+                $this->preserveHistory($data, $before, $kind, $this->itemsFromData($before), $this->itemsFromData($data));
+            });
             return;
         }
 
@@ -1028,16 +1069,50 @@ class MasterDataStore
                     }
                 }
             }
+            $oldFamilies = $families;
+            $oldTypes = $types;
             if ($kind === MasterDataKind::LawFamily) {
                 $families = $data['items'];
+                $removed = array_diff(array_column($oldFamilies, 'code'), array_column($families, 'code'));
+                $types = array_values(array_filter($types, static fn (array $type): bool => ! in_array($type['attrs']['family_code'], $removed, true)));
             } else {
                 $types = $data['items'];
             }
             if (! $this->initializingLawCatalog) {
                 $this->normalizeLawCatalog($families, $types, $kind === MasterDataKind::LawFamily);
             }
+            $before = $catalog;
             $catalog = ['items' => $this->sortItems($families), 'law_types' => $this->sortItems($types)];
+            $this->preserveHistory($catalog, $before, MasterDataKind::LawFamily, $oldFamilies, $families);
+            $this->preserveHistory($catalog, $before, MasterDataKind::LawType, $oldTypes, $types);
         });
+    }
+
+    private function kindData(MasterDataKind $kind): array
+    {
+        return $this->blob->read(self::BLOB_KIND, $this->isLawKind($kind) ? MasterDataKind::LawFamily->value : $kind->value) ?? [];
+    }
+
+    private function preserveHistory(array &$data, array $before, MasterDataKind $kind, array $oldItems, array $items): void
+    {
+        $key = $kind->value;
+        $data['last_code_no'] = array_replace($before['last_code_no'] ?? [], $data['last_code_no'] ?? []);
+        $data['deleted_codes'] = array_replace($before['deleted_codes'] ?? [], $data['deleted_codes'] ?? []);
+        $max = (int) ($data['last_code_no'][$key] ?? 0);
+        foreach (array_merge($oldItems, $items) as $item) {
+            $max = max($max, (int) substr($item['code'], strlen($kind->prefix())));
+        }
+        $data['last_code_no'][$key] = $max;
+        $removed = array_diff(array_column($oldItems, 'code'), array_column($items, 'code'));
+        $data['deleted_codes'][$key] = array_values(array_unique(array_merge($data['deleted_codes'][$key] ?? [], $removed)));
+        foreach ($oldItems as $item) {
+            if (in_array($item['code'], $removed, true)) {
+                Log::info('Master data deleted', [
+                    'actor' => auth()->user()?->username ?? auth()->id(),
+                    'kind' => $key, 'code' => $item['code'], 'name' => $item['name'],
+                ]);
+            }
+        }
     }
 
     private function normalizeLawCatalog(array &$families, array &$types, bool $syncStandalone = false): void
@@ -1136,7 +1211,7 @@ class MasterDataStore
             unset($type);
             $this->normalizeLawCatalog($families, $types, true);
             $updated = $family;
-            $catalog = ['items' => $families, 'law_types' => $types];
+            $catalog = array_replace($catalog, ['items' => $families, 'law_types' => $types]);
         });
         return $updated;
     }

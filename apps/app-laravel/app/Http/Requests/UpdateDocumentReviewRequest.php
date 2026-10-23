@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ReviewStore;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\LawCategories;
@@ -81,7 +82,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'metadata.signatory_name' => ['nullable', 'string', 'max:255'],
             'metadata.signatory_position' => ['nullable', 'string', 'max:255'],
             'law_meta' => ['nullable', 'array'],
-            'law_meta.status' => ['nullable', 'string', 'max:120', Rule::in($this->activeEnforcementStatusCodes())],
+            'law_meta.status' => ['nullable', 'string', 'max:120', Rule::in(array_column(app(MasterDataStore::class)->all(MasterDataKind::EnforcementStatus), 'code'))],
             'law_meta.law_type' => ['nullable', 'string', 'max:120'],
             'law_meta.source' => ['nullable', 'string', 'in:internal,external'],
             'law_meta.law_group' => ['nullable', 'string', 'max:120'],
@@ -136,6 +137,31 @@ class UpdateDocumentReviewRequest extends FormRequest
                 return;
             }
 
+            $store = app(MasterDataStore::class);
+            $document = app(ReviewStore::class)->getReviewDocument((string) $this->route('documentId'));
+            $current = $document['law_meta'] ?? [];
+            foreach ([
+                'status' => MasterDataKind::EnforcementStatus,
+                'law_type' => MasterDataKind::LawType,
+                'law_groups' => MasterDataKind::LawCategory,
+                'change_status' => MasterDataKind::ChangeStatus,
+            ] as $field => $kind) {
+                $oldValues = (array) ($current[$field] ?? ($field === 'law_groups' ? ($current['law_group'] ?? []) : []));
+                $oldCodes = array_map(fn ($value) => $store->resolve($kind, (string) $value)['code'] ?? '', $oldValues);
+                foreach ((array) ($lawMeta[$field] ?? []) as $value) {
+                    $item = $store->resolve($kind, (string) $value);
+                    if ($item !== null && ! $item['is_active'] && ! in_array($item['code'], $oldCodes, true)) {
+                        $validator->errors()->add('law_meta.'.$field, 'รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น');
+                    }
+                    if ($kind === MasterDataKind::LawType && $item !== null) {
+                        $family = $store->find(MasterDataKind::LawFamily, $item['attrs']['family_code']);
+                        if ($family !== null && ! $family['is_active'] && ! in_array($item['code'], $oldCodes, true)) {
+                            $validator->errors()->add('law_meta.'.$field, 'รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น');
+                        }
+                    }
+                }
+            }
+
             $lawTypeValue = $lawMeta['law_type'] ?? null;
             if ($lawTypeValue === null || $lawTypeValue === '') {
                 return;
@@ -156,23 +182,6 @@ class UpdateDocumentReviewRequest extends FormRequest
             }
 
         });
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function activeEnforcementStatusCodes(): array
-    {
-        /** @var MasterDataStore $store */
-        $store = app(MasterDataStore::class);
-
-        return array_values(array_map(
-            static fn (array $item): string => (string) $item['code'],
-            array_filter(
-                $store->all(MasterDataKind::EnforcementStatus),
-                static fn (array $item): bool => (bool) ($item['is_active'] ?? false),
-            ),
-        ));
     }
 
     /**

@@ -49,7 +49,7 @@ enum MasterDataKind: string
 
     public function deletable(): bool
     {
-        return false;
+        return $this !== self::ChangeDetail;
     }
 
     /**
