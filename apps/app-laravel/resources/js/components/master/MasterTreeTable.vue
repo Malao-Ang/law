@@ -83,6 +83,16 @@
                   <v-icon icon="mdi-drag-vertical" size="20" class="master-tree__drag-handle" />
                 </template>
                 <template v-else>
+                <v-btn
+                  size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none"
+                  :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
+                  :disabled="row.family.attrs.has_subtypes === false"
+                  :aria-hidden="row.family.attrs.has_subtypes === false ? 'true' : undefined"
+                  :tabindex="row.family.attrs.has_subtypes === false ? -1 : undefined"
+                  @click="$emit('addType', row.family)"
+                >
+                  ประเภท
+                </v-btn>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
                     <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editFamily', row.family)" />
@@ -175,18 +185,6 @@
                 />
                 </template>
               </div>
-            </td>
-          </tr>
-          <tr
-            v-if="row.family.attrs.has_subtypes !== false && !reorderMode"
-            v-show="expandedCodes.includes(row.family.code)"
-            class="master-tree__child master-tree__add-row"
-          >
-            <td />
-            <td colspan="6" class="master-tree__child-code">
-              <v-btn size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none" @click="$emit('addType', row.family)">
-                เพิ่มประเภทใน{{ row.family.name }}
-              </v-btn>
             </td>
           </tr>
         </template>
@@ -310,6 +308,10 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   margin-right: 4px;
   padding: 0;
   width: 28px;
+}
+
+.master-tree__add-placeholder {
+  visibility: hidden;
 }
 
 .master-tree__toggle-spacer {
