@@ -113,6 +113,15 @@ export const useAuthStore = defineStore('auth', () => {
     loaded.value = true;
   }
 
+  async function devLogin(username: string): Promise<void> {
+    await ensureCsrfCookie();
+    apply(await jsonRequest<MePayload>('/api/auth/dev-login', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    }));
+    loaded.value = true;
+  }
+
   async function selectUnit(unit_code: string): Promise<void> {
     await jsonRequest('/api/auth/active-unit', { method: 'POST', body: JSON.stringify({ unit_code }) });
     await fetchMe(true);
@@ -143,5 +152,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, logout };
+  return { canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
 });

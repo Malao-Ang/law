@@ -127,6 +127,14 @@
             </v-btn>
           </v-form>
 
+          <v-card v-if="devLoginEnabled && !auth.isAuthenticated" variant="outlined" class="mt-4 pa-4">
+            <div class="text-subtitle-2 mb-3">เข้าสู่ระบบแบบทดสอบ (เฉพาะเครื่องพัฒนา)</div>
+            <v-form @submit.prevent="submitDev">
+              <v-text-field v-model="devUsername" label="ชื่อผู้ใช้" autocomplete="username" variant="outlined" density="compact" hide-details :disabled="loading" />
+              <v-btn type="submit" block color="admin-primary" class="mt-3" :loading="loading" :disabled="!devUsername.trim() || loading">เข้าสู่ระบบทดสอบ</v-btn>
+            </v-form>
+          </v-card>
+
           <v-btn
             block
             class="mt-3"
@@ -145,9 +153,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { ApiRequestError } from '../../api/client';
+import { jsonRequest, type ApiRequestError } from '../../api/client';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import { useAuthStore } from '../../stores/authStore';
@@ -155,6 +163,16 @@ import { useAuthStore } from '../../stores/authStore';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+const devLoginEnabled = ref(false);
+const devUsername = ref('');
+onMounted(async () => {
+  try {
+    devLoginEnabled.value = (await jsonRequest<{ dev_login: boolean }>('/api/auth/config')).dev_login === true;
+  } catch {
+    devLoginEnabled.value = false;
+  }
+});
 
 const username = ref('');
 const password = ref('');
@@ -181,6 +199,20 @@ function messageFor(error: ApiRequestError): string {
       return 'ระบบยืนยันตัวตนของมหาวิทยาลัยไม่พร้อมใช้งาน';
     default:
       return error.message || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่';
+  }
+}
+
+async function submitDev(): Promise<void> {
+  if (!devUsername.value.trim() || loading.value) return;
+  loading.value = true;
+  errorMessage.value = '';
+  try {
+    await auth.devLogin(devUsername.value.trim());
+    await router.push(redirectPath.value);
+  } catch (error) {
+    errorMessage.value = messageFor(error as ApiRequestError);
+  } finally {
+    loading.value = false;
   }
 }
 
