@@ -40,6 +40,8 @@ Route::prefix('master-data/{kind}')->group(function (): void {
     Route::post('/', [MasterDataController::class, 'store']);
     Route::patch('/reorder', [MasterDataController::class, 'reorder']);
     Route::get('/{code}', [MasterDataController::class, 'show']);
+    Route::patch('/{code}', [MasterDataController::class, 'update']);
+    Route::post('/{code}/subtypes', [MasterDataController::class, 'subtypes']);
     Route::put('/{code}', [MasterDataController::class, 'update']);
     Route::patch('/{code}/active', [MasterDataController::class, 'setActive']);
     Route::delete('/{code}', [MasterDataController::class, 'destroy']);

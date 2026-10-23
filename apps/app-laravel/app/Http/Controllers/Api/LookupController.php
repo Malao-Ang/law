@@ -65,6 +65,7 @@ class LookupController extends Controller
             'title' => (string) ($item['name'] ?? ''),
             'value' => (string) ($item['code'] ?? ''),
             'code' => (string) ($item['code'] ?? ''),
+            'has_subtypes' => (bool) ($item['attrs']['has_subtypes'] ?? true),
             'source' => (string) ($item['attrs']['source'] ?? 'internal'),
             'color' => $item['attrs']['color'] ?? null,
             'sort_order' => (int) ($item['sort_order'] ?? 0),
@@ -89,6 +90,8 @@ class LookupController extends Controller
                 'value' => (string) ($item['code'] ?? ''),
                 'code' => (string) ($item['code'] ?? ''),
                 'family_code' => $familyCode,
+                'is_primary' => (bool) ($item['attrs']['is_primary'] ?? false),
+                'has_subtypes' => (bool) ($family['attrs']['has_subtypes'] ?? true),
                 'source' => (string) ($family['attrs']['source'] ?? 'internal'),
             ];
         }, $items);

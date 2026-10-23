@@ -484,6 +484,7 @@ enum MasterDataKind: string
             ],
             self::LawFamily => [
                 'attrs.source' => ['required', 'string', 'in:internal,external'],
+                'attrs.has_subtypes' => ['sometimes', 'boolean'],
                 'attrs.color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             ],
             self::LawType => [
