@@ -129,6 +129,26 @@ export async function csrfHeaders(method: string): Promise<Record<string, string
   return token ? { 'X-XSRF-TOKEN': token } : {};
 }
 
+// Multiple workspaces load status, review and versions together.
+const readDeniedDialogs = new Map<string, Promise<void>>();
+async function documentReadDenied(url: string, message: string): Promise<void> {
+  const documentId = /^\/api\/documents\/([^/?]+)/.exec(new URL(url, window.location.origin).pathname)?.[1] ?? '';
+  const existing = readDeniedDialogs.get(documentId);
+  if (existing) return existing;
+  const pending = (async () => {
+    const { router } = await import('../router');
+    const current = router.currentRoute.value;
+    const isCurrentDocument = documentId && decodeURIComponent(documentId) === current.params.documentId;
+    const { alertError } = await import('../components/master/masterDialogs');
+    await alertError(message);
+    if (isCurrentDocument && router.currentRoute.value.fullPath === current.fullPath) {
+      await router.replace(current.path.startsWith('/law/') ? '/database' : '/admin/laws');
+    }
+  })().finally(() => { readDeniedDialogs.delete(documentId); });
+  readDeniedDialogs.set(documentId, pending);
+  return pending;
+}
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const method = (init?.method ?? 'GET').toUpperCase();
@@ -170,8 +190,12 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     error.errors = payload?.errors;
 
     if (response.status === 403) {
-      const { alertError } = await import('../components/master/masterDialogs');
-      await alertError(error.message);
+      if (method === 'GET' && new URL(url, window.location.origin).pathname.startsWith('/api/documents/')) {
+        await documentReadDenied(url, error.message);
+      } else {
+        const { alertError } = await import('../components/master/masterDialogs');
+        await alertError(error.message);
+      }
     }
     if (response.status === 401 && !url.startsWith('/api/auth/')) {
       unauthorizedHandler?.();

@@ -142,7 +142,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   setUnauthorizedHandler(() => {
-    if (!authEnforced.value || !user.value) return;
     clear();
     void import('../router').then(({ router }) => {
       const current = router.currentRoute.value;

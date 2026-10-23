@@ -45,7 +45,7 @@
             <v-col cols="12" md="6">
               <AccessScopeCard
                 title="Private"
-                subtitle="เฉพาะกลุ่ม — ถ้าไม่เลือกกลุ่ม จะแสดงให้ผู้ใช้ที่ล็อกอินทุกคนเห็น"
+                subtitle="เฉพาะผู้รับผิดชอบ สมาชิกหน่วยงานเจ้าของ และกลุ่มที่เลือก"
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
@@ -65,7 +65,7 @@
               <div class="d-flex flex-column flex-md-row align-md-center justify-space-between ga-3 mb-3">
                 <div>
                   <div class="text-subtitle-1 font-weight-bold">ค้นหากลุ่มสิทธิ์</div>
-                  <div class="text-body-2 text-medium-emphasis">เลือกกลุ่มเพื่อจำกัดการเข้าถึง หรือไม่เลือกกลุ่มเพื่อเปิดให้ผู้ใช้ที่ล็อกอินทุกคนเห็น</div>
+                  <div class="text-body-2 text-medium-emphasis">เลือกกลุ่มหน่วยงานหรือบุคคลที่สามารถอ่านเอกสารเพิ่มเติมได้</div>
                 </div>
                 <v-btn color="admin-primary" prepend-icon="mdi-plus" @click="createDialog = true">สร้างกลุ่มใหม่</v-btn>
               </div>
@@ -119,7 +119,7 @@
             <div v-if="selectedGroups.length === 0" class="permission-empty-state">
               <v-icon icon="mdi-lock-outline" size="36" color="grey-lighten-1" />
               <div class="text-subtitle-2 font-weight-bold mt-2">ยังไม่ได้เลือกกลุ่มสิทธิ์</div>
-              <div class="text-body-2 text-medium-emphasis">เอกสาร Private นี้จะแสดงให้ผู้ใช้ที่ล็อกอินทุกคนเห็นในระหว่างที่ระบบยังไม่มี auth middleware</div>
+              <div class="text-body-2 text-medium-emphasis">เอกสารนี้จะอ่านได้โดยผู้ดูแลระบบสูงสุด ผู้รับผิดชอบหลัก/ร่วม และสมาชิกหน่วยงานเจ้าของ</div>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
@@ -127,6 +127,7 @@
                 v-for="group in selectedGroups"
                 :key="group.id"
                 :group="group"
+                :directory="directory"
                 removable
                 @detail="showGroupDetail"
                 @remove="removeGroup"

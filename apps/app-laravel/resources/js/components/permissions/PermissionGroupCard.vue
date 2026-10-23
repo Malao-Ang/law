@@ -22,6 +22,8 @@
         </div>
       </div>
 
+      <div v-if="unitNames" class="text-body-2 mt-2">หน่วยงาน: {{ unitNames }}</div>
+      <div v-if="userNames" class="text-body-2 mt-2">บุคคล: {{ userNames }}</div>
       <div class="d-flex flex-wrap ga-2 mt-3">
         <v-chip size="x-small" color="primary" variant="tonal">{{ group.counts.units }} หน่วยงาน</v-chip>
         <v-chip size="x-small" color="secondary" variant="tonal">{{ group.counts.users }} บุคคล</v-chip>
@@ -31,12 +33,19 @@
 </template>
 
 <script setup lang="ts">
-import type { PermissionGroup } from '../../types/permission';
+import { computed } from 'vue';
+import type { PermissionDirectoryResponse, PermissionGroup } from '../../types/permission';
 
-defineProps<{
+const props = defineProps<{
   group: PermissionGroup;
   removable?: boolean;
+  directory?: PermissionDirectoryResponse | null;
 }>();
+
+const unitNames = computed(() => props.group.unit_ids.map(id =>
+  props.directory?.units.find(unit => unit.id === id)?.name ?? props.group.units.find(unit => unit.id === id)?.name ?? id).join(', '));
+const userNames = computed(() => props.group.user_ids.map(id =>
+  props.directory?.users.find(user => user.id === id)?.name ?? props.group.users.find(user => user.id === id)?.name ?? id).join(', '));
 
 defineEmits<{
   detail: [groupId: string];
