@@ -22,6 +22,11 @@ class UpdateDocumentReviewRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $lawMeta = $this->input('law_meta');
+        if (is_array($lawMeta)) {
+            foreach (\App\Services\Auth\DocumentOwnership::FIELDS as $field) {
+                unset($lawMeta[$field]);
+            }
+        }
         if (is_array($lawMeta) && array_key_exists('status', $lawMeta)) {
             $lawMeta['status'] = app(EnforcementStatuses::class)->resolve($lawMeta['status'])['code'] ?? trim((string) $lawMeta['status']);
         }
@@ -81,6 +86,9 @@ class UpdateDocumentReviewRequest extends FormRequest
             'metadata.signatory_name' => ['nullable', 'string', 'max:255'],
             'metadata.signatory_position' => ['nullable', 'string', 'max:255'],
             'law_meta' => ['nullable', 'array'],
+            'law_meta.uploaded_by' => ['prohibited'],
+            'law_meta.responsible' => ['prohibited'],
+            'law_meta.owner_unit_code' => ['prohibited'],
             'law_meta.status' => ['nullable', 'string', 'max:120', Rule::in($this->activeEnforcementStatusCodes())],
             'law_meta.law_type' => ['nullable', 'string', 'max:120'],
             'law_meta.source' => ['nullable', 'string', 'in:internal,external'],

@@ -1,5 +1,6 @@
 <template>
-  <div class="upload-form">
+  <div class="upload-form" :inert="auth.authEnforced && !auth.canUpload">
+    <v-alert v-if="auth.authEnforced && !auth.canUpload" type="info" variant="tonal" class="mb-3">คุณไม่มีสิทธิ์อัปโหลดเอกสารในหน่วยงานที่เลือก</v-alert>
     <div v-if="!pendingFile" class="mb-3">
       <div class="text-caption text-medium-emphasis mb-1">ประเภทเอกสาร</div>
       <v-btn-toggle v-model="documentType" mandatory divided density="comfortable" color="admin-primary">

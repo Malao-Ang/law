@@ -10,7 +10,6 @@ use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
 use App\Services\Auth\DocumentOwnership;
-use App\Services\Auth\CurrentUser;
 use App\Services\Auth\MongoUserStore;
 use App\Services\MasterData\UnitStore;
 use Illuminate\Http\Request;
@@ -21,7 +20,11 @@ class UploadController extends Controller
 
     public function index(): JsonResponse
     {
-        return response()->json(['documents' => $this->reviewStore->listDocuments()]);
+        $documents = array_map(function (array $row): array {
+            $row['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $this->reviewStore->getStatus($row['document_id']) ?? []);
+            return $row;
+        }, $this->reviewStore->listDocuments());
+        return response()->json(['documents' => $documents]);
     }
 
     public function store(StoreDocumentRequest $request): JsonResponse
@@ -114,13 +117,13 @@ class UploadController extends Controller
             ], 404);
         }
 
+        $status['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $status);
         return response()->json($status);
     }
 
     public function transfer(Request $request, string $documentId): JsonResponse
     {
-        $actor = app(CurrentUser::class)->user($request);
-        abort_if(config('auth_ldap.enforced') && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่โอนเจ้าของเอกสารได้');
+        app(\App\Services\Auth\DocumentAccess::class)->authorize($request, 'transfer');
         $before = $this->reviewStore->getStatus($documentId);
         abort_if($before === null, 404, 'ไม่พบเอกสาร');
         $data = $request->validate(['owner_unit_code' => ['required', 'string'], 'username' => ['present', 'nullable', 'string']]);

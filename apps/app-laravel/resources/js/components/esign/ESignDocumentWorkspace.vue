@@ -13,7 +13,7 @@
         class="text-none"
         @click="router.push(`/documents/${documentId}/esign/preview`)"
       >ดูตัวอย่าง</v-btn>
-      <v-btn
+      <v-btn v-show="can.edit"
         color="admin-primary"
         size="small"
         prepend-icon="mdi-file-document-edit-outline"
@@ -231,7 +231,7 @@
                 </div>
               </div>
             </div>
-            <v-btn
+            <v-btn v-show="can.esign"
               v-if="stage === 'draft' || stage === 'cancelled'"
               block
               color="warning"
@@ -290,7 +290,7 @@
             <div class="esign-kv">
               <span>การเผยแพร่</span>
               <v-switch
-                v-if="isEdit"
+                v-if="isEdit && can.publish"
                 :model-value="isPublished"
                 :loading="publishToggleSaving"
                 :disabled="publishToggleSaving"
@@ -347,26 +347,26 @@
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/esign/preview`)"
           >ดูตัวอย่างเอกสาร</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             variant="outlined"
             prepend-icon="mdi-pencil-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/law-info?mode=edit`)"
           >แก้ไขข้อมูลเอกสาร</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             variant="outlined"
             prepend-icon="mdi-graph-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/relations`)"
           >ความสัมพันธ์กฎหมาย</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             v-if="isEdit"
             variant="outlined"
             prepend-icon="mdi-file-document-edit-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/review`)"
           >แก้ไขเนื้อหา</v-btn>
-          <v-btn
+          <v-btn v-show="can.publish"
             v-else
             variant="outlined"
             prepend-icon="mdi-shield-lock-outline"
@@ -381,6 +381,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
@@ -405,6 +406,7 @@ const { categoryLabel, categoryLabels } = useLawCategory();
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
 });
+const { can } = useDocumentAccess(() => props.documentId);
 const isEdit = computed(() => props.mode === 'edit');
 const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const fileUrl = computed(() => documentFileUrl(props.documentId));
@@ -455,6 +457,7 @@ const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
 
 async function togglePublished(next: boolean | null): Promise<void> {
+  let promoteStatus = false;
   if (next) {
     const status = await fetchStatus(props.documentId);
     if (status?.rag_skipped) {
@@ -489,7 +492,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     });
 
     if (result.isConfirmed) {
-      await documentStore.saveLawMeta({ status: inForceCode.value });
+      promoteStatus = true;
     } else if (result.isDenied) {
       router.push(`/documents/${props.documentId}/law-info`);
       return;
@@ -500,6 +503,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   publishToggleSaving.value = true;
   try {
     await documentStore.saveLawMeta({
+      ...(promoteStatus ? { status: inForceCode.value } : {}),
       published_date: next ? new Date().toISOString().slice(0, 10) : '',
     });
   } finally {

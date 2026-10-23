@@ -6,7 +6,7 @@
     show-bell
   >
     <template #actions>
-      <v-btn
+      <v-btn v-show="can.esign"
         variant="outlined"
         size="small"
         class="text-none"
@@ -18,7 +18,7 @@
         size="small"
         :prepend-icon="canPrepareSend ? 'mdi-send-outline' : 'mdi-file-search-outline'"
         class="text-none"
-        :disabled="canPrepareSend && !canSend"
+        :disabled="canPrepareSend && (!canSend || !can.esign)"
         :loading="sending"
         @click="handlePrimaryAction"
       >{{ stage === 'cancelled' ? 'ส่งอีกครั้ง' : (stage === 'draft' ? 'ส่งไปยังระบบ E-Sign' : 'ดูสถานะการลงนาม') }}</v-btn>
@@ -57,7 +57,7 @@
           <div class="d-flex align-center ga-1">
             <v-btn icon="mdi-refresh" size="x-small" variant="text" title="สร้าง PDF ใหม่" @click="refreshPdfPreview" />
             <v-btn icon="mdi-open-in-new" size="x-small" variant="text" title="เปิด PDF" :href="pdfPreviewUrl" target="_blank" rel="noopener" />
-            <v-btn icon="mdi-download" size="x-small" variant="text" title="ดาวน์โหลด PDF" :loading="downloadingPdf" @click="downloadPdf" />
+            <v-btn v-show="can.edit" icon="mdi-download" size="x-small" variant="text" title="ดาวน์โหลด PDF" :loading="downloadingPdf" @click="downloadPdf" />
           </div>
         </div>
 
@@ -93,7 +93,7 @@
         <v-card flat border rounded="lg" class="pa-4 mb-3">
           <div class="d-flex align-center justify-space-between mb-3">
             <div class="text-subtitle-2 font-weight-bold">จัดการผู้ลงนาม</div>
-            <v-btn
+            <v-btn v-show="can.esign"
               color="admin-primary"
               size="small"
               prepend-icon="mdi-plus"
@@ -127,7 +127,7 @@
                 </div>
                 <div v-if="signer.note" class="text-caption text-warning text-truncate">{{ signer.note }}</div>
               </div>
-              <v-btn
+              <v-btn v-show="can.esign"
                 icon="mdi-close"
                 size="x-small"
                 variant="text"
@@ -183,7 +183,7 @@
         <v-card flat border rounded="lg" class="pa-4">
           <div class="d-flex align-center justify-space-between mb-3">
             <div class="text-subtitle-2 font-weight-bold">ความสัมพันธ์กฎหมาย</div>
-            <v-btn
+            <v-btn v-show="can.edit"
               size="x-small"
               variant="text"
               class="text-none"
@@ -231,6 +231,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { downloadPdfExport, fetchStatus, reviewPdfPreviewUrl, sendDocumentESign } from '../../api/client';
@@ -260,6 +261,7 @@ import {
 import { createClientId } from '../../utils/createClientId';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const previewStore = usePreviewStore();

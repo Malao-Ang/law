@@ -19,7 +19,7 @@ class BackfillDocumentOwnerCommand extends Command
         $rows = [];
         foreach ($documents->listDocuments() as $row) {
             $status = $documents->getStatus($row['document_id']);
-            if (! array_key_exists('owner_unit_code', $status)) {
+            if (empty($status['owner_unit_code'])) {
                 $rows[] = $status;
             }
         }
@@ -38,7 +38,7 @@ class BackfillDocumentOwnerCommand extends Command
         }
         $this->info('สำรองข้อมูลแล้ว: '.$path);
         foreach ($rows as $row) {
-            $documents->setStatus($row['document_id'], ['owner_unit_code' => $code, 'responsible' => null, 'uploaded_by' => $row['uploaded_by'] ?? null]);
+            $documents->setStatus($row['document_id'], ['owner_unit_code' => $code, 'responsible' => $row['responsible'] ?? null, 'uploaded_by' => $row['uploaded_by'] ?? null]);
         }
         $this->info('ปรับเจ้าของเอกสารเรียบร้อยแล้ว: '.count($rows).' ฉบับ');
         return self::SUCCESS;

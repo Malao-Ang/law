@@ -8,6 +8,10 @@ const previewCache = new Map<string, PreviewData>();
 const previewInFlight = new Map<string, { version: number; promise: Promise<PreviewData> }>();
 const previewVersion = new Map<string, number>();
 
+export function clearReviewCache(): void {
+  for (const id of new Set([...reviewCache.keys(), ...reviewInFlight.keys()])) invalidateReview(id);
+}
+
 function currentVersion(versions: Map<string, number>, documentId: string): number {
   return versions.get(documentId) ?? 0;
 }

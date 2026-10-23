@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { clearReviewCache } from './reviewCache';
 import { computed, ref } from 'vue';
 import { ensureCsrfCookie, jsonRequest, setUnauthorizedHandler } from '../api/client';
 
@@ -32,6 +33,7 @@ interface MePayload {
   user: AuthUser;
   role: AuthRole;
   auth_enforced: boolean;
+  can_upload: boolean;
   is_super_admin: boolean;
   memberships: Membership[];
   active_unit: Unit | null;
@@ -43,6 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
   const role = ref<AuthRole | null>(null);
   const authEnforced = ref(false);
   const loaded = ref(false);
+  const canUpload = ref(false);
   const is_super_admin = ref(false);
   const memberships = ref<Membership[]>([]);
   const active_unit = ref<Unit | null>(null);
@@ -55,9 +58,12 @@ export const useAuthStore = defineStore('auth', () => {
   const roleLabel = computed(() => (role.value ? ROLE_LABELS[role.value] ?? role.value : ''));
 
   function apply(payload: MePayload): void {
+    if (user.value?.username !== payload.user?.username || active_unit.value?.code !== payload.active_unit?.code
+      || is_super_admin.value !== Boolean(payload.is_super_admin) || JSON.stringify(memberships.value) !== JSON.stringify(payload.memberships ?? [])) clearReviewCache();
     user.value = payload.user;
     role.value = payload.role;
     authEnforced.value = payload.auth_enforced;
+    canUpload.value = payload.can_upload;
     is_super_admin.value = Boolean(payload.is_super_admin);
     memberships.value = payload.memberships ?? [];
     active_unit.value = payload.active_unit ?? null;
@@ -65,7 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clear(): void {
+    clearReviewCache();
     user.value = null;
+    canUpload.value = false;
     role.value = null;
     is_super_admin.value = false;
     memberships.value = [];
@@ -135,5 +143,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, logout };
+  return { canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, logout };
 });

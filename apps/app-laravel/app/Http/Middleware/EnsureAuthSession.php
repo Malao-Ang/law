@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Guards admin/write API routes. A no-op while AUTH_ENFORCED=false.
- * Role-by-route rules arrive later; for now role `user` is kept out of guarded routes.
+ * DocumentAccess handles document actions, including cancellation by a sender now holding role user.
  */
 class EnsureAuthSession
 {
@@ -27,7 +27,7 @@ class EnsureAuthSession
             return response()->json(['message' => 'กรุณาเข้าสู่ระบบ'], 401);
         }
 
-        if ($this->currentUser->role($user, $request) === MongoUserStore::ROLE_USER) {
+        if ($this->currentUser->role($user, $request) === MongoUserStore::ROLE_USER && ! $request->route('documentId')) {
             return response()->json(['message' => 'ไม่มีสิทธิ์เข้าถึง'], 403);
         }
 

@@ -109,7 +109,7 @@ router.beforeEach(async (to) => {
   if (guarded && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
-  if (guarded && !auth.isAdminRole && !(to.path === '/admin/units' && auth.canManageUnits)) {
+  if (to.path.startsWith('/admin') && !auth.isAdminRole && !(to.path === '/admin/units' && auth.canManageUnits)) {
     return { path: '/' };
   }
 

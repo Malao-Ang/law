@@ -169,6 +169,10 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     error.status = response.status;
     error.errors = payload?.errors;
 
+    if (response.status === 403) {
+      const { alertError } = await import('../components/master/masterDialogs');
+      await alertError('คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
+    }
     if (response.status === 401 && !url.startsWith('/api/auth/')) {
       unauthorizedHandler?.();
     }
@@ -380,6 +384,10 @@ async function downloadBinaryExport(
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      const { alertError } = await import('../components/master/masterDialogs');
+      await alertError('คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
+    }
     const data = (await response.json().catch(() => ({}))) as ApiErrorPayload;
     throw new Error(data.message ?? `Export failed (${response.status})`);
   }

@@ -9,6 +9,7 @@
       :variant="isOld ? 'historical' : 'default'"
       next-label="ถัดไป"
       :next-loading="documentStore.saving"
+      :next-disabled="!can.edit"
       @back="router.back()"
       @next="saveAndNext"
     />
@@ -18,7 +19,7 @@
         <span>กำลังโหลด...</span>
       </div>
 
-      <v-form v-else ref="formRef" validate-on="submit lazy">
+      <v-form v-else :disabled="!can.edit" ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
@@ -291,6 +292,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
 import { useRoute, useRouter } from 'vue-router';
@@ -310,6 +312,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const route = useRoute();

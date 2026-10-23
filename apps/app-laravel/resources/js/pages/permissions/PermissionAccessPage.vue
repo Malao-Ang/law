@@ -9,12 +9,12 @@
       :variant="isOld ? 'historical' : 'default'"
       :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
-      :next-disabled="nextDisabled"
+      :next-disabled="nextDisabled || !can.publish"
       @back="router.back()"
       @next="saveAndPublish"
     />
 
-    <div class="mx-auto" style="max-width:1400px; padding-bottom:60px">
+    <div :inert="!can.publish" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -152,6 +152,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
@@ -175,6 +176,7 @@ import PermissionGroupFormDialog from '../../components/permissions/PermissionGr
 import { useLawStatus } from '../../composables/useLawStatus';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const { isDraft } = useLawStatus();

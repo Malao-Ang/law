@@ -3,7 +3,6 @@
 namespace App\Services\Auth;
 
 use App\Services\MasterData\UnitStore;
-use App\Services\ReviewStore;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,7 +11,7 @@ class DocumentOwnership
 {
     public const FIELDS = ['uploaded_by', 'responsible', 'owner_unit_code'];
 
-    public function __construct(private readonly ReviewStore $documents, private readonly CurrentUser $current,
+    public function __construct(private readonly CurrentUser $current,
         private readonly UnitStore $units, private readonly MongoBlobStore $blobs) {}
 
     public function legalUnitCode(): string

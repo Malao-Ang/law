@@ -189,6 +189,15 @@ export interface ComposeState {
   metadata: DocumentMetadata;
 }
 
+export interface DocumentCapabilities {
+  edit: boolean;
+  delete: boolean;
+  esign: boolean;
+  publish: boolean;
+  transfer: boolean;
+  cancel_esign: boolean;
+}
+
 export interface LawMeta {
   uploaded_by?: { username: string | null; name: string | null; at: string } | null;
   responsible?: { username: string; name: string | null } | null;
@@ -242,6 +251,7 @@ export interface LawRelation {
 }
 
 export interface DocumentListItem {
+  can?: DocumentCapabilities;
   uploaded_by?: { username: string | null; name: string | null; at: string } | null;
   responsible?: { username: string; name: string | null } | null;
   owner_unit_code?: string | null;
@@ -284,6 +294,7 @@ export interface LawRelationTarget {
 }
 
 export interface ReviewDocument {
+  can?: DocumentCapabilities;
   document_id: string;
   source_file: string;
   source_type: 'docx' | 'pdf_text' | 'pdf_scan' | 'pdf_mixed';
@@ -327,6 +338,7 @@ export interface ReviewDocument {
 }
 
 export interface DocumentStatus {
+  can?: DocumentCapabilities;
   document_id: string;
   document_type?: DocumentType;
   status: 'queued' | 'processing' | 'done' | 'failed' | 'exported' | 'ingesting' | 'ingested';

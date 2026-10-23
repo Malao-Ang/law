@@ -135,7 +135,7 @@
                   <p class="text-caption text-medium-emphasis mb-0">อ่านตัวบทแบบ read-only</p>
                 </div>
                 <v-btn
-                  v-if="!isOldDoc"
+                  v-if="!isOldDoc && can.edit"
                   color="admin-primary"
                   variant="tonal"
                   size="small"
@@ -215,7 +215,7 @@
                   :key="`publish-switch-${isPublished}`"
                   :model-value="isPublished"
                   :loading="publishToggleSaving"
-                  :disabled="publishToggleSaving"
+                  :disabled="publishToggleSaving || !can.publish"
                   color="success"
                   density="compact"
                   hide-details
@@ -240,6 +240,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
@@ -262,6 +263,7 @@ const { typeLabel } = useLawType();
 const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 
 const router = useRouter();
 const documentStore = useDocumentStore();
@@ -446,7 +448,7 @@ const actions = computed(() => {
     });
   }
 
-  return list;
+  return list.filter(action => action.key === 'permissions' ? can.value.publish : ['esign', 'preview'].includes(action.key) ? can.value.esign : can.value.edit);
 });
 
 function metaStatusColor(status: string): string {
@@ -464,7 +466,9 @@ function relationTypeLabel(type: RelationType): string {
   return labels[type] ?? type;
 }
 
+const promoteOnPublish = ref(false);
 async function togglePublished(next: boolean | null): Promise<void> {
+  promoteOnPublish.value = false;
   // ปิดเผยแพร่ — ไม่ต้องตรวจอะไร เปิด confirm dialog ตรงๆ
   if (!next) {
     publishDialogNext.value = false;
@@ -562,7 +566,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       confirmButtonColor: '#1a3673',
     });
     if (r.isConfirmed) {
-      await documentStore.saveLawMeta({ status: inForceCode.value });
+      promoteOnPublish.value = true;
     } else if (r.isDenied) {
       router.push(`/documents/${props.documentId}/law-info?mode=edit`);
       return;
@@ -580,6 +584,7 @@ async function confirmPublishChange(): Promise<void> {
   publishToggleSaving.value = true;
   try {
     const saved = await documentStore.saveLawMeta({
+      ...(next && promoteOnPublish.value ? { status: inForceCode.value } : {}),
       published_date: next ? new Date().toISOString().slice(0, 10) : '',
     });
     if (!saved) return;

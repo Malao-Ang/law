@@ -108,6 +108,7 @@ class CurrentUser
             'memberships' => array_values($memberships),
             'active_unit' => is_string($activeCode) ? $this->units->find($activeCode) : null,
             'needs_unit_selection' => ! ($user['is_super_admin'] ?? false) && count($memberships) > 0 && $activeCode === null,
+            'can_upload' => app(DocumentAccess::class)->allows($request, 'upload'),
             'auth_enforced' => (bool) config('auth_ldap.enforced'),
         ];
     }

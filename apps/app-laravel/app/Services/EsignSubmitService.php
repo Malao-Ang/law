@@ -97,6 +97,7 @@ class EsignSubmitService
             'esign_signers' => $docSigners,
             'esign_attachments' => $attachments,
             'esign_send_response' => null,
+            'esign' => ['sent_by' => null],
             'esign_submitted_at' => null,
             'esign_sign_status' => null,
             'esign_rejected_at' => null,
@@ -195,6 +196,7 @@ class EsignSubmitService
 
         $now = now()->toIso8601String();
         $this->reviewStore->setStatus($documentId, [
+            'esign' => ['sent_by' => app(\App\Services\Auth\CurrentUser::class)->user(request())['username'] ?? null],
             'esign_submitted_at' => $now,
             'esign_owner_citizenid' => $owner,
             'esign_return_url' => $returnUrl,
@@ -267,6 +269,7 @@ class EsignSubmitService
             'esign_cancel_response' => $response,
             'esign_sign_status' => 'C',
             'esign_send_response' => null,
+            'esign' => ['sent_by' => null],
             'esign_submitted_at' => null,
             'esign_confirmed_at' => null,
             'esign_signed_filename' => null,

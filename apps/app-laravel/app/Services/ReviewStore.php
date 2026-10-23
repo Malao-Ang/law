@@ -871,6 +871,13 @@ class ReviewStore
     public function updateDocumentReview(string $documentId, array $payload): array
     {
         $returnPayload = null;
+        $proposed = $this->blob->read('review', $documentId) ?? [];
+        $proposed['law_meta'] = array_merge($proposed['law_meta'] ?? [], $payload['law_meta'] ?? []);
+        $proposed['relations'] = $payload['relations'] ?? $proposed['relations'] ?? [];
+        foreach ($this->replacementTargets($documentId, $proposed) as $target) {
+            if ($target === $documentId) continue;
+            app(\App\Services\Auth\DocumentAccess::class)->authorize(request(), 'edit', $this->getStatus($target) ?? []);
+        }
 
         $this->blob->withLock('review', $documentId, function (array &$document) use ($documentId, $payload, &$returnPayload): void {
             if (array_key_exists('draft_html', $payload) && is_string($payload['draft_html'])) {
@@ -986,13 +993,8 @@ class ReviewStore
      *
      * @return list<string>
      */
-    public function applySameLevelReplacement(string $documentId): array
+    private function replacementTargets(string $documentId, array $document): array
     {
-        $document = $this->blob->read('review', $documentId);
-        if ($document === null) {
-            return [];
-        }
-
         $changeStatus = trim((string) (($document['law_meta']['change_status'] ?? '') ?: ''));
         if (app(ChangeStatuses::class)->role($changeStatus) !== 'whole') {
             return [];
@@ -1017,13 +1019,31 @@ class ReviewStore
             return [];
         }
 
-        $component = $this->sameLevelComponentIds($documentId, $targets);
+        return $this->sameLevelComponentIds($documentId, $targets);
+    }
+
+    public function applySameLevelReplacement(string $documentId): array
+    {
+        $document = $this->blob->read('review', $documentId);
+        if ($document === null) {
+            return [];
+        }
+
+        $component = $this->replacementTargets($documentId, $document);
+        if ($component === []) return [];
         $revoked = [];
         foreach ($component as $id) {
             if ($id === $documentId) {
                 continue;
             }
+            $before = ['status' => $this->getStatus($id), 'review' => $this->blob->read('review', $id)];
+            $before['responsible'] = $before['status']['responsible'] ?? null;
+            app(\App\Services\Auth\DocumentAccess::class)->authorize(request(), 'edit', $before['status'] ?? []);
             $this->patchLawMeta($id, ['status' => $this->enforcementStatuses()->codeForRole('repealed')]);
+            if (app(\App\Services\Auth\DocumentAccess::class)->actsOnBehalf(request(), $before['status'] ?? [])) {
+                app(\App\Services\Auth\DocumentOwnership::class)->record(request(), $id, 'edit:replacement', $before,
+                    ['status' => $this->getStatus($id), 'review' => $this->blob->read('review', $id)]);
+            }
             $revoked[] = $id;
         }
 

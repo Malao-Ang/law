@@ -2,11 +2,11 @@
   <AppShell :breadcrumbs="['การจัดการข้อมูล', 'การนำเข้าข้อมูล', 'จัดลำดับเนื้อหา']" title="" full-height>
     <WorkflowFooterBar
       :step="3"
-      :next-disabled="blockBusy"
+      :next-disabled="blockBusy || !can.edit"
       :next-loading="documentStore.saving"
       extra-label="ข้ามขั้นตอนนี้"
       extra-icon="mdi-skip-next-outline"
-      :extra-disabled="documentStore.saving || blockBusy"
+      :extra-disabled="documentStore.saving || blockBusy || !can.edit"
       @back="router.push(`/documents/${props.documentId}/review`)"
       @next="goToLawInfo"
       @extra="skipRagStep"
@@ -19,7 +19,7 @@
     </div>
 
     <template v-else>
-      <div class="rag-content-area">
+      <div class="rag-content-area" :inert="!can.edit">
         <!-- Selection action bar -->
         <div
           class="rag-selection-bar d-flex align-center ga-2 px-3 py-2 rounded-lg"
@@ -208,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useComposeStore } from '../../stores/composeStore';
@@ -226,6 +227,7 @@ import Swal from 'sweetalert2';
 import { updateRagSkipped } from '../../api/client';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 
 const router = useRouter();
 const composeStore = useComposeStore();
