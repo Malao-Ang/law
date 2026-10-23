@@ -66,6 +66,11 @@
         </v-tooltip>
       </template>
 
+      <template #item.ownership="{ item }">
+        <div class="text-caption">ผู้อัปโหลด: {{ item.uploadedBy }}</div>
+        <div class="text-caption">ผู้รับผิดชอบ: {{ item.responsible }}</div>
+        <div class="text-caption">หน่วยงาน: {{ item.ownerUnitCode }}</div>
+      </template>
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
           {{ typeLabel(item.lawType) }}
@@ -186,6 +191,9 @@ const { typeLabel } = useLawType();
 interface Row {
   no: number;
   documentId: string;
+  uploadedBy: string;
+  responsible: string;
+  ownerUnitCode: string;
   title: string;
   updatedAt: string;
   stage: StageKey;            // still drives the action button column
@@ -235,6 +243,7 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
+  { title: 'เจ้าของเอกสาร', key: 'ownership', sortable: false },
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
   { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
@@ -271,6 +280,9 @@ const rows = computed<Row[]>(() =>
     return {
       no: index + 1,
       documentId: doc.document_id,
+      uploadedBy: doc.uploaded_by?.name || doc.uploaded_by?.username || 'ไม่ระบุ',
+      responsible: doc.responsible?.name || doc.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด',
+      ownerUnitCode: doc.owner_unit_code || 'ไม่ระบุ',
       title: doc.title || doc.document_id,
       updatedAt: formatDate(doc.updated_at),
       stage,

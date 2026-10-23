@@ -190,6 +190,9 @@ export interface ComposeState {
 }
 
 export interface LawMeta {
+  uploaded_by?: { username: string | null; name: string | null; at: string } | null;
+  responsible?: { username: string; name: string | null } | null;
+  owner_unit_code?: string | null;
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
@@ -239,6 +242,9 @@ export interface LawRelation {
 }
 
 export interface DocumentListItem {
+  uploaded_by?: { username: string | null; name: string | null; at: string } | null;
+  responsible?: { username: string; name: string | null } | null;
+  owner_unit_code?: string | null;
   document_id: string;
   title: string;
   status: string;

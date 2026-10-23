@@ -186,7 +186,7 @@ export async function uploadDocument(
   file: File,
   scanExtractionMode: ScanExtractionMode = 'gemini',
   extractionEngine: 'standard' | 'fast' = 'standard',
-  opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string } = {},
+  opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string; ownerUnitCode?: string } = {},
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
@@ -194,6 +194,7 @@ export async function uploadDocument(
   form.append('extraction_engine', extractionEngine);
   if (opts.documentType) form.append('document_type', opts.documentType);
   if (opts.source) form.append('source', opts.source);
+  if (opts.ownerUnitCode) form.append('owner_unit_code', opts.ownerUnitCode);
   if (opts.lawType) form.append('law_type', opts.lawType);
 
   return jsonRequest<UploadResponse>('/api/documents', {

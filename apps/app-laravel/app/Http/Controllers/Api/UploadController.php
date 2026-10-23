@@ -9,6 +9,11 @@ use App\Services\Buu\MinioUploadService;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
+use App\Services\Auth\DocumentOwnership;
+use App\Services\Auth\CurrentUser;
+use App\Services\Auth\MongoUserStore;
+use App\Services\MasterData\UnitStore;
+use Illuminate\Http\Request;
 
 class UploadController extends Controller
 {
@@ -21,6 +26,7 @@ class UploadController extends Controller
 
     public function store(StoreDocumentRequest $request): JsonResponse
     {
+        $ownership = app(DocumentOwnership::class)->forUpload($request);
         $extension = strtolower((string) $request->file('file')->getClientOriginalExtension());
         $requestedMode = (string) $request->input('scan_extraction_mode', '');
         if ($extension === 'pdf') {
@@ -35,6 +41,8 @@ class UploadController extends Controller
 
         $documentId = $this->reviewStore->generateDocumentId();
         $storedFile = $this->reviewStore->storeUpload($request->file('file'), $documentId);
+
+        $this->reviewStore->setStatus($documentId, $ownership);
 
         if ($request->input('document_type') === 'old') {
             $this->reviewStore->createHistoricalStub($documentId, $storedFile['source_file'], [
@@ -107,6 +115,27 @@ class UploadController extends Controller
         }
 
         return response()->json($status);
+    }
+
+    public function transfer(Request $request, string $documentId): JsonResponse
+    {
+        $actor = app(CurrentUser::class)->user($request);
+        abort_if(config('auth_ldap.enforced') && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่โอนเจ้าของเอกสารได้');
+        $before = $this->reviewStore->getStatus($documentId);
+        abort_if($before === null, 404, 'ไม่พบเอกสาร');
+        $data = $request->validate(['owner_unit_code' => ['required', 'string'], 'username' => ['present', 'nullable', 'string']]);
+        $unit = app(UnitStore::class)->find($data['owner_unit_code']);
+        abort_unless($unit && $unit['is_active'], 422, 'ไม่พบหน่วยงานที่เปิดใช้งาน');
+        $owner = $data['username'] === null ? null : app(MongoUserStore::class)->find($data['username']);
+        if ($data['username'] !== null) {
+            abort_unless($owner && ! ($owner['is_disabled'] ?? false)
+                && in_array($unit['code'], array_column($owner['memberships'] ?? [], 'unit_code'), true), 422, 'ผู้รับผิดชอบต้องเป็นสมาชิกของหน่วยงานเจ้าของเอกสาร');
+        }
+        $fields = ['owner_unit_code' => $unit['code'], 'responsible' => $owner ? ['username' => $owner['username'], 'name' => $owner['name'] ?? null] : null];
+        $this->reviewStore->setStatus($documentId, $fields);
+        app(DocumentOwnership::class)->record($request, $documentId, 'transfer', $before, $this->reviewStore->getStatus($documentId));
+
+        return response()->json($fields);
     }
 
     public function destroy(string $documentId): JsonResponse

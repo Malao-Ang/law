@@ -45,6 +45,11 @@
           ประกาศฉบับนี้ยังไม่ระบุผู้ออก กรุณาเลือก "ประกาศที่ออกโดยมหาวิทยาลัย" หรือ "ประกาศที่ออกโดยสภามหาวิทยาลัย"
         </v-alert>
 
+        <v-card flat border rounded="lg" class="pa-4 mb-4">
+          <p>ผู้อัปโหลด: {{ documentStore.review?.law_meta?.uploaded_by?.name || documentStore.review?.law_meta?.uploaded_by?.username || 'ไม่ระบุ' }}</p>
+          <p>ผู้รับผิดชอบ: {{ documentStore.review?.law_meta?.responsible?.name || documentStore.review?.law_meta?.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด' }}</p>
+          <p>หน่วยงานเจ้าของ: {{ documentStore.review?.law_meta?.owner_unit_code || 'ไม่ระบุ' }}</p>
+        </v-card>
         <!-- ข้อมูลพื้นฐาน -->
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-5">

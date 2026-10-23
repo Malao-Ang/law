@@ -58,7 +58,7 @@ export const useUploadStore = defineStore('upload', () => {
     file: File,
     scanMode: ScanExtractionMode,
     engine: 'standard' | 'fast',
-    opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string } = {},
+    opts: { documentType?: 'new' | 'old'; source?: string; lawType?: string; ownerUnitCode?: string } = {},
   ): Promise<string> {
     const response = await uploadDocument(file, scanMode, engine, opts);
     return response.document_id;

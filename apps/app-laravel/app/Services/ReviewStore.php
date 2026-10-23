@@ -168,6 +168,9 @@ class ReviewStore
 
             $documents[] = [
                 'document_id' => $documentId,
+                'uploaded_by' => $status['uploaded_by'] ?? null,
+                'responsible' => $status['responsible'] ?? null,
+                'owner_unit_code' => $status['owner_unit_code'] ?? null,
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
@@ -241,7 +244,10 @@ class ReviewStore
 
                 $rows[] = [
                     'document_id' => $documentId,
-                    'title' => $title,
+                    'uploaded_by' => $status['uploaded_by'] ?? null,
+                'responsible' => $status['responsible'] ?? null,
+                'owner_unit_code' => $status['owner_unit_code'] ?? null,
+                'title' => $title,
                     'status' => (string) ($status['status'] ?? 'unknown'),
                     'updated_at' => $status['updated_at'] ?? null,
                     'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
@@ -737,6 +743,11 @@ class ReviewStore
                 $this->syncDocumentReview($doc);
             });
             $document = $this->blob->read('review', $documentId) ?? $document;
+        }
+
+        $status = $this->getStatus($documentId) ?? [];
+        foreach (\App\Services\Auth\DocumentOwnership::FIELDS as $field) {
+            $document['law_meta'][$field] = $status[$field] ?? null;
         }
 
         return $document;
