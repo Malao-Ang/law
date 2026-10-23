@@ -38,6 +38,14 @@ class EnforceDocumentAccess
             $this->ownership->record($request, $id, implode('+', $actions).':'.$suffix, $before,
                 ['status' => $this->documents->getStatus($id), 'review' => $this->blobs->read('review', $id)]);
         }
+        if (config('auth_ldap.enforced') && $response->getStatusCode() < 400
+            && in_array($suffix, ['transfer', 'workflow-progress', 'export-pdf', 'export-word', 'esign/cancel'], true)) {
+            try {
+                app(\App\Services\Search\LawIndexer::class)->index($id);
+            } catch (\Throwable $exception) {
+                \Illuminate\Support\Facades\Log::warning('Law indexing failed after access metadata update', ['document_id' => $id, 'error' => $exception->getMessage()]);
+            }
+        }
         return $response;
     }
 }

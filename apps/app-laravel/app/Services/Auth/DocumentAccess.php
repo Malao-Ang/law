@@ -20,6 +20,81 @@ class DocumentAccess
         return array_merge($review['law_meta'] ?? [], $document['law_meta'] ?? [], $document);
     }
 
+    public function readDocument(string $id): ?array
+    {
+        $status = $this->documents->getStatus($id);
+        return $status === null ? null : $this->documentMeta($status);
+    }
+
+    public static function isPublished(array $document): bool
+    {
+        return ! empty($document['published_date']) || (int) ($document['workflow_completed_step'] ?? 0) >= 6;
+    }
+
+    public function canRead(Request $request, array $document): bool
+    {
+        if (! config('auth_ldap.enforced')) return true;
+        $document = $this->documentMeta($document);
+        $actor = $this->current->user($request);
+        if ($actor['is_super_admin'] ?? false) return true;
+        $published = array_key_exists('is_published', $document) ? $document['is_published'] === true : self::isPublished($document);
+        if ($published && ($document['access_scope'] ?? 'public') === 'public') return true;
+        if ($actor === null) return false;
+        $username = $actor['username'];
+        $responsible = $document['responsible']['username'] ?? $document['responsible_username'] ?? null;
+        $coEditors = $document['co_editor_usernames'] ?? array_column($document['co_editors'] ?? [], 'username');
+        if ($responsible === $username || in_array($username, $coEditors, true)) return true;
+        $code = (string) ($document['owner_unit_code'] ?? '');
+        if (! $published) {
+            $document['responsible'] = ['username' => $responsible];
+            return $request->hasSession() && $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY) === $code
+                && ($this->units->find($code)['is_active'] ?? false) && $this->innerCanAct($actor, $document, $code);
+        }
+        $codes = array_column($actor['memberships'] ?? [], 'unit_code');
+        if (in_array($code, $codes, true)) return true;
+        $allowedUnits = $document['allowed_unit_codes'] ?? [];
+        $allowedUsers = $document['allowed_usernames'] ?? [];
+        if (! array_key_exists('allowed_unit_codes', $document)) {
+            foreach ($document['permission_group_ids'] ?? [] as $id) {
+                $group = app(\App\Services\Permissions\PermissionStore::class)->findGroup($id);
+                $allowedUnits = array_merge($allowedUnits, $group['unit_ids'] ?? []);
+                $allowedUsers = array_merge($allowedUsers, $group['user_ids'] ?? []);
+            }
+        }
+        return array_intersect($codes, $allowedUnits) !== [] || in_array($username, $allowedUsers, true);
+    }
+
+    public function authorizeRead(Request $request, array $document): void
+    {
+        if ($this->canRead($request, $document)) return;
+        abort($this->current->user($request) === null ? 401 : 403, 'เอกสารนี้จำกัดสิทธิ์การเข้าถึง');
+    }
+
+    /** Filter before pagination and aggregations so unreadable drafts never leak. */
+    public function searchVisibilityFilter(Request $request): array
+    {
+        $actor = $this->current->user($request);
+        if ($actor['is_super_admin'] ?? false) return ['match_all' => (object) []];
+        $clauses = [['term' => ['is_published' => true]]];
+        if ($actor !== null) {
+            $clauses[] = ['term' => ['responsible_username' => $actor['username']]];
+            $clauses[] = ['term' => ['co_editor_usernames' => $actor['username']]];
+            $code = $request->hasSession() ? $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY) : null;
+            if (is_string($code) && ($this->units->find($code)['is_active'] ?? false)
+                && ($this->membership($actor, $code)['role'] ?? null) === 'inner_admin') {
+                $owners = [];
+                foreach ($this->users->all() as $owner) {
+                    if (! ($owner['is_super_admin'] ?? false)
+                        && in_array($this->membership($owner, $code)['role'] ?? null, ['editor', 'user'], true)) $owners[] = $owner['username'];
+                }
+                if ($owners !== []) $clauses[] = ['bool' => ['filter' => [
+                    ['term' => ['owner_unit_code' => $code]], ['terms' => ['responsible_username' => $owners]],
+                ]]];
+            }
+        }
+        return ['bool' => ['should' => $clauses, 'minimum_should_match' => 1]];
+    }
+
     private function membership(?array $user, string $code): ?array
     {
         foreach ($user['memberships'] ?? [] as $membership) {
@@ -104,13 +179,14 @@ class DocumentAccess
         foreach (['edit', 'delete', 'esign', 'publish', 'transfer', 'cancel_esign', 'manage_co_editors'] as $action) {
             $can[$action] = $this->allows($request, $action, $document);
         }
+        $can['read'] = $this->canRead($request, $document);
         return $can;
     }
 
     /** Check every category in a mixed review payload; unchanged form fields need no extra grant. */
     public function actions(Request $request, string $documentId, string $suffix): array
     {
-        if ($suffix === 'export') return ['publish'];
+        if (in_array($suffix, ['export', 'export-pdf', 'export-word'], true)) return ['publish'];
         if ($suffix === 'transfer') return ['transfer'];
         if (str_starts_with($suffix, 'co-editors/')) return ['manage_co_editors'];
         if ($request->isMethod('DELETE') && $suffix === '') return ['delete'];

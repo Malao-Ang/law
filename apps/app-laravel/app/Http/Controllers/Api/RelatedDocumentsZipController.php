@@ -39,6 +39,11 @@ class RelatedDocumentsZipController extends Controller
         $selectedTitle = $documentId;
         $usedNames = [];
         foreach ($ids as $id) {
+            if (config('auth_ldap.enforced')) {
+                $access = app(\App\Services\Auth\DocumentAccess::class);
+                $document = $access->readDocument($id);
+                if ($document === null || ! $access->canRead(request(), $document)) continue;
+            }
             $file = $this->reviewStore->downloadableFileForDocument($id);
             if ($file === null) {
                 continue;

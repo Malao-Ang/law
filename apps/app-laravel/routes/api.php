@@ -74,16 +74,16 @@ Route::prefix('master-data/{kind}')->group(function (): void {
 
 Route::get('/documents', [UploadController::class, 'index'])->middleware('auth.session');
 Route::post('/documents', [UploadController::class, 'store'])->middleware('auth.session');
-Route::get('/documents/{documentId}', [UploadController::class, 'show']);
+Route::get('/documents/{documentId}', [UploadController::class, 'show'])->middleware('doc.read');
 Route::post('/documents/{documentId}/transfer', [UploadController::class, 'transfer'])->middleware('auth.session');
 Route::put('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
 Route::delete('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
 Route::delete('/documents/{documentId}', [UploadController::class, 'destroy'])->middleware('auth.session');
-Route::get('/documents/{documentId}/review', [ReviewController::class, 'show']);
-Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions']);
-Route::get('/documents/{documentId}/preview', [ReviewController::class, 'preview']);
-Route::get('/documents/{documentId}/active-children', [ReviewController::class, 'activeChildren']);
-Route::get('/documents/{documentId}/incoming-relations', [ReviewController::class, 'incomingRelations']);
+Route::get('/documents/{documentId}/review', [ReviewController::class, 'show'])->middleware('doc.read');
+Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions'])->middleware('doc.read');
+Route::get('/documents/{documentId}/preview', [ReviewController::class, 'preview'])->middleware('doc.read');
+Route::get('/documents/{documentId}/active-children', [ReviewController::class, 'activeChildren'])->middleware('doc.read');
+Route::get('/documents/{documentId}/incoming-relations', [ReviewController::class, 'incomingRelations'])->middleware('doc.read');
 Route::put('/documents/{documentId}/document-review', [ReviewController::class, 'updateDocumentReview'])->middleware('auth.session');
 Route::patch('/documents/{documentId}/workflow-progress', [ReviewController::class, 'updateWorkflowProgress'])->middleware('auth.session');
 Route::patch('/documents/{documentId}/rag-skip', [ReviewController::class, 'updateRagSkipped'])->middleware('auth.session');
@@ -99,20 +99,20 @@ Route::patch('/documents/{documentId}/blocks/{blockId}/size', [ReviewController:
 Route::post('/documents/{documentId}/blocks/{blockId}/reprocess', [ReviewController::class, 'reprocess'])->middleware('auth.session');
 Route::post('/documents/{documentId}/pages/{pageNo}/reprocess', [ReviewController::class, 'reprocessPage'])->middleware('auth.session');
 Route::post('/documents/{documentId}/export', [ExportController::class, 'store'])->middleware('auth.session');
-Route::get('/documents/{documentId}/export-pdf/preview', [PdfExportController::class, 'preview']);
+Route::get('/documents/{documentId}/export-pdf/preview', [PdfExportController::class, 'preview'])->middleware('doc.read');
 Route::post('/documents/{documentId}/export-pdf', [PdfExportController::class, 'store'])->middleware('auth.session');
 Route::post('/documents/{documentId}/export-pdf-original', [\App\Http\Controllers\Api\OriginalPdfExportController::class, 'store'])->middleware('auth.session');
 Route::post('/documents/{documentId}/export-word', [WordExportController::class, 'store'])->middleware('auth.session');
 Route::post('/documents/{documentId}/esign/upload', [EsignController::class, 'upload'])->middleware('auth.session');
 Route::post('/documents/{documentId}/esign/send', [EsignController::class, 'send'])->middleware('auth.session');
 Route::post('/documents/{documentId}/esign/cancel', [EsignController::class, 'cancel'])->middleware('auth.session');
-Route::get('/documents/{documentId}/esign/signed-pdf', [EsignController::class, 'signedPdf']);
-Route::get('/documents/{documentId}/esign/preview-pdf', [EsignController::class, 'previewPdf']);
-Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show']);
-Route::get('/documents/{documentId}/related-download.zip', RelatedDocumentsZipController::class);
-Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentFileController::class, 'showRelated']);
-Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show']);
-Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage']);
+Route::get('/documents/{documentId}/esign/signed-pdf', [EsignController::class, 'signedPdf'])->middleware('doc.read');
+Route::get('/documents/{documentId}/esign/preview-pdf', [EsignController::class, 'previewPdf'])->middleware('doc.read');
+Route::get('/documents/{documentId}/file', [DocumentFileController::class, 'show'])->middleware('doc.read');
+Route::get('/documents/{documentId}/related-download.zip', RelatedDocumentsZipController::class)->middleware('doc.read');
+Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentFileController::class, 'showRelated'])->middleware('doc.read');
+Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show'])->middleware('doc.read');
+Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage'])->middleware('doc.read');
 
 // MinIO test endpoints (dev/debug only) — 404 in production.
 Route::middleware(NotInProduction::class)->prefix('test/minio')->group(function (): void {

@@ -37,6 +37,8 @@ class LawIndexer
     {
         $review = $this->store->getReviewDocument($documentId) ?? [];
         $meta = $review['law_meta'] ?? [];
+        $status = $this->store->getStatus($documentId) ?? [];
+        $meta['is_published'] = \App\Services\Auth\DocumentAccess::isPublished(array_merge($meta, $status));
 
         $docs = [];
         $exportPath = $this->store->absolutePath($this->store->exportRelativePath($documentId));
@@ -109,6 +111,12 @@ class LawIndexer
         $changeStatuses = $this->changeStatuses ?? app(ChangeStatuses::class);
         $changeStatus = $changeStatuses->resolve($meta['change_status'] ?? null);
         $changeStatusCode = (string) ($changeStatus['code'] ?? ($meta['change_status'] ?? ''));
+        $allowedUnits = $allowedUsers = [];
+        foreach ($permissionGroupIds as $id) {
+            $group = app(\App\Services\Permissions\PermissionStore::class)->findGroup($id);
+            $allowedUnits = array_merge($allowedUnits, $group['unit_ids'] ?? []);
+            $allowedUsers = array_merge($allowedUsers, $group['user_ids'] ?? []);
+        }
 
         return [
             'law_id'         => $documentId,
@@ -134,6 +142,12 @@ class LawIndexer
             'signer_group'   => $meta['signer_group'] ?? null,
             'access_scope'   => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
             'permission_group_ids' => $permissionGroupIds,
+            'owner_unit_code' => $meta['owner_unit_code'] ?? null,
+            'responsible_username' => $meta['responsible']['username'] ?? null,
+            'co_editor_usernames' => array_column($meta['co_editors'] ?? [], 'username'),
+            'allowed_unit_codes' => array_values(array_unique($allowedUnits)),
+            'allowed_usernames' => array_values(array_unique($allowedUsers)),
+            'is_published' => (bool) ($meta['is_published'] ?? false),
             'visibility'     => LawMetaNormalizer::effectiveVisibility($meta),
             'keywords'       => $keywords,
             'keywords_text'  => implode(' ', $keywords),
