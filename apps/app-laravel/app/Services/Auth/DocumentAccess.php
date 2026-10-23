@@ -4,13 +4,21 @@ namespace App\Services\Auth;
 
 use App\Services\MasterData\UnitStore;
 use App\Services\ReviewStore;
+use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\Request;
 
 /** All document action decisions use current memberships, never upload-time roles. */
 class DocumentAccess
 {
     public function __construct(private readonly CurrentUser $current, private readonly MongoUserStore $users,
-        private readonly UnitStore $units, private readonly ReviewStore $documents) {}
+        private readonly UnitStore $units, private readonly ReviewStore $documents, private readonly MongoBlobStore $blobs) {}
+
+    public function documentMeta(array $document): array
+    {
+        $id = $document['document_id'] ?? null;
+        $review = is_string($id) ? $this->blobs->read('review', $id) : null;
+        return array_merge($review['law_meta'] ?? [], $document['law_meta'] ?? [], $document);
+    }
 
     private function membership(?array $user, string $code): ?array
     {
@@ -51,6 +59,8 @@ class DocumentAccess
         if ($actor['is_super_admin'] ?? false) {
             return true;
         }
+        $document = $this->documentMeta($document);
+        if ($action === 'cancel_esign') $action = 'esign';
         if ($action === 'transfer') {
             return false;
         }
@@ -60,15 +70,21 @@ class DocumentAccess
             return false;
         }
         $membership = $this->membership($actor, $code);
-        // The sender may cancel even after their role/actions change (rule 6).
-        if ($action === 'cancel_esign') {
-            return ($document['esign']['sent_by'] ?? null) === $actor['username']
-                || $this->innerCanAct($actor, $document, $code);
+        if ($action === 'manage_co_editors') {
+            return ($membership['role'] ?? null) === 'inner_admin';
         }
         if ($action === 'upload') {
             return in_array('upload', MongoUserStore::effectiveActions($membership ?? []), true);
         }
         $own = ($document['responsible']['username'] ?? null) === $actor['username'];
+        foreach ($document['co_editors'] ?? [] as $coEditor) {
+            if (($coEditor['username'] ?? null) === $actor['username']
+                && in_array($action, ['edit', 'delete', 'esign', 'publish'], true)
+                && in_array($action, $coEditor['actions'] ?? [], true)
+                && in_array($action, MongoUserStore::effectiveActions($membership ?? []), true)) {
+                return true;
+            }
+        }
         return ($own && in_array($action, MongoUserStore::effectiveActions($membership ?? []), true))
             || $this->innerCanAct($actor, $document, $code);
     }
@@ -85,7 +101,7 @@ class DocumentAccess
     public function capabilities(Request $request, array $document): array
     {
         $can = [];
-        foreach (['edit', 'delete', 'esign', 'publish', 'transfer', 'cancel_esign'] as $action) {
+        foreach (['edit', 'delete', 'esign', 'publish', 'transfer', 'cancel_esign', 'manage_co_editors'] as $action) {
             $can[$action] = $this->allows($request, $action, $document);
         }
         return $can;
@@ -96,6 +112,7 @@ class DocumentAccess
     {
         if ($suffix === 'export') return ['publish'];
         if ($suffix === 'transfer') return ['transfer'];
+        if (str_starts_with($suffix, 'co-editors/')) return ['manage_co_editors'];
         if ($request->isMethod('DELETE') && $suffix === '') return ['delete'];
         if (str_starts_with($suffix, 'esign/')) return [$suffix === 'esign/cancel' ? 'cancel_esign' : 'esign'];
         if ($suffix === 'workflow-progress') return [(int) $request->input('completed_step') >= 6 ? 'publish' : 'edit'];

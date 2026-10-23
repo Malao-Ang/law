@@ -76,6 +76,8 @@ Route::get('/documents', [UploadController::class, 'index'])->middleware('auth.s
 Route::post('/documents', [UploadController::class, 'store'])->middleware('auth.session');
 Route::get('/documents/{documentId}', [UploadController::class, 'show']);
 Route::post('/documents/{documentId}/transfer', [UploadController::class, 'transfer'])->middleware('auth.session');
+Route::put('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
+Route::delete('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
 Route::delete('/documents/{documentId}', [UploadController::class, 'destroy'])->middleware('auth.session');
 Route::get('/documents/{documentId}/review', [ReviewController::class, 'show']);
 Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions']);

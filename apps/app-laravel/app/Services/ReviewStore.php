@@ -870,6 +870,7 @@ class ReviewStore
      */
     public function updateDocumentReview(string $documentId, array $payload): array
     {
+        unset($payload['law_meta']['co_editors']);
         $returnPayload = null;
         $proposed = $this->blob->read('review', $documentId) ?? [];
         $proposed['law_meta'] = array_merge($proposed['law_meta'] ?? [], $payload['law_meta'] ?? []);
@@ -2117,6 +2118,7 @@ class ReviewStore
             'access_scope' => 'public',
             'permission_group_ids' => [],
         ], $meta, [
+            'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
             'law_group' => $lawGroups[0] ?? '',
             'law_groups' => $lawGroups,
             'agency' => $agencies[0] ?? '',
