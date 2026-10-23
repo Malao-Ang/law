@@ -69,6 +69,7 @@
       <template #item.ownership="{ item }">
         <div class="text-caption">ผู้อัปโหลด: {{ item.uploadedBy }}</div>
         <div class="text-caption">ผู้รับผิดชอบ: {{ item.responsible }}</div>
+        <div v-if="item.coEditors" class="text-caption">ผู้รับผิดชอบร่วม: {{ item.coEditors }}</div>
         <div class="text-caption">หน่วยงาน: {{ item.ownerUnitCode }}</div>
       </template>
       <template #item.lawType="{ item }">
@@ -175,6 +176,7 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
+import { getReviewCached } from '../../stores/reviewCache';
 import { deleteDocument, listDocuments } from '../../api/client';
 import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
@@ -195,6 +197,7 @@ interface Row {
   can?: import('../../types/document').DocumentCapabilities;
   uploadedBy: string;
   responsible: string;
+  coEditors: string;
   ownerUnitCode: string;
   title: string;
   updatedAt: string;
@@ -285,6 +288,7 @@ const rows = computed<Row[]>(() =>
       can: doc.can,
       uploadedBy: doc.uploaded_by?.name || doc.uploaded_by?.username || 'ไม่ระบุ',
       responsible: doc.responsible?.name || doc.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด',
+      coEditors: (doc.co_editors ?? []).map(person => person.name || person.username).join(', '),
       ownerUnitCode: doc.owner_unit_code || 'ไม่ระบุ',
       title: doc.title || doc.document_id,
       updatedAt: formatDate(doc.updated_at),
@@ -387,6 +391,12 @@ async function load(): Promise<void> {
   try {
     const res = await listDocuments();
     docs.value = res.documents ?? [];
+    // The list API omits co-editors; use readable review metadata for their names.
+    await Promise.all(docs.value.filter(doc => doc.can?.read && !['queued', 'processing', 'ingesting', 'failed'].includes(doc.status)).map(async doc => {
+      try {
+        doc.co_editors = (await getReviewCached(doc.document_id)).law_meta.co_editors ?? [];
+      } catch { /* Leave names empty when review metadata is unavailable. */ }
+    }));
   } finally {
     schedulePoll();
   }

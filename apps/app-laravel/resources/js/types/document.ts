@@ -196,11 +196,23 @@ export interface DocumentCapabilities {
   publish: boolean;
   transfer: boolean;
   cancel_esign: boolean;
+  manage_co_editors: boolean;
+  read: boolean;
+}
+
+export type CoEditorAction = 'edit' | 'delete' | 'esign' | 'publish';
+export interface DocumentCoEditor {
+  username: string;
+  name: string | null;
+  actions: CoEditorAction[];
+  added_by?: string | null;
+  added_at?: string;
 }
 
 export interface LawMeta {
   uploaded_by?: { username: string | null; name: string | null; at: string } | null;
   responsible?: { username: string; name: string | null } | null;
+  co_editors?: DocumentCoEditor[];
   owner_unit_code?: string | null;
   status: string;
   law_type: string;
@@ -254,6 +266,7 @@ export interface DocumentListItem {
   can?: DocumentCapabilities;
   uploaded_by?: { username: string | null; name: string | null; at: string } | null;
   responsible?: { username: string; name: string | null } | null;
+  co_editors?: DocumentCoEditor[];
   owner_unit_code?: string | null;
   document_id: string;
   title: string;

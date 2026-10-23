@@ -171,7 +171,7 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
 
     if (response.status === 403) {
       const { alertError } = await import('../components/master/masterDialogs');
-      await alertError('คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
+      await alertError(error.message);
     }
     if (response.status === 401 && !url.startsWith('/api/auth/')) {
       unauthorizedHandler?.();

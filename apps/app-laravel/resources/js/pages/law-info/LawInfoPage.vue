@@ -19,7 +19,9 @@
         <span>กำลังโหลด...</span>
       </div>
 
-      <v-form v-else :disabled="!can.edit" ref="formRef" validate-on="submit lazy">
+      <DocumentCoEditorsCard v-if="!documentStore.loading && documentStore.review" :document-id="documentId" :can="can" @updated="setCan" />
+
+      <v-form v-if="!documentStore.loading" :disabled="!can.edit" ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
           {{ documentStore.saveError }}
@@ -292,6 +294,7 @@
 </template>
 
 <script setup lang="ts">
+import DocumentCoEditorsCard from '../../components/shared/DocumentCoEditorsCard.vue';
 import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
@@ -312,7 +315,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
-const { can } = useDocumentAccess(() => props.documentId);
+const { can, setCan } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const route = useRoute();
