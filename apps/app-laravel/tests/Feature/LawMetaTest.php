@@ -186,10 +186,12 @@ class LawMetaTest extends TestCase
         $id = 'doc_lawmeta_private_ok_'.uniqid();
         $this->seedDocument($store, $id);
 
+        // Group members are real unit codes (DEP...) and real usernames.
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('user_somchai', ['name' => 'user_somchai'], null, false);
         $group = $this->postJson('/api/permission-groups', [
             'name' => 'กลุ่มเอกสารส่วนบุคคล_'.uniqid(),
             'description' => 'ใช้กับเอกสารที่จำกัดการเข้าถึง',
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => ['DEP101'],
             'position_ids' => [],
             'user_ids' => ['user_somchai'],
         ])->assertCreated()->json();

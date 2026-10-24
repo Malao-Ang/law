@@ -12,6 +12,7 @@ class BlockUpdateConflictTest extends TestCase
     public function test_update_returns_409_on_concurrency_exception(): void
     {
         $this->mock(ReviewStore::class, function ($mock): void {
+            $mock->shouldReceive('getStatus')->andReturn(['document_id' => 'doc-conflict-test']);
             $mock->shouldReceive('patchApprovedBlock')
                 ->once()
                 ->andThrow(new ConcurrencyException('contention'));
@@ -30,6 +31,7 @@ class BlockUpdateConflictTest extends TestCase
     public function test_update_returns_404_on_not_found_runtime_exception(): void
     {
         $this->mock(ReviewStore::class, function ($mock): void {
+            $mock->shouldReceive('getStatus')->andReturn(['document_id' => 'doc-conflict-test']);
             $mock->shouldReceive('patchApprovedBlock')
                 ->once()
                 ->andThrow(new RuntimeException('Block not found.'));

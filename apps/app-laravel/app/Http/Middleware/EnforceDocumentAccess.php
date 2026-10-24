@@ -25,8 +25,14 @@ class EnforceDocumentAccess
             return $next($request);
         }
         $document = $this->documents->getStatus($id);
-        abort_if($document === null, 404, 'ไม่พบเอกสาร');
+        if ($document === null) {
+            abort_if(config('auth_ldap.enforced'), 404, 'ไม่พบเอกสาร');
+            return $next($request);
+        }
         $suffix = implode('/', array_slice($request->segments(), 3));
+        if (config('auth_ldap.enforced')) {
+            abort_if(app(\App\Services\Auth\CurrentUser::class)->user($request) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        }
         $actions = $this->access->actions($request, $id, $suffix);
         foreach ($actions as $action) {
             $this->access->authorize($request, $action, $document);
