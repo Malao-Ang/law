@@ -94,7 +94,9 @@ class AuthLoginTest extends TestCase
             ->assertJsonPath('auth_enforced', false);
 
         $doc = app(MongoUserStore::class)->find('alice');
-        $this->assertSame('user', $doc['role']);
+        $this->assertArrayNotHasKey('role', $doc);
+        $this->assertSame('user', $doc['memberships'][0]['role']);
+        $this->assertFalse($doc['is_super_admin']);
         $this->assertFalse($doc['is_disabled']);
         $this->assertSame('U1', $doc['usid']);
         $this->assertNotNull($doc['last_login_at']);
@@ -109,7 +111,8 @@ class AuthLoginTest extends TestCase
         $doc = app(MongoUserStore::class)->find('alice');
         $this->assertEqualsCanonicalizing([
             'username', 'name', 'email', 'usid', 'psn_id', 'fac_id', 'fac_name', 'dep_id', 'dep_name',
-            'position', 'retired', 'role', 'is_disabled', 'created_at', 'updated_at', 'last_login_at',
+            'position', 'retired', 'is_disabled', 'created_at', 'updated_at', 'last_login_at',
+            'ums_fac_id', 'ums_dep_id', 'memberships', 'is_super_admin',
         ], array_keys($doc));
 
         $stored = json_encode($doc, JSON_UNESCAPED_UNICODE);
@@ -132,7 +135,7 @@ class AuthLoginTest extends TestCase
             ->assertOk()
             ->assertJsonPath('role', 'super_admin');
 
-        $this->assertSame('super_admin', app(MongoUserStore::class)->find('lib06002')['role']);
+        $this->assertTrue(app(MongoUserStore::class)->find('lib06002')['is_super_admin']);
     }
 
     public function test_login_does_not_overwrite_existing_role_from_ums(): void
@@ -141,7 +144,7 @@ class AuthLoginTest extends TestCase
         $this->spa('POST', '/api/auth/login', ['username' => 'alice', 'password' => self::PASSWORD])->assertOk();
 
         app('mongo.blob.users')->withLock('user', 'alice', function (array &$data): void {
-            $data['role'] = 'editor';
+            $data['memberships'][0]['role'] = 'editor';
         });
         Cache::flush();
         RateLimiter::clear('auth-login|alice|127.0.0.1');
