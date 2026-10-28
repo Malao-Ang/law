@@ -45,7 +45,7 @@
       <MasterDataTable
         :kind="kind"
         :items="master.items.value"
-        :columns="columns"
+        :columns="tableColumns"
         :loading="master.loading.value"
         :page="master.page.value"
         :per-page="master.perPage.value"
@@ -61,8 +61,13 @@
         @toggle="handleToggle"
         @update:page="master.page.value = $event"
       >
-        <template v-for="column in columns" :key="column.key" #[`item.${column.key}`]="slotProps">
-          <slot :name="`item.${column.key}`" v-bind="slotProps" />
+        <template v-for="column in tableColumns" :key="column.key" #[`item.${column.key}`]="slotProps">
+          <slot :name="`item.${column.key}`" v-bind="slotProps">
+            <v-chip v-if="column.key === 'usage_count'" size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline" :to="usageLink(kind, slotProps.item.code, slotProps.item.usage_count) ?? undefined">
+              {{ (slotProps.item.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
+            </v-chip>
+            <template v-else>{{ slotProps.value || '-' }}</template>
+          </slot>
         </template>
       </MasterDataTable>
     </div>
@@ -112,6 +117,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import AppShell from '../shared/AppShell.vue';
+import { usageLink } from './masterLock';
 import MasterDataTable from './MasterDataTable.vue';
 import MasterItemDialog from './MasterItemDialog.vue';
 import MasterItemViewDialog from './MasterItemViewDialog.vue';
@@ -144,6 +150,9 @@ const props = defineProps<{
   codeColumnTitle?: string;
 }>();
 
+const tableColumns = computed(() => props.kind !== 'change_detail' && !props.columns.some((x) => x.key === 'usage_count')
+  ? [...props.columns, { key: 'usage_count', title: 'จำนวนเอกสาร', width: '160px', align: 'center' as const }]
+  : props.columns);
 const master = useMasterData(props.kind);
 const dialogOpen = ref(false);
 const viewOpen = ref(false);

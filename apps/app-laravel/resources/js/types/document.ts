@@ -444,6 +444,12 @@ export interface ReportBucket {
 }
 
 export interface ReportDocument {
+  law_type_code?: string;
+  law_family_code?: string;
+  group_codes?: string[];
+  meta_status_code?: string;
+  change_status_code?: string;
+  structure_codes?: string[];
   id: string;
   title: string;
   type: string;

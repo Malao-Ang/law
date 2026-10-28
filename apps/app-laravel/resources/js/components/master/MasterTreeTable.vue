@@ -46,14 +46,9 @@
             <td>{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
             <td class="text-right font-weight-bold">
               <v-chip
-                v-if="row.family.attrs.has_subtypes === false && row.primary"
                 size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
-                :to="`/admin/laws?type=${encodeURIComponent(row.primary!.code)}`"
-              >{{ (row.primary?.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
-              <v-chip
-                v-else
-                size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
-              >{{ row.usage.toLocaleString('th-TH') }} รายการ</v-chip>
+                :to="usageLink('law_family', row.family.code, row.family.usage_count) ?? undefined"
+              >{{ (row.family.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
             </td>
             <td>
               <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">

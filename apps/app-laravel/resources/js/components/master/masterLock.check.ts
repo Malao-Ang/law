@@ -52,7 +52,10 @@ assert(usageLink('law_category', 'DCT003', 1) === '/admin/laws?category=DCT003',
 assert(usageLink('law_type', 'LTY02', 4) === '/admin/laws?type=LTY02', 'type link');
 assert(usageLink('law_category', 'DCT001', 0) === null, 'zero count is not a link');
 assert(usageLink('law_category', 'DCT001', undefined) === null, 'missing count is not a link');
-assert(usageLink('legal_structure', 'LST004', 3) === null, 'legal structure has no filter');
-assert(usageLink('law_family', 'LFM01', 3) === null, 'family has no link');
+assert(usageLink('legal_structure', 'LST004', 3) === '/admin/laws?structure=LST004', 'structure link');
+assert(usageLink('law_family', 'LFM01', 3) === '/admin/laws?family=LFM01', 'family link');
 
 console.log('masterLock.check OK');
+
+assert(usageLink('enforcement_status', 'STA01', 1) === '/admin/laws?status=STA01', 'status link');
+assert(usageLink('change_status', 'CHG01', 1) === '/admin/laws?change=CHG01', 'change link');
