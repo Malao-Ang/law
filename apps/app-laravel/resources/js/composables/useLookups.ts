@@ -28,8 +28,8 @@ const lawSources = ref<SelectableOption[]>([]);
 let loaded = false;
 let inFlight: Promise<void> | null = null;
 
-async function load(): Promise<void> {
-  if (loaded) return;
+async function load(force = false): Promise<void> {
+  if (loaded && !force) return;
 
   if (!inFlight) {
     inFlight = getLookups().then((data: LookupData) => {
@@ -59,8 +59,7 @@ async function load(): Promise<void> {
 }
 
 async function reload(): Promise<void> {
-  loaded = false;
-  await load();
+  await load(true);
 }
 
 export function useLookups() {

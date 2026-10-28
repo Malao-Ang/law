@@ -1,5 +1,6 @@
 <template>
   <v-card flat border rounded="lg" class="master-table">
+    <v-progress-linear v-if="refreshing || (loading && items.length > 0)" indeterminate color="admin-primary" height="2" />
     <v-table>
       <thead>
         <tr>
@@ -18,7 +19,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-if="loading">
+        <tr v-if="loading && items.length === 0">
           <td :colspan="columns.length + 4" class="text-center py-8">
             <v-progress-circular indeterminate color="admin-primary" />
           </td>
@@ -63,6 +64,8 @@
                     icon="mdi-eye-outline"
                     variant="text"
                     size="small"
+                    :disabled="pendingCodes?.has(item.code)"
+                    :loading="pendingCodes?.has(item.code)"
                     @click="$emit('view', item)"
                   />
                 </template>
@@ -75,6 +78,8 @@
                     variant="text"
                     size="small"
                     color="admin-primary"
+                    :disabled="pendingCodes?.has(item.code)"
+                    :loading="pendingCodes?.has(item.code)"
                     @click="$emit('edit', item)"
                   />
                 </template>
@@ -86,13 +91,15 @@
                 size="small"
                 color="error"
                 aria-label="ลบ"
+                :disabled="pendingCodes?.has(item.code)"
+                :loading="pendingCodes?.has(item.code)"
                 @click="$emit('delete', item)"
               />
               <MasterToggleCell
                 v-if="!readonly"
                 :item="item"
                 :kind="kind"
-                :busy="togglingCode === item.code"
+                :busy="pendingCodes?.has(item.code) || togglingCode === item.code"
                 :epoch="switchEpoch"
                 @toggle="$emit('toggle', item, $event)"
               />
@@ -134,6 +141,8 @@ const props = defineProps<{
   total: number;
   pageCount: number;
   togglingCode?: string | null;
+  refreshing?: boolean;
+  pendingCodes?: Set<string>;
   readonly?: boolean;
   codeColumnTitle?: string;
   switchEpoch?: number;

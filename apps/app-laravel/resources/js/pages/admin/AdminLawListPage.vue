@@ -42,7 +42,7 @@
       </v-card>
     </div>
 
-    <div class="d-flex flex-wrap ga-3 mb-4 align-center">
+    <div v-if="filtersReady" class="d-flex flex-wrap ga-3 mb-4 align-center">
       <v-text-field
         v-model="search"
         placeholder="ค้นหาชื่อกฎหมาย / หน่วยงาน / หมวดหมู่"
@@ -114,6 +114,11 @@
       />
     </div>
 
+    <div v-if="filtersReady && incomingFilters.length" class="d-flex ga-2 mb-3">
+      <v-chip v-for="filter in incomingFilters" :key="filter.key" closable @click:close="clearIncoming(filter.key)">
+        กรองจาก: {{ filter.label || 'ไม่พบรายการ' }}
+      </v-chip>
+    </div>
     <v-card flat border rounded="lg">
       <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
       <v-table density="comfortable">
@@ -160,6 +165,7 @@
                 </v-chip>
               </div>
               <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
+                <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" variant="tonal">{{ law.workflowStage }}</v-chip>
                 <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
                 <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
                 <span v-if="law.pages > 0 || law.sections != null">
@@ -242,9 +248,13 @@
   </AppShell>
 </template>
 
+<script lang="ts">
+let cachedLawSummary: import('../../types/document').ReportSummary | null = null;
+</script>
+
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary } from '../../types/document';
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
@@ -254,11 +264,11 @@ import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../../components/law/VersionHistoryTimeline.vue';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { useLawType } from '../../composables/useLawType';
-import { useLawCategory } from '../../composables/useLawCategory';
+import { useLookups, withInactiveCurrent } from '../../composables/useLookups';
 
 const PAGE_SIZE = 20;
 
-const summary = ref<ReportSummary>({
+const summary = ref<ReportSummary>(cachedLawSummary ?? {
   totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
   by_type: [],
   by_group: [],
@@ -278,8 +288,13 @@ const page = ref(1);
 const versionStore = useVersionStore();
 const { draftCode, inForceCode, isRepealed, statusColor, statusLabel } = useLawStatus();
 const lawTypes = useLawType();
-const lawCategories = useLawCategory();
 const route = useRoute();
+const router = useRouter();
+const lookups = useLookups();
+const filtersReady = ref(false);
+const filterChange = ref<string | null>(null);
+const filterStructure = ref<string | null>(null);
+const filterStage = ref<string | null>(null);
 const versionDialogOpen = ref(false);
 
 function openVersions(id: string): void {
@@ -287,28 +302,74 @@ function openVersions(id: string): void {
   void versionStore.fetch(id);
 }
 
+let applyingQuery = false;
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+onUnmounted(() => clearTimeout(searchTimer));
+function readQuery(): void {
+  applyingQuery = true;
+  const value = (key: string) => typeof route.query[key] === 'string' ? route.query[key] as string : null;
+  filterType.value = value('family');
+  filterLawType.value = value('type');
+  filterCategory.value = value('category');
+  filterStatus.value = value('status');
+  filterChange.value = value('change');
+  filterStructure.value = value('structure');
+  filterStage.value = value('stage');
+  search.value = value('q') ?? '';
+  sortOrder.value = value('sort') ?? 'newest';
+  page.value = 1;
+  applyingQuery = false;
+}
+function writeQuery(): void {
+  const query = { ...route.query };
+  const values = { family: filterType.value, type: filterLawType.value, category: filterCategory.value,
+    status: filterStatus.value, change: filterChange.value, structure: filterStructure.value,
+    stage: filterStage.value, q: search.value.trim(), sort: sortOrder.value === 'newest' ? null : sortOrder.value };
+  for (const [key, value] of Object.entries(values)) {
+    if (value) query[key] = value;
+    else delete query[key];
+  }
+  void router.replace({ query });
+}
 onMounted(async () => {
-  // Prefilter from URL: ?category=DCTxxx
-  const categoryParam = route.query.category;
-  if (typeof categoryParam === 'string' && categoryParam) {
-    filterCategory.value = lawCategories.normalizeCategory(categoryParam) || categoryParam;
-  }
-  // Prefilter from URL: ?type=LTYxx
-  const typeParam = route.query.type;
-  if (typeof typeParam === 'string' && typeParam) {
-    filterLawType.value = typeParam;
-  }
-  loading.value = true;
+  loading.value = !cachedLawSummary;
   try {
+    await lookups.load();
+    readQuery();
+    filtersReady.value = true;
     summary.value = await fetchReportSummary();
+    cachedLawSummary = summary.value;
   } finally {
     loading.value = false;
   }
 });
-
-watch([search, filterType, filterLawType, filterCategory, filterStatus, sortOrder], () => {
-  page.value = 1;
+watch(() => route.query, () => {
+  if (!filtersReady.value) return;
+  clearTimeout(searchTimer);
+  readQuery();
 });
+watch([filterType, filterLawType, filterCategory, filterStatus, filterChange, filterStructure, filterStage, sortOrder], () => {
+  if (applyingQuery || !filtersReady.value) return;
+  page.value = 1;
+  clearTimeout(searchTimer);
+  writeQuery();
+}, { flush: 'sync' });
+watch(search, () => {
+  if (applyingQuery || !filtersReady.value) return;
+  page.value = 1;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(writeQuery, 300);
+}, { flush: 'sync' });
+const incomingFilters = computed(() => [
+  { key: 'change', code: filterChange.value, label: lookups.changeStatusTypesAll.value.find((x) => x.value === filterChange.value)?.title },
+  { key: 'structure', code: filterStructure.value, label: lookups.legalStructuresAll.value.find((x) => x.code === filterStructure.value)?.title },
+  { key: 'stage', code: filterStage.value, label: filterStage.value },
+].filter((x) => x.code));
+function clearIncoming(key: string): void {
+  if (key === 'change') filterChange.value = null;
+  if (key === 'structure') filterStructure.value = null;
+  if (key === 'stage') filterStage.value = null;
+}
 
 const FAMILY_META: Record<string, { color: string; icon: string }> = {
   LFM04: { color: 'doc-phaainok', icon: 'mdi-bank-outline' },
@@ -320,7 +381,7 @@ const FAMILY_META: Record<string, { color: string; icon: string }> = {
 const statCards = computed(() => {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   return lawTypes.familiesOrdered.value.map((family) => {
-    const docsForType = summary.value.documents.filter((d) => lawTypes.typeFamily(d.type) === family.code);
+    const docsForType = summary.value.documents.filter((d) => d.law_family_code === family.code);
     const count = docsForType.length;
     const recent = docsForType.filter(
       (d) => d.date && new Date(d.date).getTime() > thirtyDaysAgo,
@@ -330,15 +391,9 @@ const statCards = computed(() => {
   });
 });
 
-// Only laws that have passed the info step (ข้อมูล = step 4) belong in this catalog.
-// Raw uploads still being processed / not yet filled in are hidden.
-const infoCompletedDocs = computed(() =>
-  summary.value.documents.filter((doc) => (doc.workflow_completed_step ?? 0) >= 4),
-);
-
 const childCountMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = {};
-  for (const doc of infoCompletedDocs.value) {
+  for (const doc of summary.value.documents) {
     for (const parentId of parentIdsOf(doc)) {
       map[parentId] = (map[parentId] ?? 0) + 1;
     }
@@ -380,7 +435,10 @@ interface LawRow {
   childCount: number;
   org: string;
   group: string;
-  groupCode: string;
+  familyCode: string;
+  groupCodes: string[];
+  structureCodes: string[];
+  changeCode: string;
   pages: number;
   sections: number | null;
   editedAt: string;
@@ -389,11 +447,15 @@ interface LawRow {
 }
 
 const laws = computed<LawRow[]>(() =>
-  infoCompletedDocs.value.map((doc) => ({
+  summary.value.documents.map((doc) => ({
     id: doc.id,
     title: doc.title,
-    lawType: doc.type !== 'ไม่ระบุ' ? doc.type : '',
-    metaStatus: doc.meta_status ?? '',
+    lawType: doc.law_type_code ?? '',
+    familyCode: doc.law_family_code ?? '',
+    groupCodes: doc.group_codes ?? [],
+    structureCodes: doc.structure_codes ?? [],
+    changeCode: doc.change_status_code ?? '',
+    metaStatus: doc.meta_status_code ?? '',
     changeStatus: doc.change_status ?? '',
     publishedDate: doc.published_date ?? '',
     workflowStage: workflowStageLabel(doc),
@@ -401,7 +463,6 @@ const laws = computed<LawRow[]>(() =>
     childCount: childCountMap.value[doc.id] ?? 0,
     org: doc.agency !== 'ไม่ระบุ' ? doc.agency : '',
     group: doc.group !== 'ไม่ระบุ' ? doc.group : '',
-    groupCode: doc.group_code ?? lawCategories.normalizeCategory(doc.group !== 'ไม่ระบุ' ? doc.group : '') ?? '',
     pages: doc.page_count ?? 0,
     sections: doc.section_count ?? null,
     editedAt: formatThaiDateNumeric(doc.date) || '-',
@@ -410,11 +471,11 @@ const laws = computed<LawRow[]>(() =>
   })),
 );
 
-// Count law types over the filtered (info-completed) list so the dropdown matches the table.
+// Count families over all documents, including documents still in progress.
 const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
   const counts = new Map<string, number>();
   for (const law of laws.value) {
-    const familyCode = lawTypes.typeFamily(law.lawType);
+    const familyCode = law.familyCode;
     if (familyCode) counts.set(familyCode, (counts.get(familyCode) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -424,7 +485,7 @@ const typeCounts = computed<Array<{ key: string; count: number }>>(() => {
 
 const typeOptions = computed(() => [
   { label: 'ทุกประเภท', value: null },
-  ...lawTypes.familiesOrdered.value.map((family) => ({
+  ...withInactiveCurrent(lookups.lawFamilies.value, lookups.lawFamiliesAll.value, filterType.value).map((family) => ({
     label: `${family.title} (${typeCounts.value.find((b) => b.key === family.code)?.count ?? 0})`,
     value: family.code,
   })),
@@ -432,28 +493,21 @@ const typeOptions = computed(() => [
 
 const lawTypeOptions = computed(() => [
   { label: 'ทุกประเภทเอกสาร', value: null },
-  ...lawTypes.typesByFamily.value.flatMap((group) =>
-    group.types.map((type) => ({ label: type.title, value: type.code })),
-  ),
+  ...withInactiveCurrent(lookups.documentTypes.value, lookups.documentTypesAll.value, filterLawType.value).map((type) => ({ label: type.title, value: type.code })),
 ]);
 
 const categoryOptions = computed(() => [
   { label: 'ทุกหมวด', value: null },
-  ...lawCategories.categoryOptions.value.map((cat) => ({
+  ...withInactiveCurrent(lookups.lawGroups.value, lookups.lawGroupsAll.value, filterCategory.value).map((cat) => ({
     label: cat.title,
     value: cat.code,
   })),
 ]);
 
-const statusOptions = [
-  { label: 'ทุกสถานะ', value: null },
-  { label: 'ดำเนินการ', value: 'ดำเนินการ' },
-  { label: 'รอการเชื่อมโยงความสัมพันธ์', value: 'รอการเชื่อมโยงความสัมพันธ์' },
-  { label: 'รอส่ง eSign', value: 'รอส่ง eSign' },
-  { label: 'รอลงนาม', value: 'รอลงนาม' },
-  { label: 'เผยแพร่', value: 'เผยแพร่' },
-  { label: 'ยกเลิก', value: 'ยกเลิก' },
-];
+const statusOptions = computed(() => [
+  { label: 'ทุกสถานะบังคับใช้', value: null },
+  ...withInactiveCurrent(lookups.statuses.value, lookups.statusesAll.value, filterStatus.value).map((item) => ({ label: item.title, value: item.code })),
+]);
 
 const sortOptions = [
   { label: 'ล่าสุด', value: 'newest' },
@@ -463,10 +517,13 @@ const sortOptions = [
 
 const filteredLaws = computed(() => {
   let result = laws.value;
-  if (filterType.value) result = result.filter((l) => lawTypes.typeFamily(l.lawType) === filterType.value);
-  if (filterLawType.value) result = result.filter((l) => lawTypes.typeItem(l.lawType)?.code === filterLawType.value);
-  if (filterCategory.value) result = result.filter((l) => l.groupCode === filterCategory.value);
-  if (filterStatus.value) result = result.filter((l) => l.workflowStage === filterStatus.value);
+  if (filterType.value) result = result.filter((l) => l.familyCode === filterType.value);
+  if (filterLawType.value) result = result.filter((l) => l.lawType === filterLawType.value);
+  if (filterCategory.value) result = result.filter((l) => l.groupCodes.includes(filterCategory.value!));
+  if (filterStatus.value) result = result.filter((l) => l.metaStatus === filterStatus.value);
+  if (filterChange.value) result = result.filter((l) => l.changeCode === filterChange.value);
+  if (filterStructure.value) result = result.filter((l) => l.structureCodes.includes(filterStructure.value!));
+  if (filterStage.value) result = result.filter((l) => l.workflowStage === filterStage.value);
   if (search.value.trim()) {
     const q = search.value.trim().toLowerCase();
     result = result.filter(

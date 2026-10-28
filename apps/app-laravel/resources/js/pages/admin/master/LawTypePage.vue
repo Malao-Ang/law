@@ -83,6 +83,8 @@
         :rows="tableRows"
         :expanded-codes="[...expandedCodes]"
         :loading="familyMaster.loading.value || typeMaster.loading.value"
+        :refreshing="familyMaster.refreshing.value || typeMaster.refreshing.value"
+        :pending-codes="new Set([...familyMaster.pendingCodes.value, ...typeMaster.pendingCodes.value])"
         :toggling-code="togglingCode"
         :switch-epoch="switchEpoch"
         :reorder-mode="reorderMode"
@@ -601,13 +603,18 @@ async function saveFamily(): Promise<void> {
   try {
     const saved = await familyMaster.save(familyPayload(), editing?.code);
     if (editing && (editing.attrs.has_subtypes !== false) !== familyForm.has_subtypes) {
-      await setFamilySubtypes(saved.code, familyForm.has_subtypes, enabling ? primaryName.value : undefined);
-      await familyMaster.fetch();
-      await lookups.reload();
+      familyMaster.pendingCodes.value.add(saved.code);
+      try {
+        familyMaster.applyItem(await setFamilySubtypes(saved.code, familyForm.has_subtypes, enabling ? primaryName.value : undefined));
+        await familyMaster.fetch(true, [saved.code]);
+        void lookups.reload().catch(() => {});
+      } finally {
+        familyMaster.pendingCodes.value.delete(saved.code);
+      }
     }
     primaryDialogOpen.value = false;
     familyDialogOpen.value = false;
-    await typeMaster.fetch();
+    await typeMaster.fetch(true);
     if (!editing && familyForm.has_subtypes) openCreateType(saved);
   } catch (err) {
     fieldErrors.value = (err as ApiRequestError).errors ?? {};
@@ -627,6 +634,7 @@ async function saveType(): Promise<void> {
     if (editingType.value && previousFamilyCode !== typeForm.family_code) {
       await moveSavedTypeToFamilyEnd(saved.code, typeForm.family_code);
     }
+    await familyMaster.fetch(true);
     typeDialogOpen.value = false;
     expandedCodes.value = new Set([...expandedCodes.value, typeForm.family_code]);
   } catch (err) {
@@ -674,7 +682,7 @@ async function saveReorder(): Promise<void> {
     await familyMaster.reorder(familyOrder.value);
     await typeMaster.reorder(flattenTypeOrder(familyOrder.value, typeOrderByFamily.value));
     snackbar.success('บันทึกลำดับแล้ว');
-    await Promise.all([familyMaster.fetch(), typeMaster.fetch()]);
+    await Promise.all([familyMaster.fetch(true), typeMaster.fetch(true)]);
     reorderMode.value = false;
   } catch (err) {
     snackbar.error(err instanceof Error ? err.message : 'บันทึกลำดับไม่สำเร็จ');
@@ -723,7 +731,7 @@ async function handleDeleteFamily(item: MasterItem): Promise<void> {
   if (!item.can_delete || !(await confirmDelete(item))) return;
   try {
     await familyMaster.remove(item);
-    await typeMaster.fetch();
+    await typeMaster.fetch(true);
   } catch {
     // The composable reports the API error.
   }
@@ -733,7 +741,7 @@ async function handleDeleteType(item: MasterItem): Promise<void> {
   if (!item.can_delete || !(await confirmDelete(item))) return;
   try {
     await typeMaster.remove(item);
-    await familyMaster.fetch();
+    await familyMaster.fetch(true);
   } catch {
     // The composable reports the API error.
   }
@@ -747,7 +755,7 @@ async function handleToggleFamily(family: MasterItem, next: boolean): Promise<vo
   togglingCode.value = family.code;
   try {
     await familyMaster.toggleActive(family, next);
-    await typeMaster.fetch();
+    await typeMaster.fetch(true);
   } catch {
     switchEpoch.value++;
   } finally {

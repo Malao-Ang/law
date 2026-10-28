@@ -25,8 +25,10 @@ export function lockAriaLabel(item: LockItem, _kind: MasterKind): string {
 
 export function usageLink(kind: MasterKind, code: string, count: number | undefined): string | null {
   if ((count ?? 0) <= 0) return null;
-  if (kind === 'law_category') return `/admin/laws?category=${encodeURIComponent(code)}`;
-  if (kind === 'law_type') return `/admin/laws?type=${encodeURIComponent(code)}`;
-
-  return null;
+  const filters: Partial<Record<MasterKind, string>> = {
+    law_family: 'family', law_type: 'type', law_category: 'category',
+    enforcement_status: 'status', change_status: 'change', legal_structure: 'structure',
+  };
+  const filter = filters[kind];
+  return filter ? `/admin/laws?${filter}=${encodeURIComponent(code)}` : null;
 }
