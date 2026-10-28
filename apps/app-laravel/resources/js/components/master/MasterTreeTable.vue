@@ -1,5 +1,6 @@
 <template>
   <v-card flat border rounded="lg" class="master-tree">
+    <v-progress-linear v-if="refreshing || (loading && rows.length > 0)" indeterminate color="admin-primary" height="2" />
     <v-table>
       <thead>
         <tr>
@@ -13,7 +14,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-if="loading">
+        <tr v-if="loading && rows.length === 0">
           <td colspan="7" class="text-center py-8">
             <v-progress-circular indeterminate color="admin-primary" />
           </td>
@@ -78,7 +79,8 @@
                 <v-btn
                   size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none"
                   :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
-                  :disabled="row.family.attrs.has_subtypes === false"
+                  :disabled="row.family.attrs.has_subtypes === false || pendingCodes?.has(row.family.code)"
+                  :loading="pendingCodes?.has(row.family.code)"
                   :aria-hidden="row.family.attrs.has_subtypes === false ? 'true' : undefined"
                   :tabindex="row.family.attrs.has_subtypes === false ? -1 : undefined"
                   @click="$emit('addType', row.family)"
@@ -87,14 +89,14 @@
                 </v-btn>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
-                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editFamily', row.family)" />
+                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('editFamily', row.family)" />
                   </template>
                 </v-tooltip>
-                <v-btn v-if="row.family.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" @click="$emit('deleteFamily', row.family)" />
+                <v-btn v-if="row.family.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('deleteFamily', row.family)" />
                 <MasterToggleCell
                   :item="row.family"
                   kind="law_family"
-                  :busy="togglingCode === row.family.code"
+                  :busy="pendingCodes?.has(row.family.code) || togglingCode === row.family.code"
                   :epoch="switchEpoch"
                   @toggle="$emit('toggleFamily', row.family, $event)"
                 />
@@ -165,14 +167,14 @@
                 </v-tooltip>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
-                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" @click="$emit('editType', type)" />
+                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('editType', type)" />
                   </template>
                 </v-tooltip>
-                <v-btn v-if="type.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" @click="$emit('deleteType', type)" />
+                <v-btn v-if="type.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('deleteType', type)" />
                 <MasterToggleCell
                   :item="type"
                   kind="law_type"
-                  :busy="togglingCode === type.code"
+                  :busy="pendingCodes?.has(type.code) || togglingCode === type.code"
                   :epoch="switchEpoch"
                   @toggle="$emit('toggleType', type, $event)"
                 />
@@ -208,6 +210,8 @@ defineProps<{
   expandedCodes: string[];
   loading?: boolean;
   togglingCode?: string | null;
+  refreshing?: boolean;
+  pendingCodes?: Set<string>;
   reorderMode?: boolean;
 }>();
 

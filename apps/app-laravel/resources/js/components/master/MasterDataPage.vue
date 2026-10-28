@@ -47,6 +47,8 @@
         :items="master.items.value"
         :columns="tableColumns"
         :loading="master.loading.value"
+        :refreshing="master.refreshing.value"
+        :pending-codes="master.pendingCodes.value"
         :page="master.page.value"
         :per-page="master.perPage.value"
         :total="master.total.value"
