@@ -7,6 +7,7 @@ use App\Services\MasterData\ChangeStatuses;
 use App\Services\MasterData\EnforcementStatuses;
 use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
+use App\Services\MasterData\LegalStructures;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class ReportController extends Controller
         private readonly LawTypes $lawTypes,
         private readonly LawCategories $lawCategories,
         private readonly ChangeStatuses $changeStatuses,
+        private readonly LegalStructures $legalStructures,
     ) {}
 
     public function summary(Request $request): JsonResponse
@@ -233,12 +235,29 @@ class ReportController extends Controller
      */
     private function documents(array $rows): array
     {
-        return array_map(function (array $r): array {
+        $structuresByDocument = [];
+        foreach ($this->reviewStore->blockChunkTypesByDocument() as $documentId => $chunkTypes) {
+            $codes = [];
+            foreach ($chunkTypes as $chunkType) {
+                $code = (string) ($this->legalStructures->resolve($chunkType)['code'] ?? '');
+                if ($code !== '') {
+                    $codes[$code] = true;
+                }
+            }
+            $structuresByDocument[$documentId] = array_keys($codes);
+        }
+
+        return array_map(function (array $r) use ($structuresByDocument): array {
             $rawType = trim((string) ($r['law_type'] ?? ''));
             $type = $this->lawTypes->resolve($rawType);
 
             return [
                 'id' => $r['document_id'],
+                'law_type_code' => (string) ($type['code'] ?? ''),
+                'law_family_code' => $this->lawTypes->familyOf($rawType) ?? '',
+                'group_codes' => $this->lawCategories->codesOf((array) ($r['law_groups'] ?? [])),
+                'meta_status_code' => (string) ($this->enforcementStatuses->resolve($r['meta_status'] ?? '')['code'] ?? ''),
+                'structure_codes' => $structuresByDocument[$r['document_id']] ?? [],
                 'title' => $r['title'],
                 'type' => $type === null ? ($rawType ?: 'ไม่ระบุ') : (string) ($type['name'] ?? $rawType),
                 'type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
