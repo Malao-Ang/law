@@ -42,6 +42,8 @@ class AuditLogTest extends TestCase
         $this->deleteJson('/api/permission-groups/'.$created->json('id'))->assertOk();
         $this->deleteJson('/api/documents/'.$id)->assertOk();
 
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('audit_admin', ['name' => 'ผู้ตรวจสอบ'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin'])->withSession(['auth_username' => 'audit_admin']);
         $all = $this->getJson('/api/audit-logs')->assertOk();
         $actions = collect($all->json('items'))->pluck('action')->all();
         $this->assertContains('update', $actions);
@@ -99,6 +101,8 @@ class AuditLogTest extends TestCase
             'relations' => [],
         ])->assertOk();
 
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('audit_admin', ['name' => 'ผู้ตรวจสอบ'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin'])->withSession(['auth_username' => 'audit_admin']);
         $items = collect($this->getJson('/api/audit-logs?resource=relation')->assertOk()->json('items'));
         $this->assertEqualsCanonicalizing(
             ['เพิ่มความสัมพันธ์', 'แก้ไขความสัมพันธ์', 'ลบความสัมพันธ์'],

@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\WordExportController;
 use App\Http\Middleware\NotInProduction;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/audit-logs/export', [AuditLogController::class, 'export'])->middleware('auth.session');
 Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('auth.session');
 
 Route::get('/health', HealthController::class);
