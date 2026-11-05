@@ -33,9 +33,10 @@ class AuditLogTest extends TestCase
             'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
         ])->assertOk();
 
+        $unit = app(\App\Services\MasterData\UnitStore::class)->all()[0];
         $created = $this->postJson('/api/permission-groups', [
             'name' => 'กลุ่ม audit '.uniqid(),
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => [$unit['code']],
         ])->assertCreated();
 
         $this->deleteJson('/api/permission-groups/'.$created->json('id'))->assertOk();
