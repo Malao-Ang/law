@@ -2,7 +2,7 @@
   <v-card flat border rounded="lg" class="pa-4 mb-4">
     <div class="text-subtitle-1 font-weight-bold mb-3">ผู้รับผิดชอบเอกสาร</div>
     <div class="d-flex align-center ga-2 mb-3">
-      <span>ผู้รับผิดชอบหลัก: {{ meta?.responsible?.name || meta?.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด' }}</span>
+      <span>ผู้รับผิดชอบหลัก: {{ meta?.responsible?.name || meta?.responsible?.username || 'ดูแลโดย Super Admin' }}</span>
       <v-chip size="small" color="admin-primary">หลัก</v-chip>
     </div>
     <div v-for="person in meta?.co_editors ?? []" :key="person.username" class="d-flex flex-wrap align-center ga-3 mb-2">

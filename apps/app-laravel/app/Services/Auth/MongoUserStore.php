@@ -73,7 +73,7 @@ class MongoUserStore
         abort_unless($super || self::unitRole($actor, $unitCode) === self::ROLE_INNER_ADMIN, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
         abort_if(! $super && ($change === null || ! in_array($change['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'ไม่มีสิทธิ์เพิ่ม ลบสมาชิก หรือกำหนดบทบาทผู้ดูแล');
         $role = $user === null ? null : self::unitRole($user, $unitCode);
-        abort_if(! $super && ! in_array($role, [self::ROLE_USER, self::ROLE_EDITOR], true), 403, 'แก้ไขได้เฉพาะสมาชิกเดิมที่เป็นผู้ใช้หรือผู้แก้ไขในหน่วยงานของตนเอง');
+        abort_if(! $super && ! in_array($role, [self::ROLE_USER, self::ROLE_EDITOR], true), 403, 'แก้ไขได้เฉพาะสมาชิกเดิมที่เป็น User หรือ Editor ในหน่วยงานของตนเอง');
         abort_if(($user === null || $user === []) && ($person === null || $change === null), 404, 'ไม่พบผู้ใช้ กรุณาค้นหาผู้ใช้จาก UMS อีกครั้ง');
         abort_if($change === null && $role === null, 404, 'ไม่พบสมาชิกในหน่วยงานนี้');
     }

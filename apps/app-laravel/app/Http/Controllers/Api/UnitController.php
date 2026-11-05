@@ -173,7 +173,7 @@ class UnitController extends Controller
     {
         $actor = $this->currentUser->user($request);
         abort_if($actor === null, 401, 'กรุณาเข้าสู่ระบบ');
-        abort_if($super && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่จัดการรายการนี้ได้');
+        abort_if($super && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะ Super Admin เท่านั้นที่จัดการรายการนี้ได้');
 
         return $actor;
     }

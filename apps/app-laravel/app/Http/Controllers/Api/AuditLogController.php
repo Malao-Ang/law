@@ -61,8 +61,8 @@ class AuditLogController extends Controller
     private function roleLabel(string $role): string
     {
         return match ($role) {
-            'super_admin' => 'ผู้ดูแลระบบสูงสุด', 'inner_admin' => 'ผู้ดูแลหน่วยงาน', 'outer_admin' => 'ผู้ดูแลภายนอก',
-            'editor' => 'ผู้แก้ไข', 'user' => 'ผู้ใช้งานทั่วไป', default => $role,
+            'super_admin' => 'Super Admin', 'inner_admin' => 'Admin', 'outer_admin' => 'Outer Admin',
+            'editor' => 'Editor', 'user' => 'User', default => $role,
         };
     }
 

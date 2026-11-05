@@ -47,7 +47,7 @@ class DocumentCoEditorController extends Controller
                     if ($candidate['unit_code'] === ($status['owner_unit_code'] ?? null)) $membership = $candidate;
                 }
                 abort_if($target === null || ($target['is_disabled'] ?? false)
-                    || ! in_array($membership['role'] ?? null, ['editor', 'inner_admin', 'outer_admin'], true), 422, 'ผู้รับผิดชอบร่วมต้องเป็นผู้แก้ไขหรือผู้ดูแลในหน่วยงานเจ้าของเอกสาร');
+                    || ! in_array($membership['role'] ?? null, ['editor', 'inner_admin', 'outer_admin'], true), 422, 'ผู้รับผิดชอบร่วมต้องเป็น Editor หรือผู้ดูแลในหน่วยงานเจ้าของเอกสาร');
                 abort_if(($status['responsible']['username'] ?? null) === $username, 422, 'ผู้ใช้รายนี้เป็นผู้รับผิดชอบหลักอยู่แล้ว');
                 $extra = array_diff($actions, MongoUserStore::effectiveActions($membership));
                 $labels = ['edit' => 'แก้ไข', 'delete' => 'ลบ', 'esign' => 'ลงนามอิเล็กทรอนิกส์', 'publish' => 'เผยแพร่'];
