@@ -144,7 +144,7 @@ interface NavItem { label: string; icon: string; to?: string; exact?: boolean; s
 interface NavGroup { label: string; items: NavItem[]; }
 
 const props = defineProps<{
-  breadcrumbs: string[];
+  breadcrumbs: (string | { title: string; to?: string; disabled?: boolean })[];
   title: string;
   subtitle?: string;
   navGroups?: NavGroup[];
