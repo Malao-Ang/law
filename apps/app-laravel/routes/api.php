@@ -48,6 +48,7 @@ foreach (['units', 'master-data/unit'] as $unitPrefix) {
 }
 Route::post('/units/sync-faculties', [\App\Http\Controllers\Api\UnitController::class, 'syncFaculties']);
 Route::get('/units/{code}/members', [\App\Http\Controllers\Api\UnitController::class, 'members']);
+Route::put('/units/{code}/members', [\App\Http\Controllers\Api\UnitController::class, 'updateMembers']);
 Route::put('/units/{code}/members/{username}', [\App\Http\Controllers\Api\UnitController::class, 'updateMember']);
 Route::delete('/units/{code}/members/{username}', [\App\Http\Controllers\Api\UnitController::class, 'removeMember']);
 Route::get('/users/search', \App\Http\Controllers\Api\UserSearchController::class);
