@@ -1115,6 +1115,8 @@ class MasterDataStore
         $data['deleted_codes'][$key] = array_values(array_unique(array_merge($data['deleted_codes'][$key] ?? [], $removed)));
         foreach ($oldItems as $item) {
             if (in_array($item['code'], $removed, true)) {
+                app(\App\Services\Audit\AuditLogger::class)->record('delete', 'master_data', $item['code'], 'ลบข้อมูลหลัก', [], $item['name'], null,
+                    ['kind' => $key, 'before' => $item]);
                 Log::info('Master data deleted', [
                     'actor' => auth()->user()?->username ?? auth()->id(),
                     'kind' => $key, 'code' => $item['code'], 'name' => $item['name'],

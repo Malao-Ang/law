@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\MinioTestController;
 use App\Http\Controllers\Api\EsignCallbackController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\LawSearchController;
 use App\Http\Controllers\Api\LawSuggestController;
 use App\Http\Controllers\Api\LookupController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\OversightController;
 use App\Http\Controllers\Api\PermissionDirectoryController;
 use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -23,6 +25,9 @@ use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\WordExportController;
 use App\Http\Middleware\NotInProduction;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/audit-logs/export', [AuditLogController::class, 'export'])->middleware('auth.session');
+Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('auth.session');
 
 Route::get('/health', HealthController::class);
 Route::get('/lookups', LookupController::class);
@@ -53,6 +58,8 @@ Route::delete('/units/{code}/members/{username}', [\App\Http\Controllers\Api\Uni
 Route::get('/users/search', \App\Http\Controllers\Api\UserSearchController::class);
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
+Route::get('/oversight/summary', [OversightController::class, 'summary'])->middleware('auth.session');
+Route::put('/oversight/{documentId}', [OversightController::class, 'update'])->middleware('auth.session');
 Route::post('/laws/search', [LawSearchController::class, 'search']);
 Route::get('/laws/facets', [LawSearchController::class, 'facets']);
 Route::post('/laws/suggest', [LawSuggestController::class, 'suggest']);

@@ -27,7 +27,7 @@ class EnsureAuthSession
             return response()->json(['message' => 'กรุณาเข้าสู่ระบบ'], 401);
         }
 
-        if ($this->currentUser->role($user, $request) === MongoUserStore::ROLE_USER && ! $request->route('documentId')) {
+        if ($this->currentUser->role($user, $request) === MongoUserStore::ROLE_USER && ! $request->route('documentId') && ! $request->is('api/audit-logs*')) {
             return response()->json(['message' => 'ไม่มีสิทธิ์เข้าถึง'], 403);
         }
 

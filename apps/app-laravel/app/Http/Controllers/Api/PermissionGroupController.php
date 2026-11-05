@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpsertPermissionGroupRequest;
+use App\Services\Audit\AuditLogger;
 use App\Services\Permissions\PermissionStore;
 use Illuminate\Http\JsonResponse;
 
 class PermissionGroupController extends Controller
 {
-    public function __construct(private readonly PermissionStore $permissionStore) {}
+    public function __construct(
+        private readonly PermissionStore $permissionStore,
+        private readonly AuditLogger $audit,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -30,7 +34,17 @@ class PermissionGroupController extends Controller
 
     public function store(UpsertPermissionGroupRequest $request): JsonResponse
     {
-        return response()->json($this->permissionStore->createGroup($request->validated()), 201);
+        $group = $this->permissionStore->createGroup($request->validated());
+        $this->audit->record(
+            'create',
+            'permission_group',
+            (string) $group['id'],
+            'เพิ่มกลุ่มสิทธิ์',
+            ['ชื่อ: '.(string) ($group['name'] ?? '')],
+            (string) ($group['name'] ?? ''),
+        );
+
+        return response()->json($group, 201);
     }
 
     public function update(UpsertPermissionGroupRequest $request, string $groupId): JsonResponse
@@ -40,14 +54,33 @@ class PermissionGroupController extends Controller
             return response()->json(['message' => 'Permission group not found.'], 404);
         }
 
+        $this->audit->record(
+            'update',
+            'permission_group',
+            $groupId,
+            'แก้ไขกลุ่มสิทธิ์',
+            ['ชื่อ: '.(string) ($group['name'] ?? '')],
+            (string) ($group['name'] ?? $groupId),
+        );
+
         return response()->json($group);
     }
 
     public function destroy(string $groupId): JsonResponse
     {
+        $existing = $this->permissionStore->findGroup($groupId);
         if (! $this->permissionStore->deleteGroup($groupId)) {
             return response()->json(['message' => 'Permission group not found.'], 404);
         }
+
+        $this->audit->record(
+            'delete',
+            'permission_group',
+            $groupId,
+            'ลบกลุ่มสิทธิ์',
+            [],
+            (string) ($existing['name'] ?? $groupId),
+        );
 
         return response()->json([
             'group_id' => $groupId,

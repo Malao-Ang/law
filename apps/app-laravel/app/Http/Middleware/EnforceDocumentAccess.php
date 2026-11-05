@@ -37,6 +37,10 @@ class EnforceDocumentAccess
         foreach ($actions as $action) {
             $this->access->authorize($request, $action, $document);
         }
+        try {
+            $request->attributes->set('audit_document_before', $this->access->readDocument($id) ?? $document);
+        } catch (\Throwable $exception) { report($exception); }
+        if ($this->access->actsOnBehalf($request, $document)) $request->attributes->set('audit_on_behalf_of', $document['responsible']['username'] ?? null);
         $audit = $suffix !== 'transfer' && $this->access->actsOnBehalf($request, $document);
         $before = $audit ? ['status' => $document, 'review' => $this->blobs->read('review', $id), 'responsible' => $document['responsible'] ?? null] : [];
         $response = $next($request);

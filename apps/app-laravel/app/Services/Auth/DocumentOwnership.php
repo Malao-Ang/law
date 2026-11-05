@@ -42,6 +42,9 @@ class DocumentOwnership
 
     public function record(Request $request, string $id, string $action, array $before, mixed $after): void
     {
+        app(\App\Services\Audit\AuditLogger::class)->record($action === 'transfer' ? 'transfer' : 'update', 'document', $id,
+            $action === 'transfer' ? 'โอนเอกสาร' : (str_starts_with($action, 'co_editors') ? 'เปลี่ยนผู้รับผิดชอบร่วม' : 'ดำเนินการแทนผู้รับผิดชอบ'), [], $id, $id, ['deduplicate' => true, 'unit_code' => $before['owner_unit_code'] ?? $before['status']['owner_unit_code'] ?? null,
+                'before' => $before, 'after' => (array) $after, 'on_behalf_of' => $before['responsible']['username'] ?? null]);
         $this->blobs->write('event', (string) Str::uuid(), [
             'actor' => $this->current->user($request)['username'] ?? null,
             'owner' => $before['responsible'] ?? null, 'document' => $id, 'action' => $action,

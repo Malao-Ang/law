@@ -182,6 +182,8 @@ const defaultNavGroups: NavGroup[] = [
     items: [
       { label: 'การนำเข้าข้อมูล', icon: 'mdi-cloud-upload-outline', to: '/admin/upload' },
       { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
+      { label: 'ติดตามกำกับดูแล', icon: 'mdi-bell-ring-outline', to: '/admin/oversight' },
+      { label: 'บันทึกการเปลี่ยนแปลง', icon: 'mdi-clipboard-text-clock-outline', to: '/admin/audit-logs' },
       { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
       { label: 'แสดงความสัมพันธ์', icon: 'mdi-file-tree-outline', to: '/admin/show-relations' },
     ],
@@ -213,7 +215,7 @@ const defaultNavGroups: NavGroup[] = [
 
 const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
   ...group,
-  items: group.items.filter((item) => item.to !== '/admin/units' || auth.canManageUnits),
+  items: group.items.filter((item) => (item.to !== '/admin/units' || auth.canManageUnits) && (item.to !== '/admin/audit-logs' || auth.canViewAudit)),
 })));
 
 function isActive(item: NavItem): boolean {

@@ -163,6 +163,7 @@ class AuthController extends Controller
 
     public function logout(Request $request): Response
     {
+        app(\App\Services\Audit\AuditLogger::class)->record('logout', 'auth', $this->currentUser->user($request)['username'] ?? '', 'ออกจากระบบ');
         $this->currentUser->logout($request);
 
         return response()->noContent();
@@ -185,6 +186,7 @@ class AuthController extends Controller
 
     private function audit(string $username, string $result, Request $request): void
     {
+        app(\App\Services\Audit\AuditLogger::class)->record($result === 'success' ? 'login' : 'login_failed', 'auth', $username, $result === 'success' ? 'เข้าสู่ระบบ' : 'เข้าสู่ระบบไม่สำเร็จ', [], $username, null, ['result' => $result === 'success' ? 'success' : 'failed']);
         Log::channel('auth')->info('auth.login', [
             'username' => $username,
             'result' => $result,
