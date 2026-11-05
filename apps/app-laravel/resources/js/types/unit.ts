@@ -12,6 +12,7 @@ export interface Unit {
   missing_in_ums: boolean;
   is_active: boolean;
   sort_order: number;
+  member_count?: number;
 }
 export interface Membership {
   unit_code: string;
