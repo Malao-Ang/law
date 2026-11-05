@@ -84,8 +84,7 @@ class DocumentAccess
                 && ($this->membership($actor, $code)['role'] ?? null) === 'inner_admin') {
                 $owners = [];
                 foreach ($this->users->all() as $owner) {
-                    if (! ($owner['is_super_admin'] ?? false)
-                        && in_array($this->membership($owner, $code)['role'] ?? null, ['editor', 'user'], true)) $owners[] = $owner['username'];
+                    if (in_array($this->membership($owner, $code)['role'] ?? null, ['editor', 'user'], true)) $owners[] = $owner['username'];
                 }
                 if ($owners !== []) $clauses[] = ['bool' => ['filter' => [
                     ['term' => ['owner_unit_code' => $code]], ['terms' => ['responsible_username' => $owners]],
@@ -118,7 +117,7 @@ class DocumentAccess
         }
         $username = $document['responsible']['username'] ?? null;
         $owner = is_string($username) ? $this->users->find($username) : null;
-        return $owner !== null && ! ($owner['is_super_admin'] ?? false)
+        return $owner !== null
             && in_array($this->membership($owner, $code)['role'] ?? null, ['editor', 'user'], true);
     }
 

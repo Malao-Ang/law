@@ -13,6 +13,7 @@ final class AuditLogStore
         'update' => 'แก้ไข',
         'delete' => 'ลบ',
         'login' => 'เข้าสู่ระบบ', 'logout' => 'ออกจากระบบ', 'login_failed' => 'เข้าสู่ระบบไม่สำเร็จ',
+        'role_switch' => 'เลือกบทบาทการใช้งาน',
         'view' => 'เปิดดู', 'upload' => 'อัปโหลด', 'publish' => 'เผยแพร่', 'unpublish' => 'ยกเลิกเผยแพร่',
         'export' => 'ส่งออก', 'esign_send' => 'ส่งลงนาม', 'esign_cancel' => 'ยกเลิกลงนาม',
         'esign_signed' => 'ลงนามเสร็จ', 'transfer' => 'โอน', 'toggle' => 'เปลี่ยนสถานะ', 'reorder' => 'เรียงลำดับ',
@@ -56,6 +57,7 @@ final class AuditLogStore
         foreach (['actor_username', 'active_unit_code', 'unit_code', 'on_behalf_of', 'kind', 'result', 'user_agent', 'before', 'after'] as $field) {
             $document[$field] = $entry[$field] ?? ($field === 'result' ? 'success' : null);
         }
+        $document['is_super_admin_account'] = (bool) ($entry['is_super_admin_account'] ?? false);
         $document['user_agent'] = $this->clip($document['user_agent'] ?? '', 500);
         $this->collection->insertOne($document);
 
