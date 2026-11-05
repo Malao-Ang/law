@@ -4,10 +4,11 @@ import { computed, ref } from 'vue';
 import { ensureCsrfCookie, jsonRequest, setUnauthorizedHandler } from '../api/client';
 
 import type { Membership, Unit } from '../types/unit';
+import type { AuthMeResponse, AuthRole, AuthUser } from '../types/auth';
+
+export type { AuthMeResponse, AuthRole, AuthUser };
 
 const LEGACY_MOCK_KEY = 'elaw_mock_auth';
-
-export type AuthRole = 'super_admin' | 'inner_admin' | 'outer_admin' | 'editor' | 'user';
 
 export const ROLE_LABELS: Record<AuthRole, string> = {
   super_admin: 'ผู้ดูแลระบบสูงสุด',
@@ -16,29 +17,6 @@ export const ROLE_LABELS: Record<AuthRole, string> = {
   editor: 'ผู้แก้ไข',
   user: 'ผู้ใช้งานทั่วไป',
 };
-
-export interface AuthUser {
-  username: string;
-  name: string;
-  email: string | null;
-  position: string | null;
-  fac_id: string | null;
-  fac_name: string | null;
-  dep_id: string | null;
-  dep_name: string | null;
-  retired: boolean;
-}
-
-interface MePayload {
-  user: AuthUser;
-  role: AuthRole;
-  auth_enforced: boolean;
-  can_upload: boolean;
-  is_super_admin: boolean;
-  memberships: Membership[];
-  active_unit: Unit | null;
-  needs_unit_selection: boolean;
-}
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null);
@@ -58,7 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdminRole = computed(() => role.value !== null && role.value !== 'user');
   const roleLabel = computed(() => (role.value ? ROLE_LABELS[role.value] ?? role.value : ''));
 
-  function apply(payload: MePayload): void {
+  function apply(payload: AuthMeResponse): void {
     if (user.value?.username !== payload.user?.username || active_unit.value?.code !== payload.active_unit?.code
       || is_super_admin.value !== Boolean(payload.is_super_admin) || JSON.stringify(memberships.value) !== JSON.stringify(payload.memberships ?? [])) clearReviewCache();
     user.value = payload.user;
@@ -88,9 +66,9 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         localStorage.removeItem(LEGACY_MOCK_KEY);
         const response = await fetch('/api/auth/me', { credentials: 'include', headers: { Accept: 'application/json' } });
-        const body = (await response.json().catch(() => ({}))) as Partial<MePayload>;
+        const body = (await response.json().catch(() => ({}))) as Partial<AuthMeResponse>;
         if (response.ok && body.user && body.role) {
-          apply(body as MePayload);
+          apply(body as AuthMeResponse);
         } else if (response.status === 401) {
           clear();
           authEnforced.value = Boolean(body.auth_enforced);
@@ -107,7 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username: string, password: string): Promise<void> {
     await ensureCsrfCookie();
-    apply(await jsonRequest<MePayload>('/api/auth/login', {
+    apply(await jsonRequest<AuthMeResponse>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }));
@@ -116,7 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function devLogin(username: string): Promise<void> {
     await ensureCsrfCookie();
-    apply(await jsonRequest<MePayload>('/api/auth/dev-login', {
+    apply(await jsonRequest<AuthMeResponse>('/api/auth/dev-login', {
       method: 'POST',
       body: JSON.stringify({ username }),
     }));
