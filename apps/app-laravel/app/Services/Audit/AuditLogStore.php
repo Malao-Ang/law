@@ -11,6 +11,10 @@ final class AuditLogStore
         'create' => 'เพิ่ม',
         'update' => 'แก้ไข',
         'delete' => 'ลบ',
+        'login' => 'เข้าสู่ระบบ', 'logout' => 'ออกจากระบบ', 'login_failed' => 'เข้าสู่ระบบไม่สำเร็จ',
+        'view' => 'เปิดดู', 'upload' => 'อัปโหลด', 'publish' => 'เผยแพร่', 'unpublish' => 'ยกเลิกเผยแพร่',
+        'export' => 'ส่งออก', 'esign_send' => 'ส่งลงนาม', 'esign_cancel' => 'ยกเลิกลงนาม',
+        'esign_signed' => 'ลงนามเสร็จ', 'transfer' => 'โอน', 'toggle' => 'เปลี่ยนสถานะ', 'reorder' => 'เรียงลำดับ',
     ];
 
     /** @var array<string, string> */
@@ -20,6 +24,8 @@ final class AuditLogStore
         'permission_group' => 'กลุ่มสิทธิ์',
         'oversight' => 'กำกับดูแล',
         'relation' => 'ความสัมพันธ์',
+        'master_data' => 'ข้อมูลหลัก', 'unit' => 'หน่วยงาน', 'membership' => 'สมาชิกหน่วยงาน',
+        'user' => 'ผู้ใช้', 'auth' => 'การเข้าสู่ระบบ',
     ];
 
     public function __construct(private readonly Collection $collection) {}
@@ -46,6 +52,9 @@ final class AuditLogStore
             'ip' => $this->clip($entry['ip'] ?? '', 64),
         ];
 
+        foreach (['actor_username', 'active_unit_code', 'unit_code', 'on_behalf_of', 'kind', 'result', 'user_agent', 'before', 'after'] as $field) {
+            $document[$field] = $entry[$field] ?? ($field === 'result' ? 'success' : null);
+        }
         $this->collection->insertOne($document);
 
         return $this->present($document);
@@ -95,8 +104,16 @@ final class AuditLogStore
         ];
     }
 
+    public function indexes(): void
+    {
+        foreach (['at', 'resource', 'action', 'unit_code', 'actor_username', 'document_id'] as $field) {
+            $this->collection->createIndex([$field => $field === 'at' ? -1 : 1]);
+        }
+    }
+
     public function truncate(): void
     {
+        if (! app()->runningUnitTests()) throw new \LogicException('Audit logs are append-only.');
         $this->collection->deleteMany([]);
     }
 
@@ -110,7 +127,7 @@ final class AuditLogStore
         $resource = (string) ($document['resource'] ?? '');
         $id = (string) ($document['_id'] ?? $document['id'] ?? '');
 
-        return [
+        return array_merge($document, [
             'id' => $id,
             'at' => (string) ($document['at'] ?? ''),
             'action' => $action,
@@ -125,7 +142,7 @@ final class AuditLogStore
             'actor_name' => (string) ($document['actor_name'] ?? ''),
             'actor_role' => (string) ($document['actor_role'] ?? ''),
             'ip' => (string) ($document['ip'] ?? ''),
-        ];
+        ]);
     }
 
     /**

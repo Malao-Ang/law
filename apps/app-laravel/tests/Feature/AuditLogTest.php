@@ -49,8 +49,8 @@ class AuditLogTest extends TestCase
         $this->assertContains('delete', $actions);
 
         $oversight = collect($all->json('items'))->firstWhere('resource', 'oversight');
-        $this->assertSame('ผู้ใช้ทดสอบ', $oversight['actor_name']);
-        $this->assertSame('Mock user', $oversight['actor_role']);
+        $this->assertSame('ไม่ระบุตัวตน', $oversight['actor_name']);
+        $this->assertSame('', $oversight['actor_role']);
         $this->assertSame('กฎหมายสำหรับ audit', $oversight['label']);
         $this->assertSame('แก้ไขสถานะกำกับดูแล', $oversight['summary']);
 
