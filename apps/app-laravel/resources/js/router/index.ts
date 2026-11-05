@@ -107,6 +107,11 @@ router.beforeEach(async (to) => {
       : { path: '/' };
   }
 
+  if (to.path === '/admin/audit-logs') {
+    if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } };
+    return auth.canViewAudit ? true : { path: '/' };
+  }
+
   if (!auth.authEnforced) return true;
 
   const guarded = to.path.startsWith('/admin') || to.path.startsWith('/documents');

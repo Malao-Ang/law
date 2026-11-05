@@ -215,7 +215,7 @@ const defaultNavGroups: NavGroup[] = [
 
 const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
   ...group,
-  items: group.items.filter((item) => item.to !== '/admin/units' || auth.canManageUnits),
+  items: group.items.filter((item) => (item.to !== '/admin/units' || auth.canManageUnits) && (item.to !== '/admin/audit-logs' || auth.canViewAudit)),
 })));
 
 function isActive(item: NavItem): boolean {

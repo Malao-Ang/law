@@ -782,13 +782,17 @@ export function updateRagSkipped(documentId: string, ragSkipped: boolean): Promi
   });
 }
 
-export function fetchAuditLogs(params: { action?: string; resource?: string; q?: string } = {}): Promise<AuditLogResponse> {
-  const search = new URLSearchParams();
-  if (params.action) search.set('action', params.action);
-  if (params.resource) search.set('resource', params.resource);
-  if (params.q) search.set('q', params.q);
-  const qs = search.toString();
-  return jsonRequest<AuditLogResponse>(`/api/audit-logs${qs ? `?${qs}` : ''}`);
+export type AuditLogFilters = { action?: string; resource?: string[]; q?: string; unit?: string; actor?: string; document?: string; from?: string; to?: string; page?: number; per_page?: number };
+export function auditLogQuery(params: AuditLogFilters): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) value.forEach((item) => query.append(`${key}[]`, item));
+    else if (value != null && value !== '') query.set(key, String(value));
+  }
+  return query.toString();
+}
+export function fetchAuditLogs(params: AuditLogFilters = {}): Promise<AuditLogResponse> {
+  return jsonRequest<AuditLogResponse>(`/api/audit-logs?${auditLogQuery(params)}`);
 }
 
 export function fetchOversightSummary(): Promise<OversightSummary> {

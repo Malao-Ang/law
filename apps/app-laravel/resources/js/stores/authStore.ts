@@ -50,6 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
   const memberships = ref<Membership[]>([]);
   const active_unit = ref<Unit | null>(null);
   const needs_unit_selection = ref(false);
+  const canViewAudit = computed(() => is_super_admin.value || memberships.value.some((m) => m.role === 'inner_admin'));
   const canManageUnits = computed(() => is_super_admin.value || memberships.value.some((m) => ['inner_admin', 'outer_admin'].includes(m.role)));
   let pendingFetch: Promise<void> | null = null;
 
@@ -151,5 +152,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
+  return { canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
 });
