@@ -34,7 +34,7 @@
     </div>
     <v-dialog v-model="peopleDialog" max-width="800" :retain-focus="false" persistent>
       <v-card rounded="lg"><v-card-title>เพิ่มคนใน {{ selectedUnit?.name }}</v-card-title><v-card-text>
-        <v-form class="d-flex ga-2" @submit.prevent="searchPeople"><v-text-field v-model="peopleQuery" label="ค้นหาชื่อ นามสกุล หรือชื่อผู้ใช้" variant="outlined" density="compact" hide-details :disabled="saving" /><v-btn type="submit" color="admin-primary" :loading="searching" :disabled="saving">ค้นหา</v-btn></v-form>
+        <v-form class="d-flex ga-2" @submit.prevent="searchPeople"><v-text-field v-model="peopleQuery" label="ค้นหาชื่อ นามสกุล หรือชื่อผู้ใช้" placeholder="ค้นด้วยชื่อหรือนามสกุลภาษาไทย" hint="ค้นจาก UMS ด้วยชื่อหรือนามสกุลภาษาไทย (ชื่อผู้ใช้ค้นได้เฉพาะคนที่เคยเข้าสู่ระบบ)" persistent-hint variant="outlined" density="compact" :disabled="saving" /><v-btn type="submit" color="admin-primary" :loading="searching" :disabled="saving">ค้นหา</v-btn></v-form>
         <v-list class="people-results"><v-list-item v-for="person in people" :key="person.username" :title="person.name || person.username" :subtitle="person.username"><template #prepend><v-checkbox-btn v-model="picked" :value="person.username" :disabled="saving || draft.some((m) => m.username === person.username)" :aria-label="`เพิ่ม ${person.username}`" /></template></v-list-item></v-list>
         <p v-if="searched && !people.length && !searching">ไม่พบผู้ใช้ที่ตรงกับคำค้นหา</p>
         <p class="mb-3">เลือก {{ picked.length }} คน</p>
@@ -185,7 +185,7 @@ async function searchPeople(): Promise<void> {
     // Preserve selections from earlier searches in this dialog.
     const retained = people.value.filter((p) => picked.value.includes(p.username));
     people.value = [...retained, ...result.items.filter((p) => !retained.some((r) => r.username === p.username))]; searched.value = true;
-    if (result.ums_unavailable) await Swal.fire({ icon: 'warning', titleText: 'ค้นหาจาก UMS ไม่สำเร็จ', text: result.message || 'แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ', confirmButtonText: 'ตกลง' });
+    if (result.ums_unavailable) await Swal.fire({ icon: 'warning', titleText: 'ระบบ UMS ไม่ตอบสนอง', text: result.message || 'แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ', confirmButtonText: 'ตกลง' });
   } catch (error) { await showError(error); }
   finally { searching.value = false; }
 }

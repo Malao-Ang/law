@@ -43,7 +43,7 @@ class UserSearchController extends Controller
         }
 
         return response()->json(['items' => array_slice(array_values($people), 0, 50), 'ums_unavailable' => $unavailable,
-            'message' => $unavailable ? 'ไม่สามารถค้นหาจาก UMS ได้ แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ' : null]);
+            'message' => $unavailable ? 'ระบบ UMS ไม่ตอบสนอง กรุณากดค้นหาอีกครั้ง (ตอนนี้แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ)' : null]);
     }
 
     private function summary(array $person): array

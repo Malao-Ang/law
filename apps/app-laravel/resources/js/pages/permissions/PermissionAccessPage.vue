@@ -119,7 +119,7 @@
             <div v-if="selectedGroups.length === 0" class="permission-empty-state">
               <v-icon icon="mdi-lock-outline" size="36" color="grey-lighten-1" />
               <div class="text-subtitle-2 font-weight-bold mt-2">ยังไม่ได้เลือกกลุ่มสิทธิ์</div>
-              <div class="text-body-2 text-medium-emphasis">เอกสารนี้จะอ่านได้โดยผู้ดูแลระบบสูงสุด ผู้รับผิดชอบหลัก/ร่วม และสมาชิกหน่วยงานเจ้าของ</div>
+              <div class="text-body-2 text-medium-emphasis">เอกสารนี้จะอ่านได้โดย Super Admin ผู้รับผิดชอบหลัก/ร่วม และสมาชิกหน่วยงานเจ้าของ</div>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
