@@ -158,6 +158,16 @@ class ReviewController extends Controller
 
     public function update(UpdateBlockRequest $request, string $documentId, string $blockId): JsonResponse
     {
+        $beforeBlock = [];
+        try {
+            foreach ((app(\App\Services\Storage\MongoBlobStore::class)->read('review', $documentId)['pages'] ?? []) as $page) {
+                foreach ($page['blocks'] ?? [] as $block) {
+                    if (($block['block_id'] ?? '') === $blockId) $beforeBlock = $block;
+                }
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
         try {
             $updatedBlock = $this->reviewStore->patchApprovedBlock(
                 documentId: $documentId,
@@ -176,7 +186,7 @@ class ReviewController extends Controller
         if ($text !== '') {
             $changes[] = 'ข้อความ: '.mb_substr(preg_replace('/\s+/u', ' ', $text) ?? $text, 0, 80);
         }
-        $this->audit->record('update', 'block', $blockId, 'แก้ไขเนื้อหาบล็อก', $changes, $blockId, $documentId);
+        $this->audit->record('update', 'block', $blockId, 'แก้ไขเนื้อหาบล็อก', $changes, $blockId, $documentId, ['before' => $beforeBlock, 'after' => $updatedBlock]);
 
         return response()->json([
             'document_id' => $documentId,
@@ -352,7 +362,7 @@ class ReviewController extends Controller
         $this->reviewStore->setStatus($documentId, $patch);
 
         $this->audit->record(
-            'update',
+            $completedStep >= 6 ? 'publish' : 'update',
             'document',
             $documentId,
             $completedStep >= 6 ? 'เผยแพร่เอกสาร' : 'อัปเดตขั้นตอนงาน',

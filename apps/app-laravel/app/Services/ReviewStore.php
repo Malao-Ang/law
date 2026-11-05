@@ -971,7 +971,12 @@ class ReviewStore
             ];
         });
 
-        $revoked = $this->applySameLevelReplacement($documentId);
+        request()->attributes->set('audit_replacement', true);
+        try {
+            $revoked = $this->applySameLevelReplacement($documentId);
+        } finally {
+            request()->attributes->remove('audit_replacement');
+        }
         $fresh = $this->blob->read('review', $documentId);
         if (is_array($fresh) && is_array($returnPayload)) {
             $returnPayload['law_meta'] = $fresh['law_meta'] ?? $returnPayload['law_meta'];
@@ -1160,14 +1165,21 @@ class ReviewStore
      */
     public function patchLawMeta(string $documentId, array $fields): void
     {
-        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields): void {
+        $before = $after = [];
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields, &$before, &$after): void {
             $this->ensureLawMetaDefaults($document);
+            $before = $document['law_meta'];
             if (($fields['access_scope'] ?? null) === 'public') {
                 $fields['permission_group_ids'] = [];
             }
             $document['law_meta'] = array_merge($document['law_meta'], $fields);
             $this->ensureLawMetaDefaults($document);
+            $after = $document['law_meta'];
         });
+        if (request()->attributes->get('audit_replacement') && $before !== $after) {
+            app(\App\Services\Audit\AuditLogger::class)->record('update', 'relation', $documentId, 'ปรับสถานะจากการปรับปรุงทั้งฉบับ', [], $documentId, $documentId,
+                ['before' => $before, 'after' => $after]);
+        }
         Cache::forget('law-meta-list');
     }
 

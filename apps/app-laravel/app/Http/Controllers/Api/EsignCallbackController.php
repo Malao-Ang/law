@@ -109,6 +109,8 @@ class EsignCallbackController
         }
 
         $reviewStore->setStatus($documentId, $patch);
+        app(\App\Services\Audit\AuditLogger::class)->record('esign_signed', 'document', $documentId, 'ผลการลงนาม', [], $documentId, $documentId,
+            ['before' => ['sign_status' => $current['esign_sign_status'] ?? null], 'after' => ['sign_status' => $signStatus], 'result' => $signStatus === 'Y' ? 'success' : 'failed']);
 
         Log::info('e-sign callback received', [
             'document_id' => $documentId,

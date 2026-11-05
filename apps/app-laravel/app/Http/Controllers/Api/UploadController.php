@@ -151,6 +151,7 @@ class UploadController extends Controller
 
     public function destroy(string $documentId): JsonResponse
     {
+        $before = $this->reviewStore->getStatus($documentId) ?? [];
         try {
             if (! $this->reviewStore->deleteDocument($documentId)) {
                 return response()->json([
@@ -161,7 +162,7 @@ class UploadController extends Controller
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 
-        $this->audit->record('delete', 'document', $documentId, 'ลบเอกสาร', [], $documentId, $documentId);
+        $this->audit->record('delete', 'document', $documentId, 'ลบเอกสาร', [], $documentId, $documentId, ['unit_code' => $before['owner_unit_code'] ?? null, 'before' => $before]);
 
         return response()->json([
             'document_id' => $documentId,
@@ -172,7 +173,7 @@ class UploadController extends Controller
     private function auditCreated(string $documentId, string $sourceFile, string $kind): void
     {
         $this->audit->record(
-            'create',
+            'upload',
             'document',
             $documentId,
             'นำเข้าเอกสาร',
