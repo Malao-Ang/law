@@ -1933,10 +1933,30 @@ class ReviewStore
 
             $dueDate = trim((string) ($entry['proclamation_due_date'] ?? ''));
             $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1 ? $dueDate : null;
+            $issuedOn = trim((string) ($entry['proclamation_issued_on'] ?? ''));
+            $issuedOn = preg_match('/^\d{4}-\d{2}-\d{2}$/', $issuedOn) === 1 ? $issuedOn : null;
+            $proclamationScope = ($entry['proclamation_scope'] ?? '') === 'sections' ? 'sections' : 'whole';
+            $proclamationSections = [];
+            $rawSections = $entry['proclamation_sections'] ?? [];
+            if (is_string($rawSections)) {
+                $rawSections = preg_split('/[,،\n]+/u', $rawSections) ?: [];
+            }
+            foreach (is_array($rawSections) ? $rawSections : [] as $section) {
+                $text = trim((string) $section);
+                if ($text !== '' && ! in_array($text, $proclamationSections, true)) {
+                    $proclamationSections[] = $text;
+                }
+            }
             $requiresProclamation = filter_var($entry['requires_new_proclamation'] ?? false, FILTER_VALIDATE_BOOLEAN);
-            if (! $requiresProclamation || $dueDate === null) {
+            if (! $requiresProclamation || $dueDate === null || ($proclamationScope === 'sections' && $proclamationSections === [])) {
                 $requiresProclamation = false;
                 $dueDate = null;
+                $issuedOn = null;
+                $proclamationScope = 'whole';
+                $proclamationSections = [];
+            }
+            if ($proclamationScope !== 'sections') {
+                $proclamationSections = [];
             }
 
             $clean[] = [
@@ -1953,7 +1973,10 @@ class ReviewStore
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
                 'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
                 'requires_new_proclamation' => $requiresProclamation,
+                'proclamation_scope' => $requiresProclamation ? $proclamationScope : null,
+                'proclamation_sections' => $proclamationSections,
                 'proclamation_due_date' => $dueDate,
+                'proclamation_issued_on' => $requiresProclamation ? $issuedOn : null,
             ];
         }
 

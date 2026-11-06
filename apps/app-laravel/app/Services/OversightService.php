@@ -8,6 +8,8 @@ use RuntimeException;
 
 final class OversightService
 {
+    /** @var array<string, array<int, array{sections: array<int, string>}>>|null */
+    private ?array $issuedFollowUpIndex = null;
     /** @var array<int, string> */
     private const MONTHS = [
         1 => 'มกราคม',
@@ -386,7 +388,7 @@ final class OversightService
             'backup' => $this->contact($stored['backup'] ?? []),
             'steps' => $steps,
             'reminders_sent' => is_array($stored['reminders_sent'] ?? null) ? $stored['reminders_sent'] : [],
-            'proclamation_deadlines' => $this->proclamationDeadlines($review),
+            'proclamation_deadlines' => $this->proclamationDeadlines($documentId, $review),
         ];
     }
 
@@ -558,10 +560,15 @@ final class OversightService
                 continue;
             }
             $title = trim((string) ($item['title'] ?? ''));
+            $scope = (string) ($item['scope'] ?? 'whole');
+            $sections = is_array($item['sections'] ?? null) ? implode(', ', $item['sections']) : '';
+            $prefix = $scope === 'sections'
+                ? 'ออกประกาศฉบับใหม่บางข้อ'.($sections !== '' ? ' ('.$sections.')' : '')
+                : 'ออกประกาศฉบับใหม่ทั้งฉบับ';
             $deadlines[] = [
                 'kind' => 'proclamation',
                 'key' => (string) ($item['id'] ?? $date),
-                'label' => $title !== '' ? 'ออกประกาศฉบับใหม่: '.$title : 'ออกประกาศฉบับใหม่',
+                'label' => $title !== '' ? $prefix.': '.$title : $prefix,
                 'date' => $date,
             ];
         }
@@ -571,9 +578,9 @@ final class OversightService
 
     /**
      * @param  array<string, mixed>  $review
-     * @return array<int, array{id: string, title: string, date: string}>
+     * @return array<int, array{id: string, title: string, date: string, scope: string, sections: array<int, string>}>
      */
-    private function proclamationDeadlines(array $review): array
+    private function proclamationDeadlines(string $documentId, array $review): array
     {
         $items = [];
         foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $relation) {
@@ -581,18 +588,147 @@ final class OversightService
                 continue;
             }
             $date = $this->dateOrNull($relation['proclamation_due_date'] ?? null);
-            if ($date === null) {
+            if ($date === null || $this->proclamationFulfilled($documentId, $relation)) {
                 continue;
             }
             $id = trim((string) ($relation['id'] ?? ''));
+            $scope = ($relation['proclamation_scope'] ?? '') === 'sections' ? 'sections' : 'whole';
+            $sections = [];
+            foreach (is_array($relation['proclamation_sections'] ?? null) ? $relation['proclamation_sections'] : [] as $section) {
+                $text = trim((string) $section);
+                if ($text !== '') {
+                    $sections[] = $text;
+                }
+            }
             $items[] = [
                 'id' => $id !== '' ? $id : $date,
                 'title' => trim((string) ($relation['target_title'] ?? '')),
                 'date' => $date,
+                'scope' => $scope,
+                'sections' => $sections,
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $relation
+     */
+    private function proclamationFulfilled(string $documentId, array $relation): bool
+    {
+        if ($this->dateOrNull($relation['proclamation_issued_on'] ?? null) !== null) {
+            return true;
+        }
+
+        $scope = ($relation['proclamation_scope'] ?? '') === 'sections' ? 'sections' : 'whole';
+        $needed = [];
+        foreach (is_array($relation['proclamation_sections'] ?? null) ? $relation['proclamation_sections'] : [] as $section) {
+            $text = trim((string) $section);
+            if ($text !== '') {
+                $needed[$text] = $text;
+            }
+        }
+        $covered = [];
+        foreach ($this->issuedFollowUps()[$documentId] ?? [] as $followUp) {
+            if ($scope === 'whole') {
+                return true;
+            }
+            foreach ($followUp['sections'] as $section) {
+                $covered[$section] = $section;
+            }
+        }
+
+        return $scope === 'sections' && $needed !== [] && array_diff($needed, $covered) === [];
+    }
+
+    /**
+     * Laws already in force that cite this document, keyed by the cited document id.
+     *
+     * @return array<string, array<int, array{sections: array<int, string>}>>
+     */
+    private function issuedFollowUps(): array
+    {
+        if ($this->issuedFollowUpIndex !== null) {
+            return $this->issuedFollowUpIndex;
+        }
+
+        $index = [];
+        foreach ($this->blob->allStatuses() as $status) {
+            $id = trim((string) ($status['document_id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $review = $this->blob->read('review', $id);
+            if (! is_array($review)) {
+                continue;
+            }
+            $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+            if (! $this->lawIsInForce($meta['status'] ?? null)) {
+                continue;
+            }
+
+            $parents = [];
+            foreach (['parent_document_ids'] as $key) {
+                foreach (is_array($meta[$key] ?? null) ? $meta[$key] : [] as $parent) {
+                    $parent = trim((string) $parent);
+                    if ($parent !== '') {
+                        $parents[$parent] = $parent;
+                    }
+                }
+            }
+            $legacyParent = trim((string) ($meta['parent_document_id'] ?? ''));
+            if ($legacyParent !== '') {
+                $parents[$legacyParent] = $legacyParent;
+            }
+
+            $sectionsByParent = [];
+            foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $relation) {
+                if (! is_array($relation)) {
+                    continue;
+                }
+                $target = trim((string) ($relation['target_document_id'] ?? ''));
+                if ($target === '') {
+                    continue;
+                }
+                $parents[$target] = $target;
+                foreach (['target_section', 'target_block_id'] as $field) {
+                    $section = trim((string) ($relation[$field] ?? ''));
+                    if ($section !== '') {
+                        $sectionsByParent[$target][$section] = $section;
+                    }
+                }
+            }
+
+            foreach ($parents as $parent) {
+                if ($parent === $id) {
+                    continue;
+                }
+                $index[$parent][] = [
+                    'sections' => array_values($sectionsByParent[$parent] ?? []),
+                ];
+            }
+        }
+
+        $this->issuedFollowUpIndex = $index;
+
+        return $index;
+    }
+
+    private function lawIsInForce(mixed $status): bool
+    {
+        $normalized = mb_strtolower(trim((string) $status), 'UTF-8');
+        if ($normalized === '') {
+            return false;
+        }
+        foreach (['ยกเลิก', 'สิ้นผล', 'หมดอายุ', 'repeal', 'cancel', 'expired'] as $inactive) {
+            if (str_contains($normalized, $inactive)) {
+                return false;
+            }
+        }
+
+        return in_array($normalized, ['มีผลบังคับใช้', 'ใช้งาน', 'active', 'published'], true)
+            || str_contains($normalized, 'เผยแพร่');
     }
 
     /**

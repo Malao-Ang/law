@@ -81,11 +81,23 @@ export function relationTypeFromChangeDetail(detail: string | null | undefined):
   return undefined;
 }
 
+export function proclamationScopeLabel(relation: LawRelation): string {
+  if (relation.proclamation_scope === 'sections') {
+    const sections = (relation.proclamation_sections ?? []).filter((section) => section.trim() !== '');
+    return sections.length > 0 ? `บางข้อ: ${sections.join(', ')}` : 'บางข้อ';
+  }
+  return 'ทั้งฉบับ';
+}
+
 export function proclamationDueLabel(relation: LawRelation): string | null {
   if (!relation.requires_new_proclamation || !relation.proclamation_due_date) return null;
+  const scope = proclamationScopeLabel(relation);
+  if (relation.proclamation_issued_on) {
+    return `ออกประกาศแล้ว (${scope})`;
+  }
   const [year, month, day] = relation.proclamation_due_date.split('-');
-  if (!year || !month || !day) return 'ต้องออกประกาศฉบับใหม่';
-  return `ออกประกาศภายใน ${day}/${month}/${Number(year) + 543}`;
+  if (!year || !month || !day) return `ต้องออกประกาศฉบับใหม่ (${scope})`;
+  return `ออกประกาศภายใน ${day}/${month}/${Number(year) + 543} (${scope})`;
 }
 
 export function changeDetailMeta(detail: string | null | undefined) {

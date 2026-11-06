@@ -325,9 +325,111 @@ class OversightTest extends TestCase
             return $mail->lawTitle === 'ฉบับที่ต้องออกประกาศใหม่'
                 && count($mail->hits) === 1
                 && $mail->hits[0]['days_left'] === 14
-                && $mail->hits[0]['label'] === 'ออกประกาศฉบับใหม่: ประกาศที่ถูกเชื่อม'
-                && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่: ประกาศที่ถูกเชื่อม');
+                && $mail->hits[0]['label'] === 'ออกประกาศฉบับใหม่ทั้งฉบับ: ประกาศที่ถูกเชื่อม'
+                && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่ทั้งฉบับ: ประกาศที่ถูกเชื่อม');
         });
+    }
+
+    public function test_proclamation_reminder_stops_when_the_new_law_is_in_force(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $whole = 'ov_whole_'.uniqid();
+        $partial = 'ov_part_'.uniqid();
+        $this->seedDocument($whole, 'ต้องออกทั้งฉบับ');
+        $this->seedDocument($partial, 'ต้องออกบางข้อ');
+        $this->track($whole, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->track($partial, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+
+        $this->putJson("/api/documents/{$whole}/document-review", [
+            'relations' => [[
+                'id' => 'r-whole',
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_title' => 'กฎหมายเดิม',
+                'requires_new_proclamation' => true,
+                'proclamation_scope' => 'whole',
+                'proclamation_due_date' => $due,
+                'proclamation_issued_on' => '2026-10-20',
+            ]],
+        ])->assertOk()->assertJsonPath('relations.0.proclamation_issued_on', '2026-10-20');
+
+        $this->putJson("/api/documents/{$partial}/document-review", [
+            'relations' => [[
+                'id' => 'r-part',
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_title' => 'กฎหมายเดิม',
+                'requires_new_proclamation' => true,
+                'proclamation_scope' => 'sections',
+                'proclamation_sections' => ['ข้อ ๕', 'ข้อ ๗'],
+                'proclamation_due_date' => $due,
+            ]],
+        ])->assertOk()->assertJsonPath('relations.0.proclamation_sections', ['ข้อ ๕', 'ข้อ ๗']);
+
+        $child = 'ov_child_'.uniqid();
+        $this->seedDocument($child, 'ประกาศลูก');
+        $this->putJson("/api/documents/{$child}/document-review", [
+            'law_meta' => [
+                'status' => 'มีผลบังคับใช้',
+                'parent_document_ids' => [$partial],
+            ],
+            'relations' => [[
+                'id' => 'cover-5',
+                'scope' => 'section',
+                'type' => 'amends',
+                'target_document_id' => $partial,
+                'target_title' => 'ต้องออกบางข้อ',
+                'target_section' => 'ข้อ ๕',
+            ]],
+        ])->assertOk();
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->lawTitle === 'ต้องออกบางข้อ'
+                && $mail->hits[0]['label'] === 'ออกประกาศฉบับใหม่บางข้อ (ข้อ ๕, ข้อ ๗): กฎหมายเดิม';
+        });
+        Mail::assertSent(OversightReminderMail::class, 1);
+    }
+
+    public function test_section_proclamation_stops_only_after_every_section_is_covered(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
+        $id = 'ov_cover_'.uniqid();
+        $this->seedDocument($id, 'รอครบทุกข้อ');
+        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [[
+                'id' => 'r-sections',
+                'type' => 'amends',
+                'target_title' => 'ต้นทาง',
+                'requires_new_proclamation' => true,
+                'proclamation_scope' => 'sections',
+                'proclamation_sections' => ['ข้อ ๕'],
+                'proclamation_due_date' => $due,
+            ]],
+        ])->assertOk();
+
+        $child = 'ov_cover_child_'.uniqid();
+        $this->seedDocument($child, 'ประกาศที่ครอบข้อ');
+        $this->putJson("/api/documents/{$child}/document-review", [
+            'law_meta' => ['status' => 'มีผลบังคับใช้', 'parent_document_ids' => [$id]],
+            'relations' => [[
+                'id' => 'covered',
+                'type' => 'amends',
+                'target_document_id' => $id,
+                'target_title' => 'รอครบทุกข้อ',
+                'target_section' => 'ข้อ ๕',
+            ]],
+        ])->assertOk();
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertNothingSent();
     }
 
     public function test_admin_can_send_one_law_before_the_reminder_day(): void

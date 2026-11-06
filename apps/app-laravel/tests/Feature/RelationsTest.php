@@ -145,6 +145,41 @@ class RelationsTest extends TestCase
         $response->assertJsonPath('relations.1.proclamation_due_date', null);
     }
 
+    public function test_section_proclamation_requires_the_section_list(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_rel_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $response = $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [
+                [
+                    'id' => 'r-sections',
+                    'type' => 'amends',
+                    'target_title' => 'ประกาศเดิม',
+                    'requires_new_proclamation' => true,
+                    'proclamation_scope' => 'sections',
+                    'proclamation_sections' => ['ข้อ ๕', ' ข้อ ๗ '],
+                    'proclamation_due_date' => '2026-12-01',
+                ],
+                [
+                    'id' => 'r-empty',
+                    'type' => 'amends',
+                    'target_title' => 'ไม่มีข้อ',
+                    'requires_new_proclamation' => true,
+                    'proclamation_scope' => 'sections',
+                    'proclamation_due_date' => '2026-12-01',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('relations.0.proclamation_scope', 'sections');
+        $response->assertJsonPath('relations.0.proclamation_sections', ['ข้อ ๕', 'ข้อ ๗']);
+        $response->assertJsonPath('relations.1.requires_new_proclamation', false);
+        $response->assertJsonCount(2, 'relations');
+    }
+
     public function test_whole_edition_replacement_revokes_same_level_chain(): void
     {
         $store = app(ReviewStore::class);

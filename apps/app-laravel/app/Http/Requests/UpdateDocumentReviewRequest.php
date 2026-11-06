@@ -94,7 +94,11 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.url' => ['nullable', 'url', 'max:500'],
             'relations.*.change_detail' => ['nullable', 'string', 'max:120'],
             'relations.*.requires_new_proclamation' => ['nullable', 'boolean'],
+            'relations.*.proclamation_scope' => ['nullable', 'string', 'in:whole,sections'],
+            'relations.*.proclamation_sections' => ['nullable', 'array', 'max:30'],
+            'relations.*.proclamation_sections.*' => ['nullable', 'string', 'max:120'],
             'relations.*.proclamation_due_date' => ['nullable', 'date_format:Y-m-d'],
+            'relations.*.proclamation_issued_on' => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 }
