@@ -7,6 +7,7 @@
       </v-container>
     </v-main>
     <GlobalSnackbar />
+    <RoleSelectDialog />
   </v-app>
 </template>
 
@@ -14,6 +15,7 @@
 import { computed } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 import GlobalSnackbar from './components/shared/GlobalSnackbar.vue';
+import RoleSelectDialog from './components/auth/RoleSelectDialog.vue';
 
 const route = useRoute();
 const isBareLayout = computed(() => Boolean(route.meta.bareLayout));
