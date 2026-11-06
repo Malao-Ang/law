@@ -395,12 +395,13 @@ import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { createLawTypeCatalog } from '../../composables/useLawType';
+import { useLawType } from '../../composables/useLawType';
 import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
-const { typeLabel } = useLawType();
+const lawTypes = useLawType();
+const { typeLabel } = lawTypes;
 const changeStatusCS = useChangeStatus();
 
 // ── Types ─────────────────────────────────────────────────
@@ -433,7 +434,6 @@ interface ChangeLogEntry {
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 const { statusColor } = useLawStatus();
-const lawTypes = createLawTypeCatalog();
 
 // ── Table state ───────────────────────────────────────────
 const PAGE_SIZE = 20;
