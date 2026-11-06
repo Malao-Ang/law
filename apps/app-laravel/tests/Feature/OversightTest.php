@@ -145,7 +145,10 @@ class OversightTest extends TestCase
         Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail) use ($days): bool {
             return $mail->hasTo('owner@example.com')
                 && $mail->hasTo('backup@example.com')
-                && $mail->hits[0]['days_left'] === $days;
+                && $mail->hits[0]['days_left'] === $days
+                && str_contains($mail->envelope()->subject, 'เหลือ '.$days.' วัน')
+                && str_contains($mail->bodyHtml, 'ใกล้ถึงกำหนดดำเนินการ')
+                && str_contains($mail->bodyHtml, 'ระบบติดตามการกำกับดูแล');
         });
 
         $this->artisan('oversight:send-reminders')->assertSuccessful();
@@ -208,6 +211,80 @@ class OversightTest extends TestCase
                 && $mail->hits[0]['days_left'] === 7;
         });
         Mail::assertSent(OversightReminderMail::class, 1);
+    }
+
+    public function test_admin_can_edit_the_mail_text_and_trigger_sending(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
+        $id = 'ov_ui_mail_'.uniqid();
+        $this->seedDocument($id, 'ฉบับจากหน้าแอดมิน');
+        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due);
+
+        $this->getJson('/api/oversight/mail')
+            ->assertOk()
+            ->assertJsonPath('template.link_label', 'ระบบติดตามการกำกับดูแล')
+            ->assertJsonPath('pending_count', 1)
+            ->assertJsonPath('items.0.due_now', true)
+            ->assertJsonPath('items.0.document_id', $id);
+
+        $this->putJson('/api/oversight/mail', [
+            'subject' => '',
+            'body' => 'มีข้อความ',
+            'link_label' => 'เปิดระบบ',
+        ])->assertStatus(422);
+
+        $this->putJson('/api/oversight/mail', [
+            'subject' => 'เตือนเอง {title}',
+            'body' => "<script>alert(1)</script>\n\n{title}\n\n{deadlines}\n\nดูที่ {link}",
+            'link_label' => 'เปิดระบบ',
+        ])->assertOk()->assertJsonPath('template.subject', 'เตือนเอง {title}');
+
+        $this->postJson('/api/oversight/mail/send')
+            ->assertOk()
+            ->assertJsonPath('sent', 1);
+
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->hasTo('owner@example.com')
+                && $mail->envelope()->subject === 'เตือนเอง ฉบับจากหน้าแอดมิน'
+                && str_contains($mail->bodyHtml, '&lt;script&gt;alert(1)&lt;/script&gt;')
+                && ! str_contains($mail->bodyHtml, '<script>')
+                && str_contains($mail->bodyHtml, 'เปิดระบบ');
+        });
+
+        $this->postJson('/api/oversight/mail/send')->assertOk()->assertJsonPath('sent', 0);
+
+        $summaries = collect($this->getJson('/api/audit-logs')->json('items'))->pluck('summary');
+        $this->assertTrue($summaries->contains('แก้ไขข้อความอีเมลแจ้งเตือน'));
+        $this->assertTrue($summaries->contains('ส่งอีเมลแจ้งเตือนตามรอบด้วยตนเอง'));
+    }
+
+    public function test_admin_can_send_one_law_before_the_reminder_day(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $id = 'ov_early_'.uniqid();
+        $this->seedDocument($id, 'ฉบับส่งก่อนถึงรอบ');
+        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2026-12-20');
+
+        $this->postJson('/api/oversight/mail/send', ['document_id' => $id])
+            ->assertOk()
+            ->assertJsonPath('sent', 1)
+            ->assertJsonPath('emails.0', 'owner@example.com');
+        Mail::assertSent(OversightReminderMail::class, 1);
+
+        Carbon::setTestNow('2026-12-13 02:00:00');
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, 2);
+
+        $closed = 'ov_closed_send_'.uniqid();
+        $this->seedDocument($closed);
+        $this->track($closed, 'ยกเลิก', '2026-12-20');
+        $this->postJson('/api/oversight/mail/send', ['document_id' => $closed])->assertStatus(422);
+        $this->postJson('/api/oversight/mail/send', ['document_id' => 'missing_'.uniqid()])->assertNotFound();
     }
 
     /** @return array<string, array{0: int}> */
