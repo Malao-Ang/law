@@ -47,6 +47,7 @@ final class AuditLogger
                 'changes' => $changes, 'before' => $before, 'after' => $after,
                 'actor_username' => $user['username'] ?? '',
                 'actor_name' => $user['name'] ?? 'ไม่ระบุตัวตน',
+                'is_super_admin_account' => (bool) ($user['can_act_as_super_admin'] ?? false),
                 'actor_role' => $user ? $current->role($user, $request) : '',
                 'active_unit_code' => $active,
                 'unit_code' => $context['unit_code'] ?? $document['owner_unit_code'] ?? $active,

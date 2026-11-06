@@ -98,7 +98,7 @@ router.beforeEach(async (to) => {
   if (auth.isAuthenticated && auth.needs_unit_selection && to.path !== '/select-unit') {
     return { path: '/select-unit' };
   }
-  if (to.path === '/select-unit' && (!auth.isAuthenticated || auth.is_super_admin)) {
+  if (to.path === '/select-unit' && !auth.isAuthenticated) {
     return { path: '/' };
   }
 

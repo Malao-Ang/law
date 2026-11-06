@@ -25,6 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
   const loaded = ref(false);
   const canUpload = ref(false);
   const is_super_admin = ref(false);
+  const can_act_as_super_admin = ref(false);
+  const acting_mode = ref<AuthMeResponse['acting_mode']>(null);
   const memberships = ref<Membership[]>([]);
   const active_unit = ref<Unit | null>(null);
   const needs_unit_selection = ref(false);
@@ -44,9 +46,11 @@ export const useAuthStore = defineStore('auth', () => {
     authEnforced.value = payload.auth_enforced;
     canUpload.value = payload.can_upload;
     is_super_admin.value = Boolean(payload.is_super_admin);
+    can_act_as_super_admin.value = Boolean(payload.can_act_as_super_admin);
+    acting_mode.value = payload.acting_mode ?? null;
     memberships.value = payload.memberships ?? [];
     active_unit.value = payload.active_unit ?? null;
-    needs_unit_selection.value = !is_super_admin.value && Boolean(payload.needs_unit_selection);
+    needs_unit_selection.value = Boolean(payload.needs_unit_selection);
   }
 
   function clear(): void {
@@ -55,6 +59,8 @@ export const useAuthStore = defineStore('auth', () => {
     canUpload.value = false;
     role.value = null;
     is_super_admin.value = false;
+    can_act_as_super_admin.value = false;
+    acting_mode.value = null;
     memberships.value = [];
     active_unit.value = null;
     needs_unit_selection.value = false;
@@ -109,6 +115,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function selectSuperAdmin(): Promise<void> {
+    await jsonRequest('/api/auth/active-unit', { method: 'POST', body: JSON.stringify({ mode: 'super_admin' }) });
+    await fetchMe(true);
+    if (!is_super_admin.value || acting_mode.value !== 'super_admin') {
+      throw new Error('ไม่สามารถเลือกบทบาทได้ กรุณาลองอีกครั้ง');
+    }
+  }
+
   async function logout(redirectTo = '/login'): Promise<void> {
     try {
       await jsonRequest<void>('/api/auth/logout', { method: 'POST' });
@@ -130,5 +144,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
+  return { can_act_as_super_admin, acting_mode, selectSuperAdmin, canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
 });
