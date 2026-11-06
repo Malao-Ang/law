@@ -4,6 +4,17 @@
     title="ติดตามการกำกับดูแลและแจ้งเตือน"
     subtitle="ปรับสถานะ วันแล้วเสร็จ และผู้รับอีเมลของกฎหมายลำดับรอง"
   >
+    <template #title-actions>
+      <v-btn
+        to="/admin/oversight-mail"
+        color="admin-primary"
+        variant="tonal"
+        class="text-none"
+        prepend-icon="mdi-email-edit-outline"
+      >
+        ข้อความและการส่งอีเมล
+      </v-btn>
+    </template>
     <v-alert type="info" variant="tonal" class="mb-4" density="comfortable">
       ระบบส่งอีเมลถึงผู้รับผิดชอบหลักและผู้ประสานงานสำรองเมื่อเหลือ
       {{ reminderLabel }} วัน ก่อนกำหนดเวลาออกประกาศ หรือก่อนกำหนดแล้วเสร็จของขั้นตอนที่ยังไม่บันทึกวันแล้วเสร็จ

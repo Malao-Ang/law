@@ -8,6 +8,8 @@ use RuntimeException;
 
 final class OversightService
 {
+    /** @var array<string, array<int, array{sections: array<int, string>}>>|null */
+    private ?array $issuedFollowUpIndex = null;
     /** @var array<int, string> */
     private const MONTHS = [
         1 => 'มกราคม',
@@ -89,14 +91,71 @@ final class OversightService
     }
 
     /**
-     * Documents with a deadline landing on a reminder offset that has not been sent.
-     *
-     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, hits: array<int, array<string, mixed>>}>
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
      */
-    public function pendingReminders(): array
+    public function mailTemplate(): array
+    {
+        $defaults = $this->defaultMailTemplate();
+        $stored = $this->mailSettings();
+
+        return [
+            'subject' => $this->storedMailText($stored['subject'] ?? null, $defaults['subject'], 180),
+            'body' => $this->storedMailText($stored['body'] ?? null, $defaults['body'], 4000),
+            'link_label' => $this->storedMailText($stored['link_label'] ?? null, $defaults['link_label'], 120),
+            'reminder_days' => $this->reminderDays(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
+     */
+    public function saveMailTemplate(array $payload): array
+    {
+        $existing = $this->mailSettings();
+        $days = array_key_exists('reminder_days', $payload)
+            ? $this->normalizeReminderDays($payload['reminder_days'])
+            : $this->normalizeReminderDays($existing['reminder_days'] ?? null);
+        if ($days === []) {
+            $days = $this->defaultReminderDays();
+        }
+
+        $template = [
+            'subject' => $this->cleanMailLine($payload['subject'] ?? '', 180),
+            'body' => $this->cleanMailBody($payload['body'] ?? '', 4000),
+            'link_label' => $this->cleanMailLine($payload['link_label'] ?? '', 120),
+            'reminder_days' => $days,
+        ];
+        $this->blob->write('settings', 'oversight-mail', $template);
+
+        return $template;
+    }
+
+    /**
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
+     */
+    public function defaultMailTemplate(): array
+    {
+        return [
+            'subject' => $this->configMail('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย — เหลือ {days} วัน'),
+            'body' => $this->configMail(
+                'mail_body',
+                "เรียนผู้รับผิดชอบ\n\nกฎหมาย {title} ใกล้ถึงกำหนดดำเนินการ\n\n{deadlines}\n\nกรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}",
+            ),
+            'link_label' => $this->configMail('mail_link_label', 'ระบบติดตามการกำกับดูแล'),
+            'reminder_days' => $this->defaultReminderDays(),
+        ];
+    }
+
+    /**
+     * Tracked laws that can receive a reminder, including ones that are not due today.
+     *
+     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, due_now: bool, already_sent: bool, hits: array<int, array<string, mixed>>}>
+     */
+    public function reminderCatalog(): array
     {
         $offsets = $this->reminderDays();
-        $batches = [];
+        $items = [];
 
         foreach ($this->records() as $record) {
             if (! $record['tracked'] || $record['closed']) {
@@ -108,41 +167,109 @@ final class OversightService
                 continue;
             }
 
-            $sent = is_array($record['reminders_sent'] ?? null) ? $record['reminders_sent'] : [];
-            $hits = [];
-            foreach ($this->openDeadlines($record) as $deadline) {
-                $days = $this->daysUntil($deadline['date']);
-                if ($days === null || ! in_array($days, $offsets, true)) {
-                    continue;
-                }
-
-                $sentKey = $deadline['kind'].':'.$deadline['key'].':'.$deadline['date'].':'.$days;
-                if (isset($sent[$sentKey])) {
-                    continue;
-                }
-
-                $hits[] = [
-                    'label' => $deadline['label'],
-                    'date' => $deadline['date'],
-                    'display_date' => $this->formatThai($deadline['date']),
-                    'days_left' => $days,
-                    'sent_key' => $sentKey,
-                ];
-            }
-
-            if ($hits === []) {
+            $allHits = $this->deadlineHits($record);
+            if ($allHits === []) {
                 continue;
             }
 
-            $batches[] = [
+            $sent = is_array($record['reminders_sent'] ?? null) ? $record['reminders_sent'] : [];
+            $offsetHits = [];
+            $unsentOffset = [];
+            foreach ($allHits as $hit) {
+                if (! in_array($hit['days_left'], $offsets, true)) {
+                    continue;
+                }
+                $offsetHits[] = $hit;
+                if (! isset($sent[$hit['sent_key']])) {
+                    $unsentOffset[] = $hit;
+                }
+            }
+
+            $dueNow = $unsentOffset !== [];
+            $items[] = [
                 'document_id' => $record['document_id'],
                 'title' => $record['title'],
                 'emails' => $emails,
-                'hits' => $hits,
+                'due_now' => $dueNow,
+                'already_sent' => $offsetHits !== [] && ! $dueNow,
+                'hits' => $dueNow ? $unsentOffset : ($offsetHits !== [] ? $offsetHits : $allHits),
+            ];
+        }
+
+        usort($items, static function (array $a, array $b): int {
+            $daysA = (int) ($a['hits'][0]['days_left'] ?? 9999);
+            $daysB = (int) ($b['hits'][0]['days_left'] ?? 9999);
+
+            return [$b['due_now'] ? 1 : 0, $daysA, $a['title']]
+                <=> [$a['due_now'] ? 1 : 0, $daysB, $b['title']];
+        });
+
+        return $items;
+    }
+
+    /**
+     * Documents with a deadline landing on a reminder offset that has not been sent.
+     *
+     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, hits: array<int, array<string, mixed>>}>
+     */
+    public function pendingReminders(): array
+    {
+        $batches = [];
+        foreach ($this->reminderCatalog() as $item) {
+            if (! $item['due_now']) {
+                continue;
+            }
+            $batches[] = [
+                'document_id' => $item['document_id'],
+                'title' => $item['title'],
+                'emails' => $item['emails'],
+                'hits' => $item['hits'],
             ];
         }
 
         return $batches;
+    }
+
+    /**
+     * @return array{document_id: string, title: string, emails: array<int, string>, hits: array<int, array<string, mixed>>}
+     */
+    public function manualBatch(string $documentId): array
+    {
+        if ($this->blob->read('review', $documentId) === null) {
+            throw new RuntimeException('ไม่พบเอกสาร', 404);
+        }
+
+        foreach ($this->reminderCatalog() as $item) {
+            if ($item['document_id'] !== $documentId) {
+                continue;
+            }
+
+            return [
+                'document_id' => $item['document_id'],
+                'title' => $item['title'],
+                'emails' => $item['emails'],
+                'hits' => $item['hits'],
+            ];
+        }
+
+        foreach ($this->records() as $record) {
+            if ($record['document_id'] !== $documentId) {
+                continue;
+            }
+            if (! $record['tracked']) {
+                throw new RuntimeException('กฎหมายนี้ยังไม่ได้ติดตาม', 422);
+            }
+            if ($record['closed']) {
+                throw new RuntimeException('กฎหมายนี้ปิดงานแล้ว จึงไม่ส่งแจ้งเตือน', 422);
+            }
+            if ($this->emails($record) === []) {
+                throw new RuntimeException('ยังไม่มีอีเมลผู้รับผิดชอบ', 422);
+            }
+
+            throw new RuntimeException('ไม่มีกำหนดที่ยังเปิดอยู่', 422);
+        }
+
+        throw new RuntimeException('ไม่พบเอกสาร', 404);
     }
 
     public function markSent(string $documentId, string $key): void
@@ -261,6 +388,7 @@ final class OversightService
             'backup' => $this->contact($stored['backup'] ?? []),
             'steps' => $steps,
             'reminders_sent' => is_array($stored['reminders_sent'] ?? null) ? $stored['reminders_sent'] : [],
+            'proclamation_deadlines' => $this->proclamationDeadlines($documentId, $review),
         ];
     }
 
@@ -270,7 +398,7 @@ final class OversightService
      */
     private function publicItem(array $record): array
     {
-        unset($record['reminders_sent']);
+        unset($record['reminders_sent'], $record['proclamation_deadlines']);
 
         return $record;
     }
@@ -373,6 +501,30 @@ final class OversightService
 
     /**
      * @param  array<string, mixed>  $record
+     * @return array<int, array{label: string, date: string, display_date: string, days_left: int, sent_key: string}>
+     */
+    private function deadlineHits(array $record): array
+    {
+        $hits = [];
+        foreach ($this->openDeadlines($record) as $deadline) {
+            $days = $this->daysUntil($deadline['date']);
+            if ($days === null) {
+                continue;
+            }
+            $hits[] = [
+                'label' => $deadline['label'],
+                'date' => $deadline['date'],
+                'display_date' => $this->formatThai($deadline['date']),
+                'days_left' => $days,
+                'sent_key' => $deadline['kind'].':'.$deadline['key'].':'.$deadline['date'].':'.$days,
+            ];
+        }
+
+        return $hits;
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
      * @return array<int, array{kind: string, key: string, label: string, date: string}>
      */
     private function openDeadlines(array $record): array
@@ -399,7 +551,184 @@ final class OversightService
             ];
         }
 
+        foreach (is_array($record['proclamation_deadlines'] ?? null) ? $record['proclamation_deadlines'] : [] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $date = $this->dateOrNull($item['date'] ?? null);
+            if ($date === null) {
+                continue;
+            }
+            $title = trim((string) ($item['title'] ?? ''));
+            $scope = (string) ($item['scope'] ?? 'whole');
+            $sections = is_array($item['sections'] ?? null) ? implode(', ', $item['sections']) : '';
+            $prefix = $scope === 'sections'
+                ? 'ออกประกาศฉบับใหม่บางข้อ'.($sections !== '' ? ' ('.$sections.')' : '')
+                : 'ออกประกาศฉบับใหม่ทั้งฉบับ';
+            $deadlines[] = [
+                'kind' => 'proclamation',
+                'key' => (string) ($item['id'] ?? $date),
+                'label' => $title !== '' ? $prefix.': '.$title : $prefix,
+                'date' => $date,
+            ];
+        }
+
         return $deadlines;
+    }
+
+    /**
+     * @param  array<string, mixed>  $review
+     * @return array<int, array{id: string, title: string, date: string, scope: string, sections: array<int, string>}>
+     */
+    private function proclamationDeadlines(string $documentId, array $review): array
+    {
+        $items = [];
+        foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $relation) {
+            if (! is_array($relation) || empty($relation['requires_new_proclamation'])) {
+                continue;
+            }
+            $date = $this->dateOrNull($relation['proclamation_due_date'] ?? null);
+            if ($date === null || $this->proclamationFulfilled($documentId, $relation)) {
+                continue;
+            }
+            $id = trim((string) ($relation['id'] ?? ''));
+            $scope = ($relation['proclamation_scope'] ?? '') === 'sections' ? 'sections' : 'whole';
+            $sections = [];
+            foreach (is_array($relation['proclamation_sections'] ?? null) ? $relation['proclamation_sections'] : [] as $section) {
+                $text = trim((string) $section);
+                if ($text !== '') {
+                    $sections[] = $text;
+                }
+            }
+            $items[] = [
+                'id' => $id !== '' ? $id : $date,
+                'title' => trim((string) ($relation['target_title'] ?? '')),
+                'date' => $date,
+                'scope' => $scope,
+                'sections' => $sections,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $relation
+     */
+    private function proclamationFulfilled(string $documentId, array $relation): bool
+    {
+        if ($this->dateOrNull($relation['proclamation_issued_on'] ?? null) !== null) {
+            return true;
+        }
+
+        $scope = ($relation['proclamation_scope'] ?? '') === 'sections' ? 'sections' : 'whole';
+        $needed = [];
+        foreach (is_array($relation['proclamation_sections'] ?? null) ? $relation['proclamation_sections'] : [] as $section) {
+            $text = trim((string) $section);
+            if ($text !== '') {
+                $needed[$text] = $text;
+            }
+        }
+        $covered = [];
+        foreach ($this->issuedFollowUps()[$documentId] ?? [] as $followUp) {
+            if ($scope === 'whole') {
+                return true;
+            }
+            foreach ($followUp['sections'] as $section) {
+                $covered[$section] = $section;
+            }
+        }
+
+        return $scope === 'sections' && $needed !== [] && array_diff($needed, $covered) === [];
+    }
+
+    /**
+     * Laws already in force that cite this document, keyed by the cited document id.
+     *
+     * @return array<string, array<int, array{sections: array<int, string>}>>
+     */
+    private function issuedFollowUps(): array
+    {
+        if ($this->issuedFollowUpIndex !== null) {
+            return $this->issuedFollowUpIndex;
+        }
+
+        $index = [];
+        foreach ($this->blob->allStatuses() as $status) {
+            $id = trim((string) ($status['document_id'] ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $review = $this->blob->read('review', $id);
+            if (! is_array($review)) {
+                continue;
+            }
+            $meta = is_array($review['law_meta'] ?? null) ? $review['law_meta'] : [];
+            if (! $this->lawIsInForce($meta['status'] ?? null)) {
+                continue;
+            }
+
+            $parents = [];
+            foreach (['parent_document_ids'] as $key) {
+                foreach (is_array($meta[$key] ?? null) ? $meta[$key] : [] as $parent) {
+                    $parent = trim((string) $parent);
+                    if ($parent !== '') {
+                        $parents[$parent] = $parent;
+                    }
+                }
+            }
+            $legacyParent = trim((string) ($meta['parent_document_id'] ?? ''));
+            if ($legacyParent !== '') {
+                $parents[$legacyParent] = $legacyParent;
+            }
+
+            $sectionsByParent = [];
+            foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $relation) {
+                if (! is_array($relation)) {
+                    continue;
+                }
+                $target = trim((string) ($relation['target_document_id'] ?? ''));
+                if ($target === '') {
+                    continue;
+                }
+                $parents[$target] = $target;
+                foreach (['target_section', 'target_block_id'] as $field) {
+                    $section = trim((string) ($relation[$field] ?? ''));
+                    if ($section !== '') {
+                        $sectionsByParent[$target][$section] = $section;
+                    }
+                }
+            }
+
+            foreach ($parents as $parent) {
+                if ($parent === $id) {
+                    continue;
+                }
+                $index[$parent][] = [
+                    'sections' => array_values($sectionsByParent[$parent] ?? []),
+                ];
+            }
+        }
+
+        $this->issuedFollowUpIndex = $index;
+
+        return $index;
+    }
+
+    private function lawIsInForce(mixed $status): bool
+    {
+        $normalized = mb_strtolower(trim((string) $status), 'UTF-8');
+        if ($normalized === '') {
+            return false;
+        }
+        foreach (['ยกเลิก', 'สิ้นผล', 'หมดอายุ', 'repeal', 'cancel', 'expired'] as $inactive) {
+            if (str_contains($normalized, $inactive)) {
+                return false;
+            }
+        }
+
+        return in_array($normalized, ['มีผลบังคับใช้', 'ใช้งาน', 'active', 'published'], true)
+            || str_contains($normalized, 'เผยแพร่');
     }
 
     /**
@@ -510,15 +839,88 @@ final class OversightService
         return is_string($zone) && $zone !== '' ? $zone : 'Asia/Bangkok';
     }
 
-    /** @return array<int, int> */
-    private function reminderDays(): array
+    private function storedMailText(mixed $value, string $fallback, int $limit): string
     {
-        $days = config('oversight.reminder_days');
-        if (! is_array($days) || $days === []) {
-            return [30, 14, 7];
+        if (! is_string($value) || trim($value) === '') {
+            return $fallback;
         }
 
-        return array_values(array_map(static fn (mixed $day): int => (int) $day, $days));
+        return mb_substr(str_replace("\r\n", "\n", trim($value)), 0, $limit);
+    }
+
+    private function cleanMailLine(mixed $value, int $limit): string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', (string) $value) ?? '');
+
+        return mb_substr($text, 0, $limit);
+    }
+
+    private function cleanMailBody(mixed $value, int $limit): string
+    {
+        $text = str_replace("\r\n", "\n", trim((string) $value));
+
+        return mb_substr($text, 0, $limit);
+    }
+
+    private function configMail(string $key, string $fallback): string
+    {
+        $value = config('oversight.'.$key);
+        if (! is_string($value) || trim($value) === '') {
+            return $fallback;
+        }
+
+        return str_replace("\r\n", "\n", trim($value));
+    }
+
+    /** @return array<int, int> */
+    public function reminderDays(): array
+    {
+        $stored = $this->normalizeReminderDays($this->mailSettings()['reminder_days'] ?? null);
+
+        return $stored !== [] ? $stored : $this->defaultReminderDays();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mailSettings(): array
+    {
+        $stored = $this->blob->read('settings', 'oversight-mail');
+
+        return is_array($stored) ? $stored : [];
+    }
+
+    /** @return array<int, int> */
+    private function defaultReminderDays(): array
+    {
+        $days = $this->normalizeReminderDays(config('oversight.reminder_days'));
+
+        return $days !== [] ? $days : [30, 14, 7];
+    }
+
+    /** @return array<int, int> */
+    private function normalizeReminderDays(mixed $days): array
+    {
+        if (! is_array($days)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($days as $day) {
+            if (! is_numeric($day)) {
+                continue;
+            }
+            $value = (int) $day;
+            if ($value < 0 || $value > 365) {
+                continue;
+            }
+            $clean[$value] = $value;
+        }
+
+        $clean = array_values($clean);
+        rsort($clean);
+
+        return $clean;
     }
 
     /** @return array<int, string> */

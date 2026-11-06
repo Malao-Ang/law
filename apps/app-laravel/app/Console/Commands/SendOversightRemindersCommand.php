@@ -2,11 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Mail\OversightReminderMail;
+use App\Services\OversightReminderDispatcher;
 use App\Services\OversightService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
 
 class SendOversightRemindersCommand extends Command
 {
@@ -14,43 +12,30 @@ class SendOversightRemindersCommand extends Command
 
     protected $description = 'Email primary and backup contacts 30, 14, and 7 days before an oversight deadline.';
 
-    public function handle(OversightService $oversight): int
+    public function handle(OversightService $oversight, OversightReminderDispatcher $mailer): int
     {
-        $dryRun = (bool) $this->option('dry-run');
-        $sent = 0;
-
-        foreach ($oversight->pendingReminders() as $batch) {
-            $labels = collect($batch['hits'])->map(
-                static fn (array $hit): string => $hit['label'].' '.$hit['display_date'].' ('.$hit['days_left'].' วัน)',
-            )->implode('; ');
-            $this->line($batch['document_id'].' -> '.implode(', ', $batch['emails']).' | '.$labels);
-
-            if ($dryRun) {
-                $sent++;
-
-                continue;
+        if ($this->option('dry-run')) {
+            $count = 0;
+            foreach ($oversight->pendingReminders() as $batch) {
+                $labels = collect($batch['hits'])->map(
+                    static fn (array $hit): string => $hit['label'].' '.$hit['display_date'].' ('.$hit['days_left'].' วัน)',
+                )->implode('; ');
+                $this->line($batch['document_id'].' -> '.implode(', ', $batch['emails']).' | '.$labels);
+                $count++;
             }
+            $this->info('จะแจ้งเตือน '.$count.' ฉบับ');
 
-            try {
-                Mail::to($batch['emails'])->send(new OversightReminderMail(
-                    $batch['title'],
-                    $batch['hits'],
-                    url('/admin/oversight'),
-                ));
-            } catch (Throwable $e) {
-                report($e);
-                $this->error($batch['document_id'].' ส่งไม่สำเร็จ: '.$e->getMessage());
-
-                continue;
-            }
-
-            foreach ($batch['hits'] as $hit) {
-                $oversight->markSent($batch['document_id'], $hit['sent_key']);
-            }
-            $sent++;
+            return self::SUCCESS;
         }
 
-        $this->info(($dryRun ? 'จะแจ้งเตือน ' : 'ส่งแจ้งเตือน ').$sent.' ฉบับ');
+        $result = $mailer->sendPending();
+        foreach ($result['delivered'] as $row) {
+            $this->line($row['document_id'].' -> '.implode(', ', $row['emails']));
+        }
+        foreach ($result['failed'] as $fail) {
+            $this->error($fail['document_id'].' ส่งไม่สำเร็จ: '.$fail['message']);
+        }
+        $this->info('ส่งแจ้งเตือน '.$result['sent'].' ฉบับ');
 
         return self::SUCCESS;
     }

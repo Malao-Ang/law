@@ -21,7 +21,7 @@
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
-import type { OversightSummary, OversightUpdatePayload, OversightItem } from '../types/oversight';
+import type { OversightSummary, OversightUpdatePayload, OversightItem, OversightMailSettings, OversightMailTemplate, OversightMailSendResult } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
 import type { AuditLogResponse } from '../types/auditLog';
 
@@ -674,6 +674,24 @@ export function fetchAuditLogs(params: { action?: string; resource?: string; q?:
 
 export function fetchOversightSummary(): Promise<OversightSummary> {
   return jsonRequest<OversightSummary>('/api/oversight/summary');
+}
+
+export function fetchOversightMail(): Promise<OversightMailSettings> {
+  return jsonRequest<OversightMailSettings>('/api/oversight/mail');
+}
+
+export function saveOversightMail(payload: OversightMailTemplate): Promise<{ template: OversightMailTemplate }> {
+  return jsonRequest<{ template: OversightMailTemplate }>('/api/oversight/mail', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendOversightMail(documentId?: string): Promise<OversightMailSendResult> {
+  return jsonRequest<OversightMailSendResult>('/api/oversight/mail/send', {
+    method: 'POST',
+    body: JSON.stringify(documentId ? { document_id: documentId } : {}),
+  });
 }
 
 export function saveOversight(documentId: string, payload: OversightUpdatePayload): Promise<OversightItem> {
