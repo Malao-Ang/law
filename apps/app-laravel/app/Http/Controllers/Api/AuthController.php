@@ -149,19 +149,18 @@ class AuthController extends Controller
         $user = $this->currentUser->user($request);
         abort_if($user === null, 401, 'กรุณาเข้าสู่ระบบ');
         $data = $request->validate([
-            'mode' => ['sometimes', 'string', 'in:super_admin', 'prohibits:unit_code'],
-            'unit_code' => ['required_without:mode', 'string', 'regex:/^DEP[0-9]{3}$/'],
+            'mode' => ['sometimes', 'string', 'in:super_admin'],
+            'unit_code' => ['sometimes', 'string', 'regex:/^DEP[0-9]{3}$/'],
         ], [
-            'unit_code.required_without' => 'กรุณาเลือกบทบาทการใช้งาน',
             'unit_code.string' => 'รหัสหน่วยงานไม่ถูกต้อง',
             'unit_code.regex' => 'รหัสหน่วยงานไม่ถูกต้อง',
             'mode.in' => 'บทบาทไม่ถูกต้อง',
             'mode.string' => 'บทบาทไม่ถูกต้อง',
-            'mode.prohibits' => 'กรุณาเลือกบทบาทเพียงรายการเดียว',
         ]);
+        abort_if(isset($data['mode']) === isset($data['unit_code']), 422, 'กรุณาเลือกบทบาทการใช้งานเพียงรายการเดียว');
         $before = ['acting_mode' => $request->session()->get(CurrentUser::ACTING_MODE_KEY)];
         if (($data['mode'] ?? null) === 'super_admin') {
-            abort_unless($user['can_act_as_super_admin'] ?? false, 403, 'ไม่มีสิทธิ์ใช้งานในบทบาทผู้ดูแลระบบสูงสุด');
+            abort_unless($user['can_act_as_super_admin'] ?? false, 403, 'ไม่มีสิทธิ์ใช้งานในบทบาท Super Admin');
             $request->session()->forget(CurrentUser::ACTIVE_UNIT_KEY);
             $request->session()->put(CurrentUser::ACTING_MODE_KEY, 'super_admin');
         } else {
