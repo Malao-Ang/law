@@ -90,6 +90,29 @@ services:
       pdf-service:
         condition: service_started
 
+  scheduler:
+    image: ${LARAVEL_IMAGE:-thai-ocr-laravel-app:local}
+    build:
+      context: ./apps/app-laravel
+      dockerfile: Dockerfile
+    container_name: thai-ocr-scheduler
+    working_dir: /var/www/html
+    command: >
+      sh -c "php artisan schedule:work"
+    restart: unless-stopped
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
+      - PDF_SERVICE_URL=http://pdf-service:3001
+    volumes:
+      - poc_storage:/var/www/html/storage/app/poc
+    env_file:
+      - .env
+    depends_on:
+      laravel-app:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
   ocr-service:
     image: ${OCR_IMAGE:-thai-ocr-service:local}
     build:

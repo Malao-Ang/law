@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDocumentRequest;
 use App\Jobs\ExtractDocumentJob;
+use App\Services\Audit\AuditLogger;
 use App\Services\Buu\MinioUploadService;
 use App\Services\ReviewStore;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use RuntimeException;
 
 class UploadController extends Controller
 {
-    public function __construct(private readonly ReviewStore $reviewStore) {}
+    public function __construct(
+        private readonly ReviewStore $reviewStore,
+        private readonly AuditLogger $audit,
+    ) {}
 
     public function index(): JsonResponse
     {
@@ -69,6 +73,8 @@ class UploadController extends Controller
                 }
             }
 
+            $this->auditCreated($documentId, $storedFile['source_file'], 'เอกสารเก่า');
+
             return response()->json(['document_id' => $documentId, 'status' => 'done'], 202);
         }
 
@@ -84,6 +90,8 @@ class UploadController extends Controller
             'correction_status' => 'not_required',
             'document_type' => 'new',
         ]);
+
+        $this->auditCreated($documentId, $storedFile['source_file'], 'เอกสารใหม่');
 
         ExtractDocumentJob::dispatch(
             documentId: $documentId,
@@ -121,9 +129,24 @@ class UploadController extends Controller
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 
+        $this->audit->record('delete', 'document', $documentId, 'ลบเอกสาร', [], $documentId, $documentId);
+
         return response()->json([
             'document_id' => $documentId,
             'status' => 'deleted',
         ]);
+    }
+
+    private function auditCreated(string $documentId, string $sourceFile, string $kind): void
+    {
+        $this->audit->record(
+            'create',
+            'document',
+            $documentId,
+            'นำเข้าเอกสาร',
+            ['ไฟล์: '.$sourceFile, 'ประเภท: '.$kind],
+            $sourceFile,
+            $documentId,
+        );
     }
 }

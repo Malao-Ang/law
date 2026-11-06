@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateBlockRequest;
 use App\Http\Requests\UpdateBlockSizeRequest;
 use App\Http\Requests\UpdateDocumentReviewRequest;
 use App\Jobs\ReprocessBlockJob;
+use App\Services\Audit\AuditLogger;
 use App\Services\DocumentHtmlService;
 use App\Services\DocumentPipelineClient;
 use App\Services\Permissions\PermissionStore;
@@ -30,6 +31,7 @@ class ReviewController extends Controller
         private readonly DocumentPipelineClient $pipelineClient,
         private readonly PermissionStore $permissionStore,
         private readonly LawIndexer $lawIndexer,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function show(string $documentId): JsonResponse
@@ -168,6 +170,13 @@ class ReviewController extends Controller
             return response()->json(['message' => $exception->getMessage()], 404);
         }
 
+        $changes = ['หน้า '.(int) $request->validated('page_no')];
+        $text = trim((string) ($request->validated('approved_text') ?? ''));
+        if ($text !== '') {
+            $changes[] = 'ข้อความ: '.mb_substr(preg_replace('/\s+/u', ' ', $text) ?? $text, 0, 80);
+        }
+        $this->audit->record('update', 'block', $blockId, 'แก้ไขเนื้อหาบล็อก', $changes, $blockId, $documentId);
+
         return response()->json([
             'document_id' => $documentId,
             'block_id' => $blockId,
@@ -179,6 +188,16 @@ class ReviewController extends Controller
     public function updateDocumentReview(UpdateDocumentReviewRequest $request, string $documentId): JsonResponse
     {
         $payload = $request->validated();
+        $incomingRelations = is_array($payload['relations'] ?? null) ? $payload['relations'] : null;
+        $previousRelations = [];
+        if ($incomingRelations !== null) {
+            try {
+                $existing = $this->reviewStore->getReviewDocument($documentId);
+                $previousRelations = is_array($existing['relations'] ?? null) ? $existing['relations'] : [];
+            } catch (Throwable) {
+                $previousRelations = [];
+            }
+        }
 
         try {
             if (isset($payload['law_meta']) && is_array($payload['law_meta'])) {
@@ -209,6 +228,33 @@ class ReviewController extends Controller
                     'error' => $exception->getMessage(),
                 ]);
             }
+        }
+
+        $parts = [];
+        foreach ([
+            'law_meta' => 'ข้อมูลกฎหมาย',
+            'document_review' => 'สถานะตรวจทาน',
+            'compose_state' => 'สถานะจัดหน้า',
+        ] as $key => $label) {
+            if (array_key_exists($key, $request->validated())) {
+                $parts[] = $label;
+            }
+        }
+        $lawMeta = is_array($payload['law_meta'] ?? null) ? $payload['law_meta'] : [];
+        $title = trim((string) (($lawMeta['title'] ?? '') ?: $documentId));
+        if ($parts !== []) {
+            $this->audit->record(
+                'update',
+                'document',
+                $documentId,
+                'แก้ไข'.implode(', ', $parts),
+                $parts,
+                $title,
+                $documentId,
+            );
+        }
+        if ($incomingRelations !== null) {
+            $this->auditRelationChanges($documentId, $title, $previousRelations, $incomingRelations);
         }
 
         return response()->json([
@@ -301,6 +347,16 @@ class ReviewController extends Controller
         }
 
         $this->reviewStore->setStatus($documentId, $patch);
+
+        $this->audit->record(
+            'update',
+            'document',
+            $documentId,
+            $completedStep >= 6 ? 'เผยแพร่เอกสาร' : 'อัปเดตขั้นตอนงาน',
+            ['ขั้นตอนที่เสร็จ: '.$completedStep],
+            $documentId,
+            $documentId,
+        );
 
         return response()->json([
             'document_id' => $documentId,
@@ -414,6 +470,8 @@ class ReviewController extends Controller
             return response()->json(['message' => $exception->getMessage()], 404);
         }
 
+        $this->audit->record('update', 'block', $documentId, 'เรียงลำดับบล็อก', ['จำนวน '.count($blockIds).' บล็อก'], $documentId, $documentId);
+
         return response()->json([
             'document_id' => $documentId,
             'status' => 'updated',
@@ -456,6 +514,8 @@ class ReviewController extends Controller
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
+        $this->audit->record('delete', 'block', $blockId, 'ลบบล็อก', ['หน้า '.$pageNo], $blockId, $documentId);
+
         return response()->json(['document_id' => $documentId, 'block_id' => $blockId, 'status' => 'deleted']);
     }
 
@@ -479,6 +539,8 @@ class ReviewController extends Controller
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
+        $this->audit->record('update', 'block', $documentId, 'รวมบล็อก', ['จำนวน '.count($blockIds).' บล็อก'], $documentId, $documentId);
+
         return response()->json(['document_id' => $documentId, 'status' => 'merged', 'block' => $merged]);
     }
 
@@ -498,6 +560,8 @@ class ReviewController extends Controller
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         }
+
+        $this->audit->record('update', 'block', $documentId, 'กู้คืนบล็อก', [], $documentId, $documentId);
 
         return response()->json([
             'document_id' => $documentId,
@@ -531,6 +595,8 @@ class ReviewController extends Controller
             return response()->json(['message' => $e->getMessage()], 404);
         }
 
+        $this->audit->record('update', 'block', $blockId, 'แยกบล็อก', ['หน้า '.(int) $validated['page_no']], $blockId, $documentId);
+
         return response()->json([
             'document_id' => $documentId,
             'status' => 'split',
@@ -552,6 +618,17 @@ class ReviewController extends Controller
         $this->reviewStore->setStatus($documentId, [
             'rag_skipped' => (bool) $validated['rag_skipped'],
         ]);
+
+        $skipped = (bool) $validated['rag_skipped'];
+        $this->audit->record(
+            'update',
+            'document',
+            $documentId,
+            $skipped ? 'ข้ามการทำ RAG' : 'ยกเลิกการข้าม RAG',
+            [],
+            $documentId,
+            $documentId,
+        );
 
         return response()->json([
             'document_id' => $documentId,
@@ -583,7 +660,173 @@ class ReviewController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $this->audit->record(
+            'create',
+            'block',
+            (string) ($newBlock['block_id'] ?? $documentId),
+            'เพิ่มบล็อก',
+            ['หน้า '.(int) $validated['page_no']],
+            (string) ($newBlock['block_id'] ?? ''),
+            $documentId,
+        );
+
         return response()->json(['document_id' => $documentId, 'status' => 'created', 'block' => $newBlock]);
+    }
+
+    /**
+     * @param  array<int, mixed>  $previous
+     * @param  array<int, mixed>  $incoming
+     */
+    private function auditRelationChanges(string $documentId, string $documentTitle, array $previous, array $incoming): void
+    {
+        $before = $this->relationsById($previous);
+        $after = $this->relationsById($incoming);
+
+        foreach ($after as $id => $relation) {
+            if (! isset($before[$id])) {
+                $this->audit->record(
+                    'create',
+                    'relation',
+                    $id,
+                    'เพิ่มความสัมพันธ์',
+                    $this->relationChanges($relation, null, $documentTitle),
+                    $this->relationLabel($relation),
+                    $documentId,
+                );
+                continue;
+            }
+
+            if ($this->relationFingerprint($before[$id]) === $this->relationFingerprint($relation)) {
+                continue;
+            }
+
+            $this->audit->record(
+                'update',
+                'relation',
+                $id,
+                'แก้ไขความสัมพันธ์',
+                $this->relationChanges($relation, $before[$id], $documentTitle),
+                $this->relationLabel($relation),
+                $documentId,
+            );
+        }
+
+        foreach ($before as $id => $relation) {
+            if (isset($after[$id])) {
+                continue;
+            }
+
+            $this->audit->record(
+                'delete',
+                'relation',
+                $id,
+                'ลบความสัมพันธ์',
+                $this->relationChanges($relation, null, $documentTitle),
+                $this->relationLabel($relation),
+                $documentId,
+            );
+        }
+    }
+
+    /**
+     * @param  array<int, mixed>  $relations
+     * @return array<string, array<string, mixed>>
+     */
+    private function relationsById(array $relations): array
+    {
+        $indexed = [];
+        foreach ($relations as $relation) {
+            if (! is_array($relation)) {
+                continue;
+            }
+            $title = trim((string) ($relation['target_title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+            $id = trim((string) ($relation['id'] ?? ''));
+            if ($id === '') {
+                $id = 'new:'.$this->relationFingerprint($relation);
+            }
+            $indexed[$id] = $relation;
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $relation
+     * @param  array<string, mixed>|null  $previous
+     * @return array<int, string>
+     */
+    private function relationChanges(array $relation, ?array $previous = null, string $documentTitle = ''): array
+    {
+        $lines = [
+            'เอกสาร: '.($documentTitle !== '' ? $documentTitle : '—'),
+            'ประเภท: '.$this->relationTypeLabel((string) ($relation['type'] ?? 'related')),
+            'เป้าหมาย: '.$this->relationTarget($relation),
+            'ขอบเขต: '.(($relation['scope'] ?? 'document') === 'section' ? 'รายข้อ' : 'ทั้งฉบับ'),
+        ];
+        $detail = trim((string) ($relation['change_detail'] ?? ''));
+        if ($detail !== '') {
+            $lines[] = 'รายละเอียด: '.$detail;
+        }
+        $note = trim((string) ($relation['note'] ?? ''));
+        if ($note !== '') {
+            $lines[] = 'หมายเหตุ: '.$note;
+        }
+        if ($previous !== null && $this->relationTypeLabel((string) ($previous['type'] ?? '')) !== $this->relationTypeLabel((string) ($relation['type'] ?? ''))) {
+            $lines[] = 'ประเภทเดิม: '.$this->relationTypeLabel((string) ($previous['type'] ?? 'related'));
+        }
+        if ($previous !== null && $this->relationTarget($previous) !== $this->relationTarget($relation)) {
+            $lines[] = 'เป้าหมายเดิม: '.$this->relationTarget($previous);
+        }
+
+        return $lines;
+    }
+
+    /** @param  array<string, mixed>  $relation */
+    private function relationLabel(array $relation): string
+    {
+        return $this->relationTypeLabel((string) ($relation['type'] ?? 'related')).' · '.$this->relationTarget($relation);
+    }
+
+    /** @param  array<string, mixed>  $relation */
+    private function relationTarget(array $relation): string
+    {
+        $title = trim((string) ($relation['target_title'] ?? ''));
+        $section = trim((string) ($relation['target_section'] ?? ''));
+
+        return $section === '' ? $title : $title.' · '.$section;
+    }
+
+    private function relationTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'repeals' => 'ยกเลิก',
+            'amends' => 'แก้ไขเพิ่มเติม',
+            'issued_under' => 'ออกตามอำนาจ',
+            'supersedes' => 'แทนที่',
+            default => 'เกี่ยวข้อง',
+        };
+    }
+
+    /** @param  array<string, mixed>  $relation */
+    private function relationFingerprint(array $relation): string
+    {
+        $encoded = json_encode([
+            'type' => (string) ($relation['type'] ?? 'related'),
+            'scope' => (string) ($relation['scope'] ?? 'document'),
+            'block_id' => (string) ($relation['block_id'] ?? ''),
+            'target_document_id' => (string) ($relation['target_document_id'] ?? ''),
+            'target_title' => trim((string) ($relation['target_title'] ?? '')),
+            'target_section' => trim((string) ($relation['target_section'] ?? '')),
+            'target_block_id' => trim((string) ($relation['target_block_id'] ?? '')),
+            'note' => trim((string) ($relation['note'] ?? '')),
+            'change_detail' => trim((string) ($relation['change_detail'] ?? '')),
+            'url' => trim((string) ($relation['url'] ?? '')),
+        ], JSON_UNESCAPED_UNICODE);
+
+        return is_string($encoded) ? $encoded : '';
     }
 
     private function concurrencyResponse(): JsonResponse

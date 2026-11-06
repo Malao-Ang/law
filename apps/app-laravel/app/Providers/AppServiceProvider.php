@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Audit\AuditLogStore;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
@@ -44,6 +45,13 @@ class AppServiceProvider extends ServiceProvider
             $database = (string) config('database.connections.mongodb.database', 'poc');
 
             return new MongoBlobStore($client->$database->selectCollection('documents'));
+        });
+
+        $this->app->singleton(AuditLogStore::class, function (): AuditLogStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new AuditLogStore($client->$database->selectCollection('audit_logs'));
         });
 
         $this->app->singleton('mongo.blob.permissions', function (): MongoBlobStore {
