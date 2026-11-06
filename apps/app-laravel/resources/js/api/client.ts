@@ -40,6 +40,7 @@ export type SelectableOption = {
   title: string;
   value: string;
   subtitle?: string;
+  code?: string;
 };
 
 export type LawStatusRole = 'in_force' | 'repealed' | 'draft' | null;
