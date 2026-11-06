@@ -90,9 +90,9 @@ class UmsPersonService
     }
 
     /** @return list<mixed> */
-    private function search(string $fname, string $lname): array
+    private function search(string $fname, string $lname, string $endpoint = 'ums.person'): array
     {
-        $response = $this->kong->postJson('ums.person', [
+        $response = $this->kong->postJson($endpoint, [
             'facid' => '',
             'depid' => '',
             'fname' => $fname,
@@ -109,7 +109,7 @@ class UmsPersonService
     {
         $people = [];
         foreach ($this->queries($query) as [$first, $last]) {
-            foreach ($this->search($first, $last) as $row) {
+            foreach ($this->search($first, $last, 'ums.person.search') as $row) {
                 if (! is_array($row)) {
                     continue;
                 }

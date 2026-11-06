@@ -1,307 +1,140 @@
 <template>
-  <AppShell
-    :breadcrumbs="['การจัดการข้อมูล', 'บันทึกการเปลี่ยนแปลง']"
-    title="บันทึกการเปลี่ยนแปลง"
-    subtitle="ดูบันทึกตามเวลา หรือเลือกเอกสารเพื่อดูประวัติการแก้ไข"
-  >
+  <AppShell :breadcrumbs="['การจัดการข้อมูล', 'ประวัติการใช้งาน']" title="ประวัติการใช้งาน" subtitle="ค้นหาและตรวจสอบประวัติการเปลี่ยนแปลง">
     <template #title-actions>
-      <div class="d-flex flex-wrap align-center ga-2">
-      <v-btn-toggle v-model="viewMode" mandatory density="compact" divided>
-        <v-btn value="log" class="text-none">แบบ log</v-btn>
-        <v-btn value="group" class="text-none">รายเอกสาร</v-btn>
-      </v-btn-toggle>
-      <v-btn
-        prepend-icon="mdi-refresh"
-        variant="tonal"
-        color="admin-primary"
-        size="small"
-        class="text-none"
-        :loading="loading"
-        @click="load"
-      >
-        รีเฟรช
-      </v-btn>
-      </div>
+      <v-btn prepend-icon="mdi-file-excel-outline" color="admin-primary" @click="openExport">ส่งออก Excel</v-btn>
+      <v-btn prepend-icon="mdi-refresh" variant="tonal" :disabled="loading" @click="load">รีเฟรช</v-btn>
     </template>
-
-    <div class="d-flex flex-wrap ga-3 mb-4 align-center">
-      <v-text-field
-        v-model="query"
-        placeholder="ค้นหาชื่อ รหัสเอกสาร หรือผู้กระทำ"
-        prepend-inner-icon="mdi-magnify"
-        variant="outlined"
-        density="compact"
-        hide-details
-        style="max-width:420px; flex:1 1 260px"
-        @keyup.enter="load"
-      />
-      <v-select
-        v-model="action"
-        :items="actionOptions"
-        item-title="label"
-        item-value="value"
-        label="การกระทำ"
-        variant="outlined"
-        density="compact"
-        hide-details
-        rounded="lg"
-        style="max-width:160px"
-      />
-      <v-select
-        v-model="resource"
-        :items="resourceOptions"
-        item-title="label"
-        item-value="value"
-        label="ประเภทข้อมูล"
-        variant="outlined"
-        density="compact"
-        hide-details
-        rounded="lg"
-        style="max-width:200px"
-      />
-      <v-btn color="admin-primary" class="text-none" @click="load">ค้นหา</v-btn>
-    </div>
-
-    <v-progress-linear v-if="loading" indeterminate color="admin-primary" class="mb-3" />
-
-    <v-card v-if="viewMode === 'group'" flat border rounded="lg" class="mb-4">
-      <div class="pa-4 text-subtitle-1 font-weight-bold">เอกสารที่แก้ไขล่าสุด</div>
-      <v-divider />
+    <v-form class="audit-filters mb-4" @submit.prevent="search">
+      <v-select v-model="filters.resource" :items="resources" item-title="label" item-value="value" label="เรื่อง" multiple chips clearable hide-details density="compact" variant="outlined" />
+      <v-select v-model="filters.action" :items="actions" item-title="label" item-value="value" label="การกระทำ" clearable hide-details density="compact" variant="outlined" />
+      <v-select v-model="filters.unit" :items="units" item-title="name" item-value="code" label="หน่วยงาน" clearable hide-details density="compact" variant="outlined" />
+      <v-text-field v-model="filters.actor" label="ผู้ทำ (ชื่อผู้ใช้)" hide-details density="compact" variant="outlined" />
+      <v-text-field v-model="filters.from" label="ตั้งแต่วันที่" type="date" hide-details density="compact" variant="outlined" />
+      <v-text-field v-model="filters.to" label="ถึงวันที่" type="date" hide-details density="compact" variant="outlined" />
+      <v-text-field v-model="filters.q" label="ค้นหา" prepend-inner-icon="mdi-magnify" hide-details density="compact" variant="outlined" />
+      <v-btn type="submit" color="admin-primary">ค้นหา</v-btn>
+    </v-form>
+    <v-alert v-if="error" type="error" class="mb-3">{{ error }}</v-alert>
+    <div style="height:4px"><v-progress-linear v-if="loading" indeterminate color="admin-primary" height="3" /></div>
+    <v-card flat border rounded="lg">
       <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>เอกสาร</th>
-            <th>แก้ไขล่าสุด</th>
-            <th>จำนวน</th>
-            <th />
-          </tr>
-        </thead>
+        <thead><tr><th>เวลา</th><th>ผู้ทำ</th><th>การกระทำ</th><th>เรื่อง</th><th>รายการ</th><th>สรุป</th><th>ผล</th><th>รายละเอียด</th></tr></thead>
         <tbody>
-          <tr v-if="!loading && groups.length === 0">
-            <td colspan="4" class="text-center text-medium-emphasis py-8">ยังไม่มีบันทึกที่ตรงกับเงื่อนไข</td>
-          </tr>
-          <tr
-            v-for="group in groups"
-            :key="group.key"
-            :class="selectedKey === group.key ? 'bg-blue-lighten-5' : ''"
-          >
-            <td>
-              <div class="font-weight-medium">{{ group.title }}</div>
-              <div class="text-caption text-medium-emphasis">{{ group.documentId || 'ไม่ได้ผูกกับเอกสาร' }}</div>
-            </td>
-            <td class="text-caption">{{ formatThaiDateTime(group.latestAt) || '—' }}</td>
-            <td>
-              <div class="d-flex flex-wrap ga-1">
-                <v-chip v-if="countAction(group, 'create')" size="x-small" color="success" variant="tonal">เพิ่ม {{ countAction(group, 'create') }}</v-chip>
-                <v-chip v-if="countAction(group, 'update')" size="x-small" color="primary" variant="tonal">แก้ไข {{ countAction(group, 'update') }}</v-chip>
-                <v-chip v-if="countAction(group, 'delete')" size="x-small" color="error" variant="tonal">ลบ {{ countAction(group, 'delete') }}</v-chip>
-              </div>
-            </td>
-            <td class="text-right">
-              <v-btn size="small" variant="tonal" color="admin-primary" class="text-none" @click="selectGroup(group.key)">
-                {{ selectedKey === group.key ? 'กำลังดู' : 'ดูประวัติ' }}
-              </v-btn>
-            </td>
-          </tr>
+          <tr v-if="!loading && !items.length"><td colspan="8" class="text-center pa-8">ไม่มีบันทึกที่ตรงกับเงื่อนไข</td></tr>
+          <template v-for="item in items" :key="item.id">
+            <tr>
+              <td class="text-center text-caption text-no-wrap">{{ tableValue(formatThaiDateTime(item.at)) }}</td>
+              <td :class="isEmptyTableValue(item.actor_name) ? 'text-center' : 'text-start'">{{ tableValue(item.actor_name) }}<div class="text-caption">{{ tableValue(item.actor_username) }}</div><div class="text-caption">{{ tableValue(roleLabel(item.actor_role)) }} · {{ tableValue(unitName(item.unit_code)) }}</div></td>
+              <td class="text-center">{{ tableValue(item.action_label) }}</td><td :class="isEmptyTableValue(item.resource_label) ? 'text-center' : 'text-start'">{{ tableValue(item.resource_label) }}</td>
+              <td :class="isEmptyTableValue(item.label || item.document_id || item.resource_id) ? 'text-center' : 'text-start'"><RouterLink v-if="item.document_id" :to="`/documents/${encodeURIComponent(item.document_id)}/law-info`">{{ tableValue(item.label || item.document_id) }}</RouterLink><RouterLink v-else-if="item.resource === 'master_data'" :to="masterLink(item)">{{ tableValue(item.label || item.resource_id) }}</RouterLink><span v-else>{{ tableValue(item.label || item.resource_id) }}</span></td>
+              <td :class="isEmptyTableValue(item.summary) ? 'text-center' : 'text-start'">{{ tableValue(item.summary) }}</td><td class="text-center">{{ tableValue(resultLabel(item.result)) }}</td>
+              <td class="text-center"><v-btn variant="text" size="small" :aria-expanded="expanded === item.id" @click="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? 'ย่อ' : 'ดู' }}</v-btn></td>
+            </tr>
+            <tr v-if="expanded === item.id"><td colspan="8" class="pa-4">
+              <div>IP: {{ tableValue(item.ip) }} <span v-if="item.on_behalf_of">· ทำแทน {{ item.on_behalf_of }}</span></div>
+              <div v-for="change in item.changes" :key="change">{{ change }}</div>
+              <v-table density="compact"><thead><tr><th>ข้อมูล</th><th>ก่อนเปลี่ยน</th><th>หลังเปลี่ยน</th></tr></thead><tbody><tr v-for="field in changeFields(item)" :key="field"><td :class="isEmptyTableValue(field) ? 'text-center' : 'text-start'">{{ tableValue(field) }}</td><td class="audit-value" :class="changeValueClass(field, item.before?.[field])">{{ tableValue(item.before?.[field] ?? '-') }}</td><td class="audit-value" :class="changeValueClass(field, item.after?.[field])">{{ tableValue(item.after?.[field] ?? '-') }}</td></tr></tbody></v-table>
+            </td></tr>
+          </template>
         </tbody>
       </v-table>
     </v-card>
-
-    <v-card v-if="viewMode === 'log' || selectedGroup" flat border rounded="lg">
-      <div class="pa-4 d-flex align-center flex-wrap ga-2">
-        <span class="text-subtitle-1 font-weight-bold flex-grow-1">
-          {{ viewMode === 'log' ? 'บันทึกตามเวลา' : `ประวัติของ ${selectedGroup?.title}` }}
-        </span>
-        <v-btn v-if="viewMode === 'group'" variant="text" class="text-none" @click="selectedKey = null">ปิดประวัติ</v-btn>
-      </div>
-      <v-divider />
-      <v-table density="comfortable">
-        <thead>
-          <tr>
-            <th>เวลา</th>
-            <th>การกระทำ</th>
-            <th>ประเภท</th>
-            <th>รายการ</th>
-            <th>ผู้กระทำ</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!loading && tableItems.length === 0">
-            <td colspan="6" class="text-center text-medium-emphasis py-8">ยังไม่มีบันทึกที่ตรงกับเงื่อนไข</td>
-          </tr>
-          <tr v-for="item in tableItems" :key="item.id">
-            <td class="text-caption">{{ formatThaiDateTime(item.at) || '—' }}</td>
-            <td>
-              <v-chip size="small" :color="actionColor(item.action)" variant="tonal">{{ item.action_label }}</v-chip>
-            </td>
-            <td>{{ item.resource_label }}</td>
-            <td>
-              <div class="font-weight-medium">{{ item.label || item.resource_id }}</div>
-              <div class="text-caption text-medium-emphasis">{{ item.summary }}</div>
-            </td>
-            <td>
-              <div>{{ item.actor_name || 'ไม่ระบุตัวตน' }}</div>
-              <div v-if="item.actor_role" class="text-caption text-medium-emphasis">{{ item.actor_role }}</div>
-            </td>
-            <td class="text-right">
-              <v-btn size="small" variant="text" class="text-none" @click="openDetail(item)">ดู</v-btn>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-    </v-card>
-
-    <div v-else-if="viewMode === 'group' && !loading && groups.length > 0" class="text-body-2 text-medium-emphasis">
-      เลือกเอกสารจากรายการด้านบนเพื่อดูว่ามีการแก้ไขอะไรบ้าง
-    </div>
-
-    <div class="text-caption text-medium-emphasis mt-2">แสดงไม่เกิน 200 รายการล่าสุด</div>
-
-    <v-dialog v-model="dialog" max-width="640">
-      <v-card v-if="selected">
-        <v-card-title class="text-wrap d-flex align-center ga-2">
-          <v-chip size="small" :color="actionColor(selected.action)" variant="tonal">{{ selected.action_label }}</v-chip>
-          {{ selected.summary }}
-        </v-card-title>
+    <div class="d-flex align-center justify-space-between mt-3"><span>ทั้งหมด {{ total }} รายการ</span><v-pagination v-model="page" :length="lastPage" :total-visible="7" @update:model-value="load" /></div>
+    <v-dialog v-model="exportDialog" max-width="620">
+      <v-card title="ส่งออก Excel">
         <v-card-text>
-          <div class="text-body-2 mb-1"><strong>รายการ:</strong> {{ selected.label || '—' }}</div>
-          <div class="text-body-2 mb-1"><strong>ประเภท:</strong> {{ selected.resource_label }}</div>
-          <div class="text-body-2 mb-1"><strong>รหัส:</strong> {{ selected.resource_id }}</div>
-          <div v-if="selected.document_id" class="text-body-2 mb-1"><strong>เอกสาร:</strong> {{ selected.document_id }}</div>
-          <div class="text-body-2 mb-1"><strong>ผู้กระทำ:</strong> {{ selected.actor_name || 'ไม่ระบุตัวตน' }}<span v-if="selected.actor_role"> ({{ selected.actor_role }})</span></div>
-          <div class="text-body-2 mb-1"><strong>เวลา:</strong> {{ formatThaiDateTime(selected.at) || '—' }}</div>
-          <div class="text-body-2 mb-3"><strong>IP:</strong> {{ selected.ip || '—' }}</div>
-          <div class="text-subtitle-2 font-weight-bold mb-2">รายละเอียด</div>
-          <div v-if="selected.changes.length === 0" class="text-medium-emphasis">ไม่มีรายละเอียดเพิ่มเติม</div>
-          <ul v-else class="pl-5">
-            <li v-for="(change, index) in selected.changes" :key="index">{{ change }}</li>
-          </ul>
+          <div class="mb-3">เลือกเรื่องที่จะส่งออก (ไม่เลือก = ทุกเรื่อง)</div>
+          <v-checkbox v-for="option in resources" :key="option.value" v-model="exportResources" :value="option.value" :label="option.label" hide-details density="compact" />
+          <div class="d-flex ga-3 mt-4"><v-text-field v-model="exportFrom" label="ตั้งแต่วันที่" type="date" /><v-text-field v-model="exportTo" label="ถึงวันที่" type="date" /></div>
+          <div class="text-caption">ใช้หน่วยงาน ผู้ทำ และคำค้นตามตัวกรองปัจจุบัน</div>
+          <v-alert v-if="exportError" type="error">{{ exportError }}</v-alert>
         </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" class="text-none" @click="dialog = false">ปิด</v-btn>
-        </v-card-actions>
+        <v-card-actions><v-spacer /><v-btn @click="exportDialog = false">ยกเลิก</v-btn><v-btn color="admin-primary" :loading="exporting" @click="download">ส่งออก Excel</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { fetchAuditLogs } from '../../api/client';
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
+import { onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { auditLogQuery, fetchAuditLogs, type AuditLogFilters } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
 import type { AuditLogItem, AuditLogOption } from '../../types/auditLog';
+import { ROLE_LABELS, type AuthRole } from '../../stores/authStore';
 import { formatThaiDateTime } from '../../utils/thaiDate';
 
-interface AuditGroup {
-  key: string;
-  title: string;
-  documentId: string | null;
-  items: AuditLogItem[];
-  latestAt: string;
-}
-
+const route = useRoute();
+const router = useRouter();
+const filters = reactive({ resource: [] as string[], action: '', unit: '', actor: '', document: '', q: '', from: '', to: '' });
+const page = ref(1);
 const items = ref<AuditLogItem[]>([]);
 const actions = ref<AuditLogOption[]>([]);
 const resources = ref<AuditLogOption[]>([]);
+const units = ref<{code: string; name: string}[]>([]);
+const total = ref(0);
+const lastPage = ref(1);
 const loading = ref(false);
-const query = ref('');
-const action = ref('');
-const resource = ref('');
-const viewMode = ref<'log' | 'group'>('log');
-const selectedKey = ref<string | null>(null);
-const dialog = ref(false);
-const selected = ref<AuditLogItem | null>(null);
-
-const groups = computed<AuditGroup[]>(() => {
-  const buckets = new Map<string, AuditLogItem[]>();
-  for (const item of items.value) {
-    const key = item.document_id || '__none__';
-    const bucket = buckets.get(key) ?? [];
-    bucket.push(item);
-    buckets.set(key, bucket);
-  }
-
-  return [...buckets.entries()]
-    .map(([key, groupItems]) => ({
-      key,
-      title: key === '__none__' ? 'ไม่ผูกกับเอกสาร' : groupTitle(groupItems),
-      documentId: key === '__none__' ? null : key,
-      items: [...groupItems].sort((a, b) => (a.at < b.at ? 1 : -1)),
-      latestAt: groupItems.reduce((latest, item) => (item.at > latest ? item.at : latest), ''),
-    }))
-    .sort((a, b) => {
-      if (a.latestAt === b.latestAt) return a.title.localeCompare(b.title, 'th');
-      return a.latestAt < b.latestAt ? 1 : -1;
-    });
-});
-
-const selectedGroup = computed(() => groups.value.find((group) => group.key === selectedKey.value) ?? null);
-const tableItems = computed(() => (viewMode.value === 'log' ? items.value : selectedGroup.value?.items ?? []));
-const actionOptions = computed(() => [{ value: '', label: 'ทั้งหมด' }, ...actions.value]);
-const resourceOptions = computed(() => [{ value: '', label: 'ทั้งหมด' }, ...resources.value]);
-
-onMounted(() => {
-  void load();
-});
-
-watch([action, resource], () => {
-  void load();
-});
-
-watch(groups, (next) => {
-  if (selectedKey.value && !next.some((group) => group.key === selectedKey.value)) {
-    selectedKey.value = null;
-  }
-});
-
+const error = ref('');
+const expanded = ref('');
+const exportDialog = ref(false);
+const exportResources = ref<string[]>([]);
+const exportFrom = ref('');
+const exportTo = ref('');
+const exporting = ref(false);
+const exportError = ref('');
+let generation = 0;
+function readQuery(): void {
+  for (const key of ['action', 'unit', 'actor', 'document', 'q', 'from', 'to'] as const) filters[key] = String(route.query[key] ?? '');
+  const resource = route.query.resource ?? route.query['resource[]'];
+  filters.resource = (Array.isArray(resource) ? resource : resource ? [resource] : []).filter((v): v is string => typeof v === 'string');
+  page.value = Math.max(1, Number(route.query.page) || 1);
+}
+function params(): AuditLogFilters { return { ...filters, resource: filters.resource ?? [], page: page.value, per_page: 25 }; }
 async function load(): Promise<void> {
+  const current = ++generation;
   loading.value = true;
+  error.value = '';
   try {
-    const result = await fetchAuditLogs({
-      action: action.value || undefined,
-      resource: resource.value || undefined,
-      q: query.value.trim() || undefined,
-    });
-    items.value = result.items;
-    actions.value = result.actions;
-    resources.value = result.resources;
-  } finally {
-    loading.value = false;
-  }
+    const result = await fetchAuditLogs(params());
+    if (current !== generation) return;
+    items.value = result.items; actions.value = result.actions; resources.value = result.resources; units.value = result.units;
+    total.value = result.total; lastPage.value = result.last_page;
+    const query = Object.fromEntries(Object.entries({ ...filters, page: page.value }).filter(([, v]) => Array.isArray(v) ? v.length : v !== '' && v !== null));
+    await router.replace({ query });
+  } catch (e) { if (current === generation) error.value = e instanceof Error ? e.message : 'โหลดประวัติไม่สำเร็จ'; }
+  finally { if (current === generation) loading.value = false; }
 }
-
-function groupTitle(groupItems: AuditLogItem[]): string {
-  const oversight = groupItems.find((item) => item.resource === 'oversight' && item.label);
-  if (oversight) return oversight.label;
-  const renamed = groupItems.find((item) => item.resource === 'document' && item.summary.startsWith('แก้ไข') && item.label);
-  if (renamed) return renamed.label;
-  for (const item of groupItems) {
-    const line = item.changes.find((change) => change.startsWith('เอกสาร: '));
-    const title = line?.slice('เอกสาร: '.length).trim();
-    if (title && title !== '—') return title;
-  }
-  const named = groupItems.find((item) => item.label && item.label !== item.document_id);
-  return named?.label || groupItems[0]?.document_id || 'ไม่ระบุเอกสาร';
+function search(): void { page.value = 1; void load(); }
+onMounted(() => { readQuery(); void load(); });
+watch(() => route.fullPath, () => { if (route.path !== '/admin/audit-logs') return; readQuery(); if (!loading.value) void load(); });
+function roleLabel(role: string): string { return ROLE_LABELS[role as AuthRole] || role; }
+function unitName(code: string | null): string { return units.value.find((u) => u.code === code)?.name || code || '—'; }
+function resultLabel(result: string): string { return result === 'denied' ? 'ปฏิเสธ' : result === 'failed' ? 'ไม่สำเร็จ' : 'สำเร็จ'; }
+function changeFields(item: AuditLogItem): string[] { return [...new Set([...Object.keys(item.before || {}), ...Object.keys(item.after || {})])]; }
+function changeValueClass(field: string, value: unknown): string {
+  return isEmptyTableValue(value) || typeof value === 'number' || typeof value === 'boolean'
+    || /(^|_)(code|codes|type|types|status|role|mode|count|order|date|at|on|active|scope)($|_)/.test(field)
+    ? 'text-center' : 'text-start';
 }
-
-function countAction(group: AuditGroup, actionName: string): number {
-  return group.items.filter((item) => item.action === actionName).length;
-}
-
-function selectGroup(key: string): void {
-  selectedKey.value = key;
-}
-
-function openDetail(item: AuditLogItem): void {
-  selected.value = item;
-  dialog.value = true;
-}
-
-function actionColor(value: string): string {
-  if (value === 'create') return 'success';
-  if (value === 'delete') return 'error';
-  return 'primary';
+function masterLink(item: AuditLogItem): string { const kind = (item as AuditLogItem & {kind?: string}).kind || ''; const paths: Record<string, string> = { law_type: 'law-types', law_family: 'law-types', law_category: 'categories', legal_structure: 'legal-structures', change_status: 'change-status', enforcement_status: 'enforcement-status' }; return `/admin/master/${paths[kind] || 'law-types'}`; }
+function openExport(): void { exportResources.value = [...(filters.resource ?? [])]; exportFrom.value = filters.from; exportTo.value = filters.to; exportError.value = ''; exportDialog.value = true; }
+async function download(): Promise<void> {
+  exporting.value = true; exportError.value = '';
+  try {
+    const response = await fetch(`/api/audit-logs/export?${auditLogQuery({ ...params(), resource: exportResources.value, from: exportFrom.value, to: exportTo.value })}`, { credentials: 'include', headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+    if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.message || 'ส่งออกไม่สำเร็จ'); }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a'); link.href = url; link.download = 'ประวัติการใช้งาน.xlsx'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000); exportDialog.value = false;
+  } catch (e) { exportError.value = e instanceof Error ? e.message : 'ส่งออกไม่สำเร็จ'; }
+  finally { exporting.value = false; }
 }
 </script>
+
+<style scoped>
+.audit-filters { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; }
+.audit-value { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 420px; }
+@media (max-width: 900px) { .audit-filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); } }
+</style>

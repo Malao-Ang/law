@@ -34,8 +34,8 @@ defineEmits<{
 .master-toggle {
   align-items: center;
   display: flex;
-  flex: 0 0 54px;
-  width: 54px;
-  justify-content: flex-end;
+  flex: 0 0 44px;
+  width: 44px;
+  justify-content: center;
 }
 </style>

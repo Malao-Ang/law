@@ -26,7 +26,8 @@
     </template>
 
     <template #item.family_codes="{ item }">
-      <div class="legal-structure-page__chips">
+      <span v-if="!familyCodes(item).length">-</span>
+      <div v-else class="legal-structure-page__chips justify-center">
         <v-chip
           v-for="code in familyCodes(item)"
           :key="code"
@@ -40,7 +41,8 @@
     </template>
 
     <template #item.file_types="{ item }">
-      <div class="legal-structure-page__chips">
+      <span v-if="!fileTypes(item).length">-</span>
+      <div v-else class="legal-structure-page__chips justify-center">
         <v-chip
           v-for="fileType in fileTypes(item)"
           :key="fileType"

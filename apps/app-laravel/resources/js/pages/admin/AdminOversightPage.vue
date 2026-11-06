@@ -47,22 +47,22 @@
             <td colspan="6" class="text-center text-medium-emphasis py-6">ไม่พบรายการ</td>
           </tr>
           <tr v-for="item in visibleItems" :key="item.document_id">
-            <td>
-              <div class="font-weight-medium">{{ item.title }}</div>
-              <div class="text-caption text-medium-emphasis">{{ item.law_type || 'ไม่ระบุประเภท' }}</div>
+            <td :class="isEmptyTableValue(item.title) ? 'text-center' : 'text-start'">
+              <div class="font-weight-medium">{{ tableValue(item.title) }}</div>
+              <div class="text-caption text-medium-emphasis">{{ tableValue(item.law_type) }}</div>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip size="small" :color="statusColor(item.status)" variant="tonal">
-                {{ item.status || 'ยังไม่ติดตาม' }}
+                {{ tableValue(item.status || 'ยังไม่ติดตาม') }}
               </v-chip>
             </td>
-            <td>
-              <div :class="item.overdue ? 'text-error font-weight-bold' : ''">{{ formatThaiDate(item.publish_due_date) }}</div>
+            <td class="text-center">
+              <div :class="item.overdue ? 'text-error font-weight-bold' : ''">{{ tableValue(formatThaiDate(item.publish_due_date)) }}</div>
               <div class="text-caption text-medium-emphasis">{{ daysLabel(item.days_left) }}</div>
             </td>
-            <td>{{ item.primary.name || item.primary.email || '—' }}</td>
-            <td>{{ item.backup.name || item.backup.email || '—' }}</td>
-            <td class="text-right">
+            <td :class="isEmptyTableValue(item.primary.name || item.primary.email || '-') ? 'text-center' : 'text-start'">{{ tableValue(item.primary.name || item.primary.email || '-') }}</td>
+            <td :class="isEmptyTableValue(item.backup.name || item.backup.email || '-') ? 'text-center' : 'text-start'">{{ tableValue(item.backup.name || item.backup.email || '-') }}</td>
+            <td class="text-center">
               <v-btn size="small" variant="tonal" color="admin-primary" class="text-none" @click="openEditor(item)">
                 ปรับปรุง
               </v-btn>
@@ -111,12 +111,12 @@
             </thead>
             <tbody>
               <tr v-for="step in form.steps" :key="step.key">
-                <td>{{ step.label }}</td>
-                <td>
-                  <v-text-field v-model="step.due_date" type="date" density="compact" variant="outlined" hide-details />
+                <td :class="isEmptyTableValue(step.label) ? 'text-center' : 'text-start'">{{ tableValue(step.label) }}</td>
+                <td class="text-center">
+                  <v-text-field class="text-center" v-model="step.due_date" type="date" density="compact" variant="outlined" hide-details />
                 </td>
-                <td>
-                  <v-text-field v-model="step.completed_on" type="date" density="compact" variant="outlined" hide-details />
+                <td class="text-center">
+                  <v-text-field class="text-center" v-model="step.completed_on" type="date" density="compact" variant="outlined" hide-details />
                 </td>
               </tr>
             </tbody>
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { fetchOversightSummary, saveOversight } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';

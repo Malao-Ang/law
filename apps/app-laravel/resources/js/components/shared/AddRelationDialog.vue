@@ -45,14 +45,14 @@
               <div class="existing-relations__target">
                 {{ formatRelationTarget(relation) }}
               </div>
-              <div v-if="changeDetailMeta(relation.change_detail)" class="d-flex">
+              <div v-if="detailChip(relation.change_detail)" class="d-flex">
                 <v-chip
                   size="x-small"
-                  :color="changeDetailMeta(relation.change_detail)?.color"
+                  :color="detailChip(relation.change_detail)?.color || 'teal'"
                   variant="tonal"
-                  :prepend-icon="changeDetailMeta(relation.change_detail)?.icon"
+                  :prepend-icon="detailChip(relation.change_detail)?.icon || 'mdi-pencil'"
                 >
-                  {{ changeDetailMeta(relation.change_detail)?.title }}
+                  {{ detailChip(relation.change_detail)?.title }}
                 </v-chip>
               </div>
               <div v-if="relation.note" class="text-caption text-medium-emphasis">
@@ -76,11 +76,11 @@
           <div class="text-caption font-weight-bold text-medium-emphasis mb-2">รายละเอียดการเปลี่ยนแปลง *</div>
           <v-chip-group v-model="changeDetail" mandatory>
             <v-chip
-              v-for="item in SECTION_CHANGE_DETAILS"
-              :key="item.value"
-              :value="item.value"
-              :color="item.color"
-              :prepend-icon="item.icon"
+              v-for="item in detailChoices"
+              :key="item.code"
+              :value="item.code"
+              :color="item.color || 'teal'"
+              :prepend-icon="item.icon || 'mdi-pencil'"
               filter
             >
               {{ item.title }}
@@ -209,12 +209,8 @@ import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from
 import {
   RELATION_TYPE_COLORS,
   RELATION_TYPE_ICONS,
-  SECTION_CHANGE_DETAILS,
-  changeDetailMeta,
   formatRelationTarget,
-  normalizeChangeDetail,
   proclamationDueLabel,
-  relationTypeFromChangeDetail,
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
@@ -233,6 +229,7 @@ const props = defineProps<{
   existingRelations?: LawRelation[];
   sectionLabels?: Record<string, string>;
   changeStatus?: string | null;
+  detailSource?: 'internal' | 'external' | null;
 }>();
 
 const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
@@ -249,8 +246,17 @@ const existingRelations = computed(() => props.existingRelations ?? []);
 const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
 const _cs = useChangeStatus();
 const showChangeDetails = computed(() =>
-  props.scope === 'section' && _cs.isSection(props.changeStatus ?? ''),
+  props.scope === 'section'
+  && _cs.isSection(props.changeStatus ?? '')
+  && _cs.hasDetails(props.changeStatus ?? ''),
 );
+const detailChoices = computed(() =>
+  _cs.detailOptions(props.detailSource ?? undefined).filter((item) => item.role === 'repeals' || item.role === 'amends'),
+);
+
+function detailChip(detail: string | null | undefined) {
+  return _cs.detailMeta(detail);
+}
 
 const form = ref<LawRelation>({
   id: createClientId('relation'),
@@ -311,8 +317,8 @@ watch(requiresNewProclamation, (checked) => {
 });
 
 watch(changeDetail, (detail) => {
-  const nextType = relationTypeFromChangeDetail(detail);
-  if (nextType) form.value.type = nextType;
+  const role = _cs.detailRole(detail);
+  if (role === 'repeals' || role === 'amends') form.value.type = role;
 });
 
 function relationSourceLabel(relation: LawRelation): string {
@@ -357,7 +363,7 @@ function save(): void {
     target_document_id: form.value.target_document_id || null,
     url: form.value.url?.trim() || null,
     note: form.value.note?.trim() || null,
-    change_detail: showChangeDetails.value ? normalizeChangeDetail(changeDetail.value) : null,
+    change_detail: showChangeDetails.value ? (_cs.normalizeDetail(changeDetail.value) || null) : null,
     requires_new_proclamation: requiresNewProclamation.value && proclamationDueDate.value !== '' && (proclamationScope.value !== 'sections' || proclamationSectionList().length > 0),
     proclamation_scope: requiresNewProclamation.value ? proclamationScope.value : null,
     proclamation_sections: requiresNewProclamation.value && proclamationScope.value === 'sections' ? proclamationSectionList() : [],

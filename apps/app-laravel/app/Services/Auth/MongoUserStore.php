@@ -66,21 +66,28 @@ class MongoUserStore
         return null;
     }
 
+    /** Shared preflight rules; changeMembership also rechecks under its lock. */
+    public static function validateMembershipChange(array $actor, string $unitCode, ?array $user, ?array $change, ?array $person = null): void
+    {
+        $super = (bool) ($actor['is_super_admin'] ?? false);
+        abort_unless($super || self::unitRole($actor, $unitCode) === self::ROLE_INNER_ADMIN, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
+        abort_if(! $super && ($change === null || ! in_array($change['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'ไม่มีสิทธิ์เพิ่ม ลบสมาชิก หรือกำหนดบทบาทผู้ดูแล');
+        $role = $user === null ? null : self::unitRole($user, $unitCode);
+        abort_if(! $super && ! in_array($role, [self::ROLE_USER, self::ROLE_EDITOR], true), 403, 'แก้ไขได้เฉพาะสมาชิกเดิมที่เป็น User หรือ Editor ในหน่วยงานของตนเอง');
+        abort_if(($user === null || $user === []) && ($person === null || $change === null), 404, 'ไม่พบผู้ใช้ กรุณาค้นหาผู้ใช้จาก UMS อีกครั้ง');
+        abort_if($change === null && $role === null, 404, 'ไม่พบสมาชิกในหน่วยงานนี้');
+    }
+
     /** Check target permissions inside the optimistic lock so retries recheck the current membership. */
     public function changeMembership(array $actor, string $unitCode, string $username, ?array $change, ?array $person = null): ?array
     {
-        $super = (bool) ($actor['is_super_admin'] ?? false);
-        $actorRole = self::unitRole($actor, $unitCode);
-        abort_unless($super || $actorRole === self::ROLE_INNER_ADMIN, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
-        abort_if(! $super && ($change === null || ! in_array($change['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'ไม่มีสิทธิ์เพิ่ม ลบสมาชิก หรือกำหนดบทบาทผู้ดูแล');
         $key = self::key($username);
         $before = $after = null;
-        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($actor, $super, $unitCode, $key, $change, $person, &$before, &$after): void {
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($actor, $unitCode, $key, $change, $person, &$before, &$after): void {
+            self::validateMembershipChange($actor, $unitCode, $data, $change, $person);
             $memberships = (array) ($data['memberships'] ?? []);
             $index = array_search($unitCode, array_column($memberships, 'unit_code'), true);
             $before = $index === false ? null : $memberships[$index];
-            abort_if(! $super && ($before === null || ! in_array($before['role'], [self::ROLE_USER, self::ROLE_EDITOR], true)), 403, 'แก้ไขได้เฉพาะสมาชิกเดิมที่เป็นผู้ใช้หรือผู้แก้ไขในหน่วยงานของตนเอง');
-            abort_if($data === [] && ($person === null || $change === null), 404, 'ไม่พบผู้ใช้ กรุณาค้นหาผู้ใช้จาก UMS อีกครั้ง');
             if ($data === []) {
                 $data = ['username' => $key, 'name' => $person['name'], 'email' => $person['email'],
                     'is_super_admin' => false, 'is_disabled' => false, 'created_at' => now()->toIso8601String(),
@@ -90,7 +97,6 @@ class MongoUserStore
                 }
             }
             if ($change === null) {
-                abort_if($index === false, 404, 'ไม่พบสมาชิกในหน่วยงานนี้');
                 unset($memberships[$index]);
                 $after = null;
             } else {
@@ -233,6 +239,26 @@ class MongoUserStore
         if ((bool) ($before['is_super_admin'] ?? (($before['role'] ?? '') === self::ROLE_SUPER_ADMIN)) !== (bool) ($after['is_super_admin'] ?? false)) {
             $this->audit->record($actor, 'super_admin.change', $username, null, (bool) ($before['is_super_admin'] ?? (($before['role'] ?? '') === self::ROLE_SUPER_ADMIN)), (bool) $after['is_super_admin']);
         }
+    }
+
+    public function setDisabled(array $actor, string $username, bool $disabled): array
+    {
+        abort_unless($actor['is_super_admin'] ?? false, 403, 'เฉพาะ Super Admin เท่านั้น');
+        $key = self::key($username);
+        abort_if($key === $actor['username'], 422, 'ไม่สามารถปิดหรือเปิดบัญชีของตนเอง');
+        $saved = $before = [];
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($key, $disabled, &$saved, &$before): void {
+            abort_if($data === [], 404, 'ไม่พบผู้ใช้');
+            abort_if(($data['is_super_admin'] ?? false) || in_array($key, (array) config('auth_ldap.super_admins', []), true), 422, 'ไม่สามารถปิดหรือเปิด Super Admin จากการตั้งค่าระบบ');
+            $before = ['is_disabled' => (bool) ($data['is_disabled'] ?? false)];
+            $data['is_disabled'] = $disabled;
+            $data['updated_at'] = now()->toIso8601String();
+            $saved = $data;
+        });
+        if ($before['is_disabled'] !== $disabled) app(\App\Services\Audit\AuditLogger::class)->record('update', 'user', $key,
+            $disabled ? 'ปิดการใช้งานผู้ใช้' : 'เปิดการใช้งานผู้ใช้', [], $saved['name'] ?? $key, null,
+            ['before' => $before, 'after' => ['is_disabled' => $disabled]]);
+        return $saved;
     }
 
     private function firstFilled(mixed ...$values): ?string

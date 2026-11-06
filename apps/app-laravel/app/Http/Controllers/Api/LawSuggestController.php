@@ -30,7 +30,8 @@ class LawSuggestController extends Controller
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
             if (
-                ($metaRow['status'] ?? '') === 'ingested'
+                app(\App\Services\Auth\DocumentAccess::class)->publicScope($request, $metaRow)
+                && ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
                 && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
             ) {
@@ -72,9 +73,6 @@ class LawSuggestController extends Controller
         foreach ($store->listLawMeta() as $row) {
             // Published gate: status=ingested, has published_date, not draft.
             if (! isset($publishedIds[(string) ($row['document_id'] ?? '')])) {
-                continue;
-            }
-            if (($row['access_scope'] ?? 'public') === 'private') {
                 continue;
             }
 

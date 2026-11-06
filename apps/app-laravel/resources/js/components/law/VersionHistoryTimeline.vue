@@ -2,15 +2,17 @@
   <div class="d-flex flex-column ga-3">
     <button
       v-for="v in ordered"
-      :key="v.document_id"
+      :key="v.document_id || v.version_label"
       type="button"
       class="ver-card"
       :class="{ 'ver-card--active': v.document_id === viewedDocumentId }"
+      :disabled="!v.document_id"
       @click="open(v)"
     >
       <div class="d-flex align-center justify-space-between ga-2">
-        <span class="font-weight-bold">{{ v.version_label }}</span>
+        <span class="font-weight-bold">{{ v.document_id ? v.version_label : 'เอกสารจำกัดสิทธิ์' }}</span>
         <v-chip
+          v-if="v.document_id"
           size="x-small"
           :color="v.is_current ? 'success' : 'warning'"
           variant="tonal"
@@ -61,7 +63,7 @@ function dialogText(v: VersionChainItem): string {
 }
 
 async function open(v: VersionChainItem): Promise<void> {
-  if (v.document_id === props.viewedDocumentId) return;
+  if (!v.document_id || v.document_id === props.viewedDocumentId) return;
 
   const confirmed = await Swal.fire({
     icon: 'warning',

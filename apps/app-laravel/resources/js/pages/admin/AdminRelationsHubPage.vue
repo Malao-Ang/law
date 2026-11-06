@@ -61,30 +61,31 @@
             <td colspan="7" class="text-center pa-6 text-medium-emphasis">ไม่พบเอกสารที่ตรงกับเงื่อนไข</td>
           </tr>
           <tr v-for="(doc, idx) in pagedDocs" :key="doc.id" class="rh-row" @click="openQuickEdit(doc)">
-            <td class="text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
-            <td class="py-3" style="max-width: 400px">
-              <div class="d-flex align-center ga-2 flex-wrap mb-1">
-                <span class="text-body-2 font-weight-bold">{{ doc.title }}</span>
+            <td class="text-center text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
+            <td class="py-3" style="max-width: 400px" :class="isEmptyTableValue(doc.title) ? 'text-center' : 'text-start'">
+              <div class="d-flex align-center ga-2 flex-wrap mb-1" :class="{ 'justify-center': isEmptyTableValue(doc.title) }">
+                <span class="text-body-2 font-weight-bold">{{ tableValue(doc.title) }}</span>
                 <v-chip v-if="doc.hasChildren" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
                   <v-icon start icon="mdi-link-variant" size="11" />
                   กฎหมายที่อ้างถึง
                 </v-chip>
               </div>
               <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
-                <span v-if="doc.org"><v-icon size="11" icon="mdi-domain" /> {{ doc.org }}</span>
-                <span v-if="doc.group"><v-icon size="11" icon="mdi-tag" /> {{ doc.group }}</span>
+                <span v-if="doc.org"><v-icon size="11" icon="mdi-domain" /> {{ tableValue(doc.org) }}</span>
+                <span v-if="doc.group"><v-icon size="11" icon="mdi-tag" /> {{ tableValue(doc.group) }}</span>
                 <span v-if="doc.pages > 0 || doc.sections != null">
                   <v-icon size="11" icon="mdi-file-multiple" />
-                  {{ doc.pages }} หน้า<template v-if="doc.sections != null"> / {{ doc.sections }} ข้อ</template>
+                  {{ tableValue(doc.pages) }} หน้า<template v-if="doc.sections != null"> / {{ tableValue(doc.sections) }} ข้อ</template>
                 </span>
               </div>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip v-if="doc.lawType" size="small" variant="flat" :color="typeColor(doc.lawType)" rounded="pill" class="font-weight-bold text-white">
                 {{ typeLabel(doc.lawType) }}
               </v-chip>
+              <span v-else>-</span>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip
                 size="x-small"
                 :color="doc.metaStatus ? metaStatusColor(doc.metaStatus) : workflowStageColor(doc.workflowStage)"
@@ -92,10 +93,10 @@
                 rounded="pill"
               >
                 <v-icon start icon="mdi-circle" size="8" />
-                {{ doc.metaStatus || doc.workflowStage }}
+                {{ tableValue(doc.metaStatus || doc.workflowStage) }}
               </v-chip>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip
                 v-if="changeLogCountById[doc.id]"
                 size="x-small"
@@ -108,9 +109,9 @@
               </v-chip>
               <span v-else class="text-caption text-medium-emphasis">—</span>
             </td>
-            <td class="text-caption">{{ doc.editedAt }}</td>
-            <td @click.stop>
-              <div class="d-flex ga-1">
+            <td class="text-center text-caption">{{ tableValue(doc.editedAt) }}</td>
+            <td @click.stop class="text-center">
+              <div class="d-flex justify-center ga-1">
                 <v-btn
                   icon="mdi-graph-outline"
                   size="x-small"
@@ -172,19 +173,19 @@
             </thead>
             <tbody>
               <tr v-for="entry in changeLog" :key="entry.id">
-                <td class="text-caption">{{ formatDateTime(entry.timestamp) }}</td>
-                <td class="text-caption text-truncate" style="max-width:160px">{{ entry.docTitle }}</td>
-                <td>
+                <td class="text-center text-caption">{{ tableValue(formatDateTime(entry.timestamp)) }}</td>
+                <td class="text-caption text-truncate" style="max-width:160px" :class="isEmptyTableValue(entry.docTitle) ? 'text-center' : 'text-start'">{{ tableValue(entry.docTitle) }}</td>
+                <td class="text-center">
                   <v-chip size="x-small" :color="entry.action === 'add' ? 'success' : 'error'" variant="tonal" rounded="pill">
-                    {{ entry.action === 'add' ? '+ เพิ่ม' : '− ลบ' }}
+                    {{ tableValue(entry.action === 'add' ? '+ เพิ่ม' : '− ลบ') }}
                   </v-chip>
                 </td>
-                <td>
+                <td class="text-center">
                   <v-chip size="x-small" :color="RELATION_TYPE_COLORS[entry.relationType]" variant="tonal" rounded="pill">
                     {{ relationTypeLabel(entry.relationType) }}
                   </v-chip>
                 </td>
-                <td class="text-caption text-truncate" style="max-width:200px">{{ entry.relationTarget }}</td>
+                <td class="text-caption text-truncate" style="max-width:200px" :class="isEmptyTableValue(entry.relationTarget) ? 'text-center' : 'text-start'">{{ tableValue(entry.relationTarget) }}</td>
               </tr>
             </tbody>
           </v-table>
@@ -242,6 +243,31 @@
               @click:close="documentStore.setSaveError()"
             >
               {{ documentStore.saveError }}
+            </v-alert>
+
+            <v-alert
+              v-if="showAmendedChildrenWarning"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนถ้ากฎหมายฉบับนี้ถูกแก้ไข ถ้ากฎหมายลูกที่บังคับใช้
+              <ul class="mt-1">
+                <li v-for="child in activeChildren" :key="child.document_id">{{ child.title }}</li>
+              </ul>
+            </v-alert>
+            <v-alert
+              v-if="repealedParentTitles.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนให้ตรวจสอบกฎหมายลูก เมื่อกฎหมายแม่ถูกยกเลิก
+              <ul class="mt-1">
+                <li v-for="title in repealedParentTitles" :key="title">{{ title }}</li>
+              </ul>
             </v-alert>
 
             <!-- Document-level relations -->
@@ -385,6 +411,7 @@
       :existing-relations="relations"
       :section-labels="sectionLabels"
       :change-status="documentStore.review?.law_meta?.change_status"
+      :detail-source="detailSource"
       @close="closeRelationDialog"
       @save="onRelationAdd"
     />
@@ -392,6 +419,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportSummary, LawRelation, RelationScope, RelationType } from '../../types/document';
@@ -404,7 +432,6 @@ import {
   formatRelationTarget,
   relationTypeLabel,
   uniqueRelationChangeDetails,
-  changeDetailMeta,
   proclamationDueLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
@@ -412,13 +439,33 @@ import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { createLawTypeCatalog } from '../../composables/useLawType';
+import { createLawTypeCatalog, useLawType } from '../../composables/useLawType';
 import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useRelationWarnings } from '../../composables/useRelationWarnings';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
-const { typeLabel } = useLawType();
+const lawTypes = useLawType();
+const { typeLabel, typeSource } = lawTypes;
 const changeStatusCS = useChangeStatus();
+const relationWarnings = useRelationWarnings();
+const activeChildren = relationWarnings.activeChildren;
+const showAmendedChildrenWarning = computed(() =>
+  relationWarnings.showAmendedChildrenWarning(documentStore.review?.law_meta?.change_status),
+);
+const repealedParentTitles = computed(() => relationWarnings.repealedParentTitles(
+  quickEditParentIds.value.map((id) => {
+    const doc = summary.value.documents.find((item) => item.id === id);
+    return { title: doc?.title ?? id, status: doc?.meta_status };
+  }),
+));
+const detailSource = computed<'internal' | 'external'>(() =>
+  typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
+);
+
+function changeDetailMeta(detail: string | null | undefined) {
+  return changeStatusCS.detailMeta(detail);
+}
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {
@@ -450,7 +497,6 @@ interface ChangeLogEntry {
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 const { statusColor } = useLawStatus();
-const lawTypes = createLawTypeCatalog();
 
 // ── Table state ───────────────────────────────────────────
 const PAGE_SIZE = 20;
@@ -648,6 +694,7 @@ async function openQuickEdit(doc: DocRow): Promise<void> {
   quickEditOpen.value = true;
   documentStore.reset();
   await documentStore.fetch(doc.id);
+  void relationWarnings.load(doc.id);
   // Seed pending relations from the loaded document
   pendingRelations.value = [...(documentStore.review?.relations ?? [])];
 }
@@ -689,7 +736,7 @@ async function confirmSave(): Promise<void> {
   const ok = await documentStore.saveRelations(
     pendingRelations.value,
     isSectionEditionChange(changeStatus)
-      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value) }
+      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value, (detail) => changeStatusCS.normalizeDetail(detail) || null) }
       : undefined,
   );
   if (ok) {

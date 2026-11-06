@@ -21,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
-        $middleware->api(append: [\App\Http\Middleware\ValidateActiveUnit::class, \App\Http\Middleware\EnforceDocumentAccess::class]);
+        $middleware->api(append: [\App\Http\Middleware\RecordAuditMutation::class, \App\Http\Middleware\ValidateActiveUnit::class, \App\Http\Middleware\EnforceDocumentAccess::class]);
         $middleware->alias([
             'auth.session' => EnsureAuthSession::class,
             'doc.read' => \App\Http\Middleware\EnforceDocumentRead::class,

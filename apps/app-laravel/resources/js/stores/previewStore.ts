@@ -8,19 +8,24 @@ export const usePreviewStore = defineStore('preview', () => {
   const loading = ref(false);
   const error = ref('');
 
+  let fetchRequest = 0;
   async function fetch(documentId: string, force = false): Promise<void> {
+    const current = ++fetchRequest;
+    data.value = null;
     loading.value = true;
     error.value = '';
     try {
-      data.value = await getPreviewCached(documentId, force);
+      const response = await getPreviewCached(documentId, force);
+      if (current === fetchRequest) data.value = response;
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : 'โหลดตัวอย่างไม่สำเร็จ';
+      if (current === fetchRequest) error.value = e instanceof Error ? e.message : 'โหลดตัวอย่างไม่สำเร็จ';
     } finally {
-      loading.value = false;
+      if (current === fetchRequest) loading.value = false;
     }
   }
 
   function reset(): void {
+    fetchRequest++;
     data.value = null;
     loading.value = false;
     error.value = '';

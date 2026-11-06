@@ -86,6 +86,7 @@ class ReviewStore
             }
             $current['updated_at'] = now()->toIso8601String();
         });
+        Cache::forget('law-meta-list');
     }
 
     /**
@@ -129,6 +130,7 @@ class ReviewStore
         }
 
         $this->blob->delete($documentId);
+        Cache::forget('law-meta-list');
 
         return true;
     }
@@ -171,7 +173,6 @@ class ReviewStore
                 'uploaded_by' => $status['uploaded_by'] ?? null,
                 'responsible' => $status['responsible'] ?? null,
                 'owner_unit_code' => $status['owner_unit_code'] ?? null,
-                'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
@@ -971,7 +972,12 @@ class ReviewStore
             ];
         });
 
-        $revoked = $this->applySameLevelReplacement($documentId);
+        request()->attributes->set('audit_replacement', true);
+        try {
+            $revoked = $this->applySameLevelReplacement($documentId);
+        } finally {
+            request()->attributes->remove('audit_replacement');
+        }
         $fresh = $this->blob->read('review', $documentId);
         if (is_array($fresh) && is_array($returnPayload)) {
             $returnPayload['law_meta'] = $fresh['law_meta'] ?? $returnPayload['law_meta'];
@@ -984,6 +990,7 @@ class ReviewStore
             'law_meta' => [],
             'relations' => [],
         ];
+        Cache::forget('law-meta-list');
         $payload['revoked_document_ids'] = $revoked;
 
         return $payload;
@@ -1021,7 +1028,12 @@ class ReviewStore
             return [];
         }
 
-        return $this->sameLevelComponentIds($documentId, $targets);
+        $component = $this->sameLevelComponentIds($documentId, $targets);
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $component = array_values(array_filter($component, fn ($id) => $id === $documentId
+            || $access->allows(request(), 'edit', $this->getStatus($id) ?? [])));
+
+        return $component;
     }
 
     public function applySameLevelReplacement(string $documentId): array
@@ -1160,14 +1172,21 @@ class ReviewStore
      */
     public function patchLawMeta(string $documentId, array $fields): void
     {
-        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields): void {
+        $before = $after = [];
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($fields, &$before, &$after): void {
             $this->ensureLawMetaDefaults($document);
+            $before = $document['law_meta'];
             if (($fields['access_scope'] ?? null) === 'public') {
                 $fields['permission_group_ids'] = [];
             }
             $document['law_meta'] = array_merge($document['law_meta'], $fields);
             $this->ensureLawMetaDefaults($document);
+            $after = $document['law_meta'];
         });
+        if (request()->attributes->get('audit_replacement') && $before !== $after) {
+            app(\App\Services\Audit\AuditLogger::class)->record('update', 'relation', $documentId, 'ปรับสถานะจากการปรับปรุงทั้งฉบับ', [], $documentId, $documentId,
+                ['before' => $before, 'after' => $after]);
+        }
         Cache::forget('law-meta-list');
     }
 
@@ -2007,6 +2026,23 @@ class ReviewStore
         ];
     }
 
+    private function normalizeRelationChangeDetail(mixed $value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $resolved = app(ChangeStatuses::class)->resolveDetail($raw);
+        if ($resolved === null) {
+            return $raw;
+        }
+
+        $code = trim((string) ($resolved['code'] ?? ''));
+
+        return $code !== '' ? $code : $raw;
+    }
+
     /**
      * @param  array<string, mixed>  $document
      */
@@ -2069,7 +2105,7 @@ class ReviewStore
                 'target_block_id' => trim((string) ($entry['target_block_id'] ?? '')) ?: null,
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
-                'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
+                'change_detail' => $this->normalizeRelationChangeDetail($entry['change_detail'] ?? null),
                 'requires_new_proclamation' => $requiresProclamation,
                 'proclamation_scope' => $requiresProclamation ? $proclamationScope : null,
                 'proclamation_sections' => $proclamationSections,
@@ -2152,7 +2188,6 @@ class ReviewStore
             'access_scope' => 'public',
             'permission_group_ids' => [],
         ], $meta, [
-            'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
             'law_group' => $lawGroups[0] ?? '',
             'law_groups' => $lawGroups,
             'agency' => $agencies[0] ?? '',

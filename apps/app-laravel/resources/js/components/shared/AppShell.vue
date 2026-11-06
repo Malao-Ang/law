@@ -1,19 +1,20 @@
 <template>
+  <v-defaults-provider :defaults="adminDefaults" :disabled="!isAdmin">
   <v-navigation-drawer
     :rail="rail"
     :model-value="true"
     rail-width="64"
-    width="260"
+    :width="isAdmin ? 288 : 260"
     permanent
     class="app-drawer"
   >
     <div class="app-drawer__header" :class="{ 'app-drawer__header--rail': rail }">
       <div class="app-drawer__brand">
-        <v-avatar color="admin-primary" rounded="lg" size="36" class="app-drawer__brand-icon">
+        <v-avatar color="admin-primary" rounded="lg" :size="isAdmin ? 40 : 36" class="app-drawer__brand-icon">
           <v-icon icon="mdi-scale-balance" size="18" />
         </v-avatar>
         <Transition name="fade-slide">
-          <p v-if="!rail" class="app-drawer__brand-title">e-Law</p>
+          <div v-if="!rail"><p class="app-drawer__brand-title">e-Law</p><p v-if="isAdmin" class="app-drawer__brand-caption">ระบบจัดการข้อมูลกฎหมาย</p></div>
         </Transition>
       </div>
       <v-btn
@@ -39,13 +40,16 @@
             {{ item.section }}
           </v-list-subheader>
           <v-list-item
+            :aria-label="item.label"
             :prepend-icon="item.icon"
             :title="item.label"
             :active="isActive(item)"
             color="admin-primary"
             rounded="lg"
             @click="item.to ? router.push(item.to) : undefined"
-          />
+          >
+            <template v-if="isAdmin && !rail && isActive(item)" #append><v-icon icon="mdi-chevron-right" size="18" /></template>
+          </v-list-item>
         </template>
       </template>
     </v-list>
@@ -83,7 +87,7 @@
     </template>
   </v-navigation-drawer>
 
-  <v-main class="app-shell__main" :class="{ 'app-shell__main--full-height': fullHeight }">
+  <v-main class="app-shell__main" :class="{ 'app-shell__main--full-height': fullHeight, 'app-shell__main--workflow-form': isWorkflowForm }">
     <div class="app-shell__topbar">
       <v-breadcrumbs
         v-if="breadcrumbs.length"
@@ -102,9 +106,7 @@
       <div class="app-shell__topbar-right">
         <slot name="actions" />
         <ActiveUnitMenu />
-        <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
-          <v-btn icon="mdi-bell-outline" variant="text" size="small" />
-        </v-badge>
+        <v-btn v-if="showBell" icon="mdi-bell-outline" variant="text" size="small" disabled title="ยังไม่มีระบบแจ้งเตือนในแอป" aria-label="ยังไม่มีระบบแจ้งเตือนในแอป" />
       </div>
     </div>
 
@@ -130,6 +132,7 @@
       <slot />
     </v-container>
   </v-main>
+  </v-defaults-provider>
 </template>
 
 <script setup lang="ts">
@@ -144,7 +147,7 @@ interface NavItem { label: string; icon: string; to?: string; exact?: boolean; s
 interface NavGroup { label: string; items: NavItem[]; }
 
 const props = defineProps<{
-  breadcrumbs: string[];
+  breadcrumbs: (string | { title: string; to?: string; disabled?: boolean })[];
   title: string;
   subtitle?: string;
   navGroups?: NavGroup[];
@@ -158,6 +161,18 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+const isAdmin = computed(() => route.path.startsWith('/admin'));
+const isWorkflowForm = computed(() => /^\/documents\/[^/]+\/(law-info|permissions|relations|esign)(\/|$)/.test(route.path));
+const adminDefaults = {
+  VBtn: { rounded: 'lg', height: 40, class: 'text-none' },
+  VCard: { rounded: 'lg' },
+  VTextField: { density: 'compact', rounded: 'sm' },
+  VSelect: { density: 'compact', rounded: 'sm' },
+  VAutocomplete: { density: 'compact', rounded: 'sm' },
+  VCombobox: { density: 'compact', rounded: 'sm' },
+  VTextarea: { density: 'compact', rounded: 'sm' },
+  VSwitch: { inset: true, color: 'success' },
+};
 
 const userInitials = computed(() => {
   const name = auth.user?.name?.trim();
@@ -184,9 +199,16 @@ const defaultNavGroups: NavGroup[] = [
       { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
       { label: 'ติดตามกำกับดูแล', icon: 'mdi-bell-ring-outline', to: '/admin/oversight' },
       { label: 'ข้อความแจ้งเตือน', icon: 'mdi-email-edit-outline', to: '/admin/oversight-mail' },
-      { label: 'บันทึกการเปลี่ยนแปลง', icon: 'mdi-clipboard-text-clock-outline', to: '/admin/audit-logs' },
       { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
       { label: 'แสดงความสัมพันธ์', icon: 'mdi-file-tree-outline', to: '/admin/show-relations' },
+    ],
+  },
+  {
+    label: 'ผู้ใช้และสิทธิ์',
+    items: [
+      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
+      { label: 'จัดการผู้ใช้', icon: 'mdi-account-cog-outline', to: '/admin/users' },
+      { label: 'ประวัติการใช้งาน', icon: 'mdi-clipboard-text-clock-outline', to: '/admin/audit-logs' },
     ],
   },
   {
@@ -202,7 +224,6 @@ const defaultNavGroups: NavGroup[] = [
   {
     label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
-      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
@@ -216,8 +237,8 @@ const defaultNavGroups: NavGroup[] = [
 
 const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
   ...group,
-  items: group.items.filter((item) => item.to !== '/admin/units' || auth.canManageUnits),
-})));
+  items: group.items.filter((item) => (!['/admin/units', '/admin/users'].includes(item.to ?? '') || auth.canManageUnits) && (item.to !== '/admin/audit-logs' || auth.canViewAudit)),
+})).filter(group => group.items.length > 0));
 
 function isActive(item: NavItem): boolean {
   if (!item.to) return false;
@@ -245,7 +266,14 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
   flex: 1 1 0;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
+
+.app-drawer__nav::-webkit-scrollbar { width: 4px; }
+.app-drawer__nav::-webkit-scrollbar-track { background: transparent; }
+.app-drawer__nav::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.app-drawer__nav::-webkit-scrollbar-button { display: none; }
 
 .app-drawer__header {
   align-items: center;
@@ -435,4 +463,48 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
 /* ─── Utilities ──────────────────────────────────────────── */
 .min-width-0 { min-width: 0; }
 .flex-1 { flex: 1; }
+/* Admin presentation is isolated from other AppShell consumers. */
+.v-theme--admin .app-drawer { border-right: 1px solid #e2e8f0; }
+.v-theme--admin .app-drawer__header { margin: 24px 24px 16px; padding: 16px; min-height: 74px; border: 1px solid #f1f5f9; border-radius: 16px; background: #f8fafc; }
+.v-theme--admin .app-drawer__header--rail { margin: 8px 4px; padding: 8px 0; }
+.v-theme--admin .app-drawer__brand-title { font-size: 18px; }
+.v-theme--admin .app-drawer__brand-caption { color: #94a3b8; font-size: 10px; margin: 6px 0 0; white-space: nowrap; }
+.v-theme--admin .app-drawer__nav { padding: 0 16px 16px; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-subheader) { color: #94a3b8; font-size: 10px !important; font-weight: 800; letter-spacing: .6px; min-height: 36px; text-transform: uppercase; }
+.v-theme--admin .app-drawer__section { padding-inline-start: 16px !important; font-size: 9px !important; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item) { color: #64748b; min-height: 44px; padding: 12px 16px; border-radius: 12px !important; border-right: 4px solid transparent; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item-title) { font-size: 14px; font-weight: 700; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item__prepend > .v-icon) { font-size: 20px; opacity: 1; margin-inline-end: 0; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item--active) { background: #f1f5f9; color: #1e3a8a; border-right-color: #1e3a8a; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item__overlay) { opacity: 0; }
+.v-theme--admin .app-drawer__user { margin: 16px; padding: 12px; height: 66px; border: 1px solid #e2e8f0; border-radius: 16px; }
+.v-theme--admin .app-drawer__user--rail { margin: 8px 4px; padding: 8px 0; }
+.v-theme--admin .app-shell__main,
+.v-theme--admin .app-shell__content { background: #f8fafc; }
+.v-theme--admin .app-shell__topbar { height: 64px; padding: 0 32px; border-color: #e2e8f0; }
+.v-theme--admin .app-shell__breadcrumbs { font-size: 13px; color: #94a3b8; }
+.v-theme--admin .app-shell__breadcrumbs :deep(.v-breadcrumbs-item:last-child) { color: #1e293b; font-weight: 700; opacity: 1; }
+.v-theme--admin .app-shell__page-title { padding: 24px 24px 0; }
+.v-theme--admin .app-shell__page-title h1 { color: #1e3a8a; font-size: 24px !important; font-weight: 800; line-height: 1.5; }
+.v-theme--admin .app-shell__page-title p { color: #64748b !important; opacity: 1; margin-top: 4px; font-size: 14px; }
+.v-theme--admin .app-shell__page-title :deep(.v-btn) { border-radius: 12px; padding-inline: 24px; box-shadow: 0 4px 6px -1px rgba(30,58,138,.1); }
+.v-theme--admin .app-shell__content { padding: 24px !important; }
+@media (max-width: 900px) {
+  .v-theme--admin .app-shell__page-title { flex-wrap: wrap; }
+}
+.v-theme--admin .app-drawer__user p { line-height: 20px; margin: 0; }
+.v-theme--admin .app-drawer__nav :deep(.v-list-item__prepend .v-list-item__spacer) { width: 12px; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav { padding-inline: 4px; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item) {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-inline: 0;
+  border-right: 0;
+  box-shadow: none;
+}
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item--active) { box-shadow: inset -3px 0 #1e3a8a; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__prepend) { justify-content: center; width: 100%; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__prepend .v-list-item__spacer) { width: 0; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__content) { display: none; }
+.v-theme--admin .app-drawer__user [data-testid="shell-user-role"] { font-size: 12px !important; color: #64748b; }
 </style>

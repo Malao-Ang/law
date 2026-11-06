@@ -2,6 +2,7 @@
 
 namespace App\Services\Audit;
 
+use Carbon\Carbon;
 use MongoDB\Collection;
 
 final class AuditLogStore
@@ -11,6 +12,11 @@ final class AuditLogStore
         'create' => 'เพิ่ม',
         'update' => 'แก้ไข',
         'delete' => 'ลบ',
+        'login' => 'เข้าสู่ระบบ', 'logout' => 'ออกจากระบบ', 'login_failed' => 'เข้าสู่ระบบไม่สำเร็จ',
+        'role_switch' => 'เลือกบทบาทการใช้งาน',
+        'view' => 'เปิดดู', 'upload' => 'อัปโหลด', 'publish' => 'เผยแพร่', 'unpublish' => 'ยกเลิกเผยแพร่',
+        'export' => 'ส่งออก', 'esign_send' => 'ส่งลงนาม', 'esign_cancel' => 'ยกเลิกลงนาม',
+        'esign_signed' => 'ลงนามเสร็จ', 'transfer' => 'โอน', 'toggle' => 'เปลี่ยนสถานะ', 'reorder' => 'เรียงลำดับ',
     ];
 
     /** @var array<string, string> */
@@ -20,6 +26,8 @@ final class AuditLogStore
         'permission_group' => 'กลุ่มสิทธิ์',
         'oversight' => 'กำกับดูแล',
         'relation' => 'ความสัมพันธ์',
+        'master_data' => 'ข้อมูลหลัก', 'unit' => 'หน่วยงาน', 'membership' => 'สมาชิกหน่วยงาน',
+        'audit_log' => 'ประวัติการใช้งาน', 'user' => 'ผู้ใช้', 'auth' => 'การเข้าสู่ระบบ',
     ];
 
     public function __construct(private readonly Collection $collection) {}
@@ -46,6 +54,11 @@ final class AuditLogStore
             'ip' => $this->clip($entry['ip'] ?? '', 64),
         ];
 
+        foreach (['actor_username', 'active_unit_code', 'unit_code', 'on_behalf_of', 'kind', 'result', 'user_agent', 'before', 'after'] as $field) {
+            $document[$field] = $entry[$field] ?? ($field === 'result' ? 'success' : null);
+        }
+        $document['is_super_admin_account'] = (bool) ($entry['is_super_admin_account'] ?? false);
+        $document['user_agent'] = $this->clip($document['user_agent'] ?? '', 500);
         $this->collection->insertOne($document);
 
         return $this->present($document);
@@ -54,49 +67,71 @@ final class AuditLogStore
     /**
      * @return array{items: array<int, array<string, mixed>>, actions: array<int, array{value: string, label: string}>, resources: array<int, array{value: string, label: string}>}
      */
-    public function search(?string $action, ?string $resource, ?string $query, int $limit = 200): array
+    public function filter(array $input, ?array $units): array
     {
         $filter = [];
-        if (is_string($action) && isset(self::ACTIONS[$action])) {
-            $filter['action'] = $action;
+        if ($units !== null) {
+            $filter['unit_code'] = ['$in' => $units];
         }
-        if (is_string($resource) && isset(self::RESOURCES[$resource])) {
-            $filter['resource'] = $resource;
+        if (! empty($input['unit'])) {
+            $unit = (string) $input['unit'];
+            $filter['unit_code'] = $units !== null && ! in_array($unit, $units, true) ? ['$in' => []] : $unit;
+        }
+        $resources = array_values(array_filter((array) ($input['resource'] ?? []), 'is_string'));
+        if ($resources !== []) {
+            $filter['resource'] = ['$in' => $resources];
+        }
+        foreach (['action' => 'action', 'actor' => 'actor_username', 'document' => 'document_id'] as $key => $field) {
+            if (! empty($input[$key])) {
+                $filter[$field] = (string) $input[$key];
+            }
+        }
+        if (! empty($input['from'])) {
+            $filter['at']['$gte'] = Carbon::parse($input['from'], 'Asia/Bangkok')->startOfDay()->utc()->toIso8601String();
+        }
+        if (! empty($input['to'])) {
+            $filter['at']['$lte'] = Carbon::parse($input['to'], 'Asia/Bangkok')->endOfDay()->utc()->toIso8601String();
+        }
+        if (trim((string) ($input['q'] ?? '')) !== '') {
+            $regex = ['$regex' => preg_quote(mb_substr(trim($input['q']), 0, 120), '/'), '$options' => 'i'];
+            $filter['$or'] = array_map(fn ($field) => [$field => $regex], ['label', 'summary', 'resource_id', 'document_id', 'actor_name', 'actor_username']);
         }
 
-        $query = trim((string) $query);
-        if ($query !== '') {
-            $pattern = preg_quote(mb_substr($query, 0, 80), '/');
-            $regex = ['$regex' => $pattern, '$options' => 'i'];
-            $filter['$or'] = [
-                ['label' => $regex],
-                ['summary' => $regex],
-                ['resource_id' => $regex],
-                ['document_id' => $regex],
-                ['actor_name' => $regex],
-            ];
-        }
+        return $filter;
+    }
 
-        $limit = max(1, min($limit, 200));
-        $cursor = $this->collection->find($filter, [
-            'sort' => ['at' => -1],
-            'limit' => $limit,
-        ]);
-
+    public function page(array $filter, int $page, int $perPage): array
+    {
         $items = [];
-        foreach ($cursor as $document) {
+        foreach ($this->collection->find($filter, ['sort' => ['at' => -1, '_id' => -1], 'skip' => ($page - 1) * $perPage, 'limit' => $perPage]) as $document) {
             $items[] = $this->present((array) $document);
         }
+        $total = $this->collection->countDocuments($filter);
 
-        return [
-            'items' => $items,
-            'actions' => $this->options(self::ACTIONS),
-            'resources' => $this->options(self::RESOURCES),
-        ];
+        return ['items' => $items, 'total' => $total, 'page' => $page, 'per_page' => $perPage,
+            'last_page' => max(1, (int) ceil($total / $perPage)), 'actions' => $this->options(self::ACTIONS), 'resources' => $this->options(self::RESOURCES)];
+    }
+
+    /** Mongo cursor fetches matching rows in batches without a 200-row cap. */
+    public function rows(array $filter): \Generator
+    {
+        foreach ($this->collection->find($filter, ['sort' => ['at' => -1, '_id' => -1], 'batchSize' => 500]) as $document) {
+            yield $this->present((array) $document);
+        }
+    }
+
+    public function indexes(): void
+    {
+        foreach (['at', 'resource', 'action', 'unit_code', 'actor_username', 'document_id'] as $field) {
+            $this->collection->createIndex([$field => $field === 'at' ? -1 : 1]);
+        }
     }
 
     public function truncate(): void
     {
+        if (! app()->runningUnitTests()) {
+            throw new \LogicException('Audit logs are append-only.');
+        }
         $this->collection->deleteMany([]);
     }
 
@@ -110,7 +145,9 @@ final class AuditLogStore
         $resource = (string) ($document['resource'] ?? '');
         $id = (string) ($document['_id'] ?? $document['id'] ?? '');
 
-        return [
+        unset($document['_id']);
+
+        return array_merge($document, [
             'id' => $id,
             'at' => (string) ($document['at'] ?? ''),
             'action' => $action,
@@ -125,7 +162,7 @@ final class AuditLogStore
             'actor_name' => (string) ($document['actor_name'] ?? ''),
             'actor_role' => (string) ($document['actor_role'] ?? ''),
             'ip' => (string) ($document['ip'] ?? ''),
-        ];
+        ]);
     }
 
     /**

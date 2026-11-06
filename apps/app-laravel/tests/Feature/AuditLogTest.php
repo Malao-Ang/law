@@ -33,14 +33,17 @@ class AuditLogTest extends TestCase
             'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
         ])->assertOk();
 
+        $unit = app(\App\Services\MasterData\UnitStore::class)->all()[0];
         $created = $this->postJson('/api/permission-groups', [
             'name' => 'กลุ่ม audit '.uniqid(),
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => [$unit['code']],
         ])->assertCreated();
 
         $this->deleteJson('/api/permission-groups/'.$created->json('id'))->assertOk();
         $this->deleteJson('/api/documents/'.$id)->assertOk();
 
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('audit_admin', ['name' => 'ผู้ตรวจสอบ'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin'])->withSession(['auth_username' => 'audit_admin']);
         $all = $this->getJson('/api/audit-logs')->assertOk();
         $actions = collect($all->json('items'))->pluck('action')->all();
         $this->assertContains('update', $actions);
@@ -48,8 +51,8 @@ class AuditLogTest extends TestCase
         $this->assertContains('delete', $actions);
 
         $oversight = collect($all->json('items'))->firstWhere('resource', 'oversight');
-        $this->assertSame('ผู้ใช้ทดสอบ', $oversight['actor_name']);
-        $this->assertSame('Mock user', $oversight['actor_role']);
+        $this->assertSame('ไม่ระบุตัวตน', $oversight['actor_name']);
+        $this->assertSame('', $oversight['actor_role']);
         $this->assertSame('กฎหมายสำหรับ audit', $oversight['label']);
         $this->assertSame('แก้ไขสถานะกำกับดูแล', $oversight['summary']);
 
@@ -98,6 +101,8 @@ class AuditLogTest extends TestCase
             'relations' => [],
         ])->assertOk();
 
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('audit_admin', ['name' => 'ผู้ตรวจสอบ'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin'])->withSession(['auth_username' => 'audit_admin']);
         $items = collect($this->getJson('/api/audit-logs?resource=relation')->assertOk()->json('items'));
         $this->assertEqualsCanonicalizing(
             ['เพิ่มความสัมพันธ์', 'แก้ไขความสัมพันธ์', 'ลบความสัมพันธ์'],

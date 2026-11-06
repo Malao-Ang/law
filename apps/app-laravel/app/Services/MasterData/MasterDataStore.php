@@ -84,10 +84,6 @@ class MasterDataStore
      */
     public function create(MasterDataKind $kind, array $payload): array
     {
-        if ($kind === MasterDataKind::ChangeStatus) {
-            $payload = array_intersect_key($payload, array_flip(['name', 'description']));
-        }
-
         $this->seedIfEmpty($kind);
 
         $created = null;
@@ -126,10 +122,6 @@ class MasterDataStore
      */
     public function update(MasterDataKind $kind, string $code, array $payload): ?array
     {
-        if ($kind === MasterDataKind::ChangeStatus) {
-            abort(403, 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
-        }
-
         $this->seedIfEmpty($kind);
 
         $updated = null;
@@ -145,6 +137,11 @@ class MasterDataStore
             $this->assertUniqueName($items, (string) ($payload['name'] ?? $items[$index]['name'] ?? ''), $normalizedCode);
 
             $existing = $items[$index];
+            if (($existing['is_system'] ?? false) === true
+                && in_array($kind, [MasterDataKind::ChangeStatus, MasterDataKind::ChangeDetail], true)) {
+                abort(403, 'รายการนี้เป็นข้อมูลของระบบ แก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
+            }
+
             $attrs = array_key_exists('attrs', $payload) && is_array($payload['attrs'])
                 ? $payload['attrs']
                 : (array) ($existing['attrs'] ?? []);
@@ -710,8 +707,8 @@ class MasterDataStore
             ],
             MasterDataKind::LawType => $this->normalizeLawTypeAttrs(array_merge($attrs, ['is_primary' => $existing['attrs']['is_primary'] ?? false])),
             MasterDataKind::LawCategory => [],
-            MasterDataKind::ChangeStatus => $this->normalizeChangeStatusAttrs($attrs, $existing, $isSystem),
-            MasterDataKind::ChangeDetail => $this->normalizeChangeDetailAttrs($attrs, $existing, $isSystem),
+            MasterDataKind::ChangeStatus => $this->normalizeChangeStatusAttrs($attrs, $existing),
+            MasterDataKind::ChangeDetail => $this->normalizeChangeDetailAttrs($attrs, $existing),
             MasterDataKind::LegalStructure => $this->normalizeLegalStructureAttrs($attrs, $existing, $items, $code, $isSystem),
         };
     }
@@ -721,50 +718,43 @@ class MasterDataStore
      * @param  array<string, mixed>  $existing
      * @return array{source: string, has_details: bool, role: string}
      */
-    private function normalizeChangeStatusAttrs(array $attrs, array $existing, bool $isSystem): array
+    private function normalizeChangeStatusAttrs(array $attrs, array $existing): array
     {
-        if (! $isSystem) {
-            return [
-                'source' => 'both',
-                'has_details' => false,
-                'role' => 'general',
-            ];
-        }
-
         $attrs = $attrs !== [] ? $attrs : (array) ($existing['attrs'] ?? []);
+        $role = in_array(($attrs['role'] ?? null), ['new', 'whole', 'section', 'general'], true) ? $attrs['role'] : 'general';
 
         return [
             'source' => in_array(($attrs['source'] ?? null), ['internal', 'external', 'both'], true) ? $attrs['source'] : 'both',
-            'has_details' => (bool) ($attrs['has_details'] ?? false),
-            'role' => in_array(($attrs['role'] ?? null), ['new', 'whole', 'section', 'general'], true) ? $attrs['role'] : 'general',
+            'has_details' => $role === 'section' && (bool) ($attrs['has_details'] ?? false),
+            'role' => $role,
         ];
     }
 
     /**
      * @param  array<string, mixed>  $attrs
      * @param  array<string, mixed>  $existing
-     * @return array{source: string, has_details: bool, role: string, color: ?string, icon: ?string}
+     * @return array{source: string, has_details: bool, role: string, color: string, icon: string}
      */
-    private function normalizeChangeDetailAttrs(array $attrs, array $existing, bool $isSystem): array
+    private function normalizeChangeDetailAttrs(array $attrs, array $existing): array
     {
-        if (! $isSystem) {
-            return [
-                'source' => 'both',
-                'has_details' => false,
-                'role' => 'general',
-                'color' => null,
-                'icon' => null,
-            ];
-        }
-
         $attrs = $attrs !== [] ? $attrs : (array) ($existing['attrs'] ?? []);
+        $role = in_array(($attrs['role'] ?? null), ['repeals', 'amends'], true) ? $attrs['role'] : 'amends';
+        $colors = ['error', 'success', 'teal', 'warning', 'info', 'primary', 'deep-purple', 'orange-darken-2'];
+        $color = trim((string) ($attrs['color'] ?? ''));
+        if (! in_array($color, $colors, true)) {
+            $color = $role === 'repeals' ? 'error' : 'teal';
+        }
+        $icon = trim((string) ($attrs['icon'] ?? ''));
+        if (preg_match('/^mdi-[a-z0-9-]+$/', $icon) !== 1) {
+            $icon = $role === 'repeals' ? 'mdi-cancel' : 'mdi-pencil';
+        }
 
         return [
             'source' => in_array(($attrs['source'] ?? null), ['internal', 'external', 'both'], true) ? $attrs['source'] : 'both',
-            'has_details' => (bool) ($attrs['has_details'] ?? false),
-            'role' => in_array(($attrs['role'] ?? null), ['repeals', 'amends', 'general'], true) ? $attrs['role'] : 'general',
-            'color' => isset($attrs['color']) ? trim((string) $attrs['color']) : null,
-            'icon' => isset($attrs['icon']) ? trim((string) $attrs['icon']) : null,
+            'has_details' => false,
+            'role' => $role,
+            'color' => $color,
+            'icon' => $icon,
         ];
     }
 
@@ -1115,6 +1105,8 @@ class MasterDataStore
         $data['deleted_codes'][$key] = array_values(array_unique(array_merge($data['deleted_codes'][$key] ?? [], $removed)));
         foreach ($oldItems as $item) {
             if (in_array($item['code'], $removed, true)) {
+                app(\App\Services\Audit\AuditLogger::class)->record('delete', 'master_data', $item['code'], 'ลบข้อมูลหลัก', [], $item['name'], null,
+                    ['kind' => $key, 'before' => $item]);
                 Log::info('Master data deleted', [
                     'actor' => auth()->user()?->username ?? auth()->id(),
                     'kind' => $key, 'code' => $item['code'], 'name' => $item['name'],

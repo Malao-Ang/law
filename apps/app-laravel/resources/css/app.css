@@ -3,6 +3,21 @@
   z-index: 3000 !important;
 }
 
+@media (forced-colors: none) {
+  .v-skeleton-loader :is(
+    .v-skeleton-loader__avatar,
+    .v-skeleton-loader__button,
+    .v-skeleton-loader__chip,
+    .v-skeleton-loader__divider,
+    .v-skeleton-loader__heading,
+    .v-skeleton-loader__image,
+    .v-skeleton-loader__ossein,
+    .v-skeleton-loader__text
+  ) {
+    background: #e5e7eb;
+  }
+}
+
 :root {
   --bg: #f6f4ef;
   --panel: #ffffff;
@@ -964,4 +979,126 @@ textarea {
   .compose-editor-surface {
     padding: 10px;
   }
+}
+
+.v-theme--admin .v-table > .v-table__wrapper > table > thead > tr > th {
+  text-align: center;
+}
+
+.v-theme--admin .v-data-table-header__content {
+  justify-content: center;
+}
+
+/* Public search and cards: keep admin, document content and print isolated. */
+@media screen {
+  .v-application.v-theme--user .v-main:has(> .elaw-hero) {
+    background: #f6f1e8;
+  }
+
+  .v-application.v-theme--user .elaw-footer-figma { background: #ffffff; border-top-color: #eae1d0; }
+
+  .v-application.v-theme--user .elaw-header {
+    background: #ffffff;
+    border-bottom-color: #eae1d0;
+  }
+
+  .v-application.v-theme--user .elaw-db-header {
+    background: linear-gradient(180deg, #f8f7f1 21.16%, #fff4b5 98.59%);
+  }
+
+  .v-application.v-theme--user .elaw-search-input__button {
+    background: #3c2900;
+  }
+
+  .v-application.v-theme--user .elaw-search-card .v-field:not(.v-field--error) .v-field__outline,
+  .v-application.v-theme--user .elaw-search-input .v-field:not(.v-field--error) .v-field__outline {
+    color: #d2c5b3;
+    --v-field-border-opacity: 1;
+  }
+
+  .v-application.v-theme--user .elaw-search-card .v-field--focused:not(.v-field--error) .v-field__outline,
+  .v-application.v-theme--user .elaw-search-input .v-field--focused:not(.v-field--error) .v-field__outline {
+    color: #7b580d;
+  }
+
+  .v-application.v-theme--user .filter-pill--active,
+  .v-application.v-theme--user .elaw-type-pill--active,
+  .v-application.v-theme--user .elaw-type-pill--active .elaw-type-pill__count {
+    color: #271900;
+  }
+
+  .v-application.v-theme--user .elaw-card,
+  .v-application.v-theme--user .law-list-card {
+    border-radius: 16px;
+    box-shadow: 0 1px 4px rgba(78, 69, 56, 0.08);
+  }
+
+  .v-application.v-theme--user .law-list-card {
+    border-top-color: #e5e7eb;
+    border-right-color: #e5e7eb;
+    border-bottom-color: #e5e7eb;
+  }
+
+  .v-application.v-theme--user .elaw-card:hover,
+  .v-application.v-theme--user .law-list-card:hover {
+    box-shadow: 0 4px 16px rgba(78, 69, 56, 0.12);
+  }
+
+  .v-application.v-theme--user .elaw-visibility--private {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #4b5563;
+  }
+
+  .v-application.v-theme--user .elaw-change-tag--revise,
+  .v-application.v-theme--user .law-change-tag--revise {
+    background: #eef2ff;
+    color: #4f46e5;
+  }
+
+  .v-application.v-theme--user .elaw-change-tag--partial,
+  .v-application.v-theme--user .law-change-tag--partial {
+    background: #fffbeb;
+    color: #d97706;
+  }
+
+  .v-application.v-theme--user .elaw-change-tag--cancelled,
+  .v-application.v-theme--user .law-change-tag--cancelled {
+    background: #e11d48;
+    color: #ffffff;
+  }
+
+  .v-application.v-theme--user :is(.main-nav__item, .elaw-search-card__search-btn,
+    .elaw-search-input__button, .elaw-card, .elaw-card__read-btn):focus-visible {
+    outline: 2px solid #7b580d;
+    outline-offset: 2px;
+  }
+}
+
+@media screen {
+  .v-application.v-theme--user :is(.lawx, .lawx-main) { background: #f6f1e8; }
+  .v-application.v-theme--user :is(.lawx-headcard, .lawx-card) {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(21, 47, 109, .05);
+  }
+  .v-application.v-theme--user .lawx-headcard { border-top-color: #152f6d; }
+  .v-application.v-theme--user :is(.lawx-headcard__title, .lawx-headcard__year, .lawx-toc__title) { color: #152f6d; }
+  .v-application.v-theme--user .lawx-toc { background: #ffffff; border-color: #e5e7eb; box-shadow: 0 1px 2px rgba(21, 47, 109, .05); }
+  .v-application.v-theme--user .lawx-toc__item.is-active { background: #eff6ff; border-left-color: #152f6d; color: #152f6d; }
+  .v-application.v-theme--user .lawx-info .v-card { background: #ffffff; border-color: #e5e7eb; }
+  .v-application.v-theme--user .lawx-info .v-card-title { background: #f9fafb; color: #152f6d; }
+  .v-application.v-theme--user .ver-card { border-color: #eae1d0; }
+  .v-application.v-theme--user .ver-card--active { border-color: #152f6d; box-shadow: 0 0 0 1px #152f6d; }
+  .v-application.v-theme--user .ver-card:focus-visible { outline: 2px solid #152f6d; outline-offset: 2px; }
+}
+
+@media screen {
+  .v-application.v-theme--user :is(.filter-pill, .elaw-type-pill):hover:not(:disabled) { border-color: #7b580d; }
+  .v-application.v-theme--user :is(.filter-pill, .elaw-type-pill, .elaw-search-card__tag, .elaw-btn-login, .elaw-btn-staff):focus-visible { outline: 2px solid #7b580d; outline-offset: 2px; }
+  .v-application.v-theme--user .elaw-search-card__tag:hover { box-shadow: inset 0 0 0 1px #b68d40; }
+  .v-application.v-theme--user .elaw-card__divider { border-top-color: #eae1d0; }
+  .v-application.v-theme--user .lawx-info .v-card-actions .v-btn:focus-visible { outline: 2px solid #152f6d; outline-offset: 2px; }
+  .v-application.v-theme--user .ver-card:disabled { cursor: default; background: #f9fafb; border-color: #e5e7eb; box-shadow: none; }
 }

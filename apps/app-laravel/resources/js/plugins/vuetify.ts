@@ -1,4 +1,5 @@
 import 'vuetify/styles';
+import '../../css/admin.css';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
@@ -34,9 +35,10 @@ export const vuetify = createVuetify({
       user: {
         colors: {
           ...sharedColors,
-          primary: '#ab7f29',
+          primary: '#b68d40',
+          'on-primary': '#271900',
           secondary: 'rgba(52, 48, 40, 1)',
-          background: '#f6f4ef',
+          background: '#f6f1e8',
         },
       },
       // Admin back-office (navy). Applied on /admin/* — see main.ts route guard.
@@ -45,7 +47,18 @@ export const vuetify = createVuetify({
           ...sharedColors,
           primary: '#1e3a8a',
           secondary: '#334155',
-          background: '#f4f6fb',
+          background: '#f8fafc',
+          'on-surface': '#1e293b',
+          'on-background': '#1e293b',
+          success: '#10b981',
+          error: '#dc2626',
+          info: '#1e3a8a',
+          'primary-deep': '#172033',
+          'text-secondary': '#64748b',
+          'text-muted': '#94a3b8',
+          border: '#e2e8f0',
+          'info-tint': '#eff6ff',
+          'success-tint': '#ecfdf5',
         },
       },
     },

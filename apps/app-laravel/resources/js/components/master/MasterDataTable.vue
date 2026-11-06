@@ -1,5 +1,6 @@
 <template>
   <v-card flat border rounded="lg" class="master-table">
+    <slot name="toolbar" />
     <v-progress-linear v-if="refreshing || (loading && items.length > 0)" indeterminate color="admin-primary" height="2" />
     <v-table>
       <thead>
@@ -10,7 +11,7 @@
             v-for="column in columns"
             :key="column.key"
             :style="{ width: column.width }"
-            :class="column.align === 'end' ? 'text-right' : undefined"
+            class="text-center"
           >
             {{ column.title }}
           </th>
@@ -30,51 +31,60 @@
           </td>
         </tr>
         <tr v-for="(item, index) in items" v-else :key="item.code">
-          <td class="master-table__index">{{ offset + index + 1 }}</td>
-          <td>
+          <td class="text-center master-table__index">{{ offset + index + 1 }}</td>
+          <td class="text-center">
             <v-chip size="small" variant="tonal" color="admin-primary" class="master-table__code-chip">
-              {{ item.code }}
+              {{ tableValue(item.code) }}
             </v-chip>
           </td>
           <td
             v-for="column in columns"
             :key="column.key"
-            :class="column.align === 'end' ? 'text-right' : undefined"
+            :class="isEmptyTableValue(itemValue(item, column.key)) || column.align !== 'start' && !['name', 'description'].includes(column.key) ? 'text-center' : 'text-start'"
           >
-            <slot :name="`item.${column.key}`" :item="item" :value="itemValue(item, column.key)">
-              {{ itemValue(item, column.key) || '-' }}
+            <span v-if="['name', 'description'].includes(column.key) && isEmptyTableValue(itemValue(item, column.key))">-</span>
+            <slot v-else :name="`item.${column.key}`" :item="item" :value="itemValue(item, column.key)">
+              {{ tableValue(itemValue(item, column.key)) }}
             </slot>
           </td>
-          <td>
+          <td class="text-center">
             <v-chip
               size="small"
-              :color="item.is_active ? 'success' : 'grey'"
+              :class="item.is_active ? 'master-status--active' : 'master-status--inactive'"
               variant="tonal"
               class="font-weight-medium"
             >
-              {{ item.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              {{ item.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
             </v-chip>
           </td>
-          <td class="master-table__actions-cell">
-            <div class="master-table__action-row">
+          <td class="master-table__actions-cell text-center">
+            <div class="master-table__action-row justify-center">
+              <MasterToggleCell
+                v-if="!readonly"
+                :item="item"
+                :kind="kind"
+                :busy="pendingCodes?.has(item.code) || togglingCode === item.code"
+                :epoch="switchEpoch"
+                @toggle="$emit('toggle', item, $event)"
+              />
               <v-tooltip text="ดูรายละเอียด" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
                     icon="mdi-eye-outline"
                     variant="text"
-                    size="small"
+                    size="32"
                     :disabled="pendingCodes?.has(item.code)"
                     :loading="pendingCodes?.has(item.code)"
                     @click="$emit('view', item)"
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="!readonly && kind !== 'change_status'" text="แก้ไข" location="top">
+              <v-tooltip v-if="canEdit(item)" text="แก้ไข" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
-                    icon="mdi-pencil-box-outline"
+                    icon="mdi-pencil-outline"
                     variant="text"
                     size="small"
                     color="admin-primary"
@@ -95,14 +105,6 @@
                 :loading="pendingCodes?.has(item.code)"
                 @click="$emit('delete', item)"
               />
-              <MasterToggleCell
-                v-if="!readonly"
-                :item="item"
-                :kind="kind"
-                :busy="pendingCodes?.has(item.code) || togglingCode === item.code"
-                :epoch="switchEpoch"
-                @toggle="$emit('toggle', item, $event)"
-              />
             </div>
           </td>
         </tr>
@@ -119,7 +121,8 @@
         :length="pageCount"
         :total-visible="5"
         density="compact"
-        rounded="circle"
+        rounded="sm"
+        active-color="primary"
         @update:model-value="$emit('update:page', Number($event))"
       />
     </div>
@@ -127,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed } from 'vue';
 import MasterToggleCell from './MasterToggleCell.vue';
 import type { MasterItem, MasterKind } from '../../types/masterData';
@@ -155,6 +159,12 @@ defineEmits<{
   toggle: [item: MasterItem, next: boolean];
   'update:page': [page: number];
 }>();
+
+function canEdit(item: MasterItem): boolean {
+  if (props.readonly) return false;
+  if ((props.kind === 'change_status' || props.kind === 'change_detail') && item.is_system) return false;
+  return true;
+}
 
 const offset = computed(() => (props.page - 1) * props.perPage);
 const from = computed(() => (props.total === 0 ? 0 : offset.value + 1));
@@ -209,7 +219,7 @@ function itemValue(item: MasterItem, key: string): unknown {
 }
 
 .master-table__code-chip {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: inherit;
 }
 
 .master-table__action-row {
@@ -217,7 +227,6 @@ function itemValue(item: MasterItem, key: string): unknown {
   display: flex;
   flex-wrap: nowrap;
   gap: 2px;
-  justify-content: flex-end;
   min-height: 40px;
 }
 
@@ -240,4 +249,14 @@ function itemValue(item: MasterItem, key: string): unknown {
     flex-direction: column;
   }
 }
+/* Shared master table geometry, without changing cell alignment. */
+.master-table :deep(.v-table) { font-size: 14px; color: #1e293b; }
+.master-table :deep(th) { background: rgba(239,246,255,.3); color: #6b7280; font-size: 13px; font-weight: 600; height: 44px !important; }
+.master-table :deep(td) { height: 72px !important; border-bottom-color: #e5e7eb !important; padding-inline: 20px; }
+.master-table__code-chip { background: #eff6ff !important; color: #1e3a8a !important; border: 1px solid #dbeafe; border-radius: 4px; font-size: 12.5px; font-weight: 700; }
+.master-table__code-chip :deep(.v-chip__underlay) { opacity: 0; }
+.master-table__action-row :deep(.v-btn--icon) { width: 32px; height: 32px; color: #64748b; }
+.master-table__action-row :deep(.v-icon) { font-size: 18px; }
+.master-table__footer :deep(.v-pagination__item--is-active .v-btn) { background: #1e3a8a; }
+.master-table__footer :deep(.v-pagination__item--is-active .v-btn__content) { color: #fff; }
 </style>

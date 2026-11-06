@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\OversightReminderMail;
 use Illuminate\Support\Facades\Mail;
+use RuntimeException;
 use Throwable;
 
 final class OversightReminderDispatcher
@@ -15,13 +16,18 @@ final class OversightReminderDispatcher
      *
      * @return array{sent: int, failed: array<int, array{document_id: string, title: string, message: string}>, delivered: array<int, array{document_id: string, title: string, emails: array<int, string>}>}
      */
-    public function sendPending(): array
+    public function sendPending(?\Illuminate\Http\Request $request = null): array
     {
         $sent = 0;
         $failed = [];
         $delivered = [];
 
         foreach ($this->oversight->pendingReminders() as $batch) {
+            if ($request !== null) {
+                $access = app(\App\Services\Auth\DocumentAccess::class);
+                $document = $access->readDocument($batch['document_id']);
+                if ($document === null || ! $access->adminScope($request, $document) || ! $access->allows($request, 'edit', $document)) continue;
+            }
             try {
                 $this->deliver($batch);
             } catch (Throwable $e) {

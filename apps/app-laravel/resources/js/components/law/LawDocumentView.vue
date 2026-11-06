@@ -235,6 +235,7 @@
           </div>
         </section>
         <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" :section-relation-summaries="sectionRelationSummaries" :unit-word="unitWord" :admin-context="isAdminContext" />
+        <LawCommentsPanel :document-id="props.documentId" :document-title="meta.title || cleanSourceFile" />
       </aside>
       </div>
       </template>
@@ -261,6 +262,7 @@ import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, fetchStatu
 import { hasSignedEsignPdf } from '../../utils/esignStatus';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
+import LawCommentsPanel from './LawCommentsPanel.vue';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -482,8 +484,7 @@ async function downloadPdf(): Promise<void> {
       } catch {
         // non-fatal — fall through to regular export
       }
-      await downloadPdfExport(props.documentId, safeFileName.value);
-      await documentStore.fetch(props.documentId, true);
+      window.open(`/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`, '_blank', 'noopener');
       return;
     }
 
@@ -519,7 +520,7 @@ async function printPage(): Promise<void> {
     // non-fatal
   }
   // No signed PDF yet — open the review export PDF.
-  const url = `/api/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
+  const url = `/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
   window.open(url, '_blank', 'noopener');
 }
 
@@ -1082,6 +1083,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-info {
   position: sticky;
   top: 84px;
+  max-height: calc(100vh - 108px);
+  overflow: auto;
 }
 
 @media (max-width: 1220px) {

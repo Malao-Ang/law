@@ -78,7 +78,7 @@ class ChangeStatusMasterDataSeedTest extends TestCase
         $this->assertSame($before['attrs'], $updated['attrs']);
     }
 
-    public function test_admin_created_change_items_force_general_attrs_and_start_inactive(): void
+    public function test_admin_created_change_items_keep_chosen_role_and_start_inactive(): void
     {
         /** @var MasterDataStore $store */
         $store = app(MasterDataStore::class);
@@ -95,16 +95,24 @@ class ChangeStatusMasterDataSeedTest extends TestCase
         $this->assertSame('CHG05', $status['code']);
         $this->assertFalse($status['is_active']);
         $this->assertFalse($status['is_system']);
-        $this->assertSame(['source' => 'both', 'has_details' => false, 'role' => 'general'], $status['attrs']);
+        $this->assertSame(['source' => 'internal', 'has_details' => true, 'role' => 'section'], $status['attrs']);
         $this->assertSame('CHD05', $detail['code']);
         $this->assertFalse($detail['is_active']);
         $this->assertFalse($detail['is_system']);
         $this->assertSame([
-            'source' => 'both',
+            'source' => 'external',
             'has_details' => false,
-            'role' => 'general',
-            'color' => null,
-            'icon' => null,
+            'role' => 'repeals',
+            'color' => 'error',
+            'icon' => 'mdi-cancel',
         ], $detail['attrs']);
+
+        $updated = $store->update(MasterDataKind::ChangeStatus, 'CHG05', [
+            'name' => 'สถานะทดสอบแก้',
+            'attrs' => ['source' => 'both', 'has_details' => true, 'role' => 'whole'],
+        ]);
+        $this->assertSame('สถานะทดสอบแก้', $updated['name']);
+        $this->assertSame('whole', $updated['attrs']['role']);
+        $this->assertFalse($updated['attrs']['has_details']);
     }
 }

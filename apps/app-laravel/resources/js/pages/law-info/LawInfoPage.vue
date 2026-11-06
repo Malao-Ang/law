@@ -19,8 +19,6 @@
         <span>กำลังโหลด...</span>
       </div>
 
-      <DocumentCoEditorsCard v-if="!documentStore.loading && documentStore.review" :document-id="documentId" :can="can" @updated="setCan" />
-
       <v-form v-if="!documentStore.loading" :disabled="!can.edit" ref="formRef" validate-on="submit lazy">
         <v-alert v-if="documentStore.saveError" type="error" variant="tonal" density="compact" closable class="mb-4"
           @click:close="documentStore.setSaveError()">
@@ -48,11 +46,6 @@
           ประกาศฉบับนี้ยังไม่ระบุผู้ออก กรุณาเลือก "ประกาศที่ออกโดยมหาวิทยาลัย" หรือ "ประกาศที่ออกโดยสภามหาวิทยาลัย"
         </v-alert>
 
-        <v-card flat border rounded="lg" class="pa-4 mb-4">
-          <p>ผู้อัปโหลด: {{ documentStore.review?.law_meta?.uploaded_by?.name || documentStore.review?.law_meta?.uploaded_by?.username || 'ไม่ระบุ' }}</p>
-          <p>ผู้รับผิดชอบ: {{ documentStore.review?.law_meta?.responsible?.name || documentStore.review?.law_meta?.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด' }}</p>
-          <p>หน่วยงานเจ้าของ: {{ documentStore.review?.law_meta?.owner_unit_code || 'ไม่ระบุ' }}</p>
-        </v-card>
         <!-- ข้อมูลพื้นฐาน -->
         <v-card flat border rounded="lg" class="pa-6 mb-4">
           <div class="d-flex align-center ga-2 mb-5">
@@ -277,7 +270,7 @@
             <v-col cols="12" sm="6" class="mt-2">
               <v-text-field
                 v-model="form.imported_by"
-                :label="requiredLabel('ผู้นำเข้าข้อมูล')"
+                :label="requiredLabel('ผู้นำเข้าข้อมูล (ผู้รับผิดชอบหลัก)')"
                 variant="outlined"
                 prepend-inner-icon="mdi-account-outline"
                 readonly
@@ -294,7 +287,6 @@
 </template>
 
 <script setup lang="ts">
-import DocumentCoEditorsCard from '../../components/shared/DocumentCoEditorsCard.vue';
 import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import type { VForm } from 'vuetify/components';
@@ -315,7 +307,7 @@ import { useSnackbarStore } from '../../stores/snackbarStore';
 import ThaiDatePicker from '../../components/shared/ThaiDatePicker.vue';
 
 const props = defineProps<{ documentId: string }>();
-const { can, setCan } = useDocumentAccess(() => props.documentId);
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const route = useRoute();
@@ -433,10 +425,27 @@ const documentTypePlaceholder = computed(() =>
   documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
 );
 
+/** Selectable source for the type list: old documents pick it explicitly, new documents are always internal. */
+const typeSourceFilter = computed<string | null>(() => (isOld.value ? (hasText(form.value.source) ? String(form.value.source) : null) : 'internal'));
+
+/** Keep only types of the chosen source; drop family headers left without items, and the header entirely when only one family remains. */
+function typesForSource(source: string | null) {
+  if (source === null) return [];
+  type Option = (typeof lawTypes.groupedTypeOptions.value)[number];
+  const groups = new Map<string, { header: Option | null; items: Option[] }>();
+  for (const option of lawTypes.groupedTypeOptions.value) {
+    const family = option.option_type === 'subheader' ? String(option.value).replace(/^family:/, '') : String(option.family_code ?? '');
+    const group = groups.get(family) ?? { header: null, items: [] };
+    if (option.option_type === 'subheader') group.header = option;
+    else if (option.source === source) group.items.push(option);
+    groups.set(family, group);
+  }
+  const filled = [...groups.values()].filter((group) => group.items.length > 0);
+  return filled.flatMap((group) => (filled.length > 1 && group.header ? [group.header, ...group.items] : group.items));
+}
+
 const filteredDocumentTypes = computed(() => {
-  const items = isOld.value
-    ? lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || (hasText(form.value.source) && t.source === form.value.source))
-    : lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || t.source !== 'external');
+  const items = typesForSource(typeSourceFilter.value);
   const current = normalizeSavedLawType(savedMeta.value?.law_type ?? '');
   const existing = lawTypes.typeItem(current);
   if (existing && !documentTypes.value.some((item) => item.code === existing.code)) {
@@ -445,11 +454,12 @@ const filteredDocumentTypes = computed(() => {
   return items;
 });
 
-const documentTypeHint = computed(() =>
-  lawTypes.typeSource(form.value.law_type) === 'external'
-    ? 'ภายนอก · นับเป็น "มาตรา"'
-    : 'ภายใน · นับเป็น "ข้อ"',
-);
+const documentTypeHint = computed(() => {
+  const source = hasText(form.value.law_type) ? lawTypes.typeSource(form.value.law_type) : typeSourceFilter.value;
+  if (source === 'external') return 'ภายนอก · นับเป็น "มาตรา"';
+  if (source === 'internal') return 'ภายใน · นับเป็น "ข้อ"';
+  return '';
+});
 
 const sourceRules = [
   (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
@@ -519,7 +529,9 @@ watch(() => documentStore.review, (review) => {
   const meta = review?.law_meta;
   const lawGroups = normalizeSelection(meta?.law_groups, meta?.law_group)
     .map((v) => lawCategories.normalizeCategory(v) || v);
-  const agencies = normalizeSelection(meta?.agencies, meta?.agency);
+  const savedAgencies = normalizeSelection(meta?.agencies, meta?.agency);
+  const ownerUnitName = agencyNameFor(meta?.owner_unit_code);
+  const agencies = savedAgencies.length > 0 ? savedAgencies : (ownerUnitName ? [ownerUnitName] : []);
   const savedTitle = meta?.title?.trim() ?? '';
   const inferredTitle = inferDocumentTitle(review);
   const documentTitle = savedTitle || inferredTitle || review?.source_file || '';
@@ -542,7 +554,7 @@ watch(() => documentStore.review, (review) => {
     change_details: [...(meta?.change_details ?? [])],
     keywords: normalizeKeywords(meta?.keywords),
     title: documentTitle,
-    imported_by: meta?.imported_by?.trim() || CURRENT_ADMIN_LABEL,
+    imported_by: responsibleLabel(meta) || meta?.imported_by?.trim() || CURRENT_ADMIN_LABEL,
     expiry_date: meta?.expiry_date ?? null,
     parent_document_id: meta?.parent_document_id ?? null,
     parent_document_ids: meta?.parent_document_ids?.length
@@ -551,6 +563,25 @@ watch(() => documentStore.review, (review) => {
   };
   noExpiry.value = meta?.expiry_date === null && !!meta?.title;
 }, { immediate: true });
+
+/** The importer shown on the form is the document's main responsible person (falls back to the uploader). */
+function responsibleLabel(meta?: LawMeta | null): string {
+  const person = meta?.responsible ?? meta?.uploaded_by;
+  return (person?.name || person?.username || '').trim();
+}
+
+function agencyNameFor(code?: string | null): string {
+  return code ? agencies.value.find((item) => item.code === code)?.title ?? '' : '';
+}
+
+// Lookups may arrive after the document; fill the default responsible unit once they do, only while the field is still empty.
+watch(agencies, () => {
+  const name = agencyNameFor(documentStore.review?.law_meta?.owner_unit_code);
+  if (name && form.value.agencies.length === 0) {
+    form.value.agencies = [name];
+    form.value.agency = name;
+  }
+});
 
 function blockText(block: DocumentBlock): string {
   return (block.approved_text || block.normalized_text || block.raw_text || '').trim();

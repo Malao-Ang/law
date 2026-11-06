@@ -22,14 +22,15 @@
     </template>
 
     <template #attrs="{ form }">
+      <label for="enforcement-color" class="text-body-2 font-weight-bold">สีป้ายสถานะ</label>
       <v-select
+        id="enforcement-color"
         v-model="form.attrs.color"
-        label="สีป้ายสถานะ"
         :items="colorOptions"
         item-title="title"
         item-value="value"
         variant="outlined"
-        density="comfortable"
+        density="compact"
       >
         <template #selection="{ item }">
           <v-chip :color="item.value" size="small" variant="tonal">{{ item.title }}</v-chip>
