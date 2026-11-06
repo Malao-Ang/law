@@ -83,17 +83,21 @@
                   :epoch="switchEpoch"
                   @toggle="$emit('toggleFamily', row.family, $event)"
                 />
-                <v-btn
-                  size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none"
-                  :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
-                  :disabled="row.family.attrs.has_subtypes === false || pendingCodes?.has(row.family.code)"
-                  :loading="pendingCodes?.has(row.family.code)"
-                  :aria-hidden="row.family.attrs.has_subtypes === false ? 'true' : undefined"
-                  :tabindex="row.family.attrs.has_subtypes === false ? -1 : undefined"
-                  @click="$emit('addType', row.family)"
-                >
-                  ประเภท
-                </v-btn>
+                <v-tooltip :text="`เพิ่มประเภทย่อยในกลุ่ม ${row.family.name}`" location="top" :disabled="row.family.attrs.has_subtypes === false">
+                  <template #activator="{ props: tipProps }">
+                    <v-btn
+                      v-bind="tipProps"
+                      icon="mdi-plus" size="small" variant="tonal" color="admin-primary"
+                      :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
+                      :disabled="row.family.attrs.has_subtypes === false || pendingCodes?.has(row.family.code)"
+                      :loading="pendingCodes?.has(row.family.code)"
+                      :aria-label="`เพิ่มประเภทย่อยในกลุ่ม ${row.family.name}`"
+                      :aria-hidden="row.family.attrs.has_subtypes === false ? 'true' : undefined"
+                      :tabindex="row.family.attrs.has_subtypes === false ? -1 : undefined"
+                      @click="$emit('addType', row.family)"
+                    />
+                  </template>
+                </v-tooltip>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
                     <v-btn v-bind="tip" icon="mdi-pencil-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('editFamily', row.family)" />
