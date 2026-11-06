@@ -99,6 +99,7 @@ class DocumentAccess
         $actor = $this->current->user($request);
         if ($actor === null) return false;
         if ($actor['is_super_admin'] ?? false) return true;
+        if ($request->session()->get(CurrentUser::ACTING_MODE_KEY) === 'user') return false;
         $document = $this->documentMeta($document);
         $active = $request->hasSession() ? $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY) : null;
         if (is_string($active) && $active !== '') return ($this->units->find($active)['is_active'] ?? false)
@@ -118,7 +119,14 @@ class DocumentAccess
         $actor = $this->current->user($request);
         if ($actor === null) return false;
         if ($actor['is_super_admin'] ?? false) return true;
-        $codes = array_column($actor['memberships'] ?? [], 'unit_code');
+        $active = $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY);
+        $codes = is_string($active) && $active !== ''
+            && in_array($active, array_column($actor['memberships'] ?? [], 'unit_code'), true)
+            && ($this->units->find($active)['is_active'] ?? false) ? [$active] : [];
+        $groupIds = (array) ($document['permission_group_ids'] ?? []);
+        $hasRestrictions = $groupIds !== [] || (! array_key_exists('permission_group_ids', $document)
+            && ((array) ($document['allowed_unit_codes'] ?? []) !== [] || (array) ($document['allowed_usernames'] ?? []) !== []));
+        if (! $hasRestrictions) return true;
         if (in_array($document['owner_unit_code'] ?? '', $codes, true)) return true;
         $allowedUnits = [];
         $allowedUsers = [];
@@ -212,6 +220,18 @@ class DocumentAccess
         abort_unless($this->allows($request, $action, $document), 403, 'คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
     }
 
+    public function canManagePermissions(Request $request, array $document): bool
+    {
+        $actor = $this->current->user($request);
+        if ($actor === null || $this->context($request) === 'public' || ! $this->adminScope($request, $document)) return false;
+        if ($actor['is_super_admin'] ?? false) return true;
+        $role = $this->current->role($actor, $request);
+        if ($role === 'inner_admin') return true;
+        $document = $this->documentMeta($document);
+        return $role === 'outer_admin' && ($document['responsible']['username'] ?? null) === $actor['username']
+            && $this->allows($request, 'publish', $document);
+    }
+
     public function capabilities(Request $request, array $document): array
     {
         $can = [];
@@ -219,9 +239,7 @@ class DocumentAccess
             $can[$action] = $this->allows($request, $action, $document);
         }
         if ($this->context($request) === 'public') $can = array_fill_keys(array_keys($can), false);
-        $actor = $this->current->user($request);
-        $can['manage_permissions'] = $this->context($request) !== 'public' && $this->adminScope($request, $document)
-            && $actor !== null && (($actor['is_super_admin'] ?? false) || $this->current->role($actor, $request) === 'inner_admin');
+        $can['manage_permissions'] = $this->canManagePermissions($request, $document);
         $can['read'] = $this->canRead($request, $document);
         return $can;
     }
@@ -231,8 +249,7 @@ class DocumentAccess
     {
         if (in_array($suffix, ['export', 'export-pdf', 'export-word'], true)) {
             if (in_array($suffix, ['export-pdf', 'export-word'], true) && ($this->readDocument($documentId)['access_scope'] ?? 'public') === 'private') {
-                $actor = $this->current->user($request);
-                abort_unless($actor !== null && (($actor['is_super_admin'] ?? false) || $this->current->role($actor, $request) === 'inner_admin'), 403, 'ไม่มีสิทธิ์เปลี่ยนเอกสารจำกัดสิทธิ์เป็นสาธารณะ');
+                abort_unless($this->canManagePermissions($request, $this->readDocument($documentId) ?? []), 403, 'ไม่มีสิทธิ์เปลี่ยนเอกสารจำกัดสิทธิ์เป็นสาธารณะ');
             }
             return ['publish'];
         }
@@ -246,9 +263,7 @@ class DocumentAccess
         } catch (\RuntimeException) {
             abort(404, 'ไม่พบข้อมูลเอกสารสำหรับแก้ไข');
         }
-        $actor = $this->current->user($request);
-        if ($actor !== null && ! ($actor['is_super_admin'] ?? false)
-            && $this->current->role($actor, $request) !== 'inner_admin') {
+        if (! $this->canManagePermissions($request, $this->readDocument($documentId) ?? [])) {
             foreach (['permission_group_ids', 'access_scope'] as $key) {
                 abort_if($request->has('law_meta.'.$key) && $request->input('law_meta.'.$key) != ($review['law_meta'][$key] ?? ($key === 'access_scope' ? 'public' : [])),
                     403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');

@@ -48,6 +48,7 @@ export interface RelatedLawSummary {
 }
 
 export interface LawSearchResult {
+  access_scope?: 'public' | 'private';
   law_id: string;
   title: string | null;
   title_highlighted?: string | null;

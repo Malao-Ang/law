@@ -118,6 +118,8 @@ router.beforeEach(async (to) => {
     return auth.canViewAudit ? true : { path: '/' };
   }
 
+  if (auth.acting_mode === 'user' && (to.path.startsWith('/admin') || to.path.startsWith('/documents'))) return { path: '/' };
+
   if (!auth.authEnforced) return true;
 
   const guarded = to.path.startsWith('/admin') || to.path.startsWith('/documents');

@@ -45,7 +45,7 @@
             <v-col cols="12" md="6">
               <AccessScopeCard
                 title="Private"
-                subtitle="เฉพาะผู้รับผิดชอบ สมาชิกหน่วยงานเจ้าของ และกลุ่มที่เลือก"
+                subtitle="ผู้เข้าสู่ระบบอ่านได้ หากเลือกกลุ่มจะจำกัดตามหน่วยงานที่ใช้งานหรือบุคคลที่ได้รับสิทธิ์"
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
@@ -119,7 +119,7 @@
             <div v-if="selectedGroups.length === 0" class="permission-empty-state">
               <v-icon icon="mdi-lock-outline" size="36" color="grey-lighten-1" />
               <div class="text-subtitle-2 font-weight-bold mt-2">ยังไม่ได้เลือกกลุ่มสิทธิ์</div>
-              <div class="text-body-2 text-medium-emphasis">เอกสารนี้จะอ่านได้โดย Super Admin ผู้รับผิดชอบหลัก/ร่วม และสมาชิกหน่วยงานเจ้าของ</div>
+              <div class="text-body-2 text-medium-emphasis">เมื่อไม่เลือกกลุ่มสิทธิ์ ผู้ที่เข้าสู่ระบบทุกคนสามารถอ่านเอกสารนี้ได้</div>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">

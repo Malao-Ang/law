@@ -284,7 +284,7 @@ function sortByTypeOrder(docs: DocumentVersion[]): DocumentVersion[] {
 
 function mapSearchResultToDocumentVersion(law: LawSearchResult): DocumentVersion {
   const docType = docTypeFromSource(law);
-  const publicationScope: PublicationScope = law.restricted ? 'private' : 'public';
+  const publicationScope: PublicationScope = law.access_scope === 'public' ? 'public' : 'private';
   const group = law.law_group || 'กลุ่มกฎหมาย';
   const org = law.agency || 'หน่วยงานที่เกี่ยวข้อง';
   const publishedDate = toDate(law.published_date) || new Date();

@@ -162,8 +162,8 @@ class UpdateDocumentReviewRequest extends FormRequest
                 $groupIds = array_key_exists('permission_group_ids', $lawMeta)
                     ? $lawMeta['permission_group_ids'] : ($current['permission_group_ids'] ?? []);
                 $groups = array_values(array_filter((array) $groupIds, fn ($id) => is_string($id) && trim($id) !== ''));
-                if ($groups === [] || count($groups) !== count((array) $groupIds)) {
-                    $validator->errors()->add('law_meta.permission_group_ids', 'กรุณาเลือกกลุ่มสิทธิ์อย่างน้อยหนึ่งกลุ่มสำหรับเอกสารจำกัดสิทธิ์');
+                if (count($groups) !== count((array) $groupIds)) {
+                    $validator->errors()->add('law_meta.permission_group_ids', 'รายการกลุ่มสิทธิ์ไม่ถูกต้อง กรุณาเลือกกลุ่มสิทธิ์ใหม่');
                 } else {
                     try {
                         app(\App\Services\Permissions\PermissionStore::class)->validateGroupIds($groups);

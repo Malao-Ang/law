@@ -6,6 +6,15 @@
       <v-progress-linear v-if="loading" indeterminate color="admin-primary" class="mt-3" />
       <v-card-text class="px-6 pt-4">
         <v-row>
+          <v-col cols="12" sm="6" md="4">
+            <v-card border flat rounded="lg" class="pa-5 h-100 d-flex flex-column">
+              <h2 class="text-h6 mb-2">{{ ROLE_LABELS.user }}</h2>
+              <p class="mb-4">ค้นหาและอ่านเอกสารตามสิทธิ์ โดยไม่ใช้สิทธิ์จัดการของหน่วยงาน</p>
+              <v-spacer />
+              <v-btn color="admin-primary" block class="flex-grow-0" :disabled="busy"
+                :loading="selected === 'user'" @click="select('user')">เข้าใช้งานในบทบาทนี้</v-btn>
+            </v-card>
+          </v-col>
           <v-col v-if="auth.can_act_as_super_admin" cols="12" sm="6" md="4">
             <v-card border flat rounded="lg" class="pa-5 h-100 d-flex flex-column">
               <h2 class="text-h6 mb-2">{{ ROLE_LABELS.super_admin }}</h2>
@@ -79,9 +88,10 @@ async function select(code: string): Promise<void> {
   busy.value = true;
   selected.value = code;
   try {
-    if (code === 'super_admin') await auth.selectSuperAdmin();
+    if (code === 'user') await auth.selectUser();
+    else if (code === 'super_admin') await auth.selectSuperAdmin();
     else await auth.selectUnit(code);
-    window.location.assign(targetPath());
+    window.location.assign(code === 'user' ? '/' : targetPath());
   }
   catch { await alertError('ไม่สามารถเลือกบทบาทการใช้งานได้ กรุณาลองอีกครั้ง'); }
   finally { busy.value = false; selected.value = ''; }
