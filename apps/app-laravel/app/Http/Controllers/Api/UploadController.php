@@ -24,10 +24,12 @@ class UploadController extends Controller
 
     public function index(): JsonResponse
     {
-        $documents = array_map(function (array $row): array {
-            $row['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $this->reviewStore->getStatus($row['document_id']) ?? []);
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $rows = array_values(array_filter($this->reviewStore->listDocuments(), fn (array $row): bool => $access->inWorkingScope(request(), $row)));
+        $documents = array_map(function (array $row) use ($access): array {
+            $row['can'] = $access->capabilities(request(), $this->reviewStore->getStatus($row['document_id']) ?? []);
             return $row;
-        }, $this->reviewStore->listDocuments());
+        }, $rows);
         return response()->json(['documents' => $documents]);
     }
 
