@@ -81,6 +81,13 @@ export function relationTypeFromChangeDetail(detail: string | null | undefined):
   return undefined;
 }
 
+export function proclamationDueLabel(relation: LawRelation): string | null {
+  if (!relation.requires_new_proclamation || !relation.proclamation_due_date) return null;
+  const [year, month, day] = relation.proclamation_due_date.split('-');
+  if (!year || !month || !day) return 'ต้องออกประกาศฉบับใหม่';
+  return `ออกประกาศภายใน ${day}/${month}/${Number(year) + 543}`;
+}
+
 export function changeDetailMeta(detail: string | null | undefined) {
   const normalized = normalizeChangeDetail(detail);
   return SECTION_CHANGE_DETAILS.find((item) => item.value === normalized) ?? null;

@@ -1931,6 +1931,14 @@ class ReviewStore
             $type = in_array($typeRaw, $allowedTypes, true) ? $typeRaw : 'related';
             $scope = ($entry['scope'] ?? 'document') === 'section' ? 'section' : 'document';
 
+            $dueDate = trim((string) ($entry['proclamation_due_date'] ?? ''));
+            $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1 ? $dueDate : null;
+            $requiresProclamation = filter_var($entry['requires_new_proclamation'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            if (! $requiresProclamation || $dueDate === null) {
+                $requiresProclamation = false;
+                $dueDate = null;
+            }
+
             $clean[] = [
                 'id' => (string) ($entry['id'] ?? bin2hex(random_bytes(6))),
                 'scope' => $scope,
@@ -1944,6 +1952,8 @@ class ReviewStore
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
                 'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
+                'requires_new_proclamation' => $requiresProclamation,
+                'proclamation_due_date' => $dueDate,
             ];
         }
 

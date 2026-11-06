@@ -58,6 +58,11 @@
               <div v-if="relation.note" class="text-caption text-medium-emphasis">
                 {{ relation.note }}
               </div>
+              <div v-if="proclamationDueLabel(relation)">
+                <v-chip size="x-small" color="warning" variant="tonal" prepend-icon="mdi-bullhorn-outline">
+                  {{ proclamationDueLabel(relation) }}
+                </v-chip>
+              </div>
             </div>
           </div>
           <div v-else class="existing-relations__empty text-body-2 text-medium-emphasis">
@@ -138,6 +143,26 @@
           placeholder="ไม่บังคับ"
           class="mt-4"
         />
+
+        <v-checkbox
+          v-model="requiresNewProclamation"
+          label="ต้องออกประกาศฉบับใหม่"
+          color="admin-primary"
+          hide-details
+          density="comfortable"
+          class="mt-2"
+        />
+        <v-text-field
+          v-if="requiresNewProclamation"
+          v-model="proclamationDueDate"
+          type="date"
+          label="ต้องออกประกาศภายในวันที่"
+          variant="outlined"
+          density="comfortable"
+          class="mt-2"
+          :hint="dueHint"
+          persistent-hint
+        />
       </v-card-text>
 
       <v-card-actions class="pa-4 ga-2">
@@ -159,6 +184,7 @@ import {
   changeDetailMeta,
   formatRelationTarget,
   normalizeChangeDetail,
+  proclamationDueLabel,
   relationTypeFromChangeDetail,
   relationTypeLabel,
 } from '../../types/lawRelation';
@@ -184,6 +210,8 @@ const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 const mode = ref<'picker' | 'text'>('picker');
 const pickerTarget = ref<LawRelationTarget | null>(null);
 const changeDetail = ref<string | null>(null);
+const requiresNewProclamation = ref(false);
+const proclamationDueDate = ref('');
 const existingRelations = computed(() => props.existingRelations ?? []);
 const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
 const showChangeDetails = computed(() =>
@@ -203,6 +231,20 @@ const form = ref<LawRelation>({
   note: null,
   url: null,
   change_detail: null,
+  requires_new_proclamation: false,
+  proclamation_due_date: null,
+});
+
+const dueHint = computed(() => {
+  if (!proclamationDueDate.value) return 'ระบุวันที่ที่ต้องออกประกาศ ระบบจะใช้วันนี้แจ้งเตือนทางอีเมล';
+  const due = new Date(`${proclamationDueDate.value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (Number.isNaN(days)) return 'ระบุวันที่ที่ต้องออกประกาศ';
+  if (days < 0) return `เกินกำหนด ${Math.abs(days).toLocaleString('th-TH')} วัน และจะถูกใส่ในอีเมลแจ้งเตือน`;
+  if (days === 0) return 'ต้องออกภายในวันนี้ และจะถูกใส่ในอีเมลแจ้งเตือน';
+  return `ต้องออกภายใน ${days.toLocaleString('th-TH')} วัน และจะถูกใส่ในอีเมลแจ้งเตือน`;
 });
 
 const dialogTitle = computed(() => {
@@ -212,6 +254,7 @@ const dialogTitle = computed(() => {
 
 const canSave = computed(() => {
   if (showChangeDetails.value && !(changeDetail.value?.trim())) return false;
+  if (requiresNewProclamation.value && !proclamationDueDate.value) return false;
   if (mode.value === 'text') {
     if (props.requireSection && !(form.value.target_section?.trim())) return false;
     return form.value.target_title.trim() !== '';
@@ -219,6 +262,10 @@ const canSave = computed(() => {
   if (!pickerTarget.value || pickerTarget.value.title.trim() === '') return false;
   if (props.requireSection && !pickerTarget.value.section) return false;
   return true;
+});
+
+watch(requiresNewProclamation, (checked) => {
+  if (!checked) proclamationDueDate.value = '';
 });
 
 watch(changeDetail, (detail) => {
@@ -269,6 +316,8 @@ function save(): void {
     url: form.value.url?.trim() || null,
     note: form.value.note?.trim() || null,
     change_detail: showChangeDetails.value ? normalizeChangeDetail(changeDetail.value) : null,
+    requires_new_proclamation: requiresNewProclamation.value && proclamationDueDate.value !== '',
+    proclamation_due_date: requiresNewProclamation.value ? proclamationDueDate.value || null : null,
   });
 }
 </script>

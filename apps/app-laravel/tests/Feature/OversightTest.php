@@ -261,6 +261,75 @@ class OversightTest extends TestCase
         $this->assertTrue($summaries->contains('ส่งอีเมลแจ้งเตือนตามรอบด้วยตนเอง'));
     }
 
+    public function test_admin_can_change_the_reminder_days(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $customDue = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(10)->toDateString();
+        $oldOffset = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $customId = 'ov_days_custom_'.uniqid();
+        $oldId = 'ov_days_old_'.uniqid();
+        $this->seedDocument($customId, 'ฉบับรอบใหม่');
+        $this->seedDocument($oldId, 'ฉบับรอบเดิม');
+        $this->track($customId, 'อยู่ระหว่างการยกร่าง', $customDue);
+        $this->track($oldId, 'อยู่ระหว่างการยกร่าง', $oldOffset);
+
+        $this->putJson('/api/oversight/mail', [
+            'subject' => 'แจ้งเตือน {days}',
+            'body' => '{title} {deadlines}',
+            'link_label' => 'เปิดระบบ',
+            'reminder_days' => [3, 10],
+        ])->assertOk()
+            ->assertJsonPath('template.reminder_days', [10, 3]);
+
+        $this->getJson('/api/oversight/summary')->assertJsonPath('reminder_days', [10, 3]);
+        $this->getJson('/api/oversight/mail')->assertJsonPath('pending_count', 1);
+
+        $this->putJson('/api/oversight/mail', [
+            'subject' => 'แจ้งเตือน {days}',
+            'body' => '{title} {deadlines}',
+            'link_label' => 'เปิดระบบ',
+            'reminder_days' => [],
+        ])->assertStatus(422);
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->lawTitle === 'ฉบับรอบใหม่' && $mail->hits[0]['days_left'] === 10;
+        });
+        Mail::assertSent(OversightReminderMail::class, 1);
+    }
+
+    public function test_reminder_includes_a_new_proclamation_deadline_from_a_relation(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $id = 'ov_proclaim_'.uniqid();
+        $this->seedDocument($id, 'ฉบับที่ต้องออกประกาศใหม่');
+        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [[
+                'id' => 'r-new',
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_title' => 'ประกาศที่ถูกเชื่อม',
+                'requires_new_proclamation' => true,
+                'proclamation_due_date' => $due,
+            ]],
+        ])->assertOk();
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->lawTitle === 'ฉบับที่ต้องออกประกาศใหม่'
+                && count($mail->hits) === 1
+                && $mail->hits[0]['days_left'] === 14
+                && $mail->hits[0]['label'] === 'ออกประกาศฉบับใหม่: ประกาศที่ถูกเชื่อม'
+                && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่: ประกาศที่ถูกเชื่อม');
+        });
+    }
+
     public function test_admin_can_send_one_law_before_the_reminder_day(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');

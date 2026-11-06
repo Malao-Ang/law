@@ -112,6 +112,39 @@ class RelationsTest extends TestCase
         $response->assertJsonCount(3, 'relations');
     }
 
+    public function test_relation_stores_new_proclamation_deadline_only_with_a_date(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_rel_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $response = $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [
+                [
+                    'id' => 'r-announce',
+                    'scope' => 'document',
+                    'type' => 'amends',
+                    'target_title' => 'ประกาศเดิม',
+                    'requires_new_proclamation' => true,
+                    'proclamation_due_date' => '2026-12-01',
+                ],
+                [
+                    'id' => 'r-plain',
+                    'scope' => 'document',
+                    'type' => 'related',
+                    'target_title' => 'กฎหมายทั่วไป',
+                    'requires_new_proclamation' => true,
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('relations.0.requires_new_proclamation', true);
+        $response->assertJsonPath('relations.0.proclamation_due_date', '2026-12-01');
+        $response->assertJsonPath('relations.1.requires_new_proclamation', false);
+        $response->assertJsonPath('relations.1.proclamation_due_date', null);
+    }
+
     public function test_whole_edition_replacement_revokes_same_level_chain(): void
     {
         $store = app(ReviewStore::class);

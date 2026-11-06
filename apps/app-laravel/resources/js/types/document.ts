@@ -237,6 +237,10 @@ export interface LawRelation {
   url: string | null;
   /** รายละเอียดการเปลี่ยนแปลงต่อข้อ เช่น ยกเลิกข้อ / เพิ่มข้อความ / แก้ไขข้อความ */
   change_detail?: string | null;
+  /** เชื่อมแล้วต้องออกประกาศฉบับใหม่ */
+  requires_new_proclamation?: boolean;
+  /** วันที่ที่ต้องออกประกาศฉบับใหม่ */
+  proclamation_due_date?: string | null;
 }
 
 export interface DocumentListItem {

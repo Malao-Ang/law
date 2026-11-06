@@ -55,6 +55,7 @@ export interface OversightMailTemplate {
   subject: string;
   body: string;
   link_label: string;
+  reminder_days: number[];
 }
 
 export interface OversightMailHit {

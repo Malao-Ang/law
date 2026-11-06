@@ -6,7 +6,7 @@
   >
     <v-alert type="info" variant="tonal" class="mb-4" density="comfortable">
       ระบบส่งอัตโนมัติทุกวันเวลา 08:00 น. เมื่อเหลือ {{ reminderLabel }} วัน
-      โดยใช้ข้อความที่บันทึกในหน้านี้ ส่งถึงผู้รับผิดชอบหลักและผู้ประสานงานสำรอง
+      แต่ละจำนวนส่งครั้งเดียวต่อหนึ่งกำหนด โดยใช้ข้อความที่บันทึกในหน้านี้
     </v-alert>
 
     <v-alert v-if="loadError" type="error" variant="tonal" class="mb-4" density="compact">{{ loadError }}</v-alert>
@@ -16,14 +16,43 @@
         <v-card border rounded="lg">
           <div class="pa-4 d-flex align-center flex-wrap ga-3">
             <span class="text-subtitle-1 font-weight-bold flex-grow-1">ข้อความอีเมล</span>
-            <v-btn variant="text" class="text-none" :disabled="loading" @click="restoreDefaults">ใส่ข้อความเดิม</v-btn>
+            <v-btn variant="text" class="text-none" :disabled="loading" @click="restoreDefaults">คืนค่าเริ่มต้น</v-btn>
             <v-btn color="admin-primary" class="text-none" :loading="saving" :disabled="!dirty" @click="save">
-              บันทึกข้อความ
+              บันทึก
             </v-btn>
           </div>
           <v-divider />
           <v-card-text>
             <v-alert v-if="formError" type="error" variant="tonal" class="mb-4" density="compact">{{ formError }}</v-alert>
+            <div class="text-subtitle-2 font-weight-bold mb-2">แจ้งเตือนเมื่อเหลือกี่วัน</div>
+            <div class="d-flex flex-wrap ga-2 mb-3">
+              <v-chip
+                v-for="day in form.reminder_days"
+                :key="day"
+                closable
+                color="admin-primary"
+                variant="tonal"
+                @click:close="removeDay(day)"
+              >
+                {{ day === 0 ? 'วันครบกำหนด' : `${day} วัน` }}
+              </v-chip>
+              <span v-if="form.reminder_days.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่ระบุรอบแจ้งเตือน</span>
+            </div>
+            <div class="d-flex align-center ga-2 mb-6">
+              <v-text-field
+                v-model="dayDraft"
+                type="number"
+                min="0"
+                max="365"
+                label="จำนวนวัน"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                style="max-width: 180px"
+                @keyup.enter="addDay"
+              />
+              <v-btn variant="tonal" color="admin-primary" class="text-none" @click="addDay">เพิ่มรอบ</v-btn>
+            </div>
             <v-text-field
               ref="subjectField"
               v-model="form.subject"
@@ -201,7 +230,12 @@ import type { OversightMailItem, OversightMailSettings, OversightMailTemplate } 
 const subjectTokens = ['{title}', '{days}'];
 const snackbar = useSnackbarStore();
 
-const emptyTemplate = (): OversightMailTemplate => ({ subject: '', body: '', link_label: '' });
+const emptyTemplate = (): OversightMailTemplate => ({
+  subject: '',
+  body: '',
+  link_label: '',
+  reminder_days: [30, 14, 7],
+});
 const settings = ref<OversightMailSettings>({
   template: emptyTemplate(),
   defaults: emptyTemplate(),
@@ -223,8 +257,9 @@ const confirmOpen = ref(false);
 const confirmTarget = ref<OversightMailItem | null>(null);
 const subjectField = ref<{ $el?: HTMLElement } | null>(null);
 const bodyField = ref<{ $el?: HTMLElement } | null>(null);
+const dayDraft = ref('');
 
-const reminderLabel = computed(() => settings.value.reminder_days.join(' / '));
+const reminderLabel = computed(() => form.reminder_days.join(' / ') || '—');
 const dirty = computed(() => JSON.stringify(formSnapshot()) !== JSON.stringify(saved.value));
 const missingContext = computed(() => !form.body.includes('{title}') && !form.body.includes('{deadlines}'));
 const previewItem = computed(() => {
@@ -245,15 +280,25 @@ onMounted(() => {
   void load();
 });
 
+function normalizeDays(days: number[]): number[] {
+  return [...new Set(days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 365))].sort((a, b) => b - a);
+}
+
 function formSnapshot(): OversightMailTemplate {
-  return { subject: form.subject, body: form.body, link_label: form.link_label };
+  return {
+    subject: form.subject,
+    body: form.body,
+    link_label: form.link_label,
+    reminder_days: normalizeDays(form.reminder_days),
+  };
 }
 
 function applyTemplate(template: OversightMailTemplate): void {
   form.subject = template.subject;
   form.body = template.body;
   form.link_label = template.link_label;
-  saved.value = { ...template };
+  form.reminder_days = normalizeDays(template.reminder_days ?? [30, 14, 7]);
+  saved.value = formSnapshot();
 }
 
 async function load(): Promise<void> {
@@ -272,13 +317,22 @@ async function load(): Promise<void> {
   }
 }
 
+function validateDays(): boolean {
+  if (normalizeDays(form.reminder_days).length === 0) {
+    formError.value = 'ต้องมีอย่างน้อย 1 รอบแจ้งเตือน';
+    return false;
+  }
+  return true;
+}
+
 async function save(): Promise<boolean> {
   formError.value = '';
+  if (!validateDays()) return false;
   saving.value = true;
   try {
-    const result = await saveOversightMail(formSnapshot());
-    applyTemplate(result.template);
-    snackbar.success('บันทึกข้อความอีเมลแล้ว');
+    await saveOversightMail(formSnapshot());
+    snackbar.success('บันทึกการแจ้งเตือนแล้ว');
+    await load();
     return true;
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ';
@@ -292,7 +346,36 @@ function restoreDefaults(): void {
   form.subject = settings.value.defaults.subject;
   form.body = settings.value.defaults.body;
   form.link_label = settings.value.defaults.link_label;
+  form.reminder_days = normalizeDays(settings.value.defaults.reminder_days ?? [30, 14, 7]);
   formError.value = '';
+}
+
+function addDay(): void {
+  const raw = String(dayDraft.value).trim();
+  if (!/^\d+$/.test(raw)) {
+    formError.value = 'จำนวนวันต้องเป็นจำนวนเต็ม 0 ถึง 365';
+    return;
+  }
+  const day = Number(raw);
+  if (day > 365) {
+    formError.value = 'จำนวนวันต้องเป็นจำนวนเต็ม 0 ถึง 365';
+    return;
+  }
+  if (form.reminder_days.includes(day)) {
+    formError.value = 'มีจำนวนวันนี้อยู่แล้ว';
+    return;
+  }
+  if (form.reminder_days.length >= 8) {
+    formError.value = 'เพิ่มรอบแจ้งเตือนได้ไม่เกิน 8 รอบ';
+    return;
+  }
+  form.reminder_days = normalizeDays([...form.reminder_days, day]);
+  dayDraft.value = '';
+  formError.value = '';
+}
+
+function removeDay(day: number): void {
+  form.reminder_days = form.reminder_days.filter((item) => item !== day);
 }
 
 function askSend(item: OversightMailItem | null): void {
@@ -306,6 +389,7 @@ async function confirmSend(): Promise<void> {
   formError.value = '';
   try {
     if (dirty.value) {
+      if (!validateDays()) return;
       const stored = await saveOversightMail(formSnapshot());
       applyTemplate(stored.template);
     }

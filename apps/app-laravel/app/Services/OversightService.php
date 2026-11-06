@@ -89,33 +89,40 @@ final class OversightService
     }
 
     /**
-     * @return array{subject: string, body: string, link_label: string}
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
      */
     public function mailTemplate(): array
     {
         $defaults = $this->defaultMailTemplate();
-        $stored = $this->blob->read('settings', 'oversight-mail');
-        if (! is_array($stored)) {
-            return $defaults;
-        }
+        $stored = $this->mailSettings();
 
         return [
             'subject' => $this->storedMailText($stored['subject'] ?? null, $defaults['subject'], 180),
             'body' => $this->storedMailText($stored['body'] ?? null, $defaults['body'], 4000),
             'link_label' => $this->storedMailText($stored['link_label'] ?? null, $defaults['link_label'], 120),
+            'reminder_days' => $this->reminderDays(),
         ];
     }
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{subject: string, body: string, link_label: string}
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
      */
     public function saveMailTemplate(array $payload): array
     {
+        $existing = $this->mailSettings();
+        $days = array_key_exists('reminder_days', $payload)
+            ? $this->normalizeReminderDays($payload['reminder_days'])
+            : $this->normalizeReminderDays($existing['reminder_days'] ?? null);
+        if ($days === []) {
+            $days = $this->defaultReminderDays();
+        }
+
         $template = [
             'subject' => $this->cleanMailLine($payload['subject'] ?? '', 180),
             'body' => $this->cleanMailBody($payload['body'] ?? '', 4000),
             'link_label' => $this->cleanMailLine($payload['link_label'] ?? '', 120),
+            'reminder_days' => $days,
         ];
         $this->blob->write('settings', 'oversight-mail', $template);
 
@@ -123,7 +130,7 @@ final class OversightService
     }
 
     /**
-     * @return array{subject: string, body: string, link_label: string}
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
      */
     public function defaultMailTemplate(): array
     {
@@ -134,6 +141,7 @@ final class OversightService
                 "เรียนผู้รับผิดชอบ\n\nกฎหมาย {title} ใกล้ถึงกำหนดดำเนินการ\n\n{deadlines}\n\nกรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}",
             ),
             'link_label' => $this->configMail('mail_link_label', 'ระบบติดตามการกำกับดูแล'),
+            'reminder_days' => $this->defaultReminderDays(),
         ];
     }
 
@@ -378,6 +386,7 @@ final class OversightService
             'backup' => $this->contact($stored['backup'] ?? []),
             'steps' => $steps,
             'reminders_sent' => is_array($stored['reminders_sent'] ?? null) ? $stored['reminders_sent'] : [],
+            'proclamation_deadlines' => $this->proclamationDeadlines($review),
         ];
     }
 
@@ -387,7 +396,7 @@ final class OversightService
      */
     private function publicItem(array $record): array
     {
-        unset($record['reminders_sent']);
+        unset($record['reminders_sent'], $record['proclamation_deadlines']);
 
         return $record;
     }
@@ -540,7 +549,50 @@ final class OversightService
             ];
         }
 
+        foreach (is_array($record['proclamation_deadlines'] ?? null) ? $record['proclamation_deadlines'] : [] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $date = $this->dateOrNull($item['date'] ?? null);
+            if ($date === null) {
+                continue;
+            }
+            $title = trim((string) ($item['title'] ?? ''));
+            $deadlines[] = [
+                'kind' => 'proclamation',
+                'key' => (string) ($item['id'] ?? $date),
+                'label' => $title !== '' ? 'ออกประกาศฉบับใหม่: '.$title : 'ออกประกาศฉบับใหม่',
+                'date' => $date,
+            ];
+        }
+
         return $deadlines;
+    }
+
+    /**
+     * @param  array<string, mixed>  $review
+     * @return array<int, array{id: string, title: string, date: string}>
+     */
+    private function proclamationDeadlines(array $review): array
+    {
+        $items = [];
+        foreach (is_array($review['relations'] ?? null) ? $review['relations'] : [] as $relation) {
+            if (! is_array($relation) || empty($relation['requires_new_proclamation'])) {
+                continue;
+            }
+            $date = $this->dateOrNull($relation['proclamation_due_date'] ?? null);
+            if ($date === null) {
+                continue;
+            }
+            $id = trim((string) ($relation['id'] ?? ''));
+            $items[] = [
+                'id' => $id !== '' ? $id : $date,
+                'title' => trim((string) ($relation['target_title'] ?? '')),
+                'date' => $date,
+            ];
+        }
+
+        return $items;
     }
 
     /**
@@ -685,14 +737,54 @@ final class OversightService
     }
 
     /** @return array<int, int> */
-    private function reminderDays(): array
+    public function reminderDays(): array
     {
-        $days = config('oversight.reminder_days');
-        if (! is_array($days) || $days === []) {
-            return [30, 14, 7];
+        $stored = $this->normalizeReminderDays($this->mailSettings()['reminder_days'] ?? null);
+
+        return $stored !== [] ? $stored : $this->defaultReminderDays();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mailSettings(): array
+    {
+        $stored = $this->blob->read('settings', 'oversight-mail');
+
+        return is_array($stored) ? $stored : [];
+    }
+
+    /** @return array<int, int> */
+    private function defaultReminderDays(): array
+    {
+        $days = $this->normalizeReminderDays(config('oversight.reminder_days'));
+
+        return $days !== [] ? $days : [30, 14, 7];
+    }
+
+    /** @return array<int, int> */
+    private function normalizeReminderDays(mixed $days): array
+    {
+        if (! is_array($days)) {
+            return [];
         }
 
-        return array_values(array_map(static fn (mixed $day): int => (int) $day, $days));
+        $clean = [];
+        foreach ($days as $day) {
+            if (! is_numeric($day)) {
+                continue;
+            }
+            $value = (int) $day;
+            if ($value < 0 || $value > 365) {
+                continue;
+            }
+            $clean[$value] = $value;
+        }
+
+        $clean = array_values($clean);
+        rsort($clean);
+
+        return $clean;
     }
 
     /** @return array<int, string> */

@@ -27,7 +27,7 @@ class OversightMailController extends Controller
             'template' => $this->oversight->mailTemplate(),
             'defaults' => $this->oversight->defaultMailTemplate(),
             'placeholders' => $this->placeholders(),
-            'reminder_days' => $this->reminderDays(),
+            'reminder_days' => $this->oversight->reminderDays(),
             'pending_count' => count(array_filter($items, static fn (array $item): bool => $item['due_now'])),
             'items' => $items,
         ]);
@@ -41,7 +41,10 @@ class OversightMailController extends Controller
             'oversight',
             'mail-template',
             'แก้ไขข้อความอีเมลแจ้งเตือน',
-            ['หัวข้อ: '.$template['subject']],
+            [
+                'หัวข้อ: '.$template['subject'],
+                'แจ้งเตือนเมื่อเหลือ: '.implode(', ', $template['reminder_days']).' วัน',
+            ],
             'ข้อความอีเมลแจ้งเตือน',
         );
 
@@ -103,14 +106,4 @@ class OversightMailController extends Controller
         ];
     }
 
-    /** @return array<int, int> */
-    private function reminderDays(): array
-    {
-        $days = config('oversight.reminder_days');
-        if (! is_array($days) || $days === []) {
-            return [30, 14, 7];
-        }
-
-        return array_values(array_map(static fn (mixed $day): int => (int) $day, $days));
-    }
 }
