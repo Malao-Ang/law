@@ -235,6 +235,7 @@
           </div>
         </section>
         <LawInfoPanel :meta="meta" :article-count="displayArticleCount" :article-unit-label="unitWord" :show-count="!isExternal && displayArticleCount > 0" :versions="versionStore.versions" :viewed-document-id="props.documentId" :parent-names="parentNames" :section-relation-summaries="sectionRelationSummaries" :unit-word="unitWord" :admin-context="isAdminContext" />
+        <LawCommentsPanel :document-id="props.documentId" :document-title="meta.title || cleanSourceFile" />
       </aside>
       </div>
       </template>
@@ -261,6 +262,7 @@ import { documentFileDownloadUrl, documentFileUrl, downloadPdfExport, fetchStatu
 import { hasSignedEsignPdf } from '../../utils/esignStatus';
 import DocBadge from '../shared/DocBadge.vue';
 import { lawBadgeType, LAW_BADGE_COLORS } from '../../utils/lawTypeBadge';
+import LawCommentsPanel from './LawCommentsPanel.vue';
 import LawInfoPanel from './LawInfoPanel.vue';
 import BlockFlow from '../shared/BlockFlow.vue';
 import ELawFooter from '../shared/ELawFooter.vue';
@@ -1082,6 +1084,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .lawx-info {
   position: sticky;
   top: 84px;
+  max-height: calc(100vh - 108px);
+  overflow: auto;
 }
 
 @media (max-width: 1220px) {
