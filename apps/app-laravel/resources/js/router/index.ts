@@ -107,17 +107,17 @@ router.beforeEach(async (to) => {
   if ((to.path === '/admin/units' || to.path.startsWith('/admin/units/')) && !auth.canManageUnits) {
     return auth.authEnforced && !auth.isAuthenticated
       ? { path: '/login', query: { redirect: to.fullPath } }
-      : { path: '/' };
+      : { path: auth.isAdminRole ? '/admin' : '/' };
   }
 
   if (to.path === '/admin/users' || to.path.startsWith('/admin/users/')) {
     if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } };
-    if (!auth.canManageUnits) return { path: '/' };
+    if (!auth.canManageUnits) return { path: auth.isAdminRole ? '/admin' : '/' };
   }
 
   if (to.path === '/admin/audit-logs') {
     if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } };
-    return auth.canViewAudit ? true : { path: '/' };
+    return auth.canViewAudit ? true : { path: auth.isAdminRole ? '/admin' : '/' };
   }
 
   if (auth.acting_mode === 'user' && (to.path.startsWith('/admin') || to.path.startsWith('/documents'))) return { path: '/' };

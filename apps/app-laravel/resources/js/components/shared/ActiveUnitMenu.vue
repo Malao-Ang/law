@@ -62,7 +62,7 @@ async function switchUnit(code: string): Promise<void> {
     if (code === 'user') await auth.selectUser();
     else if (code === 'super_admin') await auth.selectSuperAdmin();
     else await auth.selectUnit(code);
-    window.location.assign(code === 'user' ? '/' : '/admin');
+    window.location.assign(code === 'user' ? '/' : `${window.location.pathname}${window.location.search}${window.location.hash}`);
   } catch {
     await alertError('ไม่สามารถสลับบทบาทได้ กรุณาลองอีกครั้ง');
   } finally { busy.value = false; }

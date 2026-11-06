@@ -129,48 +129,80 @@ class UnitStore
         return $unit;
     }
 
-    public function syncFaculties(array $rows, bool $fallback): void
+    /** Compare UMS faculties with stored units without changing anything. */
+    public function previewFaculties(array $rows, bool $fallback): array
+    {
+        $changes = [];
+        $seen = [];
+        $items = $this->all();
+        foreach ($rows as $row) {
+            $fac = trim((string) ($row['fac_id'] ?? ''));
+            $name = trim((string) ($row['fac_nameth'] ?? ''));
+            if ($fac === '' || $name === '') {
+                continue;
+            }
+            $seen[] = $fac;
+            $current = null;
+            foreach ($items as $item) {
+                if ($item['type'] === 'faculty' && $item['ums_fac_id'] === $fac) {
+                    $current = $item;
+                    break;
+                }
+            }
+            if ($current === null) {
+                $changes[] = ['fac_id' => $fac, 'status' => 'new', 'name' => $name, 'current_code' => null, 'current_name' => null];
+            } elseif ($current['name'] !== $name) {
+                $changes[] = ['fac_id' => $fac, 'status' => 'renamed', 'name' => $name, 'current_code' => $current['code'], 'current_name' => $current['name']];
+            }
+        }
+        if (! $fallback) {
+            foreach ($items as $item) {
+                if ($item['type'] === 'faculty' && $item['ums_fac_id'] && ! in_array($item['ums_fac_id'], $seen, true) && empty($item['missing_in_ums'])) {
+                    $changes[] = ['fac_id' => $item['ums_fac_id'], 'status' => 'missing', 'name' => $item['name'], 'current_code' => $item['code'], 'current_name' => $item['name']];
+                }
+            }
+        }
+
+        return $changes;
+    }
+
+    /** Apply only the selected changes; a renamed faculty becomes a new unit so existing documents keep their old unit. */
+    public function applyFaculties(array $rows, array $selected, bool $fallback): array
     {
         $this->all();
-        $this->blobs->withLock('master', 'unit', function (array &$data) use ($rows, $fallback): void {
+        $applied = ['new' => 0, 'renamed' => 0, 'missing' => 0];
+        $names = [];
+        foreach ($rows as $row) {
+            $names[trim((string) ($row['fac_id'] ?? ''))] = trim((string) ($row['fac_nameth'] ?? ''));
+        }
+        $this->blobs->withLock('master', 'unit', function (array &$data) use ($selected, $names, $fallback, &$applied): void {
             $items = &$data['items'];
-            $seen = [];
-            foreach ($rows as $row) {
-                $fac = trim((string) ($row['fac_id'] ?? ''));
-                $name = trim((string) ($row['fac_nameth'] ?? ''));
-                if ($fac === '' || $name === '') {
-                    continue;
-                }
-                $seen[] = $fac;
-                $found = false;
-                foreach ($items as &$item) {
+            foreach ($selected as $fac) {
+                $index = null;
+                foreach ($items as $i => $item) {
                     if ($item['type'] === 'faculty' && $item['ums_fac_id'] === $fac) {
-                        // A fallback must not replace a name previously supplied by live UMS.
-                        if (! $fallback || $item['source'] !== 'ums') {
-                            $item['name'] = $name;
-                            $item['source'] = $fallback ? 'seed' : 'ums';
-                        }
-                        if (! $fallback) {
-                            $item['missing_in_ums'] = false;
-                        }
-                        $found = true;
+                        $index = $i;
                         break;
                     }
                 }
-                unset($item);
-                if (! $found) {
+                $name = $names[$fac] ?? '';
+                if ($index === null && $name !== '') {
                     $items[] = $this->item($this->nextCode('faculty', $items), $name, 'faculty', null, $fac, null, $fallback ? 'seed' : 'ums');
+                    $applied['new']++;
+                } elseif ($index !== null && $name !== '' && $items[$index]['name'] !== $name) {
+                    $newCode = $this->nextCode('faculty', $items);
+                    $items[$index]['ums_fac_id'] = null;
+                    $items[$index]['replaced_by'] = $newCode;
+                    $items[] = $this->item($newCode, $name, 'faculty', null, $fac, null, $fallback ? 'seed' : 'ums');
+                    $applied['renamed']++;
+                } elseif ($index !== null && $name === '' && ! $fallback) {
+                    $items[$index]['missing_in_ums'] = true;
+                    $applied['missing']++;
                 }
-            }
-            if (! $fallback) {
-                foreach ($items as &$item) {
-                    if ($item['type'] === 'faculty') {
-                        $item['missing_in_ums'] = ! in_array($item['ums_fac_id'], $seen, true);
-                    }
-                }
-                unset($item);
             }
         });
+
+        return $applied;
     }
 
     public static function fallbackFaculties(): array

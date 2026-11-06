@@ -13,10 +13,10 @@ app.use(createPinia());
 app.use(router);
 app.use(vuetify);
 
-// Swap Vuetify theme by route: /admin/* → navy admin theme, everything else → gold user theme.
+// Swap Vuetify theme by route: /admin/* and /documents/* → navy admin theme, everything else → gold user theme.
 // ponytail: defensive on the v4 theme API (change() vs global.name ref); drop the fallback once verified.
 router.afterEach((to) => {
-  const name = to.path.startsWith('/admin') ? 'admin' : 'user';
+  const name = /^\/(admin|documents)(\/|$)/.test(to.path) ? 'admin' : 'user';
   // Keep public text using the original font faces, including its synthesized weights.
   const fontLink = document.querySelector<HTMLLinkElement>('#app-sarabun-font');
   const weights = name === 'admin' ? '400;500;600;700;800' : '400;500;700';

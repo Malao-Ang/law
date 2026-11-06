@@ -53,6 +53,7 @@ foreach (['units', 'master-data/unit'] as $unitPrefix) {
     });
 }
 Route::post('/units/sync-faculties', [\App\Http\Controllers\Api\UnitController::class, 'syncFaculties']);
+Route::post('/units/sync-faculties/apply', [\App\Http\Controllers\Api\UnitController::class, 'applyFaculties']);
 Route::get('/units/{code}/members', [\App\Http\Controllers\Api\UnitController::class, 'members']);
 Route::put('/units/{code}/members', [\App\Http\Controllers\Api\UnitController::class, 'updateMembers']);
 Route::put('/units/{code}/members/{username}', [\App\Http\Controllers\Api\UnitController::class, 'updateMember']);

@@ -134,15 +134,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function logout(redirectTo = '/login'): Promise<void> {
+  async function logout(redirectTo = '/'): Promise<void> {
     try {
       await jsonRequest<void>('/api/auth/logout', { method: 'POST' });
     } catch {
       // session may already be gone
     }
     clear();
-    const { router } = await import('../router');
-    await router.push(redirectTo);
+    window.location.assign(redirectTo);
   }
 
   setUnauthorizedHandler(() => {

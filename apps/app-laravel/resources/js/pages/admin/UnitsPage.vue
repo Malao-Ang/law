@@ -21,8 +21,8 @@
             <td :class="isEmptyTableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') ? 'text-center' : 'text-start'">{{ tableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') }}</td><td class="text-center">{{ unit.member_count ?? 0 }}</td>
             <td @click.stop @keydown.stop class="text-center"><div class="d-flex justify-center master-toggle"><v-switch :key="controlRevision" :model-value="unit.is_active" :disabled="saving || syncing || !auth.is_super_admin" :aria-label="`เปิดใช้งาน ${unit.name}`" color="success" hide-details density="compact" @update:model-value="toggleUnit(unit, Boolean($event))" /></div></td>
             <td @click.stop @keydown.stop class="text-center">
-              <v-btn v-if="auth.is_super_admin" variant="text" size="small" :disabled="saving || syncing" @click="openUnit(unit)">แก้ไขหน่วยงาน</v-btn>
-              <v-btn variant="text" size="small" :to="`/admin/units/${unit.code}`">จัดการสมาชิก</v-btn>
+              <v-btn v-if="auth.is_super_admin" class="unit-action text-none" color="primary" variant="tonal" size="small" prepend-icon="mdi-pencil-outline" :disabled="saving || syncing" @click="openUnit(unit)">แก้ไขหน่วยงาน</v-btn>
+              <v-btn class="unit-action text-none" color="#94713b" variant="tonal" size="small" prepend-icon="mdi-account-group-outline" :to="`/admin/units/${unit.code}`">จัดการสมาชิก</v-btn>
             </td>
           </tr>
           <tr v-if="!loading && !rows.length"><td colspan="7" class="text-center pa-6">ไม่พบหน่วยงาน</td></tr>
@@ -58,6 +58,34 @@
         </v-card-text>
       </v-card>
     </v-dialog>
+    <v-dialog v-model="syncDialog" max-width="760" persistent :retain-focus="false">
+      <v-card rounded="lg" class="unit-dialog">
+        <v-card-title>รายการคณะจาก UMS ที่แตกต่างจากระบบ</v-card-title>
+        <v-card-text>
+          <v-alert :type="syncPreview?.fallback ? 'warning' : 'info'" variant="tonal" density="compact" class="mb-3">{{ syncPreview?.message }} (ทั้งหมด {{ syncPreview?.count }} รายการ)</v-alert>
+          <p v-if="!syncPreview?.changes.length" class="py-4 text-center">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
+          <v-table v-else density="compact">
+            <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อใน UMS</th><th>ชื่อในระบบ</th></tr></thead>
+            <tbody>
+              <tr v-for="row in syncPreview.changes" :key="`${row.status}-${row.fac_id}`">
+                <td><v-checkbox-btn v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
+                <td><v-chip size="small" variant="tonal" :color="SYNC_COLORS[row.status]">{{ SYNC_LABELS[row.status] }}</v-chip></td>
+                <td>{{ row.fac_id }}</td>
+                <td>{{ row.status === 'missing' ? '-' : row.name }}</td>
+                <td>{{ row.current_name || '-' }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+          <p v-if="syncPreview?.changes.some((row) => row.status === 'renamed')" class="text-caption mt-3">
+            คณะที่เปลี่ยนชื่อจะสร้างเป็นหน่วยงานใหม่ (รหัส DEP ใหม่) ส่วนหน่วยงานเดิมยังอยู่และเอกสารเดิมไม่ถูกเปลี่ยน สามารถปิดใช้งานหน่วยงานเดิมได้ภายหลัง
+          </p>
+          <div class="d-flex justify-end ga-2 mt-4">
+            <v-btn variant="text" :disabled="saving" @click="syncDialog = false">ปิด</v-btn>
+            <v-btn color="admin-primary" :loading="saving" :disabled="!syncSelected.length" @click="applySync">นำเข้าที่เลือก ({{ syncSelected.length }})</v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </AppShell>
 </template>
 
@@ -84,6 +112,13 @@ const perPage = ref(positive(route.query.per_page, 10));
 const loading = ref(false);
 const saving = ref(false);
 const syncing = ref(false);
+interface SyncChange { fac_id: string; status: 'new' | 'renamed' | 'missing'; name: string; current_code: string | null; current_name: string | null }
+interface SyncPreview { token: string; fallback: boolean; count: number; message: string; changes: SyncChange[] }
+const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS' } as const;
+const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error' } as const;
+const syncDialog = ref(false);
+const syncPreview = ref<SyncPreview | null>(null);
+const syncSelected = ref<string[]>([]);
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
@@ -164,17 +199,35 @@ async function syncFaculties(): Promise<void> {
   if (syncing.value || saving.value || !auth.is_super_admin) return;
   syncing.value = true;
   try {
-    const result = await jsonRequest<{ count: number; fallback: boolean; message: string }>('/api/units/sync-faculties', { method: 'POST' });
-    await loadUnits();
-    await Swal.fire({ icon: result.fallback ? 'warning' : 'success', titleText: result.fallback ? 'ใช้ข้อมูลคณะสำรอง' : 'ดึงรายการคณะสำเร็จ',
-      text: `${result.message} จำนวน ${result.count} รายการ`, confirmButtonText: 'ตกลง', confirmButtonColor: '#475467' });
+    syncPreview.value = await jsonRequest<SyncPreview>('/api/units/sync-faculties', { method: 'POST' });
+    syncSelected.value = syncPreview.value.changes.filter((row) => row.status !== 'missing').map((row) => `${row.status}:${row.fac_id}`);
+    syncDialog.value = true;
   } catch (error) { await showError(error); }
   finally { syncing.value = false; }
+}
+async function applySync(): Promise<void> {
+  if (!syncPreview.value || saving.value || syncSelected.value.length === 0) return;
+  saving.value = true;
+  try {
+    const selected = [...new Set(syncSelected.value.map((key) => key.slice(key.indexOf(':') + 1)))];
+    await jsonRequest('/api/units/sync-faculties/apply', { method: 'POST', body: JSON.stringify({ token: syncPreview.value.token, selected }) });
+    syncDialog.value = false;
+    await loadUnits();
+    await Swal.fire({ icon: 'success', titleText: 'นำเข้ารายการคณะสำเร็จ', confirmButtonText: 'ตกลง', confirmButtonColor: '#475467' });
+  } catch (error) { await showError(error); }
+  finally { saving.value = false; }
 }
 </script>
 
 <style scoped>
 .unit-row { cursor: pointer; }
 .unit-row:hover { background: #f1f5f9; }
+.unit-dialog :deep(.v-card-title) { padding: 20px 24px 8px; }
+.unit-dialog :deep(.v-card-text) { padding: 12px 24px 8px; }
+.unit-dialog :deep(.v-input) { margin-bottom: 16px; }
+.unit-dialog :deep(.v-input__details) { min-height: 0; padding-top: 2px; }
+.unit-dialog :deep(.master-dialog__switch) { margin-bottom: 8px; }
+.unit-action { font-weight: 600; }
+.unit-action + .unit-action { margin-left: 12px; }
 .unit-row:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 </style>

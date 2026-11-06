@@ -76,7 +76,17 @@ class UnitController extends Controller
     {
         $this->authorizeUser($request, true);
 
-        return response()->json($ums->sync($this->units));
+        return response()->json($ums->preview($this->units));
+    }
+
+    public function applyFaculties(Request $request, UmsFacultyService $ums): JsonResponse
+    {
+        $this->authorizeUser($request, true);
+        $data = $request->validate(['token' => ['string'], 'selected' => ['array'], 'selected.*' => ['string']], [
+            'token.string' => 'ข้อมูลไม่ถูกต้อง', 'selected.array' => 'รายการที่เลือกไม่ถูกต้อง', 'selected.*.string' => 'รายการที่เลือกไม่ถูกต้อง',
+        ]);
+
+        return response()->json(['applied' => $ums->apply($this->units, (string) ($data['token'] ?? ''), $data['selected'] ?? [])]);
     }
 
     public function members(Request $request, string $code, MongoUserStore $users): JsonResponse

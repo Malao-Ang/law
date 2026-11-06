@@ -106,7 +106,7 @@
           :color="item.accessScope === 'public' ? 'success' : 'grey'"
           variant="tonal"
         >
-          {{ item.accessScope === 'public' ? 'สาธารณะ' : 'ส่วนตัว' }}
+          {{ item.accessScope === 'public' ? 'Public' : 'Private' }}
         </v-chip>
       </template>
 
@@ -415,6 +415,20 @@ defineExpose({ load });
   color: rgba(var(--v-theme-secondary), 0.6) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
+}
+
+.pipeline-table :deep(tbody td) {
+  padding-block: 10px;
+}
+
+.pipeline-table :deep(tbody tr) {
+  height: 60px;
+}
+
+.pipeline-table :deep(td .v-btn--size-small) {
+  font-size: 0.75rem;
+  height: 30px;
+  padding-inline: 10px;
 }
 
 .pipeline-title {

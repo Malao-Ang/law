@@ -13,9 +13,9 @@
         <thead><tr><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>หน่วยงานและบทบาท</th><th>สถานะ</th><th>Super Admin</th><th>เข้าสู่ระบบล่าสุด</th></tr></thead>
         <tbody>
           <tr v-for="user in items" :key="user.username" class="user-row" tabindex="0" @click="router.push(userLink(user.username))" @keydown.enter.self="router.push(userLink(user.username))">
-            <td><router-link :to="userLink(user.username)" @click.stop>{{ user.name || user.username }}</router-link></td>
+            <td class="user-name-cell"><router-link :to="userLink(user.username)" :title="user.name || user.username" @click.stop>{{ user.name || user.username }}</router-link></td>
             <td>{{ user.username }}</td>
-            <td><div class="d-flex flex-wrap ga-1 py-2"><v-chip v-for="membership in user.memberships" :key="membership.unit_code" size="small" variant="tonal" color="primary">{{ membership.unit_name }} · {{ ROLE_LABELS[membership.role] }}</v-chip><span v-if="!user.memberships.length">ผู้ใช้ทั่วไป</span></div></td>
+            <td><div class="d-flex flex-wrap ga-1 py-2"><v-chip v-for="membership in user.memberships.slice(0, MAX_CHIPS)" :key="membership.unit_code" size="small" variant="tonal" color="primary">{{ membership.unit_name }} · {{ ROLE_LABELS[membership.role] }}</v-chip><v-chip v-if="user.memberships.length > MAX_CHIPS" size="small" variant="outlined" :title="user.memberships.slice(MAX_CHIPS).map(m => `${m.unit_name} · ${ROLE_LABELS[m.role]}`).join(', ')">+{{ user.memberships.length - MAX_CHIPS }} ...</v-chip><span v-if="!user.memberships.length">ผู้ใช้ทั่วไป</span></div></td>
             <td><v-chip size="small" :class="user.is_disabled ? 'master-status--inactive' : 'master-status--active'">{{ user.is_disabled ? 'ปิดใช้งาน' : 'ใช้งาน' }}</v-chip></td>
             <td class="text-center"><v-icon v-if="user.is_super_admin" icon="mdi-shield-crown-outline" color="primary" aria-label="Super Admin จากการตั้งค่าระบบ" /><span v-else>—</span></td>
             <td>{{ formatThaiDateTime(user.last_login_at) || '—' }}</td>
@@ -98,6 +98,7 @@ const loading = ref(false);
 const detailLoading = ref(false);
 const saving = ref(false);
 const detail = ref<UserDetail | null>(null);
+const MAX_CHIPS = 4;
 const memberships = ref<Membership[]>([]);
 const filters = reactive({ q: '', unit: null as string | null, role: null as AuthRole | null, status: null as string | null });
 const assignment = reactive({ unit_code: '', role: 'user' as UnitRole, actions: [] as UnitAction[] });
@@ -190,6 +191,8 @@ onBeforeUnmount(() => { disposed = true; controller?.abort(); detailRequest++; w
 </script>
 
 <style scoped>
+.user-name-cell { max-width: 80ch; min-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-name-cell a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .users-filters { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(140px, 1.5fr) minmax(120px, 1fr) minmax(120px, 1fr) auto; gap: 12px; align-items: center; }
 .user-row { cursor: pointer; }
 .user-row:hover { background: #f8fafc; }

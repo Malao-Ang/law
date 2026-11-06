@@ -8,7 +8,6 @@
     <div class="adm-up">
       <v-alert v-if="auth.authEnforced && !auth.canUpload" type="info" variant="tonal" class="mb-4">คุณไม่มีสิทธิ์อัปโหลดเอกสารในหน่วยงานที่เลือก</v-alert>
 
-      <v-select v-if="auth.is_super_admin" v-model="ownerUnitCode" :items="ownerUnits" item-title="name" item-value="code" label="หน่วยงานเจ้าของเอกสาร" variant="outlined" />
       <!-- ── Document type selection cards ─────────────────── -->
       <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row" :inert="auth.authEnforced && !auth.canUpload">
         <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:300px">
