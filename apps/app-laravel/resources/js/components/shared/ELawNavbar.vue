@@ -18,17 +18,6 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
-        <v-btn
-          v-if="auth.isAuthenticated && auth.isAdminRole"
-          class="elaw-btn-staff text-none"
-          color="#343028"
-          prepend-icon="mdi-shield-account-outline"
-          rounded="pill"
-          variant="flat"
-          @click="emit('go-admin')"
-        >
-          สำหรับบุคลากรองค์กร
-        </v-btn>
         <v-menu v-if="auth.isAuthenticated" location="bottom end" :close-on-content-click="false">
           <template #activator="{ props }">
             <v-btn v-bind="props" class="elaw-btn-login elaw-user-button text-none" variant="text" rounded="pill" append-icon="mdi-chevron-down" aria-label="เมนูผู้ใช้">
@@ -44,6 +33,17 @@
               <ActiveUnitMenu />
             </div>
             <v-divider class="my-4" />
+            <v-btn
+              v-if="auth.isAdminRole"
+              block
+              class="mb-2 text-none"
+              color="#343028"
+              variant="flat"
+              prepend-icon="mdi-shield-account-outline"
+              @click="emit('go-admin')"
+            >
+              จัดการกฏหมาย
+            </v-btn>
             <v-btn block variant="tonal" prepend-icon="mdi-logout" @click="logout">ออกจากระบบ</v-btn>
           </v-card>
         </v-menu>

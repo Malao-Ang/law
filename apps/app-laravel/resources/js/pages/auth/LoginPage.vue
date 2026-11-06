@@ -62,7 +62,7 @@
               rounded="lg"
               variant="outlined"
               prepend-icon="mdi-logout"
-              @click="auth.logout()"
+              @click="auth.logout('/login')"
             >
               ออกจากระบบ
             </v-btn>

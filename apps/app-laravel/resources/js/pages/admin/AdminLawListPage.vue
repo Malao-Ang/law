@@ -191,7 +191,7 @@
             </td>
             <td class="text-center">
               <v-chip size="x-small" :color="law.accessScope === 'public' ? 'success' : 'grey'" variant="tonal" rounded="pill">
-                {{ tableValue(law.accessScope === 'public' ? 'สาธารณะ' : 'ส่วนตัว') }}
+                {{ tableValue(law.accessScope === 'public' ? 'Public' : 'Private') }}
               </v-chip>
             </td>
             <td class="text-center text-caption">{{ tableValue(law.editedAt) }}</td>
