@@ -18,7 +18,6 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
-        <ActiveUnitMenu />
         <v-menu v-if="auth.isAuthenticated" location="bottom end" :close-on-content-click="false">
           <template #activator="{ props }">
             <v-btn v-bind="props" class="elaw-btn-login elaw-user-button text-none" variant="text" rounded="pill" append-icon="mdi-chevron-down" aria-label="เมนูผู้ใช้">
@@ -30,8 +29,9 @@
             <v-avatar size="64" color="#94713b" class="mb-3 text-white text-h4">{{ initial }}</v-avatar>
             <div class="text-subtitle-1 font-weight-bold">{{ auth.user?.name }}</div>
             <div class="text-body-2 text-medium-emphasis">{{ auth.user?.username }}</div>
-            <div class="text-body-2 mt-3">{{ auth.roleLabel }}</div>
-            <div v-if="auth.active_unit" class="text-body-2">{{ auth.active_unit.name }}</div>
+            <div class="d-flex justify-center mt-3">
+              <ActiveUnitMenu />
+            </div>
             <v-divider class="my-4" />
             <v-btn block variant="tonal" prepend-icon="mdi-logout" @click="logout">ออกจากระบบ</v-btn>
           </v-card>
@@ -156,12 +156,13 @@ function logout(): void {
   flex-shrink: 0;
 }
 
-.elaw-user-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.elaw-user-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .elaw-user-button { min-width: 0; }
 @media (min-width: 769px) and (max-width: 1400px) {
   .elaw-header__inner { gap: 12px; padding-inline: 20px; }
-  .elaw-header__actions { gap: 12px; }
+  .elaw-header__actions { gap: 8px; }
   .elaw-btn-staff { padding-inline: 16px; }
+  .elaw-user-name { max-width: 120px; }
 }
 
 .elaw-btn-login {
