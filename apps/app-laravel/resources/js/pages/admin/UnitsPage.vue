@@ -2,8 +2,8 @@
   <AppShell :breadcrumbs="[{ title: 'หน้าแรก', to: '/admin' }, { title: 'จัดการหน่วยงาน' }]" title="จัดการหน่วยงาน" subtitle="จัดการข้อมูลหน่วยงาน สมาชิก และสิทธิ์ดำเนินการ">
     <template v-if="auth.is_super_admin" #title-actions>
       <div class="d-flex ga-2 flex-wrap">
-        <v-btn variant="outlined" :loading="syncing" :disabled="saving" @click="syncFaculties">ดึงรายการคณะจาก UMS</v-btn>
-        <v-btn color="admin-primary" prepend-icon="mdi-plus" :disabled="saving" @click="openUnit()">เพิ่มหน่วยงาน</v-btn>
+        <v-btn variant="outlined" :loading="syncing" :disabled="saving || syncing" @click="syncFaculties">ดึงรายการคณะจาก UMS</v-btn>
+        <v-btn color="admin-primary" prepend-icon="mdi-plus" :disabled="saving || syncing" @click="openUnit()">เพิ่มหน่วยงาน</v-btn>
       </div>
     </template>
     <v-card flat border rounded="lg" class="pa-4">
@@ -13,15 +13,15 @@
         <v-select v-model="status" label="สถานะ" :items="statusOptions" variant="outlined" density="compact" hide-details />
       </div>
       <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
-      <v-table aria-label="หน่วยงาน">
+      <v-table class="units-table" aria-label="หน่วยงาน" :aria-busy="loading">
         <thead><tr><th>รหัส</th><th>ชื่อหน่วยงาน</th><th>ชนิด</th><th>หน่วยงานแม่</th><th>จำนวนสมาชิก</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
         <tbody>
           <tr v-for="unit in rows" :key="unit.code" :data-unit="unit.code" class="unit-row" tabindex="0" @click="router.push(`/admin/units/${unit.code}`)" @keydown.enter.self="router.push(`/admin/units/${unit.code}`)">
-            <td class="text-center">{{ tableValue(unit.code) }}</td><td :class="isEmptyTableValue(unit.name) ? 'text-center' : 'text-start'">{{ tableValue(unit.name) }}</td><td class="text-center">{{ tableValue(typeOptions.find((t) => t.value === unit.type)?.title) }}</td>
+            <td class="text-center"><v-chip class="unit-code-chip" label size="small">{{ tableValue(unit.code) }}</v-chip></td><td :class="isEmptyTableValue(unit.name) ? 'text-center' : 'text-start'">{{ tableValue(unit.name) }}</td><td class="text-center">{{ tableValue(typeOptions.find((t) => t.value === unit.type)?.title) }}</td>
             <td :class="isEmptyTableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') ? 'text-center' : 'text-start'">{{ tableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') }}</td><td class="text-center">{{ unit.member_count ?? 0 }}</td>
-            <td @click.stop @keydown.stop class="text-center"><div class="d-flex justify-center"><v-switch :key="controlRevision" :model-value="unit.is_active" :disabled="saving || !auth.is_super_admin" :aria-label="`เปิดใช้งาน ${unit.name}`" color="success" hide-details density="compact" @update:model-value="toggleUnit(unit, Boolean($event))" /></div></td>
+            <td @click.stop @keydown.stop class="text-center"><div class="d-flex justify-center master-toggle"><v-switch :key="controlRevision" :model-value="unit.is_active" :disabled="saving || syncing || !auth.is_super_admin" :aria-label="`เปิดใช้งาน ${unit.name}`" color="success" hide-details density="compact" @update:model-value="toggleUnit(unit, Boolean($event))" /></div></td>
             <td @click.stop @keydown.stop class="text-center">
-              <v-btn v-if="auth.is_super_admin" variant="text" size="small" :disabled="saving" @click="openUnit(unit)">แก้ไขหน่วยงาน</v-btn>
+              <v-btn v-if="auth.is_super_admin" variant="text" size="small" :disabled="saving || syncing" @click="openUnit(unit)">แก้ไขหน่วยงาน</v-btn>
               <v-btn variant="text" size="small" :to="`/admin/units/${unit.code}`">จัดการสมาชิก</v-btn>
             </td>
           </tr>
@@ -35,7 +35,7 @@
       </div>
     </v-card>
     <v-dialog v-model="unitDialog" max-width="600" :retain-focus="false" persistent>
-      <v-card rounded="lg">
+      <v-card rounded="lg" class="unit-dialog">
         <v-card-title>{{ editingCode ? 'แก้ไขหน่วยงาน' : 'เพิ่มหน่วยงาน' }}</v-card-title>
         <v-card-text>
           <v-form @submit.prevent="saveUnit">
@@ -49,8 +49,8 @@
             <v-text-field v-if="unitForm.type === 'faculty'" v-model="unitForm.ums_fac_id" label="รหัสคณะใน UMS" variant="outlined" :disabled="saving" />
             <v-text-field v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS" variant="outlined" :disabled="saving" />
             <v-text-field v-model.number="unitForm.sort_order" label="ลำดับแสดงผล" type="number" min="0" variant="outlined" :disabled="saving" />
-            <v-switch v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
-            <div class="d-flex justify-end ga-2 mt-4">
+            <v-switch class="master-dialog__switch" v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
+            <div class="unit-dialog__actions d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" :disabled="saving" @click="unitDialog = false">ยกเลิก</v-btn>
               <v-btn type="submit" color="admin-primary" :loading="saving">บันทึก</v-btn>
             </div>
@@ -68,7 +68,7 @@ import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import { alertError } from '../../components/master/masterDialogs';
-import { jsonRequest } from '../../api/client';
+import { jsonRequest, type ApiRequestError } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import type { Unit, UnitType } from '../../types/unit';
 const auth = useAuthStore();
@@ -93,7 +93,7 @@ const typeOptions = [
   { title: 'คณะ / สำนัก', value: 'faculty' }, { title: 'กอง / ศูนย์', value: 'division' },
   { title: 'ฝ่าย / ภาควิชา', value: 'department' }, { title: 'หน่วยย่อยกองกฎหมาย', value: 'law_subunit' },
 ];
-const visibleUnits = computed(() => allUnits.value.filter((u) => auth.is_super_admin || auth.memberships.some((m) => m.unit_code === u.code && ['inner_admin', 'outer_admin'].includes(m.role))));
+const visibleUnits = computed(() => allUnits.value.filter((u) => auth.is_super_admin || auth.active_unit?.code === u.code && ['inner_admin', 'outer_admin'].includes(auth.role ?? '')));
 // Status changes keep the current rows mounted until the viewer changes filters.
 const statusSnapshot = ref(new Map<string, boolean>());
 function snapshotStatus(): void { statusSnapshot.value = new Map(allUnits.value.map((u) => [u.code, u.is_active])); }
@@ -111,6 +111,7 @@ watch(() => route.query, (q) => {
   page.value = positive(q.page, 1); perPage.value = positive(q.per_page, 10);
 });
 async function showError(error: unknown): Promise<void> {
+  if ((error as ApiRequestError)?.status === 403) return;
   await alertError(error instanceof Error && /[ก-๙]/.test(error.message) ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง');
 }
 async function confirm(title: string, text: string): Promise<boolean> {
@@ -123,13 +124,14 @@ async function loadUnits(): Promise<void> {
 }
 onMounted(async () => { try { await loadUnits(); } catch (error) { await showError(error); } });
 function openUnit(unit?: Unit): void {
+  if (!auth.is_super_admin || saving.value || syncing.value) return;
   editingCode.value = unit?.code || '';
   Object.assign(unitForm, { name: unit?.name || '', type: unit?.type || 'faculty', parent_code: unit?.parent_code || null,
     ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true, sort_order: unit?.sort_order || 0 });
   unitDialog.value = true;
 }
 async function saveUnit(): Promise<void> {
-  if (saving.value || !auth.is_super_admin) return;
+  if (saving.value || syncing.value || !auth.is_super_admin) return;
   if (!unitForm.name.trim()) { await alertError('กรุณาระบุชื่อหน่วยงาน'); return; }
   if (unitForm.type === 'department' && !unitForm.parent_code) { await alertError('กรุณาเลือกคณะหรือสำนักแม่'); return; }
   if (!Number.isInteger(unitForm.sort_order) || unitForm.sort_order < 0) { await alertError('ลำดับต้องเป็นจำนวนเต็มตั้งแต่ศูนย์ขึ้นไป'); return; }
@@ -147,8 +149,9 @@ async function saveUnit(): Promise<void> {
   finally { controlRevision.value++; saving.value = false; }
 }
 async function toggleUnit(unit: Unit, active: boolean): Promise<void> {
-  if (saving.value || !auth.is_super_admin) return;
+  if (saving.value || syncing.value || !auth.is_super_admin) return;
   if (!await confirm('ยืนยันการเปลี่ยนสถานะ', `${active ? 'เปิด' : 'ปิด'}ใช้งาน ${unit.name}?`)) { controlRevision.value++; return; }
+  if (saving.value || syncing.value || !auth.is_super_admin) { controlRevision.value++; return; }
   saving.value = true;
   try {
     const { item } = await jsonRequest<{ item: Unit }>(`/api/units/${unit.code}/active`, { method: 'PATCH', body: JSON.stringify({ is_active: active }) });
@@ -158,6 +161,7 @@ async function toggleUnit(unit: Unit, active: boolean): Promise<void> {
   finally { controlRevision.value++; saving.value = false; }
 }
 async function syncFaculties(): Promise<void> {
+  if (syncing.value || saving.value || !auth.is_super_admin) return;
   syncing.value = true;
   try {
     const result = await jsonRequest<{ count: number; fallback: boolean; message: string }>('/api/units/sync-faculties', { method: 'POST' });
@@ -172,4 +176,5 @@ async function syncFaculties(): Promise<void> {
 <style scoped>
 .unit-row { cursor: pointer; }
 .unit-row:hover { background: #f1f5f9; }
+.unit-row:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 </style>

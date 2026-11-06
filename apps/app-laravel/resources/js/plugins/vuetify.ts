@@ -35,9 +35,10 @@ export const vuetify = createVuetify({
       user: {
         colors: {
           ...sharedColors,
-          primary: '#ab7f29',
+          primary: '#b68d40',
+          'on-primary': '#271900',
           secondary: 'rgba(52, 48, 40, 1)',
-          background: '#f6f4ef',
+          background: '#f6f1e8',
         },
       },
       // Admin back-office (navy). Applied on /admin/* — see main.ts route guard.

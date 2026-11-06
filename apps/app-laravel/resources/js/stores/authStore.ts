@@ -30,8 +30,9 @@ export const useAuthStore = defineStore('auth', () => {
   const memberships = ref<Membership[]>([]);
   const active_unit = ref<Unit | null>(null);
   const needs_unit_selection = ref(false);
-  const canViewAudit = computed(() => is_super_admin.value || memberships.value.some((m) => m.role === 'inner_admin'));
-  const canManageUnits = computed(() => is_super_admin.value || memberships.value.some((m) => ['inner_admin', 'outer_admin'].includes(m.role)));
+  const canViewAudit = computed(() => is_super_admin.value || role.value === 'inner_admin');
+  const scopeRevision = ref(0);
+  const canManageUnits = computed(() => is_super_admin.value || ['inner_admin', 'outer_admin'].includes(role.value ?? ''));
   let pendingFetch: Promise<void> | null = null;
 
   const isAuthenticated = computed(() => user.value !== null);
@@ -40,7 +41,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   function apply(payload: AuthMeResponse): void {
     if (user.value?.username !== payload.user?.username || active_unit.value?.code !== payload.active_unit?.code
-      || is_super_admin.value !== Boolean(payload.is_super_admin) || JSON.stringify(memberships.value) !== JSON.stringify(payload.memberships ?? [])) clearReviewCache();
+      || role.value !== payload.role || acting_mode.value !== (payload.acting_mode ?? null)
+      || is_super_admin.value !== Boolean(payload.is_super_admin) || JSON.stringify(memberships.value) !== JSON.stringify(payload.memberships ?? [])) { clearReviewCache(); scopeRevision.value++; }
     user.value = payload.user;
     role.value = payload.role;
     authEnforced.value = payload.auth_enforced;
@@ -54,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clear(): void {
+    scopeRevision.value++;
     clearReviewCache();
     user.value = null;
     canUpload.value = false;
@@ -144,5 +147,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { can_act_as_super_admin, acting_mode, selectSuperAdmin, canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
+  return { scopeRevision, can_act_as_super_admin, acting_mode, selectSuperAdmin, canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
 });

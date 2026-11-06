@@ -48,6 +48,17 @@ class ReviewController extends Controller
         return $this->withRevalidation($response);
     }
 
+    public function relationCandidate(string $documentId): JsonResponse
+    {
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument($documentId);
+        abort_if($document === null, 404);
+        abort_unless($access->visible(request(), $document), 403);
+        $review = $this->reviewStore->getReviewDocument($documentId);
+        return response()->json($this->decorateReviewPayload($documentId, $review));
+    }
+
     public function versions(string $documentId): JsonResponse
     {
         try {
@@ -56,12 +67,15 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Document not found.'], 404);
         }
 
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $chain['versions'] = array_map(fn ($row) => $access->relatedRow(request(), $row), $chain['versions']);
+        if (! in_array($chain['current_document_id'], array_column($chain['versions'], 'document_id'), true)) $chain['current_document_id'] = '';
         return response()->json($chain);
     }
 
     public function activeChildren(string $documentId): JsonResponse
     {
-        $children = $this->reviewStore->activeChildLaws($documentId);
+        $children = array_map(fn ($row) => app(\App\Services\Auth\DocumentAccess::class)->relatedRow(request(), $row), $this->reviewStore->activeChildLaws($documentId));
 
         return response()->json([
             'document_id' => $documentId,
@@ -72,12 +86,18 @@ class ReviewController extends Controller
 
     public function incomingRelations(string $documentId): JsonResponse
     {
-        $documentIds = $this->reviewStore->documentIdsLinkingTo($documentId);
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $documents = array_map(function ($id) use ($access): array {
+            $document = $access->readDocument($id);
+            return $access->relatedRow(request(), ['document_id' => $id, 'title' => $document['title'] ?? $id]);
+        }, $this->reviewStore->documentIdsLinkingTo($documentId));
+        $documentIds = array_values(array_filter(array_column($documents, 'document_id')));
 
         return response()->json([
             'document_id' => $documentId,
-            'count' => count($documentIds),
+            'count' => count($documents),
             'document_ids' => $documentIds,
+            'documents' => $documents,
         ]);
     }
 
@@ -134,10 +154,14 @@ class ReviewController extends Controller
      */
     private function decorateReviewPayload(string $documentId, array $review): array
     {
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $review = $access->sanitizeReferences(request(), $review);
+        unset($review['law_meta']['co_editors']);
+        $review['relations'] = array_map(fn ($row) => empty($row['target_document_id']) ? $row : $access->relatedRow(request(), $row), $review['relations'] ?? []);
         $sourceType = (string) ($review['source_type'] ?? '');
         $pages = is_array($review['pages'] ?? null) ? $review['pages'] : [];
 
-        $review['pages'] = array_map(function (mixed $page) use ($documentId, $sourceType): mixed {
+        $review['pages'] = array_map(function (mixed $page) use ($documentId, $sourceType, $access): mixed {
             if (! is_array($page)) {
                 return $page;
             }
@@ -147,7 +171,7 @@ class ReviewController extends Controller
             $page['source_kind'] = $page['source_kind']
                 ?? ($hasImage || $sourceType === 'pdf_scan' ? 'pdf_scan' : ($sourceType === 'docx' ? 'docx' : 'pdf_text'));
             $page['image_url'] = $hasImage && $pageNo > 0
-                ? '/api/documents/'.rawurlencode($documentId).'/pages/'.$pageNo.'/image'
+                ? ($access->context(request()) === 'public' ? '/api/public/documents/' : '/api/documents/').rawurlencode($documentId).'/pages/'.$pageNo.'/image'
                 : null;
 
             return $page;
@@ -199,6 +223,13 @@ class ReviewController extends Controller
     public function updateDocumentReview(UpdateDocumentReviewRequest $request, string $documentId): JsonResponse
     {
         $payload = $request->validated();
+        if (is_array($payload['law_meta'] ?? null)) {
+            $fields = [];
+            foreach (array_keys($request->rules()) as $key) {
+                if (str_starts_with($key, 'law_meta.') && substr_count($key, '.') === 1) $fields[] = substr($key, 9);
+            }
+            $payload['law_meta'] = array_intersect_key($payload['law_meta'], array_flip($fields));
+        }
         $incomingRelations = is_array($payload['relations'] ?? null) ? $payload['relations'] : null;
         $previousRelations = [];
         if ($incomingRelations !== null) {
@@ -210,6 +241,31 @@ class ReviewController extends Controller
             }
         }
 
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        if ($incomingRelations !== null) {
+            $previousById = array_column($previousRelations, null, 'id');
+            foreach ($incomingRelations as &$relation) {
+                $previous = $previousById[$relation['id'] ?? ''] ?? null;
+                $target = $previous['target_document_id'] ?? null;
+                $document = is_string($target) ? $access->readDocument($target) : null;
+                if ($previous !== null && empty($relation['target_document_id']) && ($relation['target_title'] ?? '') === 'เอกสารจำกัดสิทธิ์'
+                    && ($document === null || ! $access->canRead($request, $document))) $relation = $previous;
+            }
+            unset($relation);
+            $payload['relations'] = $incomingRelations;
+        }
+        $targets = array_column($incomingRelations ?? [], 'target_document_id');
+        foreach (['parent_document_id', 'parent_document_ids', 'repealed_laws'] as $field) {
+            foreach ((array) ($payload['law_meta'][$field] ?? []) as $target) {
+                if (is_string($target)) $targets[] = $target;
+            }
+        }
+        $unchangedTargets = array_column(array_filter($previousRelations, fn ($old) => in_array($old, $incomingRelations ?? [], true)), 'target_document_id');
+        foreach (array_unique(array_filter($targets)) as $target) {
+            if (in_array($target, $unchangedTargets, true)) continue;
+            $document = $access->readDocument($target);
+            abort_unless($document !== null && ($access->adminScope($request, $document) || $access->publicScope($request, $document)), 403, 'เอกสารจำกัดสิทธิ์');
+        }
         try {
             if (isset($payload['law_meta']) && is_array($payload['law_meta'])) {
                 $payload['law_meta'] = $this->normalizePermissionLawMeta($payload['law_meta']);
@@ -270,6 +326,7 @@ class ReviewController extends Controller
             $this->auditRelationChanges($documentId, $title, $previousRelations, $incomingRelations);
         }
 
+        $payload = $this->decorateReviewPayload($documentId, $payload);
         return response()->json([
             'document_id' => $documentId,
             'status' => 'updated',
@@ -298,6 +355,10 @@ class ReviewController extends Controller
         if ($scope === 'public') {
             $lawMeta['permission_group_ids'] = [];
 
+            return $lawMeta;
+        }
+
+        if (! $hasGroupIds) {
             return $lawMeta;
         }
 

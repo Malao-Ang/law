@@ -193,7 +193,6 @@ interface Row {
   can?: import('../../types/document').DocumentCapabilities;
   uploadedBy: string;
   responsible: string;
-  coEditors: string;
   ownerUnitCode: string;
   title: string;
   updatedAt: string;
@@ -284,7 +283,6 @@ const rows = computed<Row[]>(() =>
       can: doc.can,
       uploadedBy: doc.uploaded_by?.name || doc.uploaded_by?.username || 'ไม่ระบุ',
       responsible: doc.responsible?.name || doc.responsible?.username || 'ดูแลโดย Super Admin',
-      coEditors: (doc.co_editors ?? []).map(person => person.name || person.username).join(', '),
       ownerUnitCode: doc.owner_unit_code || 'ไม่ระบุ',
       title: doc.title || doc.document_id,
       updatedAt: formatDate(doc.updated_at),

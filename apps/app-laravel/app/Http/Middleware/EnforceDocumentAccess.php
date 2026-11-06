@@ -26,13 +26,10 @@ class EnforceDocumentAccess
         }
         $document = $this->documents->getStatus($id);
         if ($document === null) {
-            abort_if(config('auth_ldap.enforced'), 404, 'ไม่พบเอกสาร');
-            return $next($request);
+            abort(404, 'ไม่พบเอกสาร');
         }
         $suffix = implode('/', array_slice($request->segments(), 3));
-        if (config('auth_ldap.enforced')) {
-            abort_if(app(\App\Services\Auth\CurrentUser::class)->user($request) === null, 401, 'กรุณาเข้าสู่ระบบ');
-        }
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user($request) === null, 401, 'กรุณาเข้าสู่ระบบ');
         $actions = $this->access->actions($request, $id, $suffix);
         foreach ($actions as $action) {
             $this->access->authorize($request, $action, $document);
@@ -44,11 +41,15 @@ class EnforceDocumentAccess
         $audit = $suffix !== 'transfer' && $this->access->actsOnBehalf($request, $document);
         $before = $audit ? ['status' => $document, 'review' => $this->blobs->read('review', $id), 'responsible' => $document['responsible'] ?? null] : [];
         $response = $next($request);
+        if ($response instanceof \Illuminate\Http\JsonResponse && $response->getStatusCode() < 400) {
+            $data = $response->getData(true);
+            if (is_array($data)) $response->setData($this->access->sanitizeReferences($request, $data));
+        }
         if ($audit && $response->getStatusCode() < 400) {
             $this->ownership->record($request, $id, implode('+', $actions).':'.$suffix, $before,
                 ['status' => $this->documents->getStatus($id), 'review' => $this->blobs->read('review', $id)]);
         }
-        if (config('auth_ldap.enforced') && $response->getStatusCode() < 400
+        if ($response->getStatusCode() < 400
             && in_array($suffix, ['transfer', 'workflow-progress', 'export-pdf', 'export-word', 'esign/cancel'], true)) {
             try {
                 app(\App\Services\Search\LawIndexer::class)->index($id);

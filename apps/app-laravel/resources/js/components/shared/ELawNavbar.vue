@@ -18,6 +18,17 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
+        <v-btn
+          v-if="auth.isAuthenticated"
+          class="elaw-btn-staff text-none"
+          color="#343028"
+          prepend-icon="mdi-shield-account-outline"
+          rounded="pill"
+          variant="flat"
+          @click="emit('go-admin')"
+        >
+          สำหรับบุคลากรองค์กร
+        </v-btn>
         <v-menu v-if="auth.isAuthenticated" location="bottom end" :close-on-content-click="false">
           <template #activator="{ props }">
             <v-btn v-bind="props" class="elaw-btn-login elaw-user-button text-none" variant="text" rounded="pill" append-icon="mdi-chevron-down" aria-label="เมนูผู้ใช้">
@@ -37,17 +48,6 @@
           </v-card>
         </v-menu>
         <v-btn v-else class="elaw-btn-login text-none" prepend-icon="mdi-login" variant="text" rounded="pill" @click="router.push('/login')">เข้าสู่ระบบ</v-btn>
-        <v-btn
-          v-if="auth.isAuthenticated"
-          class="elaw-btn-staff text-none"
-          color="#343028"
-          prepend-icon="mdi-shield-account-outline"
-          rounded="pill"
-          variant="flat"
-          @click="emit('go-admin')"
-        >
-          สำหรับบุคลากรองค์กร
-        </v-btn>
       </div>
     </v-container>
   </v-app-bar>
@@ -89,8 +89,8 @@ function logout(): void {
   justify-content: space-between;
   height: var(--elaw-navbar-height);
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 0 28px;
   gap: 24px;
   box-sizing: border-box;

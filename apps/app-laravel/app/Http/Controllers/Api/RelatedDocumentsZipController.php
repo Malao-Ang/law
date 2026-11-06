@@ -38,12 +38,10 @@ class RelatedDocumentsZipController extends Controller
 
         $selectedTitle = $documentId;
         $usedNames = [];
+        $access = app(\App\Services\Auth\DocumentAccess::class);
         foreach ($ids as $id) {
-            if (config('auth_ldap.enforced')) {
-                $access = app(\App\Services\Auth\DocumentAccess::class);
-                $document = $access->readDocument($id);
-                if ($document === null || ! $access->canRead(request(), $document)) continue;
-            }
+            $document = $access->readDocument($id);
+            if ($document === null || ! $access->canRead(request(), $document)) continue;
             $file = $this->reviewStore->downloadableFileForDocument($id);
             if ($file === null) {
                 continue;
@@ -59,7 +57,12 @@ class RelatedDocumentsZipController extends Controller
             );
         }
 
+        $empty = $zip->numFiles === 0;
         $zip->close();
+        if ($empty) {
+            @unlink($zipPath);
+            abort(404, 'ไม่พบไฟล์เอกสารที่ดาวน์โหลดได้');
+        }
 
         $zipName = $this->safeFilenameBase($selectedTitle).'-เอกสารที่เกี่ยวข้อง.zip';
         $asciiFallback = trim((string) preg_replace('/[^\x20-\x7e]/', '', $zipName)) ?: 'related-documents.zip';

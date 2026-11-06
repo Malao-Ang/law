@@ -58,7 +58,7 @@ async function switchUnit(code: string): Promise<void> {
   try {
     if (code === 'super_admin') await auth.selectSuperAdmin();
     else await auth.selectUnit(code);
-    await router.push('/admin');
+    window.location.assign('/admin');
   } catch {
     await alertError('ไม่สามารถสลับบทบาทได้ กรุณาลองอีกครั้ง');
   } finally { busy.value = false; }

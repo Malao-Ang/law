@@ -241,6 +241,26 @@ class MongoUserStore
         }
     }
 
+    public function setDisabled(array $actor, string $username, bool $disabled): array
+    {
+        abort_unless($actor['is_super_admin'] ?? false, 403, 'เฉพาะ Super Admin เท่านั้น');
+        $key = self::key($username);
+        abort_if($key === $actor['username'], 422, 'ไม่สามารถปิดหรือเปิดบัญชีของตนเอง');
+        $saved = $before = [];
+        $this->blobs->withLock(self::KIND, $key, function (array &$data) use ($key, $disabled, &$saved, &$before): void {
+            abort_if($data === [], 404, 'ไม่พบผู้ใช้');
+            abort_if(($data['is_super_admin'] ?? false) || in_array($key, (array) config('auth_ldap.super_admins', []), true), 422, 'ไม่สามารถปิดหรือเปิด Super Admin จากการตั้งค่าระบบ');
+            $before = ['is_disabled' => (bool) ($data['is_disabled'] ?? false)];
+            $data['is_disabled'] = $disabled;
+            $data['updated_at'] = now()->toIso8601String();
+            $saved = $data;
+        });
+        if ($before['is_disabled'] !== $disabled) app(\App\Services\Audit\AuditLogger::class)->record('update', 'user', $key,
+            $disabled ? 'ปิดการใช้งานผู้ใช้' : 'เปิดการใช้งานผู้ใช้', [], $saved['name'] ?? $key, null,
+            ['before' => $before, 'after' => ['is_disabled' => $disabled]]);
+        return $saved;
+    }
+
     private function firstFilled(mixed ...$values): ?string
     {
         foreach ($values as $value) {

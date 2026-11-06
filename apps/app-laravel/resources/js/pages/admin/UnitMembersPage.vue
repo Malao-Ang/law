@@ -13,12 +13,12 @@
         </div>
       </v-card-text>
       <v-progress-linear v-if="loading || saving" indeterminate color="admin-primary" />
-      <v-table class="members-table" aria-label="สมาชิกหน่วยงาน">
+      <v-table class="members-table" aria-label="สมาชิกหน่วยงาน" :aria-busy="loading || saving">
         <thead><tr><th v-if="canWrite"><v-checkbox-btn class="justify-center" :model-value="allSelected" :indeterminate="selected.length > 0 && !allSelected" :disabled="saving || !editableRows.length" aria-label="เลือกสมาชิกทั้งหมด" @update:model-value="selectAll(Boolean($event))" /></th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th v-for="action in actions" :key="action.value">{{ action.title }}</th><th>ที่มา</th><th>จัดการ</th></tr></thead>
         <tbody>
           <tr v-for="member in draft" :key="member.username" :data-username="member.username" :class="{ 'draft-row': state(member), 'removed-row': member.remove }">
             <td v-if="canWrite" class="text-center"><v-checkbox-btn class="justify-center" v-model="selected" :value="member.username" :disabled="saving || member.remove || !canEdit(member)" :aria-label="`เลือก ${member.username}`" /></td>
-            <td :class="isEmptyTableValue(member.name || '-') ? 'text-center' : 'text-start'">{{ tableValue(member.name || '-') }}<span v-if="member.is_disabled" class="text-error"> (ปิดใช้งาน)</span><v-chip v-if="state(member)" size="small" :color="member.remove ? 'error' : 'warning'" class="ml-2">{{ state(member) }}</v-chip></td>
+            <td :class="isEmptyTableValue(member.name || '-') ? 'text-center' : 'text-start'"><router-link :to="`/admin/users/${encodeURIComponent(member.username)}`">{{ tableValue(member.name || '-') }}</router-link><span v-if="member.is_disabled" class="text-error"> (ปิดใช้งาน)</span><v-chip v-if="state(member)" size="small" :color="member.remove ? 'error' : 'warning'" class="ml-2">{{ state(member) }}</v-chip></td>
             <td :class="isEmptyTableValue(member.username) ? 'text-center' : 'text-start'">{{ tableValue(member.username) }}</td>
             <td class="text-center"><v-select class="text-center" v-if="canEdit(member)" :model-value="member.role" :items="roleOptions" :disabled="saving || member.remove" :aria-label="`บทบาทของ ${member.username}`" variant="outlined" density="compact" hide-details @update:model-value="changeRole(member, $event)"><template #selection="{ item }"><span class="position-absolute w-100 text-center">{{ item.title }}</span></template></v-select><span v-else>{{ tableValue(ROLE_LABELS[member.role]) }}</span></td>
             <td v-for="action in actions" :key="action.value" class="text-center"><v-checkbox-btn class="justify-center" :model-value="member.actions.includes(action.value)" :disabled="saving || member.remove || !canEdit(member) || isAdmin(member.role)" :aria-label="`${action.title} ${member.username}`" @update:model-value="changeAction(member, action.value, Boolean($event))" /></td>
@@ -33,7 +33,7 @@
       <strong>มีการเปลี่ยนแปลง {{ changed.length }} คน</strong><v-spacer /><v-btn :disabled="saving" variant="text" @click="revert">ยกเลิก</v-btn><v-btn color="admin-primary" :loading="saving" @click="save">บันทึก</v-btn>
     </div>
     <v-dialog v-model="peopleDialog" max-width="800" :retain-focus="false" persistent>
-      <v-card rounded="lg"><v-card-title>เพิ่มคนใน {{ selectedUnit?.name }}</v-card-title><v-card-text>
+      <v-card rounded="lg" class="unit-dialog"><v-card-title>เพิ่มคนใน {{ selectedUnit?.name }}</v-card-title><v-card-text>
         <v-form class="d-flex ga-2" @submit.prevent="searchPeople"><v-text-field v-model="peopleQuery" label="ค้นหาชื่อ นามสกุล หรือชื่อผู้ใช้" placeholder="ค้นด้วยชื่อหรือนามสกุลภาษาไทย" hint="ค้นจาก UMS ด้วยชื่อหรือนามสกุลภาษาไทย (ชื่อผู้ใช้ค้นได้เฉพาะคนที่เคยเข้าสู่ระบบ)" persistent-hint variant="outlined" density="compact" :disabled="saving" /><v-btn type="submit" color="admin-primary" :loading="searching" :disabled="saving">ค้นหา</v-btn></v-form>
         <v-list class="people-results"><v-list-item v-for="person in people" :key="person.username" :title="person.name || person.username" :subtitle="person.username"><template #prepend><v-checkbox-btn v-model="picked" :value="person.username" :disabled="saving || draft.some((m) => m.username === person.username)" :aria-label="`เพิ่ม ${person.username}`" /></template></v-list-item></v-list>
         <p v-if="searched && !people.length && !searching">ไม่พบผู้ใช้ที่ตรงกับคำค้นหา</p>
@@ -43,7 +43,7 @@
       </v-card-text><v-card-actions><v-spacer /><v-btn :disabled="saving" @click="peopleDialog = false">ปิด</v-btn><v-btn color="admin-primary" :disabled="saving || !picked.length" @click="addPeople">เพิ่มเข้ารายการ</v-btn></v-card-actions></v-card>
     </v-dialog>
     <v-dialog v-model="permissionsDialog" max-width="650" :retain-focus="false" persistent>
-      <v-card><v-card-title>กำหนดสิทธิ์ให้ที่เลือก {{ selected.length }} คน</v-card-title><v-card-text>
+      <v-card class="unit-dialog"><v-card-title>กำหนดสิทธิ์ให้ที่เลือก {{ selected.length }} คน</v-card-title><v-card-text>
         <v-select v-model="assignment.role" label="บทบาท" :items="roleOptions" :disabled="saving" variant="outlined" />
         <div class="d-flex ga-2 flex-wrap"><v-checkbox v-for="action in actions" :key="action.value" v-model="assignment.actions" :value="action.value" :label="action.title" :disabled="saving || assignment.role === 'user' || isAdmin(assignment.role)" hide-details /></div>
       </v-card-text><v-card-actions><v-spacer /><v-btn :disabled="saving" @click="permissionsDialog = false">ยกเลิก</v-btn><v-btn color="admin-primary" :disabled="saving" @click="applyPermissions">ใช้กับรายการ</v-btn></v-card-actions></v-card>
@@ -58,7 +58,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vu
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import { alertError } from '../../components/master/masterDialogs';
-import { jsonRequest } from '../../api/client';
+import { jsonRequest, type ApiRequestError } from '../../api/client';
 import { useAuthStore, ROLE_LABELS } from '../../stores/authStore';
 import type { Membership, Unit, UnitAction, UnitRole } from '../../types/unit';
 interface Member extends Membership { username: string; name: string | null; is_disabled: boolean; remove?: boolean; }
@@ -87,9 +87,9 @@ const actions: { title: string; value: UnitAction }[] = [
   { title: 'ส่งลงนาม', value: 'esign' }, { title: 'เผยแพร่', value: 'publish' },
 ];
 function isAdmin(role: string): boolean { return ['inner_admin', 'outer_admin'].includes(role); }
-const visibleUnits = computed(() => units.value.filter((u) => auth.is_super_admin || auth.memberships.some((m) => m.unit_code === u.code && isAdmin(m.role))));
+const visibleUnits = computed(() => units.value.filter((u) => auth.is_super_admin || auth.active_unit?.code === u.code && isAdmin(auth.role ?? '')));
 const selectedUnit = computed(() => visibleUnits.value.find((u) => u.code === code.value));
-const ownRole = computed(() => auth.memberships.find((m) => m.unit_code === code.value)?.role);
+const ownRole = computed(() => auth.active_unit?.code === code.value ? auth.role : null);
 const canWrite = computed(() => auth.is_super_admin || ownRole.value === 'inner_admin');
 const roleOptions = computed(() => (['user', 'editor', ...(auth.is_super_admin ? ['inner_admin', 'outer_admin'] : [])] as UnitRole[]).map((role) => ({ title: ROLE_LABELS[role], value: role })));
 function canEdit(member: Member): boolean {
@@ -110,7 +110,7 @@ function sourceLabel(source: string): string { return ({ ums: 'UMS', manual: '�
 function replaceMembers(members: Member[]): void { baseline.value = structuredClone(members); revert(); }
 function revert(): void { draft.value = baseline.value.map((m) => ({ ...m, actions: [...m.actions] })); selected.value = []; }
 function changeRole(member: Member, role: UnitRole): void {
-  if (saving.value || !canEdit(member) || member.remove) return;
+  if (saving.value || !canEdit(member) || member.remove || !roleOptions.value.some(option => option.value === role)) return;
   const previous = member.role;
   member.role = role;
   member.actions = isAdmin(role) ? actions.map((a) => a.value) : role === 'user' ? [] : previous === 'user' ? ['upload', 'edit'] : member.actions;
@@ -128,14 +128,24 @@ function toggleRemove(member: Member): void {
 }
 function openPermissions(): void { assignment.role = 'user'; assignment.actions = []; permissionsDialog.value = true; }
 function assignedActions(): UnitAction[] { return isAdmin(assignment.role) ? actions.map((a) => a.value) : assignment.role === 'user' ? [] : [...assignment.actions]; }
+function validAssignment(): boolean {
+  return roleOptions.value.some(option => option.value === assignment.role)
+    && assignment.actions.every(action => actions.some(option => option.value === action))
+    && new Set(assignment.actions).size === assignment.actions.length;
+}
 function applyPermissions(): void {
+  if (saving.value || !canWrite.value || !validAssignment()) return;
   for (const member of editableRows.value.filter((m) => selected.value.includes(m.username))) { member.role = assignment.role; member.actions = assignedActions(); }
   permissionsDialog.value = false;
 }
 async function showError(error: unknown): Promise<void> {
+  if ((error as ApiRequestError)?.status === 403) return;
   await alertError(error instanceof Error && /[ก-๙]/.test(error.message) ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง');
 }
 let request = 0;
+let peopleController: AbortController | null = null;
+let peopleRequest = 0;
+function cancelPeopleSearch(): void { peopleRequest++; peopleController?.abort(); peopleController = null; searching.value = false; }
 async function loadMembers(): Promise<void> {
   const seq = ++request;
   loading.value = true;
@@ -149,6 +159,10 @@ async function loadMembers(): Promise<void> {
 }
 async function save(): Promise<void> {
   if (saving.value || !canWrite.value || !changed.value.length) return;
+  if (changed.value.some(member => member.remove ? !auth.is_super_admin : !canEdit(member) || !roleOptions.value.some(option => option.value === member.role) || member.actions.some(action => !actions.some(option => option.value === action)) || new Set(member.actions).size !== member.actions.length)) {
+    await alertError('กรุณาตรวจสอบบทบาทและสิทธิ์ของสมาชิกก่อนบันทึก');
+    return;
+  }
   saving.value = true;
   try {
     const changes = changed.value.map((m) => m.remove ? { username: m.username, remove: true } : { username: m.username, role: m.role, actions: m.actions });
@@ -175,23 +189,28 @@ onMounted(async () => {
   try { units.value = (await jsonRequest<{ items: Unit[] }>('/api/units')).items; await loadMembers(); }
   catch (error) { await showError(error); }
 });
-onBeforeUnmount(() => { request++; window.removeEventListener('beforeunload', beforeUnload); });
+onBeforeUnmount(() => { request++; cancelPeopleSearch(); window.removeEventListener('beforeunload', beforeUnload); });
 watch(code, () => { peopleDialog.value = false; permissionsDialog.value = false; void loadMembers(); });
-function openPeople(): void { peopleQuery.value = ''; people.value = []; picked.value = []; searched.value = false; assignment.role = 'user'; assignment.actions = []; peopleDialog.value = true; }
+watch(peopleDialog, (open) => { if (!open) cancelPeopleSearch(); });
+function openPeople(): void { if (!auth.is_super_admin || saving.value) return; cancelPeopleSearch(); peopleQuery.value = ''; people.value = []; picked.value = []; searched.value = false; assignment.role = 'user'; assignment.actions = []; peopleDialog.value = true; }
 async function searchPeople(): Promise<void> {
+  if (searching.value || !auth.is_super_admin) return;
   if (peopleQuery.value.trim().length < 2) { await alertError('กรุณาระบุคำค้นหาอย่างน้อย 2 ตัวอักษร'); return; }
+  const seq = ++peopleRequest;
+  const controller = new AbortController(); peopleController = controller;
   searching.value = true;
   try {
-    const result = await jsonRequest<{ items: Person[]; ums_unavailable: boolean; message: string | null }>(`/api/users/search?q=${encodeURIComponent(peopleQuery.value.trim())}`);
+    const result = await jsonRequest<{ items: Person[]; ums_unavailable: boolean; message: string | null }>(`/api/users/search?q=${encodeURIComponent(peopleQuery.value.trim())}`, { signal: controller.signal });
+    if (seq !== peopleRequest || !peopleDialog.value) return;
     // Preserve selections from earlier searches in this dialog.
     const retained = people.value.filter((p) => picked.value.includes(p.username));
     people.value = [...retained, ...result.items.filter((p) => !retained.some((r) => r.username === p.username))]; searched.value = true;
     if (result.ums_unavailable) await Swal.fire({ icon: 'warning', titleText: 'ระบบ UMS ไม่ตอบสนอง', text: result.message || 'แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ', confirmButtonText: 'ตกลง' });
-  } catch (error) { await showError(error); }
-  finally { searching.value = false; }
+  } catch (error) { if (seq === peopleRequest && !controller.signal.aborted) await showError(error); }
+  finally { if (seq === peopleRequest) { searching.value = false; peopleController = null; } }
 }
 function addPeople(): void {
-  if (!auth.is_super_admin || saving.value) return;
+  if (!auth.is_super_admin || saving.value || !validAssignment()) return;
   for (const person of people.value.filter((p) => picked.value.includes(p.username))) {
     if (!draft.value.some((m) => m.username === person.username)) draft.value.push({ ...person, unit_code: code.value, role: assignment.role, actions: assignedActions(), source: 'manual', is_disabled: false });
   }

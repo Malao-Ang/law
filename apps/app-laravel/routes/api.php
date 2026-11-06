@@ -65,9 +65,9 @@ Route::get('/oversight/mail', [OversightMailController::class, 'show'])->middlew
 Route::put('/oversight/mail', [OversightMailController::class, 'update'])->middleware('auth.session');
 Route::post('/oversight/mail/send', [OversightMailController::class, 'send'])->middleware('auth.session');
 Route::put('/oversight/{documentId}', [OversightController::class, 'update'])->middleware('auth.session');
-Route::post('/laws/search', [LawSearchController::class, 'search']);
-Route::get('/laws/facets', [LawSearchController::class, 'facets']);
-Route::post('/laws/suggest', [LawSuggestController::class, 'suggest']);
+Route::post('/laws/search', [LawSearchController::class, 'search'])->defaults('document_context', 'public');
+Route::get('/laws/facets', [LawSearchController::class, 'facets'])->defaults('document_context', 'public');
+Route::post('/laws/suggest', [LawSuggestController::class, 'suggest'])->defaults('document_context', 'public');
 Route::get('/permission-directory', PermissionDirectoryController::class)->middleware('auth.session');
 Route::get('/permission-groups', [PermissionGroupController::class, 'index'])->middleware('auth.session');
 Route::post('/permission-groups', [PermissionGroupController::class, 'store'])->middleware('auth.session');
@@ -90,8 +90,6 @@ Route::get('/documents', [UploadController::class, 'index'])->middleware('auth.s
 Route::post('/documents', [UploadController::class, 'store'])->middleware('auth.session');
 Route::get('/documents/{documentId}', [UploadController::class, 'show'])->middleware('doc.read');
 Route::post('/documents/{documentId}/transfer', [UploadController::class, 'transfer'])->middleware('auth.session');
-Route::put('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
-Route::delete('/documents/{documentId}/co-editors/{username}', \App\Http\Controllers\Api\DocumentCoEditorController::class)->middleware('auth.session');
 Route::delete('/documents/{documentId}', [UploadController::class, 'destroy'])->middleware('auth.session');
 Route::get('/documents/{documentId}/review', [ReviewController::class, 'show'])->middleware('doc.read');
 Route::get('/documents/{documentId}/versions', [ReviewController::class, 'versions'])->middleware('doc.read');
@@ -142,3 +140,28 @@ Route::post('/internal/pipeline-callback', [PipelineCallbackController::class, '
 Route::match(['GET', 'POST'], '/esign/callback/{documentId}', [EsignCallbackController::class, 'receive'])
     ->where('documentId', '[A-Za-z0-9_\-]+')
     ->name('esign.callback');
+
+Route::get('/public/reports/summary', [ReportController::class, 'summary'])->defaults('document_context', 'public');
+Route::get('/relation-candidates', [UploadController::class, 'relationCandidates'])->middleware('auth.session')->defaults('document_context', 'relation');
+Route::get('/relation-candidates/{documentId}/review', [ReviewController::class, 'relationCandidate'])->middleware('auth.session')->defaults('document_context', 'relation');
+Route::prefix('public/documents/{documentId}')->middleware('doc.read')->group(function (): void {
+    foreach ([
+        '' => [UploadController::class, 'show'],
+        '/review' => [ReviewController::class, 'show'],
+        '/versions' => [ReviewController::class, 'versions'],
+        '/preview' => [ReviewController::class, 'preview'],
+        '/active-children' => [ReviewController::class, 'activeChildren'],
+        '/incoming-relations' => [ReviewController::class, 'incomingRelations'],
+        '/file' => [DocumentFileController::class, 'show'],
+        '/related/{targetDocumentId}/file' => [DocumentFileController::class, 'showRelated'],
+        '/related-download.zip' => RelatedDocumentsZipController::class,
+        '/images/{filename}' => [ImageController::class, 'show'],
+        '/pages/{pageNo}/image' => [ImageController::class, 'showPage'],
+        '/esign/signed-pdf' => [EsignController::class, 'signedPdf'],
+        '/export-pdf/preview' => [PdfExportController::class, 'preview'],
+    ] as $path => $handler) Route::get($path, $handler)->defaults('document_context', 'public');
+});
+
+Route::get('/users', [\App\Http\Controllers\Api\UserController::class, 'index']);
+Route::get('/users/{username}', [\App\Http\Controllers\Api\UserController::class, 'show']);
+Route::patch('/users/{username}/disabled', [\App\Http\Controllers\Api\UserController::class, 'disabled']);

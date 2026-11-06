@@ -40,6 +40,7 @@
             {{ item.section }}
           </v-list-subheader>
           <v-list-item
+            :aria-label="item.label"
             :prepend-icon="item.icon"
             :title="item.label"
             :active="isActive(item)"
@@ -86,7 +87,7 @@
     </template>
   </v-navigation-drawer>
 
-  <v-main class="app-shell__main" :class="{ 'app-shell__main--full-height': fullHeight }">
+  <v-main class="app-shell__main" :class="{ 'app-shell__main--full-height': fullHeight, 'app-shell__main--workflow-form': isWorkflowForm }">
     <div class="app-shell__topbar">
       <v-breadcrumbs
         v-if="breadcrumbs.length"
@@ -105,9 +106,7 @@
       <div class="app-shell__topbar-right">
         <slot name="actions" />
         <ActiveUnitMenu />
-        <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
-          <v-btn icon="mdi-bell-outline" variant="text" size="small" />
-        </v-badge>
+        <v-btn v-if="showBell" icon="mdi-bell-outline" variant="text" size="small" disabled title="ยังไม่มีระบบแจ้งเตือนในแอป" aria-label="ยังไม่มีระบบแจ้งเตือนในแอป" />
       </div>
     </div>
 
@@ -163,12 +162,14 @@ const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
 const isAdmin = computed(() => route.path.startsWith('/admin'));
+const isWorkflowForm = computed(() => /^\/documents\/[^/]+\/(law-info|permissions|relations|esign)(\/|$)/.test(route.path));
 const adminDefaults = {
   VBtn: { rounded: 'lg', height: 40, class: 'text-none' },
   VCard: { rounded: 'lg' },
   VTextField: { density: 'compact', rounded: 'sm' },
   VSelect: { density: 'compact', rounded: 'sm' },
   VAutocomplete: { density: 'compact', rounded: 'sm' },
+  VCombobox: { density: 'compact', rounded: 'sm' },
   VTextarea: { density: 'compact', rounded: 'sm' },
   VSwitch: { inset: true, color: 'success' },
 };
@@ -198,9 +199,16 @@ const defaultNavGroups: NavGroup[] = [
       { label: 'คิวตรวจสอบ OCR', icon: 'mdi-eye-check-outline', to: '/admin/ocr-queue' },
       { label: 'ติดตามกำกับดูแล', icon: 'mdi-bell-ring-outline', to: '/admin/oversight' },
       { label: 'ข้อความแจ้งเตือน', icon: 'mdi-email-edit-outline', to: '/admin/oversight-mail' },
-      { label: 'บันทึกการเปลี่ยนแปลง', icon: 'mdi-clipboard-text-clock-outline', to: '/admin/audit-logs' },
       { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
       { label: 'แสดงความสัมพันธ์', icon: 'mdi-file-tree-outline', to: '/admin/show-relations' },
+    ],
+  },
+  {
+    label: 'ผู้ใช้และสิทธิ์',
+    items: [
+      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
+      { label: 'จัดการผู้ใช้', icon: 'mdi-account-cog-outline', to: '/admin/users' },
+      { label: 'ประวัติการใช้งาน', icon: 'mdi-clipboard-text-clock-outline', to: '/admin/audit-logs' },
     ],
   },
   {
@@ -216,7 +224,6 @@ const defaultNavGroups: NavGroup[] = [
   {
     label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
-      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
@@ -230,8 +237,8 @@ const defaultNavGroups: NavGroup[] = [
 
 const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
   ...group,
-  items: group.items.filter((item) => (item.to !== '/admin/units' || auth.canManageUnits) && (item.to !== '/admin/audit-logs' || auth.canViewAudit)),
-})));
+  items: group.items.filter((item) => (!['/admin/units', '/admin/users'].includes(item.to ?? '') || auth.canManageUnits) && (item.to !== '/admin/audit-logs' || auth.canViewAudit)),
+})).filter(group => group.items.length > 0));
 
 function isActive(item: NavItem): boolean {
   if (!item.to) return false;
@@ -259,7 +266,14 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
   flex: 1 1 0;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
+
+.app-drawer__nav::-webkit-scrollbar { width: 4px; }
+.app-drawer__nav::-webkit-scrollbar-track { background: transparent; }
+.app-drawer__nav::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.app-drawer__nav::-webkit-scrollbar-button { display: none; }
 
 .app-drawer__header {
   align-items: center;
@@ -480,5 +494,17 @@ function showSectionHeader(item: NavItem, index: number, items: NavItem[]): bool
 }
 .v-theme--admin .app-drawer__user p { line-height: 20px; margin: 0; }
 .v-theme--admin .app-drawer__nav :deep(.v-list-item__prepend .v-list-item__spacer) { width: 12px; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav { padding-inline: 4px; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item) {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-inline: 0;
+  border-right: 0;
+  box-shadow: none;
+}
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item--active) { box-shadow: inset -3px 0 #1e3a8a; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__prepend) { justify-content: center; width: 100%; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__prepend .v-list-item__spacer) { width: 0; }
+.v-theme--admin .app-drawer.v-navigation-drawer--rail .app-drawer__nav :deep(.v-list-item__content) { display: none; }
 .v-theme--admin .app-drawer__user [data-testid="shell-user-role"] { font-size: 12px !important; color: #64748b; }
 </style>

@@ -12,16 +12,20 @@ export const useDocumentStore = defineStore('document', () => {
   const saving = ref(false);
   const saveError = ref('');
 
+  let fetchRequest = 0;
   async function fetch(id: string, force = false): Promise<void> {
+    const current = ++fetchRequest;
     documentId.value = id;
+    review.value = null;
     loading.value = true;
     error.value = '';
     try {
-      review.value = await getReviewCached(id, force);
+      const response = await getReviewCached(id, force);
+      if (current === fetchRequest) review.value = response;
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : 'ไม่สามารถโหลดเอกสาร';
+      if (current === fetchRequest) error.value = e instanceof Error ? e.message : 'ไม่สามารถโหลดเอกสาร';
     } finally {
-      loading.value = false;
+      if (current === fetchRequest) loading.value = false;
     }
   }
 
@@ -117,6 +121,7 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   function reset(): void {
+    fetchRequest++;
     documentId.value = '';
     review.value = null;
     loading.value = false;

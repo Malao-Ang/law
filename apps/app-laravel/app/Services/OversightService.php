@@ -31,9 +31,9 @@ final class OversightService
     /**
      * @return array<string, mixed>
      */
-    public function summary(): array
+    public function summary(?\Illuminate\Http\Request $request = null): array
     {
-        $records = $this->records();
+        $records = $this->records($request ?? request());
         $tracked = array_values(array_filter($records, static fn (array $row): bool => $row['tracked']));
 
         $onTime = 0;
@@ -152,12 +152,12 @@ final class OversightService
      *
      * @return array<int, array{document_id: string, title: string, emails: array<int, string>, due_now: bool, already_sent: bool, hits: array<int, array<string, mixed>>}>
      */
-    public function reminderCatalog(): array
+    public function reminderCatalog(?\Illuminate\Http\Request $request = null): array
     {
         $offsets = $this->reminderDays();
         $items = [];
 
-        foreach ($this->records() as $record) {
+        foreach ($this->records($request) as $record) {
             if (! $record['tracked'] || $record['closed']) {
                 continue;
             }
@@ -290,10 +290,13 @@ final class OversightService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function records(): array
+    private function records(?\Illuminate\Http\Request $request = null): array
     {
         $rows = [];
         foreach ($this->blob->allStatuses() as $status) {
+            if ($request !== null && ! app(\App\Services\Auth\DocumentAccess::class)->adminScope($request, $status)) {
+                continue;
+            }
             $documentId = (string) ($status['document_id'] ?? '');
             if ($documentId === '') {
                 continue;
@@ -304,6 +307,7 @@ final class OversightService
                 continue;
             }
 
+            if ($request !== null) $review = app(\App\Services\Auth\DocumentAccess::class)->sanitizeReferences($request, $review);
             $rows[] = $this->present($documentId, $review);
         }
 

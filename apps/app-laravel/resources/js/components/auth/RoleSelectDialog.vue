@@ -81,7 +81,7 @@ async function select(code: string): Promise<void> {
   try {
     if (code === 'super_admin') await auth.selectSuperAdmin();
     else await auth.selectUnit(code);
-    await router.push(targetPath());
+    window.location.assign(targetPath());
   }
   catch { await alertError('ไม่สามารถเลือกบทบาทการใช้งานได้ กรุณาลองอีกครั้ง'); }
   finally { busy.value = false; selected.value = ''; }

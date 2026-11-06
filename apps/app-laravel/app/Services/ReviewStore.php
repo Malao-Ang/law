@@ -86,6 +86,7 @@ class ReviewStore
             }
             $current['updated_at'] = now()->toIso8601String();
         });
+        Cache::forget('law-meta-list');
     }
 
     /**
@@ -129,6 +130,7 @@ class ReviewStore
         }
 
         $this->blob->delete($documentId);
+        Cache::forget('law-meta-list');
 
         return true;
     }
@@ -171,7 +173,6 @@ class ReviewStore
                 'uploaded_by' => $status['uploaded_by'] ?? null,
                 'responsible' => $status['responsible'] ?? null,
                 'owner_unit_code' => $status['owner_unit_code'] ?? null,
-                'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
@@ -989,6 +990,7 @@ class ReviewStore
             'law_meta' => [],
             'relations' => [],
         ];
+        Cache::forget('law-meta-list');
         $payload['revoked_document_ids'] = $revoked;
 
         return $payload;
@@ -1026,7 +1028,12 @@ class ReviewStore
             return [];
         }
 
-        return $this->sameLevelComponentIds($documentId, $targets);
+        $component = $this->sameLevelComponentIds($documentId, $targets);
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $component = array_values(array_filter($component, fn ($id) => $id === $documentId
+            || $access->allows(request(), 'edit', $this->getStatus($id) ?? [])));
+
+        return $component;
     }
 
     public function applySameLevelReplacement(string $documentId): array
@@ -2181,7 +2188,6 @@ class ReviewStore
             'access_scope' => 'public',
             'permission_group_ids' => [],
         ], $meta, [
-            'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
             'law_group' => $lawGroups[0] ?? '',
             'law_groups' => $lawGroups,
             'agency' => $agencies[0] ?? '',

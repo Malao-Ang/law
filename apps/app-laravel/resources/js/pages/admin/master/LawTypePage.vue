@@ -44,12 +44,20 @@
         />
         <v-select
           v-model="sourceFilter"
+          class="law-source-select"
           :disabled="reorderMode"
           :items="sourceOptions"
           variant="outlined"
           density="comfortable"
           hide-details
-        />
+        >
+          <template #selection="{ item }"><v-chip size="small" variant="tonal" color="primary" class="law-source-chip">{{ item.title }}</v-chip></template>
+          <template #item="{ props: itemProps, item }">
+            <v-list-item v-bind="itemProps" class="law-source-option">
+              <template #prepend><v-avatar size="28" rounded="sm" color="primary" class="me-2 text-caption font-weight-bold"><span v-if="item.value !== 'all'">{{ item.value === 'internal' ? 'ใน' : 'นอก' }}</span><v-icon v-else icon="mdi-view-grid-outline" size="16" /></v-avatar></template>
+            </v-list-item>
+          </template>
+        </v-select>
         <v-select
           v-model="activeFilter"
           :disabled="reorderMode"
@@ -149,7 +157,13 @@
             variant="outlined"
             :rules="[requiredRule]"
             :error-messages="fieldErrors['attrs.source']"
-          />
+          >
+            <template #item="{ props: itemProps, item }">
+              <v-list-item v-bind="itemProps" class="law-source-option">
+                <template #prepend><v-avatar size="28" rounded="sm" color="primary" class="me-2 text-caption font-weight-bold">{{ item.value === 'internal' ? 'ใน' : 'นอก' }}</v-avatar></template>
+              </v-list-item>
+            </template>
+          </v-select>
           <v-alert type="info" variant="tonal" density="compact" icon="mdi-format-list-numbered">
             หน่วยนับตามที่มา: {{ unitLabel(familyForm.source) }}
           </v-alert>
@@ -170,7 +184,7 @@
               v-model="familyForm.color"
               variant="outlined"
               density="compact"
-              hide-details
+              hide-details="auto"
               placeholder="#23469B"
               class="color-picker-field__input"
               :error-messages="fieldErrors['attrs.color']"
@@ -849,6 +863,8 @@ async function handleToggleType(type: MasterItem, next: boolean): Promise<void> 
   padding: 20px 22px 8px;
 }
 
+.law-source-select :deep(.v-field) { background: #eff6ff; }
+.law-source-chip { border-radius: 6px; font-weight: 600; }
 .dialog-head h2 {
   font-size: 18px;
   font-weight: 800;

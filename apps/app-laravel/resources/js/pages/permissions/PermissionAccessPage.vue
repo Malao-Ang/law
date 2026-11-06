@@ -14,7 +14,7 @@
       @next="saveAndPublish"
     />
 
-    <div :inert="!can.publish" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
+    <div :inert="!can.manage_permissions" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -251,6 +251,7 @@ async function showGroupDetail(groupId: string): Promise<void> {
 }
 
 async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Promise<void> {
+  if (!can.value.manage_permissions || groupSaving.value) return;
   groupSaving.value = true;
   try {
     const group = await createPermissionGroup(payload);
@@ -265,13 +266,16 @@ async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Pro
 }
 
 async function saveAndPublish(): Promise<void> {
+  if (!can.value.publish || documentStore.saving) return;
   documentStore.setSaveError();
 
-  const saved = await documentStore.saveLawMeta({
-    access_scope: scope.value,
-    permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
-  });
-  if (!saved) return;
+  if (can.value.manage_permissions) {
+    const saved = await documentStore.saveLawMeta({
+      access_scope: scope.value,
+      permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
+    });
+    if (!saved) return;
+  }
 
   if (isOld.value) {
     // Old docs: if status is still ร่าง/empty, just save permissions and go to edit page.
@@ -324,7 +328,7 @@ onMounted(async () => {
 
   scope.value = documentStore.review?.law_meta?.access_scope === 'private' ? 'private' : 'public';
   selectedGroupIds.value = [...(documentStore.review?.law_meta?.permission_group_ids ?? [])];
-  await loadPermissionResources();
+  if (documentStore.review?.can?.manage_permissions) await loadPermissionResources();
 });
 
 onBeforeUnmount(() => documentStore.reset());

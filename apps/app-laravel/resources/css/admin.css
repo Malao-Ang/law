@@ -15,7 +15,7 @@
 .v-theme--admin .v-field { border-radius: 6px; font-size: 14px; }
 .v-theme--admin .v-field__outline { --v-field-border-opacity: 1; color: #e2e8f0; }
 .v-theme--admin .v-field-label { color: #64748b; }
-.v-theme--admin .v-field--focused .v-field__outline { color: #1e3a8a; }
+.v-theme--admin .v-field--focused:not(.v-field--error):not(.v-field--disabled) .v-field__outline { color: #1e3a8a; }
 .v-theme--admin .v-field__input::placeholder { color: #94a3b8; opacity: 1; }
 .v-theme--admin .v-btn--variant-outlined { border-color: #e2e8f0; }
 /* Master status pills and switches, including teleported admin dialogs. */
@@ -58,4 +58,39 @@
 
 .v-theme--admin .v-pagination__item--is-active .v-btn .v-btn__overlay {
   opacity: 0;
+}
+
+/* Keep field state colors visible, including teleported date/select/dialog controls. */
+.v-theme--admin .v-field--error .v-field__outline { color: #dc2626; }
+.v-theme--admin .v-input--error :is(.v-messages, .v-field-label) { color: #dc2626; }
+.v-theme--admin .v-field--disabled { background: #f1f5f9; }
+.v-theme--admin .v-field--readonly:not(.v-field--error) { background: #f8fafc; }
+.v-theme--admin :is(.v-checkbox .v-selection-control, .v-radio, .v-checkbox-btn).v-selection-control--dirty:not(.v-selection-control--disabled):not(.v-selection-control--error) .v-icon { color: #1e3a8a; }
+.v-theme--admin :is(.v-checkbox, .v-radio, .v-checkbox-btn) .v-selection-control__input:has(input:focus-visible) { outline: 2px solid #1e3a8a; outline-offset: 2px; border-radius: 4px; }
+.v-theme--admin .v-field:not(.v-field--disabled):focus-within { --v-field-border-opacity: 1; }
+.v-theme--admin :is(.units-table, .members-table, .users-table) > .v-table__wrapper > table > thead > tr > th { background: rgba(239,246,255,.28); color: #64748b; font-size: 13px; font-weight: 600; }
+.v-theme--admin :is(.units-table, .members-table, .users-table) td { border-color: #e5e7eb; }
+.v-theme--admin .unit-code-chip { background: #eff6ff; color: #1e3a8a; border: 1px solid #dbeafe; border-radius: 4px; font-weight: 700; }
+.v-theme--admin .unit-dialog .v-card-title { color: #1e3a8a; font-weight: 700; }
+.v-theme--admin .unit-dialog .v-card-actions { background: #f8fafc; border-top: 1px solid #e2e8f0; }
+.v-theme--admin .law-source-option { border: 1px solid #e2e8f0; border-radius: 6px; }
+.v-theme--admin .law-source-option.v-list-item--active { border-color: #1e3a8a; background: #eff6ff; }
+
+/* Workflow inputs share the form palette without restyling document content. */
+@media screen {
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field { border-radius: 6px; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field:not(.v-field--error):not(.v-field--disabled) .v-field__outline { color: #e2e8f0; --v-field-border-opacity: 1; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field--focused:not(.v-field--error):not(.v-field--disabled) .v-field__outline { color: #1e3a8a; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field-label { color: #64748b; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field--disabled { background: #f1f5f9; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input--error :is(.v-field-label, .v-messages),
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-input .v-field--error .v-field__outline { color: #dc2626; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) :is(.v-checkbox .v-selection-control, .v-radio, .v-checkbox-btn).v-selection-control--dirty:not(.v-selection-control--disabled):not(.v-selection-control--error) .v-icon { color: #1e3a8a; }
+  :is(.app-shell__main--workflow-form, .lawspace-workflow-form) .v-selection-control__input:has(input:focus-visible) { outline: 2px solid #1e3a8a; outline-offset: 2px; border-radius: 4px; }
+  .lawspace-workflow-form .v-date-picker { border: 1px solid #e2e8f0; border-radius: 10px; }
+  .v-theme--admin :is(.unit-dialog, .user-detail) { border-radius: 16px; }
+  .v-theme--admin :is(.unit-dialog, .user-detail) .v-card-title { color: #1e3a8a; font-weight: 700; white-space: normal; overflow-wrap: anywhere; }
+  .v-theme--admin :is(.unit-dialog, .user-detail) .v-card-actions { background: #f8fafc; border-top: 1px solid #e2e8f0; }
+  .v-theme--admin .unit-dialog__actions { background: #f8fafc; box-shadow: 0 -1px #e2e8f0; }
+  .v-theme--admin .law-source-option:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 }

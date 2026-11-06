@@ -82,7 +82,7 @@ class UnitController extends Controller
     public function members(Request $request, string $code, MongoUserStore $users): JsonResponse
     {
         $actor = $this->authorizeUser($request);
-        abort_unless(($actor['is_super_admin'] ?? false) || in_array(MongoUserStore::unitRole($actor, $code), ['inner_admin', 'outer_admin'], true), 403, 'ไม่มีสิทธิ์ดูสมาชิกหน่วยงานนี้');
+        abort_unless(($actor['is_super_admin'] ?? false) || (request()->session()->get(CurrentUser::ACTIVE_UNIT_KEY) === $code && in_array(MongoUserStore::unitRole($actor, $code), ['inner_admin', 'outer_admin'], true)), 403, 'ไม่มีสิทธิ์ดูสมาชิกหน่วยงานนี้');
         abort_if($this->units->find($code) === null, 404, 'ไม่พบหน่วยงาน');
         return $this->membersResponse($code, $users);
     }
@@ -117,7 +117,7 @@ class UnitController extends Controller
         ]);
         $data['actions'] = $data['actions'] ?? [];
         abort_if($this->units->find($code) === null, 404, 'ไม่พบหน่วยงาน');
-        $member = $users->changeMembership($actor, $code, $username, $data, $ums->directoryPerson($username));
+        $member = $users->changeMembership($actor, $code, $username, $data, $users->find($username) === null ? $ums->directoryPerson($username) : null);
 
         return response()->json(['member' => $member]);
     }
@@ -180,7 +180,7 @@ class UnitController extends Controller
 
     private function authorizeMemberWrite(array $actor, string $code): void
     {
-        abort_unless(($actor['is_super_admin'] ?? false) || MongoUserStore::unitRole($actor, $code) === 'inner_admin', 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
+        abort_unless(($actor['is_super_admin'] ?? false) || MongoUserStore::unitRole($actor, $code) === 'inner_admin' && request()->session()->get(CurrentUser::ACTIVE_UNIT_KEY) === $code, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
     }
 
     private function validateUnit(Request $request, bool $create = false): array

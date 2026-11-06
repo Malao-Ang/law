@@ -38,11 +38,15 @@ const LawVersionsPage = () => import('../pages/law/LawVersionsPage.vue');
 const PublicShowRelationsPage = () => import('../pages/public/PublicShowRelationsPage.vue');
 const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
 
+const UsersPage = () => import('../pages/admin/UsersPage.vue');
+
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
   { path: '/select-unit', redirect: '/admin' },
   { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
+  { path: '/admin/users', name: 'admin-users', component: UsersPage, meta: { bareLayout: true } },
+  { path: '/admin/users/:username', name: 'admin-user', component: UsersPage, meta: { bareLayout: true } },
   { path: '/admin/units/:code', name: 'admin-unit-members', component: () => import('../pages/admin/UnitMembersPage.vue'), meta: { bareLayout: true } },
   { path: '/admin/units', name: 'admin-units', component: () => import('../pages/admin/UnitsPage.vue'), meta: { bareLayout: true } },
   { path: '/admin', name: 'admin', component: AdminDashboardPage, meta: { bareLayout: true } },
@@ -102,6 +106,11 @@ router.beforeEach(async (to) => {
     return auth.authEnforced && !auth.isAuthenticated
       ? { path: '/login', query: { redirect: to.fullPath } }
       : { path: '/' };
+  }
+
+  if (to.path === '/admin/users' || to.path.startsWith('/admin/users/')) {
+    if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } };
+    if (!auth.canManageUnits) return { path: '/' };
   }
 
   if (to.path === '/admin/audit-logs') {

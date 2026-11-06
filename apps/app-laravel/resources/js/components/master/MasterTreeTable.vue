@@ -42,9 +42,9 @@
             </td>
             <td :class="isEmptyTableValue(row.family.name) ? 'text-center' : 'text-start'">
               <span class="master-tree__dot" :style="{ background: row.color }" />
-              <span class="font-weight-bold">{{ tableValue(row.family.name) }}</span>
+              <v-chip size="small" variant="outlined" class="master-tree__family-chip">{{ tableValue(row.family.name) }}</v-chip>
             </td>
-            <td class="text-start">{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
+            <td class="text-start"><v-chip size="small" variant="outlined" color="primary">{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</v-chip></td>
             <td class="text-center font-weight-bold">
               <v-btn
                 size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
@@ -339,6 +339,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 .master-tree__code-chip {
   font-family: inherit;
 }
+.master-tree__family-chip { border-color: #dbeafe; background: #eff6ff; color: #1e3a8a; font-weight: 600; border-radius: 9999px; max-width: 100%; }
 
 .master-tree__dot {
   border-radius: 50%;

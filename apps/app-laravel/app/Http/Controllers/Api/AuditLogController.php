@@ -27,10 +27,56 @@ class AuditLogController extends Controller
         if ($user['is_super_admin'] ?? false) {
             return null;
         }
-        $codes = array_values(array_column(array_filter($user['memberships'] ?? [], fn ($m) => $m['role'] === 'inner_admin'), 'unit_code'));
+        $codes = array_values(array_column(array_filter($user['memberships'] ?? [], fn ($m) => $m['role'] === 'inner_admin' && $m['unit_code'] === $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY)), 'unit_code'));
         abort_if($codes === [], 403, 'ไม่มีสิทธิ์ดูประวัติการใช้งาน');
 
         return $codes;
+    }
+
+    private function filter(Request $request, array $input, ?array $units): array
+    {
+        $filter = $this->logs->filter($input, $units);
+        if ($units === null) return $filter;
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $blocked = [];
+        foreach (app(\App\Services\ReviewStore::class)->listLawMeta() as $document) {
+            if (! $access->adminScope($request, $document)) $blocked[] = $document['document_id'];
+        }
+        return $blocked === [] ? $filter : ['$and' => [$filter, ['document_id' => ['$nin' => $blocked]]]];
+    }
+
+    private function redact(Request $request, array $row): array
+    {
+        if ($this->current->user($request)['is_super_admin'] ?? false) return $row;
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $redact = function ($value) use (&$redact, $access, $request) {
+            if (! is_array($value)) return $value;
+            if (! empty($value['target_document_id'])) $value = $access->relatedRow($request, $value);
+            foreach ($value as $key => $item) $value[$key] = $redact($item);
+            return $value;
+        };
+        foreach (['before', 'after'] as $field) {
+            $row[$field] = $redact($row[$field] ?? []);
+            // AuditLogger stores dotted leaf paths; historical target identifiers may be absent from a diff.
+            foreach (array_keys($row[$field]) as $key) {
+                if (preg_match('/(^|\.)(relations|parent_document_id|parent_document_ids|repealed_laws|co_editors|co_editor_usernames)(\.|$)/', (string) $key)) unset($row[$field][$key]);
+            }
+        }
+        if (($row['resource'] ?? '') === 'relation') {
+            $review = app(\App\Services\Storage\MongoBlobStore::class)->read('review', $row['document_id'] ?? '');
+            $relation = collect($review['relations'] ?? [])->firstWhere('id', $row['resource_id']);
+            $target = $relation['target_document_id'] ?? null;
+            $document = is_string($target) ? $access->readDocument($target) : null;
+            $row['changes'] = [];
+            $row['before'] = $row['after'] = [];
+            $row['label'] = $document['title'] ?? 'เอกสารจำกัดสิทธิ์';
+            if ($document === null || ! $access->canRead($request, $document)) {
+                $row['label'] = 'เอกสารจำกัดสิทธิ์';
+                $row['changes'] = [];
+                $row['before'] = $row['after'] = [];
+            }
+        }
+        return $row;
     }
 
     private function input(Request $request): array
@@ -52,7 +98,8 @@ class AuditLogController extends Controller
     {
         $units = $this->scope($request);
         $input = $this->input($request);
-        $result = $this->logs->page($this->logs->filter($input, $units), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 25));
+        $result = $this->logs->page($this->filter($request, $input, $units), (int) ($input['page'] ?? 1), (int) ($input['per_page'] ?? 25));
+        $result['items'] = array_map(fn ($row) => $this->redact($request, $row), $result['items']);
         $result['units'] = array_values(array_filter(app(UnitStore::class)->all(), fn ($u) => $units === null || in_array($u['code'], $units, true)));
 
         return response()->json($result);
@@ -69,9 +116,9 @@ class AuditLogController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $units = $this->scope($request);
-        $filter = $this->logs->filter($this->input($request), $units);
+        $filter = $this->filter($request, $this->input($request), $units);
 
-        return response()->streamDownload(function () use ($filter): void {
+        return response()->streamDownload(function () use ($filter, $request): void {
             $previousCache = Settings::getCache();
             $cache = new AuditExportCache;
             Settings::setCache($cache);
@@ -83,6 +130,7 @@ class AuditLogController extends Controller
                 $sheet->fromArray($headers);
                 $line = 2;
                 foreach ($this->logs->rows($filter) as $row) {
+                    $row = $this->redact($request, $row);
                     $values = [$row['at'], $row['actor_username'] ?? '', $row['actor_name'], $this->roleLabel($row['actor_role']), $row['unit_code'] ?? '',
                         $row['action_label'], $row['resource_label'], $row['label'], $row['document_id'] ?? '', $row['summary'],
                         json_encode(['before' => $row['before'] ?? [], 'after' => $row['after'] ?? [], 'changes' => $row['changes']], JSON_UNESCAPED_UNICODE),

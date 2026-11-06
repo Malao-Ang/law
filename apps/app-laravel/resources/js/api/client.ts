@@ -153,7 +153,7 @@ export async function csrfHeaders(method: string): Promise<Record<string, string
 // Multiple workspaces load status, review and versions together.
 const readDeniedDialogs = new Map<string, Promise<void>>();
 async function documentReadDenied(url: string, message: string): Promise<void> {
-  const documentId = /^\/api\/documents\/([^/?]+)/.exec(new URL(url, window.location.origin).pathname)?.[1] ?? '';
+  const documentId = /^\/api\/(?:public\/)?documents\/([^/?]+)/.exec(new URL(url, window.location.origin).pathname)?.[1] ?? '';
   const existing = readDeniedDialogs.get(documentId);
   if (existing) return existing;
   const pending = (async () => {
@@ -170,12 +170,18 @@ async function documentReadDenied(url: string, message: string): Promise<void> {
   return pending;
 }
 
+export function documentReadUrl(path: string): string {
+  const publicPage = !/^\/(admin|documents)(\/|$)/.test(window.location.pathname);
+  return publicPage ? path.replace(/^\/api\/documents\//, '/api/public/documents/') : path;
+}
+
 export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
   const method = (init?.method ?? 'GET').toUpperCase();
   const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
 
-  const send = async (): Promise<Response> => fetch(input, {
+  const requestInput = method === 'GET' && typeof input === 'string' ? documentReadUrl(input) : input;
+  const send = async (): Promise<Response> => fetch(requestInput, {
     credentials: 'include',
     ...init,
     headers: {
@@ -212,7 +218,7 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     error.errors = payload?.errors;
 
     if (response.status === 403) {
-      if (method === 'GET' && new URL(url, window.location.origin).pathname.startsWith('/api/documents/')) {
+      if (method === 'GET' && /^\/api\/(?:public\/)?documents\//.test(new URL(url, window.location.origin).pathname)) {
         await documentReadDenied(url, error.message);
       } else {
         const { alertError } = await import('../components/master/masterDialogs');
@@ -252,15 +258,15 @@ export async function uploadDocument(
 }
 
 export function documentFileUrl(documentId: string): string {
-  return `/api/documents/${documentId}/file`;
+  return documentReadUrl(`/api/documents/${documentId}/file`);
 }
 
 export function documentFileDownloadUrl(documentId: string): string {
-  return `/api/documents/${encodeURIComponent(documentId)}/file?download=1`;
+  return documentReadUrl(`/api/documents/${encodeURIComponent(documentId)}/file?download=1`);
 }
 
 export function relatedDocumentFileUrl(documentId: string, targetDocumentId: string): string {
-  return `/api/documents/${encodeURIComponent(documentId)}/related/${encodeURIComponent(targetDocumentId)}/file?download=1`;
+  return documentReadUrl(`/api/documents/${encodeURIComponent(documentId)}/related/${encodeURIComponent(targetDocumentId)}/file?download=1`);
 }
 
 export interface ActiveChildLaw {
@@ -276,7 +282,7 @@ export function fetchActiveChildren(documentId: string): Promise<{ document_id: 
 }
 
 export function relatedDocumentsZipUrl(documentId: string): string {
-  return `/api/documents/${encodeURIComponent(documentId)}/related-download.zip`;
+  return documentReadUrl(`/api/documents/${encodeURIComponent(documentId)}/related-download.zip`);
 }
 
 export function fetchStatus(documentId: string): Promise<DocumentStatus> {
@@ -491,11 +497,11 @@ export function downloadPublishedPdf(
 }
 
 export function reviewPdfPreviewUrl(documentId: string): string {
-  return `/api/documents/${encodeURIComponent(documentId)}/export-pdf/preview`;
+  return documentReadUrl(`/api/documents/${encodeURIComponent(documentId)}/export-pdf/preview`);
 }
 
 export function signedEsignPdfUrl(documentId: string, download = false): string {
-  const path = `/api/documents/${encodeURIComponent(documentId)}/esign/signed-pdf`;
+  const path = documentReadUrl(`/api/documents/${encodeURIComponent(documentId)}/esign/signed-pdf`);
   return download ? `${path}?download=1` : `${path}?redirect=1`;
 }
 
@@ -752,7 +758,7 @@ export function fetchReportSummary(filters: ReportFilters = {}): Promise<ReportS
   for (const a of filters.agency ?? []) params.append('agency[]', a);
 
   const qs = params.toString();
-  return jsonRequest<ReportSummary>(`/api/reports/summary${qs ? `?${qs}` : ''}`);
+  return jsonRequest<ReportSummary>(`${!/^\/(admin|documents)(\/|$)/.test(window.location.pathname) ? '/api/public' : '/api'}/reports/summary${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchPermissionDirectory(): Promise<PermissionDirectoryResponse> {
