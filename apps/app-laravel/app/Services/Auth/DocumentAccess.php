@@ -64,6 +64,22 @@ class DocumentAccess
         return array_intersect($codes, $allowedUnits) !== [] || in_array($username, $allowedUsers, true);
     }
 
+    /**
+     * Admin document list scope: Super Admin sees everything, a user working in a unit sees only that unit's documents,
+     * a signed-in user without an active unit sees only documents they uploaded or are responsible for.
+     */
+    public function inWorkingScope(Request $request, array $document): bool
+    {
+        $actor = $this->current->user($request);
+        if ($actor === null) return ! config('auth_ldap.enforced');
+        if ($actor['is_super_admin'] ?? false) return true;
+        $active = $request->hasSession() ? $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY) : null;
+        if (is_string($active) && $active !== '') return ($document['owner_unit_code'] ?? null) === $active;
+        $username = $actor['username'];
+        return ($document['uploaded_by']['username'] ?? null) === $username
+            || ($document['responsible']['username'] ?? null) === $username;
+    }
+
     public function authorizeRead(Request $request, array $document): void
     {
         if ($this->canRead($request, $document)) return;

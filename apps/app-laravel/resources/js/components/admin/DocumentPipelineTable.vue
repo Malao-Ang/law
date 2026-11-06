@@ -67,10 +67,7 @@
       </template>
 
       <template #item.ownership="{ item }">
-        <div class="text-caption">ผู้อัปโหลด: {{ item.uploadedBy }}</div>
-        <div class="text-caption">ผู้รับผิดชอบ: {{ item.responsible }}</div>
-        <div v-if="item.coEditors" class="text-caption">ผู้รับผิดชอบร่วม: {{ item.coEditors }}</div>
-        <div class="text-caption">หน่วยงาน: {{ item.ownerUnitCode }}</div>
+        <span class="text-body-2">{{ item.uploadedBy }}</span>
       </template>
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
@@ -247,7 +244,6 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
-  { title: 'เจ้าของเอกสาร', key: 'ownership', sortable: false },
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
   { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
@@ -255,6 +251,7 @@ const headers = [
   { title: 'สถานะบังคับใช้', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
   { title: 'การเข้าถึง', key: 'access', sortable: false, align: 'center' as const, width: 100 },
   { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
+  { title: 'ผู้อัปโหลด', key: 'ownership', sortable: false, width: 180 },
   { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 170 },
 ];
 
