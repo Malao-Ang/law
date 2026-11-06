@@ -61,6 +61,30 @@
             prepend-inner-icon="mdi-file-tree"
             :loading="catalogLoading"
           />
+          <v-alert
+            v-if="showAmendedChildrenWarning"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            แจ้งเตือนถ้ากฎหมายฉบับนี้ถูกแก้ไข ถ้ากฎหมายลูกที่บังคับใช้
+            <ul class="mt-1">
+              <li v-for="child in activeChildren" :key="child.document_id">{{ child.title }}</li>
+            </ul>
+          </v-alert>
+          <v-alert
+            v-if="repealedParentTitles.length"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            แจ้งเตือนให้ตรวจสอบกฎหมายลูก เมื่อกฎหมายแม่ถูกยกเลิก
+            <ul class="mt-1">
+              <li v-for="title in repealedParentTitles" :key="title">{{ title }}</li>
+            </ul>
+          </v-alert>
         </v-card>
 
         <!-- Document-level edges -->
@@ -217,6 +241,7 @@
       :existing-relations="relations"
       :section-labels="sectionLabels"
       :change-status="changeStatus"
+      :detail-source="detailSource"
       @close="closeRelationDialog"
       @save="onRelationSave"
     />
@@ -230,6 +255,7 @@ import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import { listDocuments } from '../../api/client';
+import { useRelationWarnings } from '../../composables/useRelationWarnings';
 import type { DocumentListItem, LawRelation, RelationScope, RelationType } from '../../types/document';
 import { isCouncilAnnouncementType, isUniversityAnnouncementType, parentDocumentsForChildType } from '../../composables/useLawCatalog';
 import { buildSections, documentRelations, relationsForSection, type LawSection } from '../../composables/useLawSections';
@@ -239,11 +265,10 @@ import {
   formatRelationTarget,
   relationTypeLabel,
   uniqueRelationChangeDetails,
-  changeDetailMeta,
-  normalizeChangeDetail,
   proclamationDueLabel,
 } from '../../types/lawRelation';
 import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useLawType } from '../../composables/useLawType';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
@@ -254,7 +279,17 @@ const router = useRouter();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 const changeStatusCS = useChangeStatus();
+const relationWarnings = useRelationWarnings();
+const activeChildren = relationWarnings.activeChildren;
+const { typeSource } = useLawType();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+const detailSource = computed<'internal' | 'external'>(() =>
+  typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
+);
+
+function changeDetailMeta(detail: string | null | undefined) {
+  return changeStatusCS.detailMeta(detail);
+}
 
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);
@@ -280,6 +315,16 @@ const hasSectionCancelDetail = computed(() =>
 );
 const isWholeDocumentChange = computed(() => changeStatusCS.isWhole(changeStatus.value ?? ''));
 const isSectionChange = computed(() => changeStatusCS.isSection(changeStatus.value ?? ''));
+const showAmendedChildrenWarning = computed(() => relationWarnings.showAmendedChildrenWarning(changeStatus.value));
+const repealedParentTitles = computed(() => relationWarnings.repealedParentTitles(
+  parentIds.value.map((id) => {
+    const doc = catalog.value.find((item) => item.document_id === id) as (typeof catalog.value[number] & { meta_status?: string | null }) | undefined;
+    return {
+      title: doc?.title ?? id,
+      status: doc?.meta_status || doc?.law_status,
+    };
+  }),
+));
 const showDocumentRelations = computed(() => !isSectionChange.value);
 const showSectionRelations = computed(() => isSectionChange.value);
 const suggestedRelationType = computed<RelationType | undefined>(() => {
@@ -376,7 +421,7 @@ function closeRelationDialog(): void {
 function persistRelations(next: LawRelation[]): Promise<boolean> {
   return documentStore.saveRelations(
     next,
-    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next) } : undefined,
+    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next, (detail) => changeStatusCS.normalizeDetail(detail) || null) } : undefined,
   );
 }
 
@@ -420,6 +465,7 @@ async function saveAndEsign(): Promise<void> {
 
 onMounted(async () => {
   await documentStore.fetch(props.documentId);
+  void relationWarnings.load(props.documentId);
   const meta = documentStore.review?.law_meta;
   parentIds.value = meta?.parent_document_ids?.length
     ? [...meta.parent_document_ids]

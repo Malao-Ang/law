@@ -2007,6 +2007,23 @@ class ReviewStore
         ];
     }
 
+    private function normalizeRelationChangeDetail(mixed $value): ?string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $resolved = app(ChangeStatuses::class)->resolveDetail($raw);
+        if ($resolved === null) {
+            return $raw;
+        }
+
+        $code = trim((string) ($resolved['code'] ?? ''));
+
+        return $code !== '' ? $code : $raw;
+    }
+
     /**
      * @param  array<string, mixed>  $document
      */
@@ -2069,7 +2086,7 @@ class ReviewStore
                 'target_block_id' => trim((string) ($entry['target_block_id'] ?? '')) ?: null,
                 'note' => trim((string) ($entry['note'] ?? '')) ?: null,
                 'url' => trim((string) ($entry['url'] ?? '')) ?: null,
-                'change_detail' => trim((string) ($entry['change_detail'] ?? '')) ?: null,
+                'change_detail' => $this->normalizeRelationChangeDetail($entry['change_detail'] ?? null),
                 'requires_new_proclamation' => $requiresProclamation,
                 'proclamation_scope' => $requiresProclamation ? $proclamationScope : null,
                 'proclamation_sections' => $proclamationSections,

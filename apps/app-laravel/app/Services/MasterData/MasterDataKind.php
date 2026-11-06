@@ -49,15 +49,15 @@ enum MasterDataKind: string
 
     public function deletable(): bool
     {
-        return $this !== self::ChangeDetail;
+        return true;
     }
 
     /**
-     * Kinds that drive relation logic (relation graph, same-level replacement) are view-only.
+     * Seed rows stay locked in the store. New change statuses and details are writable.
      */
     public function readOnly(): bool
     {
-        return $this === self::ChangeDetail;
+        return false;
     }
 
     public function label(): string
@@ -491,7 +491,17 @@ enum MasterDataKind: string
                 'attrs.family_code' => ['required', 'string', 'max:32'],
             ],
             self::LawCategory => [],
-            self::ChangeStatus, self::ChangeDetail => [],
+            self::ChangeStatus => [
+                'attrs.source' => ['sometimes', 'string', 'in:internal,external,both'],
+                'attrs.has_details' => ['sometimes', 'boolean'],
+                'attrs.role' => ['sometimes', 'string', 'in:new,whole,section,general'],
+            ],
+            self::ChangeDetail => [
+                'attrs.source' => ['sometimes', 'string', 'in:internal,external,both'],
+                'attrs.role' => ['sometimes', 'string', 'in:repeals,amends'],
+                'attrs.color' => ['nullable', 'string', 'in:error,success,teal,warning,info,primary,deep-purple,orange-darken-2'],
+                'attrs.icon' => ['nullable', 'string', 'max:64'],
+            ],
             self::LegalStructure => [
                 'attrs.family_codes' => ['nullable', 'array'],
                 'attrs.family_codes.*' => ['string', 'max:32'],
