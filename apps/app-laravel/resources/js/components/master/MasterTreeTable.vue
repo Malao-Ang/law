@@ -87,7 +87,7 @@
                   <template #activator="{ props: tipProps }">
                     <v-btn
                       v-bind="tipProps"
-                      icon="mdi-plus" size="small" variant="tonal" color="admin-primary"
+                      icon="mdi-plus" size="small" variant="text" color="admin-primary"
                       :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
                       :disabled="row.family.attrs.has_subtypes === false || pendingCodes?.has(row.family.code)"
                       :loading="pendingCodes?.has(row.family.code)"
