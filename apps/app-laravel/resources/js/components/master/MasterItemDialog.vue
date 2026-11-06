@@ -137,12 +137,18 @@ const maxWidth = computed(() => Math.min(Number(props.maxWidth) || 672, 672));
 const basicSectionTitle = computed(() => props.basicSectionTitle ?? 'ข้อมูลพื้นฐาน');
 const requiredRule = (value: string) => !!value?.trim() || 'กรุณากรอกข้อมูล';
 
-watch(() => [props.modelValue, props.item] as const, () => {
+function defaultAttrs(kind?: MasterKind): UpsertMasterItemPayload['attrs'] {
+  if (kind === 'change_status') return { source: 'both', role: 'section', has_details: true };
+  if (kind === 'change_detail') return { source: 'both', role: 'amends', color: 'teal', icon: 'mdi-pencil' };
+  return {};
+}
+
+watch(() => [props.modelValue, props.item, props.kind] as const, () => {
   if (!props.modelValue) return;
   form.name = props.item?.name ?? '';
   form.description = props.item?.description ?? '';
   form.is_active = props.item?.is_active ?? false;
-  form.attrs = { ...(props.item?.attrs ?? {}) };
+  form.attrs = { ...(props.item?.attrs ?? defaultAttrs(props.kind)) };
 }, { immediate: true });
 
 function onActiveChange(value: unknown): void {

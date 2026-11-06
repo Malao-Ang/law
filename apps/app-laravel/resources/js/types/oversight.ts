@@ -51,6 +51,53 @@ export interface OversightSummary {
   items: OversightItem[];
 }
 
+export interface OversightMailTemplate {
+  subject: string;
+  body: string;
+  link_label: string;
+  reminder_days: number[];
+}
+
+export interface OversightMailHit {
+  label: string;
+  date: string;
+  display_date: string;
+  days_left: number;
+  sent_key?: string;
+}
+
+export interface OversightMailItem {
+  document_id: string;
+  title: string;
+  emails: string[];
+  due_now: boolean;
+  already_sent: boolean;
+  hits: OversightMailHit[];
+}
+
+export interface OversightMailPlaceholder {
+  token: string;
+  label: string;
+  fields: string;
+}
+
+export interface OversightMailSettings {
+  template: OversightMailTemplate;
+  defaults: OversightMailTemplate;
+  placeholders: OversightMailPlaceholder[];
+  reminder_days: number[];
+  pending_count: number;
+  items: OversightMailItem[];
+}
+
+export interface OversightMailSendResult {
+  sent: number;
+  failed: { document_id: string; title: string; message: string }[];
+  document_id?: string;
+  title?: string;
+  emails?: string[];
+}
+
 export interface OversightUpdatePayload {
   status: string;
   publish_due_date: string | null;

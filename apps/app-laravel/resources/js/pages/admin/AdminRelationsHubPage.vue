@@ -245,6 +245,31 @@
               {{ documentStore.saveError }}
             </v-alert>
 
+            <v-alert
+              v-if="showAmendedChildrenWarning"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนถ้ากฎหมายฉบับนี้ถูกแก้ไข ถ้ากฎหมายลูกที่บังคับใช้
+              <ul class="mt-1">
+                <li v-for="child in activeChildren" :key="child.document_id">{{ child.title }}</li>
+              </ul>
+            </v-alert>
+            <v-alert
+              v-if="repealedParentTitles.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนให้ตรวจสอบกฎหมายลูก เมื่อกฎหมายแม่ถูกยกเลิก
+              <ul class="mt-1">
+                <li v-for="title in repealedParentTitles" :key="title">{{ title }}</li>
+              </ul>
+            </v-alert>
+
             <!-- Document-level relations -->
             <div class="rh-section-title mb-3">
               <v-icon icon="mdi-link-variant" color="admin-primary" size="16" />
@@ -260,6 +285,15 @@
                   {{ relationTypeLabel(rel.type) }}
                 </v-chip>
                 <span class="text-body-2 text-truncate flex-1">{{ formatRelationTarget(rel) }}</span>
+                <v-chip
+                  v-if="proclamationDueLabel(rel)"
+                  size="x-small"
+                  color="warning"
+                  variant="tonal"
+                  prepend-icon="mdi-bullhorn-outline"
+                >
+                  {{ proclamationDueLabel(rel) }}
+                </v-chip>
                 <v-btn icon variant="text" size="x-small" color="error" :disabled="documentStore.saving" @click="removeRelation(rel)">
                   <v-icon icon="mdi-delete-outline" size="15" />
                 </v-btn>
@@ -289,6 +323,15 @@
                       {{ relationTypeLabel(rel.type) }}
                     </v-chip>
                     <span class="text-body-2 text-truncate flex-1">{{ formatRelationTarget(rel) }}</span>
+                    <v-chip
+                      v-if="proclamationDueLabel(rel)"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      prepend-icon="mdi-bullhorn-outline"
+                    >
+                      {{ proclamationDueLabel(rel) }}
+                    </v-chip>
                     <v-chip
                       v-if="changeDetailMeta(rel.change_detail)"
                       size="x-small"
@@ -368,6 +411,7 @@
       :existing-relations="relations"
       :section-labels="sectionLabels"
       :change-status="documentStore.review?.law_meta?.change_status"
+      :detail-source="detailSource"
       @close="closeRelationDialog"
       @save="onRelationAdd"
     />
@@ -388,21 +432,40 @@ import {
   formatRelationTarget,
   relationTypeLabel,
   uniqueRelationChangeDetails,
-  changeDetailMeta,
+  proclamationDueLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { useLawType } from '../../composables/useLawType';
+import { createLawTypeCatalog, useLawType } from '../../composables/useLawType';
 import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useRelationWarnings } from '../../composables/useRelationWarnings';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
 const lawTypes = useLawType();
-const { typeLabel } = lawTypes;
+const { typeLabel, typeSource } = lawTypes;
 const changeStatusCS = useChangeStatus();
+const relationWarnings = useRelationWarnings();
+const activeChildren = relationWarnings.activeChildren;
+const showAmendedChildrenWarning = computed(() =>
+  relationWarnings.showAmendedChildrenWarning(documentStore.review?.law_meta?.change_status),
+);
+const repealedParentTitles = computed(() => relationWarnings.repealedParentTitles(
+  quickEditParentIds.value.map((id) => {
+    const doc = summary.value.documents.find((item) => item.id === id);
+    return { title: doc?.title ?? id, status: doc?.meta_status };
+  }),
+));
+const detailSource = computed<'internal' | 'external'>(() =>
+  typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
+);
+
+function changeDetailMeta(detail: string | null | undefined) {
+  return changeStatusCS.detailMeta(detail);
+}
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {
@@ -631,6 +694,7 @@ async function openQuickEdit(doc: DocRow): Promise<void> {
   quickEditOpen.value = true;
   documentStore.reset();
   await documentStore.fetch(doc.id);
+  void relationWarnings.load(doc.id);
   // Seed pending relations from the loaded document
   pendingRelations.value = [...(documentStore.review?.relations ?? [])];
 }
@@ -672,7 +736,7 @@ async function confirmSave(): Promise<void> {
   const ok = await documentStore.saveRelations(
     pendingRelations.value,
     isSectionEditionChange(changeStatus)
-      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value) }
+      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value, (detail) => changeStatusCS.normalizeDetail(detail) || null) }
       : undefined,
   );
   if (ok) {

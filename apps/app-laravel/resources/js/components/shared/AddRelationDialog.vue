@@ -45,18 +45,23 @@
               <div class="existing-relations__target">
                 {{ formatRelationTarget(relation) }}
               </div>
-              <div v-if="changeDetailMeta(relation.change_detail)" class="d-flex">
+              <div v-if="detailChip(relation.change_detail)" class="d-flex">
                 <v-chip
                   size="x-small"
-                  :color="changeDetailMeta(relation.change_detail)?.color"
+                  :color="detailChip(relation.change_detail)?.color || 'teal'"
                   variant="tonal"
-                  :prepend-icon="changeDetailMeta(relation.change_detail)?.icon"
+                  :prepend-icon="detailChip(relation.change_detail)?.icon || 'mdi-pencil'"
                 >
-                  {{ changeDetailMeta(relation.change_detail)?.title }}
+                  {{ detailChip(relation.change_detail)?.title }}
                 </v-chip>
               </div>
               <div v-if="relation.note" class="text-caption text-medium-emphasis">
                 {{ relation.note }}
+              </div>
+              <div v-if="proclamationDueLabel(relation)">
+                <v-chip size="x-small" color="warning" variant="tonal" prepend-icon="mdi-bullhorn-outline">
+                  {{ proclamationDueLabel(relation) }}
+                </v-chip>
               </div>
             </div>
           </div>
@@ -71,11 +76,11 @@
           <div class="text-caption font-weight-bold text-medium-emphasis mb-2">รายละเอียดการเปลี่ยนแปลง *</div>
           <v-chip-group v-model="changeDetail" mandatory>
             <v-chip
-              v-for="item in SECTION_CHANGE_DETAILS"
-              :key="item.value"
-              :value="item.value"
-              :color="item.color"
-              :prepend-icon="item.icon"
+              v-for="item in detailChoices"
+              :key="item.code"
+              :value="item.code"
+              :color="item.color || 'teal'"
+              :prepend-icon="item.icon || 'mdi-pencil'"
               filter
             >
               {{ item.title }}
@@ -138,6 +143,55 @@
           placeholder="ไม่บังคับ"
           class="mt-4"
         />
+
+        <v-checkbox
+          v-model="requiresNewProclamation"
+          label="ต้องออกประกาศฉบับใหม่"
+          color="admin-primary"
+          hide-details
+          density="comfortable"
+          class="mt-2"
+        />
+        <template v-if="requiresNewProclamation">
+          <div class="text-caption font-weight-bold text-medium-emphasis mt-2 mb-1">ขอบเขตที่ต้องออกประกาศ</div>
+          <v-btn-toggle v-model="proclamationScope" mandatory density="comfortable" divided class="mb-3">
+            <v-btn value="whole" class="text-none">ทั้งฉบับ</v-btn>
+            <v-btn value="sections" class="text-none">บางข้อ</v-btn>
+          </v-btn-toggle>
+          <v-textarea
+            v-if="proclamationScope === 'sections'"
+            v-model="proclamationSectionsText"
+            label="ข้อที่ต้องออกประกาศ"
+            placeholder="เช่น ข้อ ๕, ข้อ ๗"
+            hint="คั่นแต่ละข้อด้วยจุลภาคหรือขึ้นบรรทัดใหม่"
+            persistent-hint
+            rows="2"
+            auto-grow
+            variant="outlined"
+            density="comfortable"
+            class="mb-2"
+          />
+          <v-text-field
+            v-model="proclamationDueDate"
+            type="date"
+            label="ต้องออกประกาศภายในวันที่"
+            variant="outlined"
+            density="comfortable"
+            class="mt-2"
+            :hint="dueHint"
+            persistent-hint
+          />
+          <v-text-field
+            v-model="proclamationIssuedOn"
+            type="date"
+            label="ออกประกาศแล้วเมื่อ (ไม่บังคับ)"
+            variant="outlined"
+            density="comfortable"
+            class="mt-2"
+            hint="ถ้าระบุวันนี้ ระบบจะไม่แจ้งเตือนซ้ำ ระบบจะหยุดเองด้วยเมื่อมีกฎหมายฉบับใหม่ที่อ้างฉบับนี้และมีผลบังคับใช้แล้ว กรณีบางข้อต้องผูกครบทุกข้อที่ระบุ"
+            persistent-hint
+          />
+        </template>
       </v-card-text>
 
       <v-card-actions class="pa-4 ga-2">
@@ -155,11 +209,8 @@ import type { LawRelation, LawRelationTarget, RelationScope, RelationType } from
 import {
   RELATION_TYPE_COLORS,
   RELATION_TYPE_ICONS,
-  SECTION_CHANGE_DETAILS,
-  changeDetailMeta,
   formatRelationTarget,
-  normalizeChangeDetail,
-  relationTypeFromChangeDetail,
+  proclamationDueLabel,
   relationTypeLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
@@ -178,6 +229,7 @@ const props = defineProps<{
   existingRelations?: LawRelation[];
   sectionLabels?: Record<string, string>;
   changeStatus?: string | null;
+  detailSource?: 'internal' | 'external' | null;
 }>();
 
 const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
@@ -185,12 +237,26 @@ const emit = defineEmits<{ close: []; save: [relation: LawRelation] }>();
 const mode = ref<'picker' | 'text'>('picker');
 const pickerTarget = ref<LawRelationTarget | null>(null);
 const changeDetail = ref<string | null>(null);
+const requiresNewProclamation = ref(false);
+const proclamationScope = ref<'whole' | 'sections'>('whole');
+const proclamationSectionsText = ref('');
+const proclamationDueDate = ref('');
+const proclamationIssuedOn = ref('');
 const existingRelations = computed(() => props.existingRelations ?? []);
 const allowFreeText = computed(() => !props.catalogMode || props.catalogMode === 'all');
 const _cs = useChangeStatus();
 const showChangeDetails = computed(() =>
-  props.scope === 'section' && _cs.isSection(props.changeStatus ?? ''),
+  props.scope === 'section'
+  && _cs.isSection(props.changeStatus ?? '')
+  && _cs.hasDetails(props.changeStatus ?? ''),
 );
+const detailChoices = computed(() =>
+  _cs.detailOptions(props.detailSource ?? undefined).filter((item) => item.role === 'repeals' || item.role === 'amends'),
+);
+
+function detailChip(detail: string | null | undefined) {
+  return _cs.detailMeta(detail);
+}
 
 const form = ref<LawRelation>({
   id: createClientId('relation'),
@@ -204,6 +270,23 @@ const form = ref<LawRelation>({
   note: null,
   url: null,
   change_detail: null,
+  requires_new_proclamation: false,
+  proclamation_scope: null,
+  proclamation_sections: [],
+  proclamation_due_date: null,
+  proclamation_issued_on: null,
+});
+
+const dueHint = computed(() => {
+  if (!proclamationDueDate.value) return 'ระบุวันที่ที่ต้องออกประกาศ ระบบจะใช้วันนี้แจ้งเตือนจนกว่าจะออกประกาศแล้ว';
+  const due = new Date(`${proclamationDueDate.value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (Number.isNaN(days)) return 'ระบุวันที่ที่ต้องออกประกาศ';
+  if (days < 0) return `เกินกำหนด ${Math.abs(days).toLocaleString('th-TH')} วัน และจะถูกใส่ในอีเมลแจ้งเตือน`;
+  if (days === 0) return 'ต้องออกภายในวันนี้ และจะถูกใส่ในอีเมลแจ้งเตือน';
+  return `ต้องออกภายใน ${days.toLocaleString('th-TH')} วัน และจะถูกใส่ในอีเมลแจ้งเตือน`;
 });
 
 const dialogTitle = computed(() => {
@@ -213,6 +296,8 @@ const dialogTitle = computed(() => {
 
 const canSave = computed(() => {
   if (showChangeDetails.value && !(changeDetail.value?.trim())) return false;
+  if (requiresNewProclamation.value && !proclamationDueDate.value) return false;
+  if (requiresNewProclamation.value && proclamationScope.value === 'sections' && proclamationSectionList().length === 0) return false;
   if (mode.value === 'text') {
     if (props.requireSection && !(form.value.target_section?.trim())) return false;
     return form.value.target_title.trim() !== '';
@@ -222,9 +307,18 @@ const canSave = computed(() => {
   return true;
 });
 
+watch(requiresNewProclamation, (checked) => {
+  if (!checked) {
+    proclamationDueDate.value = '';
+    proclamationIssuedOn.value = '';
+    proclamationSectionsText.value = '';
+    proclamationScope.value = 'whole';
+  }
+});
+
 watch(changeDetail, (detail) => {
-  const nextType = relationTypeFromChangeDetail(detail);
-  if (nextType) form.value.type = nextType;
+  const role = _cs.detailRole(detail);
+  if (role === 'repeals' || role === 'amends') form.value.type = role;
 });
 
 function relationSourceLabel(relation: LawRelation): string {
@@ -269,8 +363,22 @@ function save(): void {
     target_document_id: form.value.target_document_id || null,
     url: form.value.url?.trim() || null,
     note: form.value.note?.trim() || null,
-    change_detail: showChangeDetails.value ? normalizeChangeDetail(changeDetail.value) : null,
+    change_detail: showChangeDetails.value ? (_cs.normalizeDetail(changeDetail.value) || null) : null,
+    requires_new_proclamation: requiresNewProclamation.value && proclamationDueDate.value !== '' && (proclamationScope.value !== 'sections' || proclamationSectionList().length > 0),
+    proclamation_scope: requiresNewProclamation.value ? proclamationScope.value : null,
+    proclamation_sections: requiresNewProclamation.value && proclamationScope.value === 'sections' ? proclamationSectionList() : [],
+    proclamation_due_date: requiresNewProclamation.value ? proclamationDueDate.value || null : null,
+    proclamation_issued_on: requiresNewProclamation.value ? proclamationIssuedOn.value || null : null,
   });
+}
+
+function proclamationSectionList(): string[] {
+  const seen: string[] = [];
+  for (const part of proclamationSectionsText.value.split(/[,،\n]+/)) {
+    const text = part.trim();
+    if (text !== '' && !seen.includes(text)) seen.push(text);
+  }
+  return seen;
 }
 </script>
 

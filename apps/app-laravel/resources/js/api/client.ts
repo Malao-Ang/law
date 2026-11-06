@@ -21,7 +21,7 @@
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
-import type { OversightSummary, OversightUpdatePayload, OversightItem } from '../types/oversight';
+import type { OversightSummary, OversightUpdatePayload, OversightItem, OversightMailSettings, OversightMailTemplate, OversightMailSendResult } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
 import type { AuditLogResponse } from '../types/auditLog';
 
@@ -101,6 +101,21 @@ export type LookupData = {
   law_sources: SelectableOption[];
 };
 
+function actorHeaders(): Record<string, string> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('elaw_mock_auth');
+    if (!raw) return {};
+    const user = JSON.parse(raw) as { name?: string; role?: string };
+    const headers: Record<string, string> = {};
+    if (user.name) headers['X-Actor-Name'] = encodeURIComponent(user.name);
+    if (user.role) headers['X-Actor-Role'] = encodeURIComponent(user.role);
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -166,6 +181,7 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     headers: {
       Accept: 'application/json',
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...actorHeaders(),
       ...(await csrfHeaders(method)),
       ...(init?.headers ?? {}),
     },
@@ -798,6 +814,24 @@ export function fetchAuditLogs(params: AuditLogFilters = {}): Promise<AuditLogRe
 
 export function fetchOversightSummary(): Promise<OversightSummary> {
   return jsonRequest<OversightSummary>('/api/oversight/summary');
+}
+
+export function fetchOversightMail(): Promise<OversightMailSettings> {
+  return jsonRequest<OversightMailSettings>('/api/oversight/mail');
+}
+
+export function saveOversightMail(payload: OversightMailTemplate): Promise<{ template: OversightMailTemplate }> {
+  return jsonRequest<{ template: OversightMailTemplate }>('/api/oversight/mail', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function sendOversightMail(documentId?: string): Promise<OversightMailSendResult> {
+  return jsonRequest<OversightMailSendResult>('/api/oversight/mail/send', {
+    method: 'POST',
+    body: JSON.stringify(documentId ? { document_id: documentId } : {}),
+  });
 }
 
 export function saveOversight(documentId: string, payload: OversightUpdatePayload): Promise<OversightItem> {

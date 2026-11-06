@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\MinioTestController;
 use App\Http\Controllers\Api\EsignCallbackController;
@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\LawSuggestController;
 use App\Http\Controllers\Api\LookupController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\OversightController;
+use App\Http\Controllers\Api\OversightMailController;
 use App\Http\Controllers\Api\PermissionDirectoryController;
 use App\Http\Controllers\Api\PermissionGroupController;
 use App\Http\Controllers\Api\PipelineCallbackController;
@@ -60,6 +61,9 @@ Route::get('/users/search', \App\Http\Controllers\Api\UserSearchController::clas
 
 Route::get('/reports/summary', [ReportController::class, 'summary']);
 Route::get('/oversight/summary', [OversightController::class, 'summary'])->middleware('auth.session');
+Route::get('/oversight/mail', [OversightMailController::class, 'show'])->middleware('auth.session');
+Route::put('/oversight/mail', [OversightMailController::class, 'update'])->middleware('auth.session');
+Route::post('/oversight/mail/send', [OversightMailController::class, 'send'])->middleware('auth.session');
 Route::put('/oversight/{documentId}', [OversightController::class, 'update'])->middleware('auth.session');
 Route::post('/laws/search', [LawSearchController::class, 'search']);
 Route::get('/laws/facets', [LawSearchController::class, 'facets']);

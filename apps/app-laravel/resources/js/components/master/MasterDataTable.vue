@@ -80,7 +80,7 @@
                   />
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="!readonly && kind !== 'change_status'" text="แก้ไข" location="top">
+              <v-tooltip v-if="canEdit(item)" text="แก้ไข" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
@@ -159,6 +159,12 @@ defineEmits<{
   toggle: [item: MasterItem, next: boolean];
   'update:page': [page: number];
 }>();
+
+function canEdit(item: MasterItem): boolean {
+  if (props.readonly) return false;
+  if ((props.kind === 'change_status' || props.kind === 'change_detail') && item.is_system) return false;
+  return true;
+}
 
 const offset = computed(() => (props.page - 1) * props.perPage);
 const from = computed(() => (props.total === 0 ? 0 : offset.value + 1));
