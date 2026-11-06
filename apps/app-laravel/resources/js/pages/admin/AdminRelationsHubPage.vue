@@ -259,6 +259,15 @@
                   {{ relationTypeLabel(rel.type) }}
                 </v-chip>
                 <span class="text-body-2 text-truncate flex-1">{{ formatRelationTarget(rel) }}</span>
+                <v-chip
+                  v-if="proclamationDueLabel(rel)"
+                  size="x-small"
+                  color="warning"
+                  variant="tonal"
+                  prepend-icon="mdi-bullhorn-outline"
+                >
+                  {{ proclamationDueLabel(rel) }}
+                </v-chip>
                 <v-btn icon variant="text" size="x-small" color="error" :disabled="documentStore.saving" @click="removeRelation(rel)">
                   <v-icon icon="mdi-delete-outline" size="15" />
                 </v-btn>
@@ -288,6 +297,15 @@
                       {{ relationTypeLabel(rel.type) }}
                     </v-chip>
                     <span class="text-body-2 text-truncate flex-1">{{ formatRelationTarget(rel) }}</span>
+                    <v-chip
+                      v-if="proclamationDueLabel(rel)"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      prepend-icon="mdi-bullhorn-outline"
+                    >
+                      {{ proclamationDueLabel(rel) }}
+                    </v-chip>
                     <v-chip
                       v-if="changeDetailMeta(rel.change_detail)"
                       size="x-small"
@@ -387,6 +405,7 @@ import {
   relationTypeLabel,
   uniqueRelationChangeDetails,
   changeDetailMeta,
+  proclamationDueLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';

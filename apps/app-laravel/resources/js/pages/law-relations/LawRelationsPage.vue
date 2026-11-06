@@ -101,6 +101,15 @@
               >
                 {{ changeDetailMeta(rel.change_detail)?.title }}
               </v-chip>
+              <v-chip
+                v-if="proclamationDueLabel(rel)"
+                size="x-small"
+                color="warning"
+                variant="tonal"
+                prepend-icon="mdi-bullhorn-outline"
+              >
+                {{ proclamationDueLabel(rel) }}
+              </v-chip>
               <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
               <v-spacer />
               <v-btn
@@ -165,6 +174,15 @@
                   >
                     {{ changeDetailMeta(rel.change_detail)?.title }}
                   </v-chip>
+                  <v-chip
+                    v-if="proclamationDueLabel(rel)"
+                    size="x-small"
+                    color="warning"
+                    variant="tonal"
+                    prepend-icon="mdi-bullhorn-outline"
+                  >
+                    {{ proclamationDueLabel(rel) }}
+                  </v-chip>
                   <span v-if="rel.note" class="relations-list__note text-caption text-medium-emphasis">{{ rel.note }}</span>
                   <v-spacer />
                   <v-btn
@@ -223,6 +241,7 @@ import {
   uniqueRelationChangeDetails,
   changeDetailMeta,
   normalizeChangeDetail,
+  proclamationDueLabel,
 } from '../../types/lawRelation';
 import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
