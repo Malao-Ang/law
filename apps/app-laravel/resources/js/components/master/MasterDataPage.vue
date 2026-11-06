@@ -15,29 +15,6 @@
     <div class="master-page">
       <MasterStatCards :stats="master.stats.value" :labels="statLabels" />
 
-      <v-card flat border rounded="lg" class="master-page__filters">
-        <v-text-field
-          v-model="master.q.value"
-          :placeholder="searchPlaceholder"
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          clearable
-        />
-        <v-select
-          v-model="master.activeFilter.value"
-          :items="activeOptions"
-          variant="outlined"
-          density="comfortable"
-          hide-details
-          class="master-page__status-filter"
-        />
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" class="text-none" @click="master.resetFilters">
-          ล้างตัวกรอง
-        </v-btn>
-      </v-card>
-
       <v-alert v-if="master.error.value" type="error" variant="tonal" density="compact">
         {{ master.error.value }}
       </v-alert>
@@ -63,12 +40,37 @@
         @toggle="handleToggle"
         @update:page="master.page.value = $event"
       >
+        <template #toolbar>
+          <div class="master-page__filters">
+            <v-text-field
+              v-model="master.q.value"
+              :placeholder="searchPlaceholder"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+            <v-select
+              v-model="master.activeFilter.value"
+              :items="activeOptions"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="master-page__status-filter"
+            />
+            <v-btn variant="outlined" prepend-icon="mdi-refresh" class="text-none" @click="master.resetFilters">
+              ล้างตัวกรอง
+            </v-btn>
+          </div>
+
+        </template>
         <template v-for="column in tableColumns" :key="column.key" #[`item.${column.key}`]="slotProps">
           <slot :name="`item.${column.key}`" v-bind="slotProps">
-            <v-chip v-if="column.key === 'usage_count'" size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline" :to="usageLink(kind, slotProps.item.code, slotProps.item.usage_count) ?? undefined">
+            <v-btn v-if="column.key === 'usage_count'" size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline" :to="usageLink(kind, slotProps.item.code, slotProps.item.usage_count) ?? undefined">
               {{ (slotProps.item.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
-            </v-chip>
-            <template v-else>{{ tableValue(slotProps.value) }}</template>
+            </v-btn>
+            <span v-else :class="{ 'master-page__name': column.key === 'name' }">{{ tableValue(slotProps.value) }}</span>
           </slot>
         </template>
       </MasterDataTable>
@@ -270,8 +272,10 @@ async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
   align-items: center;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(220px, 1fr) 220px auto;
-  padding: 14px;
+  grid-template-columns: minmax(220px, 1fr) 160px auto;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .master-page__status-filter {
@@ -283,4 +287,7 @@ async function handleSave(payload: UpsertMasterItemPayload): Promise<void> {
     grid-template-columns: 1fr;
   }
 }
+.master-page__filters :deep(.v-field) { --v-input-control-height: 44px; }
+.master-page__filters :deep(.v-btn) { border-radius: 6px; height: 44px; color: #1e293b; }
+.master-page__name { color: #1e293b; font-weight: 700; }
 </style>

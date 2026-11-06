@@ -13,7 +13,40 @@
 .v-theme--admin .v-btn { font-weight: 700; letter-spacing: 0; text-transform: none; }
 .v-theme--admin .v-card { border-radius: 10px; box-shadow: 0 1px 1px rgba(0,0,0,.05); }
 .v-theme--admin .v-field { border-radius: 6px; font-size: 14px; }
-.v-theme--admin .v-field__outline { color: #e2e8f0; }
+.v-theme--admin .v-field__outline { --v-field-border-opacity: 1; color: #e2e8f0; }
+.v-theme--admin .v-field-label { color: #64748b; }
 .v-theme--admin .v-field--focused .v-field__outline { color: #1e3a8a; }
 .v-theme--admin .v-field__input::placeholder { color: #94a3b8; opacity: 1; }
 .v-theme--admin .v-btn--variant-outlined { border-color: #e2e8f0; }
+/* Master status pills and switches, including teleported admin dialogs. */
+.v-theme--admin .master-status--active,
+.v-theme--admin .master-status--inactive { border-radius: 20px; font-size: 12.5px; font-weight: 600; }
+.v-theme--admin .master-status--active { background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
+.v-theme--admin .master-status--inactive { background: #f3f4f6; border: 1px solid #e5e7eb; color: #4a5568; }
+.v-theme--admin .master-status--active .v-chip__content::before,
+.v-theme--admin .master-status--inactive .v-chip__content::before { content: ''; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #10b981; }
+.v-theme--admin .master-status--inactive .v-chip__content::before { background: #9ca3af; }
+.v-theme--admin .master-toggle .v-selection-control,
+.v-theme--admin .master-dialog__switch .v-selection-control { min-height: 32px; }
+.v-theme--admin .master-toggle .v-switch__track,
+.v-theme--admin .master-dialog__switch .v-switch__track { width: 44px; height: 24px; min-width: 44px; border-radius: 24px; background: #9ca3af; opacity: 1; }
+.v-theme--admin .master-toggle .v-selection-control--dirty .v-switch__track,
+.v-theme--admin .master-dialog__switch .v-selection-control--dirty .v-switch__track { background: #10b981; }
+.v-theme--admin .master-toggle .v-switch__thumb,
+.v-theme--admin .master-dialog__switch .v-switch__thumb { width: 18px; height: 18px; background: white; transform: none; box-shadow: none; }
+.v-theme--admin .master-toggle .v-switch__thumb .v-icon,
+.v-theme--admin .master-dialog__switch .v-switch__thumb .v-icon { display: none; }
+.v-theme--admin .master-table__footer .v-btn { border-radius: 6px; }
+
+.v-theme--admin .master-toggle .v-selection-control__wrapper,
+.v-theme--admin .master-dialog__switch .v-selection-control__wrapper { width: 44px; }
+.v-theme--admin .master-toggle .v-selection-control__input,
+.v-theme--admin .master-dialog__switch .v-selection-control__input { width: 24px; height: 24px; }
+
+.v-theme--admin .v-divider { border-color: #e2e8f0; opacity: 1; }
+.v-theme--admin .master-table .v-btn--variant-tonal,
+.v-theme--admin .master-tree .v-btn--variant-tonal { background: #eff6ff; color: #1e3a8a; }
+.v-theme--admin .master-table .v-btn--variant-tonal { height: 28px; padding-inline: 8px; border-radius: 6px; font-size: 12.5px; }
+
+.v-theme--admin .master-status--active .v-chip__underlay,
+.v-theme--admin .master-status--inactive .v-chip__underlay { opacity: 0; }

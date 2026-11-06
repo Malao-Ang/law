@@ -32,9 +32,9 @@
           >
             <td class="text-center master-tree__order-cell">{{ familyIndex + 1 }}</td>
             <td class="text-center">
-              <button v-if="row.family.attrs.has_subtypes !== false" type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
+              <v-btn v-if="row.family.attrs.has_subtypes !== false" variant="text" icon size="28" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
                 <v-icon :icon="expandedCodes.includes(row.family.code) ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
-              </button>
+              </v-btn>
               <span v-else class="master-tree__toggle-spacer" aria-hidden="true" />
               <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
                 {{ tableValue(row.family.code) }}
@@ -46,14 +46,14 @@
             </td>
             <td class="text-start">{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
             <td class="text-center font-weight-bold">
-              <v-chip
+              <v-btn
                 size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
                 :to="usageLink('law_family', row.family.code, row.family.usage_count) ?? undefined"
-              >{{ (row.family.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
+              >{{ (row.family.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-btn>
             </td>
             <td class="text-center">
-              <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
-                {{ row.family.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              <v-chip size="small" :class="row.family.is_active ? 'master-status--active' : 'master-status--inactive'" variant="tonal" class="font-weight-medium">
+                {{ row.family.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
               </v-chip>
             </td>
             <td class="text-center">
@@ -96,7 +96,7 @@
                 </v-btn>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
-                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('editFamily', row.family)" />
+                    <v-btn v-bind="tip" icon="mdi-pencil-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('editFamily', row.family)" />
                   </template>
                 </v-tooltip>
                 <v-btn v-if="row.family.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('deleteFamily', row.family)" />
@@ -125,7 +125,7 @@
             <td class="master-tree__child-name" :class="isEmptyTableValue(type.name) ? 'text-center' : 'text-start'">{{ tableValue(type.name) }}</td>
             <td class="text-start text-medium-emphasis">ตามกลุ่ม</td>
             <td class="text-center">
-              <v-chip
+              <v-btn
                 size="small"
                 variant="tonal"
                 color="admin-primary"
@@ -133,11 +133,11 @@
                 :to="usageLink('law_type', type.code, type.usage_count) ?? undefined"
               >
                 {{ (type.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
-              </v-chip>
+              </v-btn>
             </td>
             <td class="text-center">
-              <v-chip size="small" :color="type.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
-                {{ type.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              <v-chip size="small" :class="type.is_active ? 'master-status--active' : 'master-status--inactive'" variant="tonal" class="font-weight-medium">
+                {{ type.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
               </v-chip>
             </td>
             <td class="text-center">
@@ -174,7 +174,7 @@
                 </v-tooltip>
                 <v-tooltip text="แก้ไข" location="top">
                   <template #activator="{ props: tip }">
-                    <v-btn v-bind="tip" icon="mdi-pencil-box-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('editType', type)" />
+                    <v-btn v-bind="tip" icon="mdi-pencil-outline" variant="text" size="small" color="admin-primary" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('editType', type)" />
                   </template>
                 </v-tooltip>
                 <v-btn v-if="type.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('deleteType', type)" />
@@ -333,7 +333,7 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
 }
 
 .master-tree__code-chip {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: inherit;
 }
 
 .master-tree__dot {
@@ -410,4 +410,12 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
     left: 10px;
   }
 }
+/* Shared master table geometry, without changing cell alignment. */
+.master-tree :deep(.v-table) { font-size: 14px; color: #1e293b; }
+.master-tree :deep(th) { background: rgba(239,246,255,.3); color: #6b7280; font-size: 13px; font-weight: 600; height: 44px !important; }
+.master-tree :deep(td) { height: 72px !important; border-bottom-color: #e5e7eb !important; padding-inline: 20px; }
+.master-tree__code-chip { background: #eff6ff !important; color: #1e3a8a !important; border: 1px solid #dbeafe; border-radius: 4px; font-size: 12.5px; font-weight: 700; }
+.master-tree__code-chip :deep(.v-chip__underlay) { opacity: 0; }
+.master-tree__action-row :deep(.v-btn--icon) { width: 32px; height: 32px; color: #64748b; }
+.master-tree__action-row :deep(.v-icon) { font-size: 18px; }
 </style>

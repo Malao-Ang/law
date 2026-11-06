@@ -1,14 +1,15 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="620" @update:model-value="$emit('update:modelValue', Boolean($event))">
+  <v-dialog :model-value="modelValue" max-width="672" @update:model-value="$emit('update:modelValue', Boolean($event))">
     <v-card rounded="xl" class="master-view">
       <div class="master-view__header">
         <div>
           <h2 class="master-view__title">{{ item?.name || title }}</h2>
           <p class="master-view__subtitle">{{ item?.code }}</p>
         </div>
-        <v-btn icon="mdi-close" variant="text" size="small" @click="$emit('update:modelValue', false)" />
+        <v-btn icon="mdi-close" variant="text" size="32" aria-label="ปิด" @click="$emit('update:modelValue', false)" />
       </div>
 
+      <v-divider />
       <v-card-text v-if="item" class="master-view__body">
         <div class="master-view__grid">
           <div class="master-view__field">
@@ -25,7 +26,7 @@
           </div>
           <div class="master-view__field">
             <span>สถานะ</span>
-            <v-chip size="small" :color="item.is_active ? 'success' : 'grey'" variant="tonal">
+            <v-chip size="small" :class="item.is_active ? 'master-status--active' : 'master-status--inactive'" variant="tonal">
               {{ item.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
             </v-chip>
           </div>
@@ -122,4 +123,12 @@ defineEmits<{
     grid-template-columns: 1fr;
   }
 }
+.master-view { border-radius: 16px !important; }
+.master-view__header { padding: 20px 28px; min-height: 80px; }
+.master-view__title { color: #1e3a8a; font-size: 20px; font-weight: 700; }
+.master-view__subtitle { color: #64748b; font-family: inherit; }
+.master-view__body { padding: 24px 28px; }
+.master-view__field { background: #f8fafc; border-color: #e2e8f0; }
+.master-view__field span { color: #64748b; font-size: 14px; font-weight: 600; }
+.master-view__field strong { color: #1e293b; }
 </style>

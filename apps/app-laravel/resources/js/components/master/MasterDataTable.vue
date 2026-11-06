@@ -1,5 +1,6 @@
 <template>
   <v-card flat border rounded="lg" class="master-table">
+    <slot name="toolbar" />
     <v-progress-linear v-if="refreshing || (loading && items.length > 0)" indeterminate color="admin-primary" height="2" />
     <v-table>
       <thead>
@@ -49,11 +50,11 @@
           <td class="text-center">
             <v-chip
               size="small"
-              :color="item.is_active ? 'success' : 'grey'"
+              :class="item.is_active ? 'master-status--active' : 'master-status--inactive'"
               variant="tonal"
               class="font-weight-medium"
             >
-              {{ item.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
+              {{ item.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
             </v-chip>
           </td>
           <td class="master-table__actions-cell text-center">
@@ -72,7 +73,7 @@
                     v-bind="tip"
                     icon="mdi-eye-outline"
                     variant="text"
-                    size="small"
+                    size="32"
                     :disabled="pendingCodes?.has(item.code)"
                     :loading="pendingCodes?.has(item.code)"
                     @click="$emit('view', item)"
@@ -83,7 +84,7 @@
                 <template #activator="{ props: tip }">
                   <v-btn
                     v-bind="tip"
-                    icon="mdi-pencil-box-outline"
+                    icon="mdi-pencil-outline"
                     variant="text"
                     size="small"
                     color="admin-primary"
@@ -120,7 +121,8 @@
         :length="pageCount"
         :total-visible="5"
         density="compact"
-        rounded="circle"
+        rounded="sm"
+        active-color="primary"
         @update:model-value="$emit('update:page', Number($event))"
       />
     </div>
@@ -211,7 +213,7 @@ function itemValue(item: MasterItem, key: string): unknown {
 }
 
 .master-table__code-chip {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: inherit;
 }
 
 .master-table__action-row {
@@ -241,4 +243,14 @@ function itemValue(item: MasterItem, key: string): unknown {
     flex-direction: column;
   }
 }
+/* Shared master table geometry, without changing cell alignment. */
+.master-table :deep(.v-table) { font-size: 14px; color: #1e293b; }
+.master-table :deep(th) { background: rgba(239,246,255,.3); color: #6b7280; font-size: 13px; font-weight: 600; height: 44px !important; }
+.master-table :deep(td) { height: 72px !important; border-bottom-color: #e5e7eb !important; padding-inline: 20px; }
+.master-table__code-chip { background: #eff6ff !important; color: #1e3a8a !important; border: 1px solid #dbeafe; border-radius: 4px; font-size: 12.5px; font-weight: 700; }
+.master-table__code-chip :deep(.v-chip__underlay) { opacity: 0; }
+.master-table__action-row :deep(.v-btn--icon) { width: 32px; height: 32px; color: #64748b; }
+.master-table__action-row :deep(.v-icon) { font-size: 18px; }
+.master-table__footer :deep(.v-pagination__item--is-active .v-btn) { background: #1e3a8a; }
+.master-table__footer :deep(.v-pagination__item--is-active .v-btn__content) { color: #fff; }
 </style>
