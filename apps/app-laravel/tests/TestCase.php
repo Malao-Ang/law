@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Services\Audit\AuditLogStore;
+use App\Services\LawCommentStore;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
@@ -23,6 +24,7 @@ abstract class TestCase extends BaseTestCase
             app('mongo.blob.master')->truncate();
             app('mongo.blob.users')->truncate();
             app(AuditLogStore::class)->truncate();
+            app(LawCommentStore::class)->truncate();
         } catch (\Exception) {
             // MongoDB not reachable — tests that need it will fail naturally
         }

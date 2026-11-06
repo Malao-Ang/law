@@ -2,9 +2,10 @@
 
 namespace App\Providers;
 
-use App\Services\Auth\MongoUserStore;
-use App\Services\Auth\MembershipAuditLog;
 use App\Services\Audit\AuditLogStore;
+use App\Services\Auth\MembershipAuditLog;
+use App\Services\Auth\MongoUserStore;
+use App\Services\LawCommentStore;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;
@@ -65,6 +66,13 @@ class AppServiceProvider extends ServiceProvider
             $database = (string) config('database.connections.mongodb.database', 'poc');
 
             return new AuditLogStore($client->$database->selectCollection('audit_logs'));
+        });
+
+        $this->app->singleton(LawCommentStore::class, function (): LawCommentStore {
+            $client = $this->app->make(Client::class);
+            $database = (string) config('database.connections.mongodb.database', 'poc');
+
+            return new LawCommentStore($client->$database->selectCollection('law_comments'));
         });
 
         $this->app->singleton('mongo.blob.permissions', function (): MongoBlobStore {

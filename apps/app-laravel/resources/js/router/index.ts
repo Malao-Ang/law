@@ -34,6 +34,7 @@ const ESignPage = () => import('../pages/esign/ESignPage.vue');
 const ESignPreviewPage = () => import('../pages/esign/ESignPreviewPage.vue');
 const ESignStatusPage = () => import('../pages/esign/ESignStatusPage.vue');
 const LawPage = () => import('../pages/law/LawPage.vue');
+const LawCommentsPage = () => import('../pages/law/LawCommentsPage.vue');
 const LawVersionsPage = () => import('../pages/law/LawVersionsPage.vue');
 const PublicShowRelationsPage = () => import('../pages/public/PublicShowRelationsPage.vue');
 const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
@@ -79,6 +80,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/documents/:documentId/preview', name: 'preview', component: PreviewPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId/versions', name: 'law-versions', component: LawVersionsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/relations/:documentId?', name: 'public-show-relations', component: PublicShowRelationsPage, props: true, meta: { bareLayout: true } },
+  { path: '/law/:documentId/comments', name: 'law-comments', component: LawCommentsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
   // Dev-only MinIO test page — excluded from production builds.
   ...(import.meta.env.DEV
