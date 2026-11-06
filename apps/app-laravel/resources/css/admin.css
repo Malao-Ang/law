@@ -50,3 +50,12 @@
 
 .v-theme--admin .master-status--active .v-chip__underlay,
 .v-theme--admin .master-status--inactive .v-chip__underlay { opacity: 0; }
+
+.v-theme--admin .v-pagination__item--is-active .v-btn {
+  background-color: rgb(var(--v-theme-primary)) !important;
+  color: #fff !important;
+}
+
+.v-theme--admin .v-pagination__item--is-active .v-btn .v-btn__overlay {
+  opacity: 0;
+}
