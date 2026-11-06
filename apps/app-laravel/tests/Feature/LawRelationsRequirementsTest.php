@@ -74,7 +74,7 @@ class LawRelationsRequirementsTest extends TestCase
         $this->seedLaw($store, $childId, 'Active Child', ['parent_document_ids' => [$parentId]]);
         $this->seedLaw($store, $inactiveChildId, 'Inactive Child', [
             'parent_document_id' => $parentId,
-            'status' => 'cancelled',
+            'status' => 'STA02',
         ]);
 
         $this->getJson("/api/documents/{$parentId}/active-children")

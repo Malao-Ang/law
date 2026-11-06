@@ -66,9 +66,15 @@
         </v-tooltip>
       </template>
 
+      <template #item.ownership="{ item }">
+        <div class="text-caption">ผู้อัปโหลด: {{ item.uploadedBy }}</div>
+        <div class="text-caption">ผู้รับผิดชอบ: {{ item.responsible }}</div>
+        <div v-if="item.coEditors" class="text-caption">ผู้รับผิดชอบร่วม: {{ item.coEditors }}</div>
+        <div class="text-caption">หน่วยงาน: {{ item.ownerUnitCode }}</div>
+      </template>
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
-          {{ item.lawType }}
+          {{ typeLabel(item.lawType) }}
         </v-chip>
         <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
         <v-chip v-else size="small" color="grey" variant="tonal">รอประมวลผล</v-chip>
@@ -78,12 +84,12 @@
         <v-chip
           v-if="item.lawStatus"
           size="small"
-          :color="item.lawStatus === 'มีผลบังคับใช้' ? 'success' : item.lawStatus === 'ยกเลิกการใช้งาน' ? 'error' : 'warning'"
+          :color="statusColor(item.lawStatus) || 'warning'"
           variant="tonal"
         >
-          {{ item.lawStatus }}
+          {{ statusLabel(item.lawStatus) }}
         </v-chip>
-        <v-chip v-else size="small" color="warning" variant="tonal">ร่าง</v-chip>
+        <v-chip v-else size="small" color="warning" variant="tonal">{{ statusLabel(draftCode) }}</v-chip>
       </template>
 
       <template #item.lifecycle="{ item }">
@@ -128,6 +134,7 @@
             color="admin-primary"
             :title="rowActionLabel(item) || 'ดูเอกสาร'"
             :aria-label="rowActionLabel(item) || 'ดูเอกสาร'"
+            :disabled="!canRunAction(item)"
             @click="runAction(item)"
           >{{ rowActionLabel(item) || 'ดูเอกสาร' }}</v-btn>
 
@@ -139,7 +146,7 @@
             color="error"
             title="ลบประวัติอัปโหลด"
             :loading="deletingId === item.documentId"
-            :disabled="deletingId !== null && deletingId !== item.documentId"
+            :disabled="!item.can?.delete || (deletingId !== null && deletingId !== item.documentId)"
             @click="confirmDelete(item)"
           >ลบ</v-btn>
 
@@ -151,7 +158,7 @@
             color="error"
             title="ลบประวัติอัปโหลด"
             :loading="deletingId === item.documentId"
-            :disabled="deletingId !== null && deletingId !== item.documentId"
+            :disabled="!item.can?.delete || (deletingId !== null && deletingId !== item.documentId)"
             @click="confirmDelete(item)"
           />
 
@@ -174,14 +181,23 @@ import type { DocumentListItem } from '../../types/document';
 import { useSnackbarStore } from '../../stores/snackbarStore';
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
 import { lifecycleStatus, type LifecycleStatus } from '../../utils/lifecycleStatus';
+import { useLawStatus } from '../../composables/useLawStatus';
 import {
   deleteStage, deriveStage, deriveStageForDocument, deriveStageFromWorkflow, laterStage, nextStage, readStages, writeStage,
   STAGE_MAP, type StageKey,
 } from '../../data/documentPipeline';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel } = useLawType();
 
 interface Row {
   no: number;
   documentId: string;
+  can?: import('../../types/document').DocumentCapabilities;
+  uploadedBy: string;
+  responsible: string;
+  coEditors: string;
+  ownerUnitCode: string;
   title: string;
   updatedAt: string;
   stage: StageKey;            // still drives the action button column
@@ -194,6 +210,7 @@ interface Row {
 
 const router = useRouter();
 const snackbar = useSnackbarStore();
+const { draftCode, statusColor, statusLabel } = useLawStatus();
 const docs = ref<DocumentListItem[]>([]);
 const localStages = ref<Record<string, StageKey>>(readStages());
 const loading = ref(false);
@@ -230,6 +247,7 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
+  { title: 'เจ้าของเอกสาร', key: 'ownership', sortable: false },
   { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
   { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
   { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
@@ -266,11 +284,16 @@ const rows = computed<Row[]>(() =>
     return {
       no: index + 1,
       documentId: doc.document_id,
+      can: doc.can,
+      uploadedBy: doc.uploaded_by?.name || doc.uploaded_by?.username || 'ไม่ระบุ',
+      responsible: doc.responsible?.name || doc.responsible?.username || 'ดูแลโดยผู้ดูแลระบบสูงสุด',
+      coEditors: (doc.co_editors ?? []).map(person => person.name || person.username).join(', '),
+      ownerUnitCode: doc.owner_unit_code || 'ไม่ระบุ',
       title: doc.title || doc.document_id,
       updatedAt: formatDate(doc.updated_at),
       stage,
       lawType: doc.law_type ?? '',
-      lawStatus: doc.law_status || (!doc.published_date ? 'ร่าง' : ''),
+      lawStatus: doc.law_status || (!doc.published_date ? draftCode.value : ''),
       documentType: doc.document_type ?? 'new',
       lifecycle: lifecycleStatus(doc, stage),
       accessScope: doc.access_scope === 'public' ? 'public' : 'private',
@@ -290,6 +313,18 @@ function actionLabel(stage: StageKey): string {
 function setStage(documentId: string, stage: StageKey): void {
   localStages.value = { ...localStages.value, [documentId]: stage };
   writeStage(documentId, stage);
+}
+
+function canRunAction(row: Row): boolean {
+  if (isOldInfoStage(row)) return Boolean(row.can?.edit);
+  const action = STAGE_MAP[row.stage].action;
+  if (action.type === 'route') {
+    const path = action.to(row.documentId);
+    if (path.includes('/esign')) return Boolean(row.can?.esign || row.can?.cancel_esign || row.can?.publish);
+    if (path.includes('/permissions')) return Boolean(row.can?.publish);
+    if (path.startsWith('/law/') || path.endsWith('/edit') || path.endsWith('/preview')) return true;
+  }
+  return Boolean(row.can?.edit);
 }
 
 function runAction(row: Row): void {

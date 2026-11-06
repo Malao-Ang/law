@@ -1,5 +1,5 @@
 <template>
-  <v-layout class="document-compose-workspace">
+  <v-layout class="document-compose-workspace" :inert="!can.edit">
     <v-navigation-drawer
       v-model="leftDrawer"
       class="compose-drawer"
@@ -121,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDisplay } from 'vuetify';
@@ -163,6 +164,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   mode: 'review',
 });
+const { can } = useDocumentAccess(() => props.documentId);
 
 const { mdAndDown } = useDisplay();
 const vueRouter = useRouter();
@@ -260,7 +262,7 @@ watch(isCompact, (next) => {
 }, { immediate: true });
 
 watch([font, fontSize], () => {
-  if (!hydrating.value && composeStore.review) {
+  if (can.value.edit && !hydrating.value && composeStore.review) {
     scheduleComposeSave();
   }
 });
@@ -318,7 +320,7 @@ function requestScrollToBlock(blockId: string): void {
 
 function onMetadataUpdate(next: DocumentMetadata): void {
   metadata.value = next;
-  if (!hydrating.value && composeStore.review) scheduleComposeSave();
+  if (can.value.edit && !hydrating.value && composeStore.review) scheduleComposeSave();
 }
 
 function dispatchToolbarAction(type: string, value?: string): void {

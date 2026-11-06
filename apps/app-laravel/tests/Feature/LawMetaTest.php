@@ -43,7 +43,7 @@ class LawMetaTest extends TestCase
         $doc = $store->getReviewDocument($id);
 
         $this->assertArrayHasKey('law_meta', $doc);
-        $this->assertSame('', $doc['law_meta']['status']);
+        $this->assertSame('STA03', $doc['law_meta']['status']);
         $this->assertSame('', $doc['law_meta']['law_type']);
         $this->assertSame('public', $doc['law_meta']['access_scope']);
         $this->assertSame([], $doc['law_meta']['permission_group_ids']);
@@ -98,9 +98,9 @@ class LawMetaTest extends TestCase
 
         $response = $this->putJson("/api/documents/{$id}/document-review", [
             'law_meta' => [
-                'status' => 'มีผลใช้บังคับ',
+                'status' => 'มีผลบังคับใช้',
                 'law_type' => 'พระราชบัญญัติ',
-                'law_group' => 'ด้านวิชาการ',
+                'law_group' => 'academic',
                 'agency' => 'มหาวิทยาลัยบูรพา',
                 'section_count' => 25,
                 'keywords' => ['ข้อมูลส่วนบุคคล', ' PDPA ', 'ข้อมูลส่วนบุคคล'],
@@ -110,14 +110,14 @@ class LawMetaTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.status', 'มีผลใช้บังคับ');
+        $response->assertJsonPath('law_meta.status', 'STA01');
         $response->assertJsonPath('law_meta.agency', 'มหาวิทยาลัยบูรพา');
         $response->assertJsonPath('law_meta.section_count', 1);
         $response->assertJsonPath('law_meta.keywords', ['ข้อมูลส่วนบุคคล', 'PDPA']);
         $response->assertJsonPath('law_meta.repealed_laws', ['พ.ร.บ. เก่า ๒๕๓๓']);
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('พระราชบัญญัติ', $doc['law_meta']['law_type']);
+        $this->assertSame('LTY05', $doc['law_meta']['law_type']);
         $this->assertSame(1, $doc['law_meta']['section_count']);
         $this->assertSame(['ข้อมูลส่วนบุคคล', 'PDPA'], $doc['law_meta']['keywords']);
     }
@@ -135,10 +135,10 @@ class LawMetaTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.change_status', 'กฎหมายล่าสุด');
+        $response->assertJsonPath('law_meta.change_status', 'CHG01');
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('กฎหมายล่าสุด', $doc['law_meta']['change_status']);
+        $this->assertSame('CHG01', $doc['law_meta']['change_status']);
     }
 
     public function test_public_access_scope_clears_permission_groups(): void
@@ -186,10 +186,12 @@ class LawMetaTest extends TestCase
         $id = 'doc_lawmeta_private_ok_'.uniqid();
         $this->seedDocument($store, $id);
 
+        // Group members are real unit codes (DEP...) and real usernames.
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('user_somchai', ['name' => 'user_somchai'], null, false);
         $group = $this->postJson('/api/permission-groups', [
             'name' => 'กลุ่มเอกสารส่วนบุคคล_'.uniqid(),
             'description' => 'ใช้กับเอกสารที่จำกัดการเข้าถึง',
-            'unit_ids' => ['unit_legal'],
+            'unit_ids' => ['DEP101'],
             'position_ids' => [],
             'user_ids' => ['user_somchai'],
         ])->assertCreated()->json();
@@ -276,6 +278,46 @@ class LawMetaTest extends TestCase
         $this->assertSame(2, $doc['law_meta']['section_count']);
     }
 
+    public function test_section_count_skips_chapters_and_counts_codes(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_lawmeta_chapter_'.uniqid();
+        $block = static fn (string $bid, int $order, string $text, string $chunkType): array => [
+            'block_id' => $bid,
+            'type' => 'paragraph',
+            'reading_order' => $order,
+            'raw_text' => $text,
+            'normalized_text' => $text,
+            'ai_suggested_text' => $text,
+            'approved_text' => $text,
+            'confidence' => 1.0,
+            'needs_review' => false,
+            'flags' => [],
+            'meta' => ['chunk_type' => $chunkType, 'layout' => ['tabs' => []], 'formatting' => []],
+        ];
+
+        $store->writeReviewDocument($id, [
+            'document_id' => $id,
+            'source_file' => 'x.docx',
+            'source_type' => 'docx',
+            'language' => 'th',
+            'summary' => ['page_count' => 1, 'block_count' => 4, 'review_required_count' => 0],
+            'pages' => [[
+                'page_no' => 1,
+                'blocks' => [
+                    $block('p1-b0001', 1, 'หมวด 1', 'CHAPTER'),
+                    $block('p1-b0002', 2, 'ส่วนที่ 1', 'LST012'),
+                    $block('p1-b0003', 3, 'ข้อ 1', 'LST004'),
+                    $block('p1-b0004', 4, 'มาตรา 2', 'SECTION'),
+                ],
+            ]],
+        ]);
+
+        $this->putJson("/api/documents/{$id}/document-review", ['law_meta' => ['section_count' => 999]])
+            ->assertOk()
+            ->assertJsonPath('law_meta.section_count', 2);
+    }
+
     public function test_keywords_longer_than_limit_are_rejected(): void
     {
         $store = app(ReviewStore::class);
@@ -346,22 +388,33 @@ class LawMetaTest extends TestCase
 
         $response = $this->putJson("/api/documents/{$id}/document-review", [
             'law_meta' => [
-                'law_groups' => ['ด้านวิชาการ', 'ด้านกฎหมายและนิติการ'],
+                'law_groups' => ['academic', 'ด้านกิจการนิสิต', 'DCT001'],
                 'agencies' => ['มหาวิทยาลัยบูรพา', 'สำนักงานอธิการบดี'],
             ],
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('law_meta.law_group', 'ด้านวิชาการ');
-        $response->assertJsonPath('law_meta.law_groups', ['ด้านวิชาการ', 'ด้านกฎหมายและนิติการ']);
+        $response->assertJsonPath('law_meta.law_group', 'DCT001');
+        $response->assertJsonPath('law_meta.law_groups', ['DCT001', 'DCT002']);
         $response->assertJsonPath('law_meta.agency', 'มหาวิทยาลัยบูรพา');
         $response->assertJsonPath('law_meta.agencies', ['มหาวิทยาลัยบูรพา', 'สำนักงานอธิการบดี']);
 
         $doc = $store->getReviewDocument($id);
-        $this->assertSame('ด้านวิชาการ', $doc['law_meta']['law_group']);
-        $this->assertSame(['ด้านวิชาการ', 'ด้านกฎหมายและนิติการ'], $doc['law_meta']['law_groups']);
+        $this->assertSame('DCT001', $doc['law_meta']['law_group']);
+        $this->assertSame(['DCT001', 'DCT002'], $doc['law_meta']['law_groups']);
         $this->assertSame('มหาวิทยาลัยบูรพา', $doc['law_meta']['agency']);
         $this->assertSame(['มหาวิทยาลัยบูรพา', 'สำนักงานอธิการบดี'], $doc['law_meta']['agencies']);
+    }
+
+    public function test_update_document_review_rejects_unknown_law_category(): void
+    {
+        $store = app(ReviewStore::class);
+        $id = 'doc_lawmeta_badgroup_'.uniqid();
+        $this->seedDocument($store, $id);
+
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'law_meta' => ['law_groups' => ['ด้านที่ไม่มีอยู่จริง']],
+        ])->assertStatus(422)->assertJsonPath('errors', ['law_meta.law_groups' => ['ไม่พบหมวดเอกสารที่เลือก']]);
     }
 
     public function test_legacy_law_meta_values_are_promoted_to_multi_value_arrays(): void

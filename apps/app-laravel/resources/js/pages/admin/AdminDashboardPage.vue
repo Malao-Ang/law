@@ -136,8 +136,8 @@
                 <span class="recent-row__title">{{ doc.title }}</span>
               </td>
               <td>
-                <v-chip size="small" :color="STATUS_CHIP[doc.status] ?? 'default'" rounded="pill" variant="tonal">
-                  {{ doc.meta_status || doc.status }}
+                <v-chip size="small" :color="statusChipColor(doc.status)" rounded="pill" variant="tonal">
+                  {{ doc.meta_status ? statusLabel(doc.meta_status) : doc.status }}
                 </v-chip>
               </td>
               <td class="text-body-2">{{ complexityLabel(doc.section_count) }}</td>
@@ -168,15 +168,13 @@ import { fetchReportSummary } from '../../api/client';
 import type { ReportDocument, ReportSummary } from '../../types/document';
 import ReportStatCard from '../../components/admin/ReportStatCard.vue';
 import AppShell from '../../components/shared/AppShell.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 const router = useRouter();
+const { statusColor, statusLabel } = useLawStatus();
 
 const STATUS_CHIP: Record<string, string> = {
   active: 'success',
-  มีผลบังคับใช้: 'success',
-  มีผลใช้บังคับ: 'success',
-  ใช้บังคับ: 'success',
-  บังคับใช้: 'success',
   done: 'success',
   exported: 'success',
   ingested: 'success',
@@ -185,6 +183,10 @@ const STATUS_CHIP: Record<string, string> = {
   ingesting: 'info',
   failed: 'error',
 };
+
+function statusChipColor(status: string): string {
+  return statusColor(status) || STATUS_CHIP[status] || 'default';
+}
 
 const PUBLISHED = ['exported', 'ingested'];
 const PROCESSING = ['queued', 'processing', 'ingesting'];

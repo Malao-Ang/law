@@ -1,23 +1,23 @@
 import type { LawRelation, RelationType, ReportDocument } from '../types/document';
 import { parentIdsOf } from './useLawCatalog';
 import { formatThaiDate } from '../utils/thaiDate';
+import { useLawStatus } from './useLawStatus';
+import { createLawTypeCatalog } from './useLawType';
+import { createChangeStatusCatalog } from './useChangeStatus';
 
 export const SHOW_REL_RECENT_KEY = 'lawspace.show-relations.recent';
 const MAX_RECENT = 12;
 export const MAX_DEPTH = 6;
 export const SAME_LEVEL_PREVIEW_COUNT = 5;
 
-export const TYPE_META: Record<string, { color: string; short: string }> = {
-  กฎหมายภายนอก: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
-  พระราชบัญญัติ: { color: 'doc-phaainok', short: 'พ.ร.บ.' },
-  พระราชกำหนด: { color: 'doc-phaainok', short: 'พ.ร.ก.' },
-  กฎกระทรวง: { color: 'doc-phaainok', short: 'กฎกระทรวง' },
-  ประกาศกระทรวง: { color: 'doc-phaainok', short: 'ประกาศ ก.' },
-  ข้อบังคับ: { color: 'doc-kho-bangkhab', short: 'ข้อบังคับ' },
-  ระเบียบ: { color: 'doc-rabiap', short: 'ระเบียบ' },
-  ประกาศ: { color: 'doc-prakat', short: 'ประกาศ' },
-  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat', short: 'ประกาศ มหาลัย' },
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat', short: 'ประกาศ สภา' },
+const lawTypes = createLawTypeCatalog();
+// Singleton change-status catalog using fallback seeds (no runtime /api/lookups call here).
+const changeStatus = createChangeStatusCatalog({ types: [], typesAll: [], details: [], detailsAll: [] });
+const FAMILY_COLOR_CLASS: Record<string, string> = {
+  LFM01: 'doc-kho-bangkhab',
+  LFM02: 'doc-rabiap',
+  LFM03: 'doc-prakat',
+  LFM04: 'doc-phaainok',
 };
 
 export const RELATION_FILTERS: Array<{ value: RelationType; label: string }> = [
@@ -57,24 +57,19 @@ export interface RelTreeNode {
 }
 
 export function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
+  return FAMILY_COLOR_CLASS[lawTypes.typeFamily(type)] ?? 'grey';
 }
 
 export function typeShort(type: string): string {
-  return TYPE_META[type]?.short ?? (type.includes('ประกาศ') ? 'ประกาศ' : type);
+  return lawTypes.typeLabel(type) || type;
 }
 
 export function typeIcon(type: string): string {
-  if (
-    type === 'กฎหมายภายนอก'
-    || type === 'พระราชบัญญัติ'
-    || type === 'พระราชกำหนด'
-    || type === 'กฎกระทรวง'
-    || type === 'ประกาศกระทรวง'
-  ) return 'mdi-office-building-outline';
-  if (type === 'ข้อบังคับ') return 'mdi-scale-balance';
-  if (type === 'ระเบียบ') return 'mdi-folder-outline';
-  if (type.includes('ประกาศ')) return 'mdi-bullhorn-outline';
+  const familyCode = lawTypes.typeFamily(type);
+  if (familyCode === 'LFM04') return 'mdi-office-building-outline';
+  if (familyCode === 'LFM01') return 'mdi-scale-balance';
+  if (familyCode === 'LFM02') return 'mdi-folder-outline';
+  if (familyCode === 'LFM03') return 'mdi-bullhorn-outline';
   return 'mdi-file-document-outline';
 }
 
@@ -104,13 +99,9 @@ export function workflowStageColor(stage: string): string {
 }
 
 export function metaStatusColor(status: string): string {
-  if (
-    status === 'active'
-    || status === 'มีผลบังคับใช้'
-    || status === 'มีผลใช้บังคับ'
-    || status === 'ใช้บังคับ'
-    || status === 'บังคับใช้'
-  ) return 'success';
+  const { isInForce, isRepealed } = useLawStatus();
+  if (isInForce(status)) return 'success';
+  if (isRepealed(status)) return 'error';
   if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
@@ -121,7 +112,8 @@ export function isActiveStatus(status: string): boolean {
 }
 
 export function isCancelledStatus(status: string): boolean {
-  return status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status === 'ยกเลิกการใช้งาน' || status.includes('ยกเลิก');
+  const { isRepealed } = useLawStatus();
+  return isRepealed(status) || status === 'ยกเลิก' || status === 'ถูกยกเลิก' || status.includes('ยกเลิก');
 }
 
 /**
@@ -137,7 +129,8 @@ export function isPublishedLaw(doc: {
   const status = (doc.status ?? '').trim();
   const publishedDate = (doc.published_date ?? '').trim();
   const metaStatus = (doc.meta_status ?? '').trim();
-  return status === 'ingested' && publishedDate !== '' && metaStatus !== 'ร่าง';
+  const { isDraft } = useLawStatus();
+  return status === 'ingested' && publishedDate !== '' && !isDraft(metaStatus);
 }
 
 export function isKeptInRelationGraph(row: Pick<ShowRelRow, 'metaStatus' | 'workflowStage'>): boolean {
@@ -200,44 +193,28 @@ export function rememberRecentId(documentId: string): void {
   localStorage.setItem(SHOW_REL_RECENT_KEY, JSON.stringify(next));
 }
 
-export const SAME_LEVEL_CHANGE_STATUSES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-]);
-
-export const WHOLE_EDITION_CHANGES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-]);
-
-export const SECTION_EDITION_CHANGES = new Set([
-  'ปรับปรุงรายข้อ',
-  'ปรับปรุงรายมาตรา',
-  'ยกเลิกรายมาตรา',
-]);
-
-export function isSameLevelChange(changeStatus: string): boolean {
-  return SAME_LEVEL_CHANGE_STATUSES.has(changeStatus.trim());
+export function isSameLevelChange(value: string): boolean {
+  return changeStatus.isWhole(value);
 }
 
-export function isWholeEditionChange(changeStatus: string): boolean {
-  return WHOLE_EDITION_CHANGES.has(changeStatus.trim());
+export function isWholeEditionChange(value: string): boolean {
+  return changeStatus.isWhole(value);
 }
 
-export function isSectionEditionChange(changeStatus: string): boolean {
-  return SECTION_EDITION_CHANGES.has(changeStatus.trim());
+export function isSectionEditionChange(value: string): boolean {
+  return changeStatus.isSection(value);
 }
 
-export function isNewLawChange(changeStatus: string): boolean {
-  return changeStatus.trim() === 'กฎหมายใหม่';
+export function isNewLawChange(value: string): boolean {
+  return changeStatus.isNew(value);
 }
 
-export function isAmendmentChange(changeStatus: string): boolean {
-  return isSameLevelChange(changeStatus) || isSectionEditionChange(changeStatus);
+export function isAmendmentChange(value: string): boolean {
+  return changeStatus.isWhole(value) || changeStatus.isSection(value);
 }
 
-export function versionNodeSize(changeStatus: string): 'big' | 'small' {
-  return isSectionEditionChange(changeStatus) ? 'small' : 'big';
+export function versionNodeSize(value: string): 'big' | 'small' {
+  return changeStatus.isSection(value) ? 'small' : 'big';
 }
 
 export const SAME_LEVEL_RELATION_TYPES = new Set<RelationType>([

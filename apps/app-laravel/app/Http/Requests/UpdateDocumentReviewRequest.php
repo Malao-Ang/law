@@ -2,7 +2,16 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ReviewStore;
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
+use App\Services\MasterData\MasterDataKind;
+use App\Services\MasterData\MasterDataStore;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UpdateDocumentReviewRequest extends FormRequest
 {
@@ -13,9 +22,39 @@ class UpdateDocumentReviewRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $lawMeta = $this->input('law_meta');
+        if (is_array($lawMeta)) {
+            foreach (\App\Services\Auth\DocumentOwnership::FIELDS as $field) {
+                unset($lawMeta[$field]);
+            }
+        }
+        if (is_array($lawMeta) && array_key_exists('status', $lawMeta)) {
+            $lawMeta['status'] = app(EnforcementStatuses::class)->resolve($lawMeta['status'])['code'] ?? trim((string) $lawMeta['status']);
+        }
+        if (is_array($lawMeta) && array_key_exists('law_type', $lawMeta)) {
+            $resolved = app(LawTypes::class)->resolve($lawMeta['law_type']);
+            if ($resolved !== null) {
+                $lawMeta['law_type'] = (string) $resolved['code'];
+            }
+        }
+        if (is_array($lawMeta) && array_key_exists('issuer', $lawMeta)) {
+            unset($lawMeta['issuer']);
+        }
+        if (is_array($lawMeta) && (array_key_exists('law_groups', $lawMeta) || array_key_exists('law_group', $lawMeta))) {
+            $lawMeta = $this->normalizeLawCategoryFields($lawMeta);
+        }
+        if (is_array($lawMeta) && (array_key_exists('change_status', $lawMeta) || array_key_exists('change_details', $lawMeta))) {
+            $lawMeta = $this->normalizeChangeStatusFields($lawMeta);
+        }
+
+        $payload = [
             'reset_to_generated' => filter_var($this->input('reset_to_generated', false), FILTER_VALIDATE_BOOL),
-        ]);
+        ];
+        if (is_array($lawMeta)) {
+            $payload['law_meta'] = $lawMeta;
+        }
+
+        $this->merge($payload);
     }
 
     /**
@@ -48,7 +87,10 @@ class UpdateDocumentReviewRequest extends FormRequest
             'metadata.signatory_name' => ['nullable', 'string', 'max:255'],
             'metadata.signatory_position' => ['nullable', 'string', 'max:255'],
             'law_meta' => ['nullable', 'array'],
-            'law_meta.status' => ['nullable', 'string', 'max:120'],
+            'law_meta.uploaded_by' => ['prohibited'],
+            'law_meta.responsible' => ['prohibited'],
+            'law_meta.owner_unit_code' => ['prohibited'],
+            'law_meta.status' => ['nullable', 'string', 'max:120', Rule::in(array_column(app(MasterDataStore::class)->all(MasterDataKind::EnforcementStatus), 'code'))],
             'law_meta.law_type' => ['nullable', 'string', 'max:120'],
             'law_meta.source' => ['nullable', 'string', 'in:internal,external'],
             'law_meta.law_group' => ['nullable', 'string', 'max:120'],
@@ -57,7 +99,6 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.change_details.*' => ['nullable', 'string', 'max:120'],
             'law_meta.agency' => ['nullable', 'string', 'max:255'],
             'law_meta.signer_group' => ['nullable', 'string', 'max:255'],
-            'law_meta.issuer' => ['nullable', 'string', 'max:120'],
             'law_meta.promulgation_date' => ['nullable', 'string', 'max:120'],
             'law_meta.effective_date' => ['nullable', 'string', 'max:120'],
             'law_meta.gazette_reference' => ['nullable', 'string', 'max:255'],
@@ -79,7 +120,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.parent_document_ids' => ['nullable', 'array'],
             'law_meta.parent_document_ids.*' => ['nullable', 'string', 'max:128'],
             'law_meta.access_scope' => ['nullable', 'string', 'in:public,private'],
-            'law_meta.permission_group_ids' => ['nullable', 'array'],
+            'law_meta.permission_group_ids' => ['nullable', 'required_if:law_meta.access_scope,private', 'array', 'min:1'],
             'law_meta.permission_group_ids.*' => ['nullable', 'string', 'max:128'],
             'relations' => ['nullable', 'array'],
             'relations.*.id' => ['nullable', 'string', 'max:64'],
@@ -100,5 +141,151 @@ class UpdateDocumentReviewRequest extends FormRequest
             'relations.*.proclamation_due_date' => ['nullable', 'date_format:Y-m-d'],
             'relations.*.proclamation_issued_on' => ['nullable', 'date_format:Y-m-d'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $lawMeta = $this->input('law_meta');
+            if (! is_array($lawMeta)) {
+                return;
+            }
+
+            $store = app(MasterDataStore::class);
+            $document = app(ReviewStore::class)->getReviewDocument((string) $this->route('documentId'));
+            $current = $document['law_meta'] ?? [];
+            foreach ([
+                'status' => MasterDataKind::EnforcementStatus,
+                'law_type' => MasterDataKind::LawType,
+                'law_groups' => MasterDataKind::LawCategory,
+                'change_status' => MasterDataKind::ChangeStatus,
+            ] as $field => $kind) {
+                $oldValues = (array) ($current[$field] ?? ($field === 'law_groups' ? ($current['law_group'] ?? []) : []));
+                $oldCodes = array_map(fn ($value) => $store->resolve($kind, (string) $value)['code'] ?? '', $oldValues);
+                foreach ((array) ($lawMeta[$field] ?? []) as $value) {
+                    $item = $store->resolve($kind, (string) $value);
+                    if ($item !== null && ! $item['is_active'] && ! in_array($item['code'], $oldCodes, true)) {
+                        $validator->errors()->add('law_meta.'.$field, 'รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น');
+                    }
+                    if ($kind === MasterDataKind::LawType && $item !== null) {
+                        $family = $store->find(MasterDataKind::LawFamily, $item['attrs']['family_code']);
+                        if ($family !== null && ! $family['is_active'] && ! in_array($item['code'], $oldCodes, true)) {
+                            $validator->errors()->add('law_meta.'.$field, 'รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น');
+                        }
+                    }
+                }
+            }
+
+            $lawTypeValue = $lawMeta['law_type'] ?? null;
+            if ($lawTypeValue === null || $lawTypeValue === '') {
+                return;
+            }
+
+            /** @var LawTypes $lawTypes */
+            $lawTypes = app(LawTypes::class);
+            $lawType = $lawTypes->resolve($lawTypeValue);
+            if ($lawType === null) {
+                $validator->errors()->add('law_meta.law_type', 'Invalid law type.');
+
+                return;
+            }
+
+            $source = $lawMeta['source'] ?? null;
+            if ($source !== null && $source !== '' && $lawTypes->sourceOf($lawTypeValue) !== $source) {
+                $validator->errors()->add('law_meta.source', 'Law type source does not match.');
+            }
+
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $lawMeta
+     * @return array<string, mixed>
+     */
+    private function normalizeLawCategoryFields(array $lawMeta): array
+    {
+        /** @var LawCategories $categories */
+        $categories = app(LawCategories::class);
+        $values = [];
+        if (array_key_exists('law_groups', $lawMeta)) {
+            $values = is_array($lawMeta['law_groups']) ? $lawMeta['law_groups'] : [$lawMeta['law_groups']];
+        }
+        if ($values === [] && array_key_exists('law_group', $lawMeta)) {
+            $values = [$lawMeta['law_group']];
+        }
+
+        $codes = [];
+        foreach ($values as $value) {
+            $raw = trim((string) $value);
+            if ($raw === '') {
+                continue;
+            }
+
+            $resolved = $categories->resolve($raw);
+            if ($resolved === null) {
+                throw ValidationException::withMessages([
+                    'law_meta.law_groups' => ['ไม่พบหมวดเอกสารที่เลือก'],
+                ]);
+            }
+
+            $code = (string) ($resolved['code'] ?? '');
+            if ($code !== '' && ! in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        $lawMeta['law_groups'] = $codes;
+        $lawMeta['law_group'] = $codes[0] ?? '';
+
+        return $lawMeta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $lawMeta
+     * @return array<string, mixed>
+     */
+    private function normalizeChangeStatusFields(array $lawMeta): array
+    {
+        /** @var ChangeStatuses $changeStatuses */
+        $changeStatuses = app(ChangeStatuses::class);
+
+        if (array_key_exists('change_status', $lawMeta)) {
+            $raw = trim((string) ($lawMeta['change_status'] ?? ''));
+            if ($raw !== '') {
+                $resolved = $changeStatuses->resolve($raw);
+                if ($resolved === null) {
+                    throw ValidationException::withMessages([
+                        'law_meta.change_status' => ['ไม่พบสถานะการเปลี่ยนแปลงที่เลือก'],
+                    ]);
+                }
+                $lawMeta['change_status'] = (string) ($resolved['code'] ?? '');
+            }
+        }
+
+        if (array_key_exists('change_details', $lawMeta)) {
+            $details = is_array($lawMeta['change_details']) ? $lawMeta['change_details'] : [$lawMeta['change_details']];
+            $codes = [];
+            foreach ($details as $detail) {
+                $raw = trim((string) $detail);
+                if ($raw === '') {
+                    continue;
+                }
+
+                $resolved = $changeStatuses->resolveDetail($raw);
+                if ($resolved === null) {
+                    throw ValidationException::withMessages([
+                        'law_meta.change_details' => ['ไม่พบรายละเอียดการเปลี่ยนแปลงที่เลือก'],
+                    ]);
+                }
+
+                $code = (string) ($resolved['code'] ?? '');
+                if ($code !== '' && ! in_array($code, $codes, true)) {
+                    $codes[] = $code;
+                }
+            }
+            $lawMeta['change_details'] = $codes;
+        }
+
+        return $lawMeta;
     }
 }

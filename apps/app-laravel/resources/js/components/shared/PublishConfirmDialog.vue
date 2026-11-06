@@ -78,6 +78,7 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { fetchStatus } from '../../api/client';
 import type { DocumentStatus } from '../../types/document';
 import { isEsignApproved } from '../../utils/esignStatus';
+import { useLawStatus } from '../../composables/useLawStatus';
 
 type ChecklistLevel = 'required' | 'optional';
 
@@ -102,6 +103,7 @@ const emit = defineEmits<{
 
 const documentStore = useDocumentStore();
 const docStatus = ref<DocumentStatus | null>(null);
+const { isDraft, statusLabel } = useLawStatus();
 
 const open = computed({
   get: () => props.modelValue,
@@ -161,12 +163,12 @@ const checklist = computed<ChecklistItem[]>(() => {
   });
 
   // 5. สถานะบังคับใช้ (required — ต้องไม่เป็น "ร่าง")
-  const statusOk = !!currentMeta?.status && currentMeta.status !== 'ร่าง';
+  const statusOk = !!currentMeta?.status && !isDraft(currentMeta.status);
   items.push({
     key: 'status',
     label: 'สถานะการบังคับใช้',
     ok: statusOk,
-    status: statusOk ? currentMeta!.status : 'ยังเป็นร่าง',
+    status: statusOk ? statusLabel(currentMeta!.status) : 'ยังเป็นร่าง',
     level: 'required',
   });
 

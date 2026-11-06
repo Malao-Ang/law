@@ -10,12 +10,12 @@
           <span class="law-info-row__label text-medium-emphasis">สถานะ</span>
           <span class="law-info-row__value font-weight-semibold d-flex align-center justify-end ga-1" :class="statusClass(meta.status)">
             <v-icon icon="mdi-circle" size="x-small" />
-            {{ meta.status }}
+            {{ statusLabel(meta.status) }}
           </span>
         </div>
         <div v-if="showChangeStatus" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">สถานะการเปลี่ยนแปลง</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.change_status }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ changeStatusLabel(meta.change_status) }}</span>
         </div>
         <div v-if="meta.promulgation_date" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">วันที่ประกาศ</span>
@@ -27,19 +27,15 @@
         </div>
         <div v-if="meta.law_type" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">ประเภท</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.law_type }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ typeLabel(meta.law_type) }}</span>
         </div>
         <div v-if="meta.gazette_reference" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">อ้างอิง</span>
           <span class="law-info-row__value font-weight-semibold">{{ meta.gazette_reference }}</span>
         </div>
-        <div v-if="meta.issuer" class="law-info-row py-1">
-          <span class="law-info-row__label text-medium-emphasis">ออกโดย</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.issuer }}</span>
-        </div>
         <div v-if="meta.law_group" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมาย</span>
-          <span class="law-info-row__value font-weight-semibold">{{ meta.law_group }}</span>
+          <span class="law-info-row__value font-weight-semibold">{{ categoryLabel(meta.law_group) }}</span>
         </div>
         <div v-if="meta.agency" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">หน่วยงาน</span>
@@ -54,7 +50,7 @@
         <div v-if="meta.law_groups?.length > 1" class="law-info-row py-1">
           <span class="law-info-row__label text-medium-emphasis">กลุ่มกฎหมายทั้งหมด</span>
           <div class="d-flex flex-wrap ga-1 justify-end">
-            <v-chip v-for="group in meta.law_groups" :key="group" size="x-small" variant="tonal">{{ group }}</v-chip>
+            <v-chip v-for="group in categoryLabels(meta.law_groups)" :key="group" size="x-small" variant="tonal">{{ group }}</v-chip>
           </div>
         </div>
         <div v-if="meta.expiry_date" class="law-info-row py-1">
@@ -161,6 +157,14 @@ import { computed } from 'vue';
 import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
+import { useChangeStatus } from '../../composables/useChangeStatus';
+
+const { typeLabel } = useLawType();
+const { categoryLabel, categoryLabels } = useLawCategory();
+const { label: changeStatusLabel, isNew: isNewStatus } = useChangeStatus();
 
 interface SectionRelationGroup {
   type: RelationType;
@@ -198,10 +202,11 @@ function relHref(rel: LawRelation): string | undefined {
 
 const parentNames = computed(() => props.parentNames ?? []);
 const sectionRelationSummaries = computed(() => props.sectionRelationSummaries ?? []);
+const { isInForce, isRepealed, statusLabel } = useLawStatus();
 
 const showChangeStatus = computed(() => {
-  const changeStatus = props.meta.change_status?.trim();
-  return !!changeStatus && changeStatus !== 'กฎหมายใหม่';
+  const cs = props.meta.change_status?.trim();
+  return !!cs && !isNewStatus(cs);
 });
 
 function formatLawDate(value: string | null | undefined): string {
@@ -209,8 +214,8 @@ function formatLawDate(value: string | null | undefined): string {
 }
 
 function statusClass(status: string): string {
-  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'text-success';
-  if (status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'text-error';
+  if (isInForce(status)) return 'text-success';
+  if (isRepealed(status)) return 'text-error';
   return 'text-warning';
 }
 </script>

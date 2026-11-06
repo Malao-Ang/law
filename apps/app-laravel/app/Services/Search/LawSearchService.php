@@ -2,45 +2,29 @@
 
 namespace App\Services\Search;
 
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
+
 class LawSearchService
 {
-    private const TERM_FILTERS = ['law_type', 'status', 'change_status', 'agency', 'law_group', 'signer_group'];
+    private const TERM_FILTERS = ['law_type', 'law_family', 'status', 'change_status', 'agency', 'law_group', 'signer_group'];
     private const FUZZY_MIN_QUERY_LENGTH = 4;
-    private const EXTERNAL_LAW_TYPE_ALIASES = [
-        'กฎหมายภายนอก',
-        'พระราชบัญญัติ',
-        'พระราชกำหนด',
-        'กฎกระทรวง',
-        'ประกาศกระทรวง',
-        'พ.ร.บ.',
-        'พ.ร.บ',
-        'พรบ',
-        'พ.ร.ก.',
-        'พ.ร.ก',
-        'พรก',
-        'phrb',
-        'prb',
-        'phrk',
-        'kotmai-krung',
-        'kotmai-phaainok',
-        'kot-krathruang',
-        'kotmai-krw',
-        'prakat-krw',
-    ];
-    private const EXTERNAL_LAW_GROUP_ALIASES = [
-        'กฎหมายภายนอก',
-        'kotmai-phaainok',
-        'kotmai-krung',
-    ];
-    private const LAW_TYPE_FILTER_ALIASES = [
-        'external' => ['กฎหมายภายนอก', 'kotmai-phaainok', 'kotmai-krung'],
-        'external-act' => ['พระราชบัญญัติ', 'พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'],
-        'external-decree' => ['พระราชกำหนด', 'พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'],
-        'external-ministerial-rule' => ['กฎกระทรวง', 'kot-krathruang', 'kotmai-krw'],
-        'external-ministerial-announcement' => ['ประกาศกระทรวง', 'prakat-krw'],
-    ];
+    private readonly LawTypes $lawTypes;
+    private readonly LawCategories $lawCategories;
+    private readonly ChangeStatuses $changeStatuses;
 
-    public function __construct(private readonly ElasticClient $client) {}
+    public function __construct(
+        private readonly ElasticClient $client,
+        ?LawTypes $lawTypes = null,
+        ?LawCategories $lawCategories = null,
+        ?ChangeStatuses $changeStatuses = null,
+    ) {
+        $this->lawTypes = $lawTypes ?? app(LawTypes::class);
+        $this->lawCategories = $lawCategories ?? app(LawCategories::class);
+        $this->changeStatuses = $changeStatuses ?? app(ChangeStatuses::class);
+    }
+
 
     /**
      * @param  array{q?:string,filters?:array<string,mixed>,page?:int,per_page?:int}  $params
@@ -77,6 +61,7 @@ class LawSearchService
 
         return $this->parse($raw, $mode);
     }
+
 
     /**
      * @param  array<string,mixed>  $filters
@@ -126,6 +111,7 @@ class LawSearchService
         return $this->buildBodyFromMust($must, $filters, $page, $perPage);
     }
 
+
     /**
      * @param  array<string,mixed>  $filters
      * @return array<string,mixed>
@@ -163,6 +149,7 @@ class LawSearchService
         return $this->buildBodyFromMust($must, $filters, $page, $perPage);
     }
 
+
     /**
      * @param  array<string,mixed>  $raw
      * @param  array<int,string>  $variants
@@ -183,6 +170,7 @@ class LawSearchService
 
         return $exact === 0 ? 'fuzzy' : 'exact';
     }
+
 
     /**
      * @param  array<string,mixed>  $hit
@@ -226,6 +214,7 @@ class LawSearchService
 
         return false;
     }
+
 
     /**
      * @return array<string,mixed>
@@ -271,6 +260,7 @@ class LawSearchService
             ],
         ];
     }
+
 
     /**
      * @param  array<int,string>  $variants
@@ -318,6 +308,7 @@ class LawSearchService
         ];
     }
 
+
     /**
      * @param  array<string,mixed>  $must
      * @param  array<string,mixed>  $filters
@@ -327,11 +318,20 @@ class LawSearchService
     {
 
         $filterClauses = [$this->visibleAccessFilter()];
+        if (config('auth_ldap.enforced')) {
+            $filterClauses[] = app(\App\Services\Auth\DocumentAccess::class)->searchVisibilityFilter(request());
+        }
         foreach (self::TERM_FILTERS as $field) {
             if (! empty($filters[$field])) {
                 $values = array_values((array) $filters[$field]);
                 if ($field === 'law_type') {
                     $values = $this->expandLawTypeFilterValues($values);
+                } elseif ($field === 'law_family') {
+                    $values = $this->expandLawFamilyFilterValues($values);
+                } elseif ($field === 'law_group') {
+                    $values = $this->expandLawCategoryFilterValues($values);
+                } elseif ($field === 'change_status') {
+                    $values = $this->expandChangeStatusFilterValues($values);
                 }
                 $filterClauses[] = ['terms' => [$field => $values]];
             }
@@ -384,6 +384,7 @@ class LawSearchService
         ];
     }
 
+
     /**
      * @param  array<int,mixed>  $values
      * @return array<int,string>
@@ -398,49 +399,128 @@ class LawSearchService
             }
             $key = $this->lawTypeFilterKey($type);
             if ($key === 'external') {
-                array_push($expanded, ...self::EXTERNAL_LAW_TYPE_ALIASES);
+                $this->pushFamilyFilterValues($expanded, 'LFM04');
                 continue;
             }
-            $aliases = self::LAW_TYPE_FILTER_ALIASES[$key] ?? [$type];
-            foreach ($aliases as $alias) {
-                $expanded[] = $alias;
+            $family = $this->lawTypes->family($type);
+            if ($family !== null) {
+                $this->pushFamilyFilterValues($expanded, (string) $family['code']);
+                continue;
             }
+            $resolved = $this->lawTypes->resolve($type);
+            if ($resolved !== null) {
+                $this->pushTypeFilterValues($expanded, $resolved);
+                continue;
+            }
+
+            $expanded[] = $type;
         }
 
-        return array_values(array_unique($expanded));
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
     }
 
-    private function canonicalLawType(string $lawType): string
-    {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_TYPE_ALIASES, true),
-                str_contains($lawType, 'พระราชบัญญัติ'),
-                str_contains($lawType, 'พระราชกำหนด'),
-                str_contains($lawType, 'กฎกระทรวง'),
-                str_contains($lawType, 'ประกาศกระทรวง') => 'kotmai-phaainok',
-            default => 'other',
-        };
+    /**
+     * @param  list<string>  $expanded
+     */
+    private function pushFamilyFilterValues(array &$expanded, string $familyCode): void
+    {
+        foreach ($this->lawTypes->codesOfFamily($familyCode) as $code) {
+            $type = $this->lawTypes->resolve($code);
+            if ($type !== null) {
+                $this->pushTypeFilterValues($expanded, $type);
+            }
+        }
+    }
+
+
+    /**
+     * @param  list<string>  $expanded
+     * @param  array<string,mixed>  $type
+     */
+    private function pushTypeFilterValues(array &$expanded, array $type): void
+    {
+        $expanded[] = (string) ($type['code'] ?? '');
+        $expanded[] = (string) ($type['name'] ?? '');
+        foreach ((array) ($type['aliases'] ?? []) as $alias) {
+            $expanded[] = (string) $alias;
+        }
+    }
+
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandLawFamilyFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $family = $this->lawTypes->family($value);
+            $expanded[] = $family === null ? trim((string) $value) : (string) $family['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
+    }
+
+
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandLawCategoryFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $category = $this->lawCategories->resolve($value);
+            $expanded[] = $category === null ? trim((string) $value) : (string) $category['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
+    }
+
+
+    /**
+     * @param  array<int,mixed>  $values
+     * @return array<int,string>
+     */
+    private function expandChangeStatusFilterValues(array $values): array
+    {
+        $expanded = [];
+        foreach ($values as $value) {
+            $status = $this->changeStatuses->resolve($value);
+            $expanded[] = $status === null ? trim((string) $value) : (string) $status['code'];
+        }
+
+        return array_values(array_unique(array_filter($expanded, static fn (string $value): bool => $value !== '')));
     }
 
     private function lawTypeFilterKey(string $lawType): string
     {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+        if ($this->lawTypes->family($lawType) !== null) {
+            return $this->lawTypes->familyOf($lawType) === 'LFM04' ? 'external' : $this->canonicalLawType($lawType);
+        }
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_GROUP_ALIASES, true) => 'external',
-            str_contains($lawType, 'พระราชบัญญัติ'),
-                in_array($compact, ['พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'], true) => 'external-act',
-            str_contains($lawType, 'พระราชกำหนด'),
-                in_array($compact, ['พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'], true) => 'external-decree',
-            str_contains($lawType, 'กฎกระทรวง'),
-                in_array($compact, ['kot-krathruang', 'kotmai-krw'], true) => 'external-ministerial-rule',
-            str_contains($lawType, 'ประกาศกระทรวง'),
-                $compact === 'prakat-krw' => 'external-ministerial-announcement',
-            default => 'other',
+        $code = (string) ($this->lawTypes->resolve($lawType)['code'] ?? '');
+
+        return match ($code) {
+            'LTY05' => 'external-act',
+            'LTY04' => 'external-decree',
+            'LTY06' => 'external-ministerial-rule',
+            'LTY07' => 'external-ministerial-announcement',
+            default => $this->canonicalLawType($lawType),
+        };
+    }
+
+    private function canonicalLawType(string $lawType): string
+    {
+        $familyCode = $this->lawTypes->familyOf($lawType);
+
+        return match ($familyCode) {
+            'LFM01' => 'kho-bangkhab',
+            'LFM02' => 'rabiap',
+            'LFM03' => 'prakat',
+            'LFM04' => 'kotmai-phaainok',
+            default => $this->lawTypes->sourceOf($lawType) === 'external' ? 'kotmai-phaainok' : 'other',
         };
     }
 
@@ -478,7 +558,10 @@ class LawSearchService
                 $snippets[] = mb_substr((string) $source['text'], 0, 200);
             }
 
-            $restricted = $this->isRestrictedSource($source);
+            $restricted = config('auth_ldap.enforced')
+                ? ! app(\App\Services\Auth\DocumentAccess::class)->canRead(request(), $source)
+                : $this->isRestrictedSource($source);
+            if (config('auth_ldap.enforced') && ! ($source['is_published'] ?? false) && $restricted) continue;
 
             $titleHighlighted = null;
             $titleHighlightFragments = $hit['highlight']['title'] ?? [];
@@ -495,17 +578,25 @@ class LawSearchService
                 }
             }
 
+            $rawType = (string) ($source['law_type'] ?? '');
+            $type = $this->lawTypes->resolve($rawType);
+
             $results[] = [
                 'law_id' => $source['law_id'] ?? null,
                 'title' => $source['title'] ?? null,
                 'title_highlighted' => $titleHighlighted,
-                'law_type' => $source['law_type'] ?? null,
+                'law_type' => $source['law_type_label'] ?? ($type === null ? ($source['law_type'] ?? null) : (string) ($type['name'] ?? $rawType)),
+                'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
+                'law_family' => $source['law_family'] ?? ($type['attrs']['family_code'] ?? null),
                 'status' => $source['status'] ?? null,
-                'change_status' => $source['change_status'] ?? null,
+                'change_status' => $source['change_status_label'] ?? $this->changeStatuses->labelOf($source['change_status'] ?? ''),
+                'change_status_code' => (string) ($source['change_status'] ?? ''),
                 'summary' => $source['summary'] ?? null,
                 'published_date' => $source['published_date'] ?? null,
                 'agency' => $source['agency'] ?? null,
-                'law_group' => $source['law_group'] ?? null,
+                'law_group' => $source['law_group_labels'][0] ?? $this->lawCategories->labelOf($source['law_group'] ?? ''),
+                'law_groups' => (array) ($source['law_group_labels'] ?? []),
+                'law_group_codes' => (array) ($source['law_groups'] ?? []),
                 'signer_group' => $source['signer_group'] ?? null,
                 'restricted' => $restricted,
                 'requires_permission' => $restricted && $this->hasPermissionGroups($source),
@@ -519,7 +610,9 @@ class LawSearchService
         $facets = [];
         foreach (self::TERM_FILTERS as $field) {
             $facets[$field] = array_map(
-                fn (array $bucket): array => ['value' => (string) $bucket['key'], 'count' => (int) $bucket['doc_count']],
+                fn (array $bucket): array => $field === 'change_status'
+                    ? ['value' => (string) $bucket['key'], 'label' => $this->changeStatuses->labelOf($bucket['key'] ?? ''), 'count' => (int) $bucket['doc_count']]
+                    : ['value' => (string) $bucket['key'], 'count' => (int) $bucket['doc_count']],
                 $raw['aggregations'][$field]['buckets'] ?? [],
             );
         }
@@ -540,6 +633,7 @@ class LawSearchService
             ],
         ];
     }
+
 
     /**
      * @param  array<string,mixed>  $raw
@@ -572,6 +666,7 @@ class LawSearchService
         return round(min(1.0, $confidence), 2);
     }
 
+
     /**
      * @param  array<int, array<string,mixed>>  $results
      */
@@ -586,6 +681,7 @@ class LawSearchService
             $results,
         )), 2);
     }
+
 
     /**
      * Keep indexed public docs and private teasers visible.
@@ -608,6 +704,7 @@ class LawSearchService
         ];
     }
 
+
     /**
      * @param  array<string,mixed>  $source
      */
@@ -616,6 +713,7 @@ class LawSearchService
         return ($source['visibility'] ?? null) === 'restricted'
             || ($source['access_scope'] ?? null) === 'private';
     }
+
 
     /**
      * @param  array<string,mixed>  $source

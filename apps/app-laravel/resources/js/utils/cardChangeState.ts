@@ -1,3 +1,8 @@
+import { useLawStatus } from '../composables/useLawStatus';
+import { createChangeStatusCatalog } from '../composables/useChangeStatus';
+
+const _cs = createChangeStatusCatalog({ types: [], typesAll: [], details: [], detailsAll: [] });
+
 export type CardChangeVariant = 'cancelled' | 'partial' | 'revise' | 'new';
 
 export interface CardChangeState {
@@ -10,11 +15,12 @@ export interface CardChangeState {
  * First match wins. Unknown/empty → 'new' (green agency strip / default).
  */
 export function cardChangeState(changeStatus?: string | null, status?: string | null): CardChangeState {
+  const { isRepealed } = useLawStatus();
   const change = (changeStatus ?? '').trim();
   const use = (status ?? '').trim();
 
-  if (use === 'ยกเลิกการใช้งาน') return { variant: 'new', label: '' };
+  if (isRepealed(use)) return { variant: 'new', label: '' };
   if (change.startsWith('ยกเลิก')) return { variant: 'partial', label: 'ยกเลิกบางส่วน' };
-  if (change.startsWith('ปรับปรุง')) return { variant: 'revise', label: change };
+  if (_cs.isWhole(change) || _cs.isSection(change)) return { variant: 'revise', label: _cs.label(change) };
   return { variant: 'new', label: '' };
 }

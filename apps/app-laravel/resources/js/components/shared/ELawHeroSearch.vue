@@ -4,6 +4,8 @@ import FilterTypeBadge from './FilterTypeBadge.vue';
 import { useLawSearchStore } from '../../stores/lawSearchStore';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import type { LawSuggestion } from '../../types/lawSearch';
+import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const emit = defineEmits<{
   search: [query: string, types: string[], groups: string[]];
@@ -16,6 +18,8 @@ const queryInput = ref<{ focus?: () => void } | null>(null);
 
 // Live near-word suggestions (the suggest endpoint already falls back to fuzzy).
 const searchStore = useLawSearchStore();
+const lawTypes = useLawType();
+const lawCategories = useLawCategory();
 const searchFocused = ref(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,30 +75,19 @@ onBeforeUnmount(() => {
   searchStore.clearSuggestions();
 });
 
-const typeOptions = ['ทั้งหมด', 'ข้อบังคับ', 'ระเบียบ', 'ประกาศ', 'กฎหมายภายนอก'];
+const typeOptions = computed(() => ['ทั้งหมด', ...lawTypes.familiesOrdered.value.map((family) => family.title)]);
+const typeToValue = computed<Record<string, string>>(() =>
+  Object.fromEntries(lawTypes.familiesOrdered.value.map((family) => [family.title, family.code])),
+);
 
-const typeToValue: Record<string, string> = {
-  'กฎหมายภายนอก': 'kotmai-phaainok',
-  'ข้อบังคับ': 'kho-bangkhab',
-  'ระเบียบ': 'rabiap',
-  'ประกาศ': 'prakat',
-};
-
-const groupFilters = [
-  { label: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', value: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร' },
-  { label: 'ด้านกิจการนิสิต', value: 'ด้านกิจการนิสิต' },
-  { label: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์', value: 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์' },
-  { label: 'ด้านบริการวิชาการ', value: 'ด้านบริการวิชาการ' },
-  { label: 'ด้านโครงสร้างองค์กรและระบบการบริหาร', value: 'ด้านโครงสร้างองค์กรและระบบการบริหาร' },
-  { label: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ', value: 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ' },
-  { label: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง', value: 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง' },
-  { label: 'ด้านอื่น ๆ', value: 'ด้านอื่น ๆ' },
-];
+const groupFilters = computed(() =>
+  lawCategories.categoryOptions.value.map((item) => ({ label: item.title, value: item.code })),
+);
 
 const popularTags = ['อัตราเบิกค่าใช้จ่ายเดินทาง', 'กองทุนสร้างเสริมสุขภาพ', 'โครงสร้างสถาบันวิจัย'];
 
 function emitSearch(): void {
-  const types = selectedType.value === 'ทั้งหมด' ? [] : [typeToValue[selectedType.value] ?? selectedType.value];
+  const types = selectedType.value === 'ทั้งหมด' ? [] : [typeToValue.value[selectedType.value] ?? selectedType.value];
   emit('search', query.value, types, selectedGroups.value);
 }
 

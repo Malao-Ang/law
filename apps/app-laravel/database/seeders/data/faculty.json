@@ -1,0 +1,162 @@
+[
+  {
+    "fac_id": "94",
+    "fac_nameth": "คณะดนตรีและการแสดง",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "99",
+    "fac_nameth": "คณะทันตแพทยศาสตร์",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "46",
+    "fac_nameth": "คณะนิติศาสตร์",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "97",
+    "fac_nameth": "คณะบริหารธุรกิจ",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "04",
+    "fac_nameth": "คณะพยาบาลศาสตร์",
+    "fac_priority": "7"
+  },
+  {
+    "fac_id": "05",
+    "fac_nameth": "คณะมนุษยศาสตร์และสังคมศาสตร์",
+    "fac_priority": "11"
+  },
+  {
+    "fac_id": "45",
+    "fac_nameth": "คณะรัฐศาสตร์",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "44",
+    "fac_nameth": "คณะวิทยาการสารสนเทศ",
+    "fac_priority": "14"
+  },
+  {
+    "fac_id": "06",
+    "fac_nameth": "คณะวิทยาศาสตร์",
+    "fac_priority": "15"
+  },
+  {
+    "fac_id": "35",
+    "fac_nameth": "คณะวิทยาศาสตร์การกีฬา",
+    "fac_priority": "16"
+  },
+  {
+    "fac_id": "84",
+    "fac_nameth": "คณะวิทยาศาสตร์และศิลปศาสตร์",
+    "fac_priority": "17"
+  },
+  {
+    "fac_id": "90",
+    "fac_nameth": "คณะวิทยาศาสตร์และสังคมศาสตร์",
+    "fac_priority": "18"
+  },
+  {
+    "fac_id": "07",
+    "fac_nameth": "คณะวิศวกรรมศาสตร์",
+    "fac_priority": "19"
+  },
+  {
+    "fac_id": "08",
+    "fac_nameth": "คณะศิลปกรรมศาสตร์",
+    "fac_priority": "20"
+  },
+  {
+    "fac_id": "09",
+    "fac_nameth": "คณะศึกษาศาสตร์",
+    "fac_priority": "21"
+  },
+  {
+    "fac_id": "41",
+    "fac_nameth": "คณะสหเวชศาสตร์",
+    "fac_priority": "22"
+  },
+  {
+    "fac_id": "10",
+    "fac_nameth": "คณะสาธารณสุขศาสตร์",
+    "fac_priority": "23"
+  },
+  {
+    "fac_id": "85",
+    "fac_nameth": "คณะอัญมณี",
+    "fac_priority": "24"
+  },
+  {
+    "fac_id": "91",
+    "fac_nameth": "คณะเทคโนโลยีการเกษตร",
+    "fac_priority": "5"
+  },
+  {
+    "fac_id": "83",
+    "fac_nameth": "คณะเทคโนโลยีทางทะเล",
+    "fac_priority": "6"
+  },
+  {
+    "fac_id": "42",
+    "fac_nameth": "คณะเภสัชศาสตร์",
+    "fac_priority": "9"
+  },
+  {
+    "fac_id": "25",
+    "fac_nameth": "คณะแพทยศาสตร์",
+    "fac_priority": "8"
+  },
+  {
+    "fac_id": "34",
+    "fac_nameth": "คณะโลจิสติกส์",
+    "fac_priority": "13"
+  },
+  {
+    "fac_id": "03",
+    "fac_nameth": "บัณฑิตวิทยาลัย",
+    "fac_priority": null
+  },
+  {
+    "fac_id": "26",
+    "fac_nameth": "วิทยาลัยนานาชาติ",
+    "fac_priority": "26"
+  },
+  {
+    "fac_id": "93",
+    "fac_nameth": "สถาบันภาษา",
+    "fac_priority": "31"
+  },
+  {
+    "fac_id": "11",
+    "fac_nameth": "สถาบันวิทยาศาสตร์ทางทะเล",
+    "fac_priority": "30"
+  },
+  {
+    "fac_id": "12",
+    "fac_nameth": "สำนักคอมพิวเตอร์",
+    "fac_priority": "32"
+  },
+  {
+    "fac_id": "01",
+    "fac_nameth": "สำนักงานสภามหาวิทยาลัย",
+    "fac_priority": "1"
+  },
+  {
+    "fac_id": "02",
+    "fac_nameth": "สำนักงานอธิการบดี",
+    "fac_priority": "2"
+  },
+  {
+    "fac_id": "13",
+    "fac_nameth": "สำนักบริการวิชาการ",
+    "fac_priority": "33"
+  },
+  {
+    "fac_id": "14",
+    "fac_nameth": "สำนักหอสมุด",
+    "fac_priority": "34"
+  }
+]

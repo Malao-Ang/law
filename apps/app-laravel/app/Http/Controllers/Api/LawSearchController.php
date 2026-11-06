@@ -5,6 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSearchRequest;
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
+use App\Services\MasterData\MasterDataKind;
+use App\Services\MasterData\MasterDataStore;
 use App\Services\ReviewStore;
 use App\Services\Search\LawIndexer;
 use App\Services\Search\LawSearchQuery;
@@ -16,33 +22,12 @@ use Illuminate\Support\Facades\Log;
 
 class LawSearchController extends Controller
 {
-    private const EXTERNAL_LAW_TYPE_ALIASES = [
-        'กฎหมายภายนอก',
-        'พระราชบัญญัติ',
-        'พระราชกำหนด',
-        'กฎกระทรวง',
-        'ประกาศกระทรวง',
-        'พ.ร.บ.',
-        'พ.ร.บ',
-        'พรบ',
-        'พ.ร.ก.',
-        'พ.ร.ก',
-        'พรก',
-        'phrb',
-        'prb',
-        'phrk',
-        'kotmai-krung',
-        'kotmai-phaainok',
-        'kot-krathruang',
-        'kotmai-krw',
-        'prakat-krw',
-    ];
-
-    private const EXTERNAL_LAW_GROUP_ALIASES = [
-        'กฎหมายภายนอก',
-        'kotmai-phaainok',
-        'kotmai-krung',
-    ];
+    public function __construct(
+        private readonly EnforcementStatuses $enforcementStatuses,
+        private readonly LawTypes $lawTypes,
+        private readonly LawCategories $lawCategories,
+        private readonly ChangeStatuses $changeStatuses,
+    ) {}
 
     public function search(LawSearchRequest $request, LawSearchService $service, LawSuggestService $suggestService, ReviewStore $store): JsonResponse
     {
@@ -69,10 +54,16 @@ class LawSearchController extends Controller
         // drops unpublished, draft, or stale-filter docs the ES index may still contain.
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
+            if (config('auth_ldap.enforced')) {
+                if ($this->rowSearchVisible($metaRow) && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])) {
+                    $publishedIds[(string) $metaRow['document_id']] = true;
+                }
+                continue;
+            }
             if (
                 ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
-                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+                && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
                 && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])
             ) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
@@ -140,6 +131,7 @@ class LawSearchController extends Controller
         return 'law-search:elastic-unavailable:'.sha1((string) config('search.host').'|'.(string) config('search.index'));
     }
 
+
     /**
      * @param  array<string,mixed>  $row
      * @param  array<string,mixed>|null  $fileRow
@@ -147,15 +139,20 @@ class LawSearchController extends Controller
      */
     private function overlayCurrentAccessState(array $row, ?array $fileRow): array
     {
+        if (config('auth_ldap.enforced') && $fileRow === null) {
+            $access = app(\App\Services\Auth\DocumentAccess::class);
+            $document = $access->readDocument((string) ($row['law_id'] ?? ''));
+            $row['restricted'] = $document === null || ! $access->canRead(request(), $document);
+            $row['requires_permission'] = $row['restricted'] && $this->hasPermissionGroups($document ?? []);
+            if ($row['restricted']) $row['snippets'] = [];
+        }
         if ($fileRow === null) {
             $row['source'] = $this->sourceForLawType((string) ($row['law_type'] ?? ''));
-            $row['issuer'] = (string) ($row['issuer'] ?? '');
 
             return $row;
         }
 
         $row['source'] = (string) ($fileRow['source'] ?? $this->sourceForLawType((string) ($row['law_type'] ?? '')));
-        $row['issuer'] = (string) ($fileRow['issuer'] ?? ($row['issuer'] ?? ''));
         if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
             $row['title_highlighted'] = $fileRow['title_highlighted'];
         }
@@ -183,6 +180,7 @@ class LawSearchController extends Controller
         $metaById = array_column($allMeta, null, 'document_id');
         $childTypeIndex = [];
         foreach ($allMeta as $meta) {
+            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($meta)) continue;
             $type = $this->canonicalType((string) ($meta['law_type'] ?? ''));
             foreach (LawMetaNormalizer::parentDocumentIds($meta) as $parentId) {
                 $childTypeIndex[$parentId][$type] = ($childTypeIndex[$parentId][$type] ?? 0) + 1;
@@ -193,13 +191,14 @@ class LawSearchController extends Controller
         $deferredContentRows = [];
         $deferContentSearch = ! $query->isEmpty() && ! $query->isBoolean();
         foreach ($allMeta as $row) {
-            if (($row['status'] ?? '') !== 'ingested') {
+            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($row)) continue;
+            if (! config('auth_ldap.enforced') && ($row['status'] ?? '') !== 'ingested') {
                 continue;
             }
-            if (($row['published_date'] ?? '') === '') {
+            if (! config('auth_ldap.enforced') && ($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if (($row['meta_status'] ?? '') === 'ร่าง') {
+            if (! config('auth_ldap.enforced') && $this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue; // Hide draft documents from public search
             }
 
@@ -250,32 +249,37 @@ class LawSearchController extends Controller
             && ! $query->isEmpty()
             && ! $query->isNegatedOnly();
         $results = array_map(function (array $r) use ($query, $store, $childTypeIndex, $metaById, $includeHeavyDetails): array {
-            $restricted = LawMetaNormalizer::effectiveVisibility($r) === 'restricted';
+            $restricted = $this->rowRestricted($r);
             $requiresPermission = $restricted && $this->hasPermissionGroups($r);
             $id = (string) $r['document_id'];
+
+            $lawType = $this->lawTypes->resolve($r['law_type'] ?? '');
 
             return [
                 'law_id' => $id,
                 'title' => $r['title'],
                 'title_highlighted' => $this->highlightTitle((string) ($r['title'] ?? ''), $query),
-                'law_type' => $r['law_type'],
+                'law_type' => $lawType === null ? $r['law_type'] : (string) ($lawType['name'] ?? $r['law_type']),
+                'law_type_code' => $lawType === null ? (string) ($r['law_type'] ?? '') : (string) ($lawType['code'] ?? ''),
                 'source' => $this->sourceForLawType((string) ($r['law_type'] ?? '')),
-                'issuer' => (string) ($r['issuer'] ?? ''),
                 'status' => $r['meta_status'],
-                'change_status' => $r['change_status'],
+                'change_status' => $this->changeStatuses->labelOf($r['change_status'] ?? ''),
+                'change_status_code' => $this->changeStatusCode($r['change_status'] ?? ''),
                 'summary' => null,
                 'published_date' => $r['published_date'] ?? null,
                 'agency' => $r['agencies'][0] ?? null,
-                'law_group' => $r['law_groups'][0] ?? null,
+                'law_group' => $this->lawCategories->labelOf($r['law_groups'][0] ?? ''),
+                'law_groups' => $this->lawCategories->labelsOf((array) ($r['law_groups'] ?? [])),
+                'law_group_codes' => $this->categoryCodesFromRow($r),
                 'signer_group' => $r['signer_group'],
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],
-                'related_laws' => $includeHeavyDetails ? $this->relatedLawSummaries($id, $store, $metaById) : [],
-                'affected_sections' => $this->affectedSections($id, $store),
+                'related_laws' => ($includeHeavyDetails && (! config('auth_ldap.enforced') || ! $restricted)) ? $this->relatedLawSummaries($id, $store, $metaById) : [],
+                'affected_sections' => (! config('auth_ldap.enforced') || ! $restricted) ? $this->affectedSections($id, $store) : [],
                 'confidence' => (float) ($r['_search_confidence'] ?? 0.5),
                 'match_mode' => (string) ($r['_search_match_mode'] ?? 'file_browse'),
-                'snippets' => ($includeHeavyDetails && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
+                'snippets' => (($includeHeavyDetails || config('auth_ldap.enforced')) && ! $restricted) ? $this->makeFileBasedSnippets($id, $query, $store, (string) ($r['title'] ?? '')) : [],
                 'keywords' => array_values(array_filter((array) ($r['keywords'] ?? []), 'is_string')),
             ];
         }, $paged);
@@ -291,6 +295,7 @@ class LawSearchController extends Controller
         return ['total' => $total, 'results' => $results, 'facets' => $facets, 'meta' => $meta, 'fuzzy' => $usedFuzzy];
     }
 
+
     /**
      * @param  array<string,mixed>  $row
      */
@@ -303,6 +308,22 @@ class LawSearchController extends Controller
             )) !== [];
     }
 
+    private function rowRestricted(array $row): bool
+    {
+        if (! config('auth_ldap.enforced')) return LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument((string) ($row['document_id'] ?? ''));
+        return $document === null || ! $access->canRead(request(), $document);
+    }
+
+    private function rowSearchVisible(array $row): bool
+    {
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument((string) ($row['document_id'] ?? ''));
+        return $document !== null && (\App\Services\Auth\DocumentAccess::isPublished($document) || $access->canRead(request(), $document));
+    }
+
+
     /**
      * @param  array<string,mixed>  $row
      * @param  array<string,mixed>  $filters
@@ -313,7 +334,12 @@ class LawSearchController extends Controller
             return false;
         }
 
-        foreach (['change_status', 'signer_group'] as $field) {
+        $wantChangeStatus = $filters['change_status'] ?? null;
+        if (! empty($wantChangeStatus) && ! in_array($this->changeStatusCode($row['change_status'] ?? ''), (array) $wantChangeStatus, true)) {
+            return false;
+        }
+
+        foreach (['signer_group'] as $field) {
             $want = $filters[$field] ?? null;
             if (! empty($want) && ! in_array($row[$field] ?? '', (array) $want, true)) {
                 return false;
@@ -334,13 +360,14 @@ class LawSearchController extends Controller
             return false;
         }
 
-        $wantGroup = $filters['law_group'] ?? null;
-        if (! empty($wantGroup) && array_intersect((array) $wantGroup, $row['law_groups'] ?? []) === []) {
+        $wantGroup = array_values((array) ($filters['law_group'] ?? []));
+        if ($wantGroup !== [] && array_intersect($wantGroup, $this->categoryCodesFromRow($row)) === []) {
             return false;
         }
 
         return true;
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -379,9 +406,20 @@ class LawSearchController extends Controller
             return true;
         }
 
+        $rowType = $this->lawTypes->resolve($lawType);
+        $rowTypeCode = (string) ($rowType['code'] ?? '');
+        $rowFamilyCode = (string) ($rowType['attrs']['family_code'] ?? '');
         $rowKey = $this->lawTypeFilterKey($lawType);
         foreach ((array) $want as $wantedType) {
             $wanted = (string) $wantedType;
+            $wantedTypeItem = $this->lawTypes->resolve($wanted);
+            if ($wantedTypeItem !== null && $rowTypeCode !== '' && (string) ($wantedTypeItem['code'] ?? '') === $rowTypeCode) {
+                return true;
+            }
+            $wantedFamily = $this->lawTypes->family($wanted);
+            if ($wantedFamily !== null && $rowFamilyCode !== '' && (string) ($wantedFamily['code'] ?? '') === $rowFamilyCode) {
+                return true;
+            }
             $wantedKey = $this->lawTypeFilterKey($wanted);
             if ($lawType === $wanted || $rowKey === $wantedKey) {
                 return true;
@@ -394,6 +432,7 @@ class LawSearchController extends Controller
         return false;
     }
 
+
     /**
      * Concatenate a document's searchable metadata into one haystack string.
      *
@@ -405,7 +444,6 @@ class LawSearchController extends Controller
             (string) ($row['title'] ?? ''),
             (string) ($row['law_type'] ?? ''),
             (string) ($row['gazette_reference'] ?? ''),
-            (string) ($row['issuer'] ?? ''),
         ];
         foreach ((array) ($row['keywords'] ?? []) as $keyword) {
             $parts[] = (string) $keyword;
@@ -415,10 +453,12 @@ class LawSearchController extends Controller
         }
         foreach ((array) ($row['law_groups'] ?? []) as $group) {
             $parts[] = (string) $group;
+            $parts[] = $this->lawCategories->labelOf($group);
         }
 
         return trim(implode(' ', array_filter($parts, static fn (string $p): bool => trim($p) !== '')));
     }
+
 
     /**
      * @param  array<string,mixed>  $row
@@ -440,7 +480,7 @@ class LawSearchController extends Controller
                 ];
             }
 
-            if ($includeContent && LawMetaNormalizer::effectiveVisibility($row) !== 'restricted') {
+            if ($includeContent && ! $this->rowRestricted($row)) {
                 foreach ($this->loadExportChunks((string) ($row['document_id'] ?? ''), $store) as $chunk) {
                     $haystack .= ' '.(string) ($chunk['text'] ?? '');
                 }
@@ -463,7 +503,7 @@ class LawSearchController extends Controller
             return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.8];
         }
 
-        $restricted = LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
+        $restricted = $this->rowRestricted($row);
         if ($includeContent && ! $restricted && $this->contentMatches((string) ($row['document_id'] ?? ''), $query, $store)) {
             return ['matched' => true, 'mode' => 'file_exact', 'confidence' => 0.7];
         }
@@ -494,6 +534,7 @@ class LawSearchController extends Controller
             'confidence' => round(0.42 + (min(1.0, $similarity) * 0.24), 2),
         ];
     }
+
 
     /**
      * @param  array<string,mixed>  $payload
@@ -527,6 +568,7 @@ class LawSearchController extends Controller
         return $payload;
     }
 
+
     /**
      * @return string[]
      */
@@ -557,6 +599,7 @@ class LawSearchController extends Controller
         return array_slice(array_values(array_unique($terms)), 0, 5);
     }
 
+
     /**
      * @param  array<int, array<string,mixed>>  $results
      */
@@ -571,6 +614,7 @@ class LawSearchController extends Controller
             $results,
         )), 2);
     }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $results
@@ -588,6 +632,7 @@ class LawSearchController extends Controller
 
         return count($modes) === 1 ? $modes[0] : 'mixed';
     }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $results
@@ -659,6 +704,7 @@ class LawSearchController extends Controller
         return (2 * $intersection) / (count($leftGrams) + count($rightGrams));
     }
 
+
     /**
      * @return string[]
      */
@@ -677,6 +723,7 @@ class LawSearchController extends Controller
         return $grams;
     }
 
+
     /**
      * Per-request memo of export chunks so content search + snippet building
      * read each export file only once.
@@ -684,6 +731,7 @@ class LawSearchController extends Controller
      * @var array<string, array<int, array<string, mixed>>>
      */
     private array $exportChunkCache = [];
+
 
     /**
      * @return array<int, array<string, mixed>>
@@ -708,6 +756,7 @@ class LawSearchController extends Controller
 
         return $this->exportChunkCache[$documentId];
     }
+
 
     /**
      * Fallback text source: concatenate block text from the review document.
@@ -750,6 +799,7 @@ class LawSearchController extends Controller
 
         return false;
     }
+
 
     /**
      * @return string[]
@@ -796,6 +846,7 @@ class LawSearchController extends Controller
         return [];
     }
 
+
     /**
      * @param  array<string,array<string,mixed>>  $metaById
      * @return list<array{document_id:string,title:string,type:string}>
@@ -812,6 +863,7 @@ class LawSearchController extends Controller
             }
 
             $targetId = trim((string) ($rel['target_document_id'] ?? ''));
+            if (config('auth_ldap.enforced') && ($targetId === '' || ! isset($metaById[$targetId]) || ! $this->rowSearchVisible($metaById[$targetId]))) continue;
             $title = trim((string) ($rel['target_title'] ?? ''));
             if ($title === '' && $targetId !== '' && isset($metaById[$targetId])) {
                 $title = trim((string) ($metaById[$targetId]['title'] ?? ''));
@@ -829,6 +881,7 @@ class LawSearchController extends Controller
 
         return array_slice(array_values($items), 0, 3);
     }
+
 
     /**
      * @return list<string>
@@ -860,6 +913,7 @@ class LawSearchController extends Controller
         return array_keys($items);
     }
 
+
     /**
      * @param  array<int, array<string,mixed>>  $results
      * @return array<string, mixed>
@@ -869,15 +923,59 @@ class LawSearchController extends Controller
         $rows = array_map(static fn (array $r): array => [
             'law_type' => (string) ($r['law_type'] ?? ''),
             'meta_status' => (string) ($r['status'] ?? ''),
-            'change_status' => (string) ($r['change_status'] ?? ''),
+            'change_status' => (string) ($r['change_status_code'] ?? $r['change_status'] ?? ''),
             'signer_group' => (string) ($r['signer_group'] ?? ''),
             'agencies' => array_values(array_filter([(string) ($r['agency'] ?? '')])),
-            'law_groups' => array_values(array_filter([(string) ($r['law_group'] ?? '')])),
+            'law_groups' => array_values(array_filter((array) ($r['law_group_codes'] ?? [(string) ($r['law_group'] ?? '')]))),
             'promulgation_date' => (string) ($r['published_date'] ?? ''),
         ], $results);
 
         return $this->computeFileBasedFacets($rows);
     }
+
+
+    /**
+     * @param  array<string,mixed>  $row
+     * @return list<string>
+     */
+    private function categoryCodesFromRow(array $row): array
+    {
+        $values = (array) ($row['law_groups'] ?? []);
+        if ($values === [] && trim((string) ($row['law_group'] ?? '')) !== '') {
+            $values = [$row['law_group']];
+        }
+
+        $codes = [];
+        foreach ($values as $value) {
+            $code = $this->categoryCode($value);
+            if ($code !== '' && ! in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
+    }
+
+    private function categoryCode(mixed $value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        return (string) ($this->lawCategories->resolve($raw)['code'] ?? $raw);
+    }
+
+    private function changeStatusCode(mixed $value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        return (string) ($this->changeStatuses->resolve($raw)['code'] ?? $raw);
+    }
+
 
     /**
      * @param  array<int, array<string,mixed>>  $rows
@@ -891,14 +989,18 @@ class LawSearchController extends Controller
         foreach ($termFields as $key => $field) {
             $counts = [];
             foreach ($rows as $r) {
-                $v = (string) ($r[$field] ?? '');
+                $v = $key === 'change_status'
+                    ? $this->changeStatusCode($r[$field] ?? '')
+                    : (string) ($r[$field] ?? '');
                 if ($v !== '') {
                     $counts[$v] = ($counts[$v] ?? 0) + 1;
                 }
             }
             arsort($counts);
             $facets[$key] = array_values(array_map(
-                fn (string $v, int $c): array => ['value' => $v, 'count' => $c],
+                fn (string $v, int $c): array => $key === 'change_status'
+                    ? ['value' => $v, 'label' => $this->changeStatuses->labelOf($v), 'count' => $c]
+                    : ['value' => $v, 'count' => $c],
                 array_keys($counts), array_values($counts),
             ));
         }
@@ -912,8 +1014,9 @@ class LawSearchController extends Controller
                 }
             }
             foreach ((array) ($r['law_groups'] ?? []) as $g) {
-                if ($g !== '') {
-                    $groupCounts[(string) $g] = ($groupCounts[(string) $g] ?? 0) + 1;
+                $code = $this->categoryCode($g);
+                if ($code !== '') {
+                    $groupCounts[$code] = ($groupCounts[$code] ?? 0) + 1;
                 }
             }
         }
@@ -923,7 +1026,7 @@ class LawSearchController extends Controller
         $facets['law_group'] = array_values(array_map(fn ($v, $c) => ['value' => $v, 'count' => $c], array_keys($groupCounts), array_values($groupCounts)));
         $facets['years'] = [];
 
-        return $facets;
+        return $this->activeFacets($facets);
     }
 
     public function facets(ReviewStore $store): JsonResponse
@@ -949,7 +1052,7 @@ class LawSearchController extends Controller
             if (($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if (($row['meta_status'] ?? '') === 'ร่าง') {
+            if ($this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue;
             }
 
@@ -961,21 +1064,23 @@ class LawSearchController extends Controller
                     $parentIds[$parentId] = true;
                 }
             }
-            $cs = (string) ($row['change_status'] ?? '');
-            if (isset($changeCounts[$cs])) {
-                $changeCounts[$cs]++;
+            $changeRole = $this->changeStatuses->role($row['change_status'] ?? '');
+            if ($changeRole === 'new') {
+                $changeCounts['new']++;
+            } elseif (in_array($changeRole, ['whole', 'section'], true)) {
+                $changeCounts['amended']++;
             }
 
             $this->tally($termCounts['law_type'], $row['law_type'] ?? '');
             $this->tally($termCounts['status'], $row['meta_status'] ?? '');
-            $this->tally($termCounts['change_status'], $row['change_status'] ?? '');
+            $this->tally($termCounts['change_status'], $this->changeStatusCode($row['change_status'] ?? ''));
             $this->tally($termCounts['signer_group'], $row['signer_group'] ?? '');
 
             foreach ((array) ($row['agencies'] ?? []) as $agency) {
                 $this->tally($termCounts['agency'], (string) $agency);
             }
             foreach ((array) ($row['law_groups'] ?? []) as $group) {
-                $this->tally($termCounts['law_group'], (string) $group);
+                $this->tally($termCounts['law_group'], $this->categoryCode($group));
             }
 
             $year = LawIndexer::parseYear((string) ($row['promulgation_date'] ?? ''));
@@ -988,7 +1093,9 @@ class LawSearchController extends Controller
         foreach ($termCounts as $field => $counts) {
             arsort($counts);
             $facets[$field] = array_values(array_map(
-                fn (string $value, int $count): array => ['value' => $value, 'count' => $count],
+                fn (string $value, int $count): array => $field === 'change_status'
+                    ? ['value' => $value, 'label' => $this->changeStatuses->labelOf($value), 'count' => $count]
+                    : ['value' => $value, 'count' => $count],
                 array_keys($counts),
                 array_values($counts),
             ));
@@ -1008,58 +1115,64 @@ class LawSearchController extends Controller
             'child_laws' => $childCount,
         ];
 
-        return response()->json($facets);
+        return response()->json($this->activeFacets($facets));
     }
 
-    /** internal/external for a law_type, from config document_types (legacy กฎหมายภายนอก = external). */
+    private function activeFacets(array $facets): array
+    {
+        $store = app(MasterDataStore::class);
+        foreach ([
+            'law_type' => MasterDataKind::LawType,
+            'status' => MasterDataKind::EnforcementStatus,
+            'change_status' => MasterDataKind::ChangeStatus,
+            'law_group' => MasterDataKind::LawCategory,
+        ] as $field => $kind) {
+            $facets[$field] = array_values(array_filter($facets[$field] ?? [], function (array $bucket) use ($store, $kind): bool {
+                $item = $store->resolve($kind, (string) ($bucket['value'] ?? ''));
+                if ($item !== null && ! $item['is_active']) return false;
+                if ($kind === MasterDataKind::LawType) {
+                    $family = $item !== null
+                        ? $store->find(MasterDataKind::LawFamily, $item['attrs']['family_code'])
+                        : $store->resolve(MasterDataKind::LawFamily, (string) ($bucket['value'] ?? ''));
+                    if ($family !== null && ! $family['is_active']) return false;
+                }
+                return true;
+            }));
+        }
+        return $facets;
+    }
+
     private function sourceForLawType(string $lawType): string
     {
-        $lawType = trim($lawType);
-        if ($this->canonicalType($lawType) === 'kotmai-phaainok') {
-            return 'external';
-        }
-        foreach ((array) config('lookups.document_types', []) as $type) {
-            if ((string) ($type['value'] ?? '') === $lawType) {
-                return ($type['source'] ?? '') === 'external' ? 'external' : 'internal';
-            }
-        }
-
-        return 'internal';
+        return $this->lawTypes->sourceOf($lawType);
     }
 
     private function canonicalType(string $lawType): string
     {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+        $familyCode = $this->lawTypes->familyOf($lawType);
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_TYPE_ALIASES, true),
-                str_contains($lawType, 'พระราชบัญญัติ'),
-                str_contains($lawType, 'พระราชกำหนด'),
-                str_contains($lawType, 'กฎกระทรวง'),
-                str_contains($lawType, 'ประกาศกระทรวง') => 'kotmai-phaainok',
-            str_contains($lawType, 'ข้อบังคับ'), $lawType === 'kho-bangkhab' => 'kho-bangkhab',
-            str_contains($lawType, 'ระเบียบ'), $lawType === 'rabiap' => 'rabiap',
-            str_contains($lawType, 'ประกาศ'), $lawType === 'prakat', $lawType === 'command', $lawType === 'resolution', str_contains($lawType, 'คำสั่ง'), str_contains($lawType, 'มติ') => 'prakat',
-            default => 'other',
+        return match ($familyCode) {
+            'LFM01' => 'kho-bangkhab',
+            'LFM02' => 'rabiap',
+            'LFM03' => 'prakat',
+            'LFM04' => 'kotmai-phaainok',
+            default => $this->lawTypes->sourceOf($lawType) === 'external' ? 'kotmai-phaainok' : 'other',
         };
     }
 
     private function lawTypeFilterKey(string $lawType): string
     {
-        $lawType = trim($lawType);
-        $compact = preg_replace('/\s+/u', '', mb_strtolower($lawType)) ?? mb_strtolower($lawType);
+        if ($this->lawTypes->family($lawType) !== null) {
+            return $this->lawTypes->familyOf($lawType) === 'LFM04' ? 'external' : $this->canonicalType($lawType);
+        }
 
-        return match (true) {
-            in_array($compact, self::EXTERNAL_LAW_GROUP_ALIASES, true) => 'external',
-            str_contains($lawType, 'พระราชบัญญัติ'),
-                in_array($compact, ['พ.ร.บ.', 'พ.ร.บ', 'พรบ', 'phrb', 'prb'], true) => 'external-act',
-            str_contains($lawType, 'พระราชกำหนด'),
-                in_array($compact, ['พ.ร.ก.', 'พ.ร.ก', 'พรก', 'phrk'], true) => 'external-decree',
-            str_contains($lawType, 'กฎกระทรวง'),
-                in_array($compact, ['kot-krathruang', 'kotmai-krw'], true) => 'external-ministerial-rule',
-            str_contains($lawType, 'ประกาศกระทรวง'),
-                $compact === 'prakat-krw' => 'external-ministerial-announcement',
+        $code = (string) ($this->lawTypes->resolve($lawType)['code'] ?? '');
+
+        return match ($code) {
+            'LTY05' => 'external-act',
+            'LTY04' => 'external-decree',
+            'LTY06' => 'external-ministerial-rule',
+            'LTY07' => 'external-ministerial-announcement',
             default => $this->canonicalType($lawType),
         };
     }
@@ -1082,6 +1195,7 @@ class LawSearchController extends Controller
         return $this->highlightNeedles($title, $needles);
     }
 
+
     /**
      * @param  array<int,string>  $needles
      * @return array{string,int}|null
@@ -1101,6 +1215,7 @@ class LawSearchController extends Controller
 
         return null;
     }
+
 
     /**
      * @param  array<int,string>  $needles

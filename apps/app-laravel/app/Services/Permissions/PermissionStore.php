@@ -14,22 +14,18 @@ class PermissionStore
 
     private const DIRECTORY_ID = 'directory';
 
-    public function __construct(private readonly MongoBlobStore $blob) {}
+    public function __construct(private readonly MongoBlobStore $blob,
+        private readonly \App\Services\MasterData\UnitStore $units,
+        private readonly \App\Services\Auth\MongoUserStore $users) {}
 
     /**
      * @return array{units: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
      */
     public function directory(): array
     {
-        $directory = $this->blob->read(self::BLOB_KIND, self::DIRECTORY_ID);
-        if ($directory === null) {
-            $directory = $this->defaultDirectory();
-            $this->blob->write(self::BLOB_KIND, self::DIRECTORY_ID, $directory);
-        }
-
         return [
-            'units' => array_values(array_filter((array) ($directory['units'] ?? []), 'is_array')),
-            'users' => array_values(array_filter((array) ($directory['users'] ?? []), 'is_array')),
+            'units' => array_values(array_map(fn ($unit) => ['id' => $unit['code'], 'name' => $unit['name']], $this->units->all())),
+            'users' => array_values(array_map(fn ($user) => ['id' => $user['username'], 'name' => $user['name'] ?? $user['username'], 'email' => $user['email'] ?? null], $this->users->all())),
         ];
     }
 
@@ -117,6 +113,7 @@ class PermissionStore
             return null;
         }
 
+        $this->reindexLinkedDocuments($groupId);
         return $this->hydrateGroup($group);
     }
 
@@ -135,7 +132,17 @@ class PermissionStore
             $deleted = true;
         });
 
+        if ($deleted) $this->reindexLinkedDocuments($groupId);
         return $deleted;
+    }
+
+    private function reindexLinkedDocuments(string $groupId): void
+    {
+        foreach (app(\App\Services\ReviewStore::class)->listLawMeta() as $row) {
+            if (in_array($groupId, $row['permission_group_ids'] ?? [], true)) {
+                app(\App\Services\Search\LawIndexer::class)->index($row['document_id']);
+            }
+        }
     }
 
     /**
@@ -316,28 +323,4 @@ class PermissionStore
         return array_values(array_filter($this->blob->read(self::BLOB_KIND, self::GROUPS_ID) ?? [], 'is_array'));
     }
 
-    /**
-     * @return array{units: array<int, array<string, string|null>>, users: array<int, array<string, string|null>>}
-     */
-    private function defaultDirectory(): array
-    {
-        return [
-            'units' => [
-                ['id' => 'unit_legal', 'name' => 'คณะกองกฎหมาย'],
-                ['id' => 'unit_science', 'name' => 'คณะวิทยาศาสตร์'],
-                ['id' => 'unit_president_office', 'name' => 'สำนักงานอธิการบดี'],
-                ['id' => 'unit_finance', 'name' => 'กองคลัง'],
-                ['id' => 'unit_procurement', 'name' => 'กองพัสดุ'],
-                ['id' => 'unit_academic', 'name' => 'สำนักวิชาการ'],
-            ],
-            'users' => [
-                ['id' => 'user_somchai', 'name' => 'สมชาย ใจดี', 'email' => 'somchai@example.local'],
-                ['id' => 'user_suda', 'name' => 'สุดา แสงทอง', 'email' => 'suda@example.local'],
-                ['id' => 'user_anan', 'name' => 'อนันต์ วัฒน์กุล', 'email' => 'anan@example.local'],
-                ['id' => 'user_kanya', 'name' => 'กัญญา บุญช่วย', 'email' => 'kanya@example.local'],
-                ['id' => 'user_narin', 'name' => 'นรินทร์ ศรีสุข', 'email' => 'narin@example.local'],
-                ['id' => 'user_pimchanok', 'name' => 'พิมพ์ชนก รุ่งเรือง', 'email' => 'pimchanok@example.local'],
-            ],
-        ];
-    }
 }

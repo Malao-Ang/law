@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\LegalStructures;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +19,7 @@ class ReviewStore
         private readonly DocumentHtmlService $documentHtmlService,
         private readonly MongoBlobStore $blob,
         ?string $basePath = null,
+        private ?EnforcementStatuses $enforcementStatuses = null,
     ) {
         $this->basePath = $basePath ?? $this->configuredBasePath();
         $this->ensureDirectories();
@@ -164,6 +168,10 @@ class ReviewStore
 
             $documents[] = [
                 'document_id' => $documentId,
+                'uploaded_by' => $status['uploaded_by'] ?? null,
+                'responsible' => $status['responsible'] ?? null,
+                'owner_unit_code' => $status['owner_unit_code'] ?? null,
+                'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
                 'title' => $title,
                 'status' => (string) ($status['status'] ?? 'unknown'),
                 'updated_at' => $status['updated_at'] ?? null,
@@ -237,7 +245,10 @@ class ReviewStore
 
                 $rows[] = [
                     'document_id' => $documentId,
-                    'title' => $title,
+                    'uploaded_by' => $status['uploaded_by'] ?? null,
+                'responsible' => $status['responsible'] ?? null,
+                'owner_unit_code' => $status['owner_unit_code'] ?? null,
+                'title' => $title,
                     'status' => (string) ($status['status'] ?? 'unknown'),
                     'updated_at' => $status['updated_at'] ?? null,
                     'access_scope' => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
@@ -245,8 +256,12 @@ class ReviewStore
                     'source' => trim((string) ($meta['source'] ?? '')),
                     'document_type' => trim((string) ($meta['document_type'] ?? 'new')),
                     'law_type' => trim((string) ($meta['law_type'] ?? '')),
-                    'meta_status' => LawMetaNormalizer::legacyStatus($meta['status'] ?? ''),
+                    'raw_meta_status' => (string) ($meta['status'] ?? ''),
+                    'meta_status' => LawMetaNormalizer::statusCode($meta['status'] ?? ''),
                     'change_status' => trim((string) ($meta['change_status'] ?? '')),
+                    'change_details' => is_array($meta['change_details'] ?? null)
+                        ? array_values(array_filter($meta['change_details'], 'is_string'))
+                        : [],
                     'signer_group' => trim((string) ($meta['signer_group'] ?? '')),
                     'law_groups' => $groups,
                     'agencies' => $agencies,
@@ -257,7 +272,6 @@ class ReviewStore
                     'keywords' => is_array($meta['keywords'] ?? null)
                         ? array_values(array_filter($meta['keywords'], 'is_string'))
                         : [],
-                    'issuer' => trim((string) ($meta['issuer'] ?? '')),
                     'section_count' => isset($meta['section_count']) ? (int) $meta['section_count'] : null,
                     'relations_count' => is_array($review['relations'] ?? null)
                         ? count($review['relations'])
@@ -369,19 +383,11 @@ class ReviewStore
 
     public function isActiveLawMetaStatus(?string $status): bool
     {
-        $normalized = mb_strtolower(trim((string) $status), 'UTF-8');
-        if ($normalized === '') {
+        if (trim((string) $status) === '') {
             return true;
         }
 
-        foreach (['ยกเลิก', 'สิ้นผล', 'หมดอายุ', 'repeal', 'cancel', 'expired'] as $inactive) {
-            if (str_contains($normalized, $inactive)) {
-                return false;
-            }
-        }
-
-        return in_array($normalized, ['มีผลบังคับใช้', 'ใช้งาน', 'active', 'published'], true)
-            || str_contains($normalized, 'เผยแพร่');
+        return ! $this->enforcementStatuses()->isRepealed($status);
     }
 
     /**
@@ -605,7 +611,6 @@ class ReviewStore
                 'is_current' => $row['document_id'] === $currentId,
                 'status' => ($row['meta_status'] ?? '') !== '' ? $row['meta_status'] : (string) ($row['status'] ?? ''),
                 'change_status' => (string) ($row['change_status'] ?? ''),
-                'issuer' => (string) ($row['issuer'] ?? ''),
                 'agency' => $row['agencies'][0] ?? '',
                 'promulgation_date' => (string) ($row['promulgation_date'] ?? ''),
                 'title' => (string) ($row['title'] ?? ''),
@@ -625,6 +630,41 @@ class ReviewStore
     {
         $this->syncDocumentReview($document);
         $this->blob->write('review', $documentId, $document);
+        Cache::forget('law-meta-list');
+    }
+
+    /**
+     * Rewrite every block's meta.chunk_type under the review lock. The mapper receives the
+     * current value and returns the new one (return the same value to leave it untouched).
+     * Only meta.chunk_type is touched.
+     *
+     * @param  callable(string): string  $mapper
+     * @return int number of blocks changed
+     */
+    public function mapBlockChunkTypes(string $documentId, callable $mapper): int
+    {
+        $changed = 0;
+
+        $this->blob->withLock('review', $documentId, function (array &$document) use ($mapper, &$changed): void {
+            foreach (($document['pages'] ?? []) as $pageIndex => $page) {
+                if (! is_array($page) || ! is_array($page['blocks'] ?? null)) {
+                    continue;
+                }
+                foreach ($page['blocks'] as $blockIndex => $block) {
+                    $current = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($current === '') {
+                        continue;
+                    }
+                    $next = $mapper($current);
+                    if ($next !== $current) {
+                        $document['pages'][$pageIndex]['blocks'][$blockIndex]['meta']['chunk_type'] = $next;
+                        $changed++;
+                    }
+                }
+            }
+        });
+
+        return $changed;
     }
 
     /**
@@ -651,6 +691,41 @@ class ReviewStore
     }
 
     /**
+     * Raw chunk_type values per document, read without syncing review HTML.
+     *
+     * @return array<string, list<string>>
+     */
+    public function blockChunkTypesByDocument(): array
+    {
+        $result = [];
+        foreach ($this->blob->allStatuses() as $status) {
+            $documentId = (string) ($status['document_id'] ?? '');
+            if ($documentId === '') {
+                continue;
+            }
+
+            $document = $this->blob->read('review', $documentId);
+            if ($document === null) {
+                continue;
+            }
+
+            $types = [];
+            foreach ((array) ($document['pages'] ?? []) as $page) {
+                foreach ((array) (is_array($page) ? ($page['blocks'] ?? []) : []) as $block) {
+                    $type = is_array($block) ? trim((string) ($block['meta']['chunk_type'] ?? '')) : '';
+                    if ($type !== '') {
+                        $types[$type] = true;
+                    }
+                }
+            }
+
+            $result[$documentId] = array_keys($types);
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getReviewDocument(string $documentId): array
@@ -669,6 +744,11 @@ class ReviewStore
                 $this->syncDocumentReview($doc);
             });
             $document = $this->blob->read('review', $documentId) ?? $document;
+        }
+
+        $status = $this->getStatus($documentId) ?? [];
+        foreach (\App\Services\Auth\DocumentOwnership::FIELDS as $field) {
+            $document['law_meta'][$field] = $status[$field] ?? null;
         }
 
         return $document;
@@ -791,7 +871,15 @@ class ReviewStore
      */
     public function updateDocumentReview(string $documentId, array $payload): array
     {
+        unset($payload['law_meta']['co_editors']);
         $returnPayload = null;
+        $proposed = $this->blob->read('review', $documentId) ?? [];
+        $proposed['law_meta'] = array_merge($proposed['law_meta'] ?? [], $payload['law_meta'] ?? []);
+        $proposed['relations'] = $payload['relations'] ?? $proposed['relations'] ?? [];
+        foreach ($this->replacementTargets($documentId, $proposed) as $target) {
+            if ($target === $documentId) continue;
+            app(\App\Services\Auth\DocumentAccess::class)->authorize(request(), 'edit', $this->getStatus($target) ?? []);
+        }
 
         $this->blob->withLock('review', $documentId, function (array &$document) use ($documentId, $payload, &$returnPayload): void {
             if (array_key_exists('draft_html', $payload) && is_string($payload['draft_html'])) {
@@ -907,15 +995,10 @@ class ReviewStore
      *
      * @return list<string>
      */
-    public function applySameLevelReplacement(string $documentId): array
+    private function replacementTargets(string $documentId, array $document): array
     {
-        $document = $this->blob->read('review', $documentId);
-        if ($document === null) {
-            return [];
-        }
-
         $changeStatus = trim((string) (($document['law_meta']['change_status'] ?? '') ?: ''));
-        if (! in_array($changeStatus, ['ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ'], true)) {
+        if (app(ChangeStatuses::class)->role($changeStatus) !== 'whole') {
             return [];
         }
 
@@ -938,17 +1021,35 @@ class ReviewStore
             return [];
         }
 
-        $component = $this->sameLevelComponentIds($documentId, $targets);
+        return $this->sameLevelComponentIds($documentId, $targets);
+    }
+
+    public function applySameLevelReplacement(string $documentId): array
+    {
+        $document = $this->blob->read('review', $documentId);
+        if ($document === null) {
+            return [];
+        }
+
+        $component = $this->replacementTargets($documentId, $document);
+        if ($component === []) return [];
         $revoked = [];
         foreach ($component as $id) {
             if ($id === $documentId) {
                 continue;
             }
-            $this->patchLawMeta($id, ['status' => 'ยกเลิกการใช้งาน']);
+            $before = ['status' => $this->getStatus($id), 'review' => $this->blob->read('review', $id)];
+            $before['responsible'] = $before['status']['responsible'] ?? null;
+            app(\App\Services\Auth\DocumentAccess::class)->authorize(request(), 'edit', $before['status'] ?? []);
+            $this->patchLawMeta($id, ['status' => $this->enforcementStatuses()->codeForRole('repealed')]);
+            if (app(\App\Services\Auth\DocumentAccess::class)->actsOnBehalf(request(), $before['status'] ?? [])) {
+                app(\App\Services\Auth\DocumentOwnership::class)->record(request(), $id, 'edit:replacement', $before,
+                    ['status' => $this->getStatus($id), 'review' => $this->blob->read('review', $id)]);
+            }
             $revoked[] = $id;
         }
 
-        $this->patchLawMeta($documentId, ['status' => 'มีผลบังคับใช้']);
+        $this->patchLawMeta($documentId, ['status' => $this->enforcementStatuses()->codeForRole('in_force')]);
 
         return $revoked;
     }
@@ -1038,14 +1139,10 @@ class ReviewStore
             return false;
         }
 
-        $changeA = trim((string) ($a['change_status'] ?? ''));
-        $changeB = trim((string) ($b['change_status'] ?? ''));
-        $amendmentChanges = [
-            'ปรับปรุงทั้งฉบับ', 'ยกเลิกทั้งฉบับ',
-            'ปรับปรุงรายข้อ', 'ปรับปรุงรายมาตรา', 'ยกเลิกรายมาตรา',
-        ];
+        $changeA = app(ChangeStatuses::class)->role($a['change_status'] ?? '');
+        $changeB = app(ChangeStatuses::class)->role($b['change_status'] ?? '');
 
-        return in_array($changeA, $amendmentChanges, true) || in_array($changeB, $amendmentChanges, true);
+        return in_array($changeA, ['whole', 'section'], true) || in_array($changeB, ['whole', 'section'], true);
     }
 
     private function regulationFamilyKey(string $title): string
@@ -1071,6 +1168,7 @@ class ReviewStore
             $document['law_meta'] = array_merge($document['law_meta'], $fields);
             $this->ensureLawMetaDefaults($document);
         });
+        Cache::forget('law-meta-list');
     }
 
     /**
@@ -2036,14 +2134,13 @@ class ReviewStore
         $document['law_meta'] = array_merge([
             'document_type' => 'new',
             'source' => '',
-            'status' => 'ร่าง',
+            'status' => $this->enforcementStatuses()->codeForRole('draft'),
             'law_type' => '',
             'law_group' => '',
             'change_status' => null,
             'law_groups' => [],
             'agency' => '',
             'signer_group' => null,
-            'issuer' => null,
             'agencies' => [],
             'keywords' => [],
             'promulgation_date' => '',
@@ -2055,6 +2152,7 @@ class ReviewStore
             'access_scope' => 'public',
             'permission_group_ids' => [],
         ], $meta, [
+            'co_editors' => LawMetaNormalizer::coEditors($meta['co_editors'] ?? []),
             'law_group' => $lawGroups[0] ?? '',
             'law_groups' => $lawGroups,
             'agency' => $agencies[0] ?? '',
@@ -2067,6 +2165,15 @@ class ReviewStore
             'access_scope' => $accessScope,
             'permission_group_ids' => $accessScope === 'public' ? [] : $permissionGroupIds,
         ]);
+    }
+
+    private function enforcementStatuses(): EnforcementStatuses
+    {
+        if ($this->enforcementStatuses === null) {
+            $this->enforcementStatuses = app(EnforcementStatuses::class);
+        }
+
+        return $this->enforcementStatuses;
     }
 
     private function countLawSections(array $document): int
@@ -2082,8 +2189,7 @@ class ReviewStore
                     continue;
                 }
 
-                $chunkType = strtoupper(trim((string) ($block['meta']['chunk_type'] ?? '')));
-                if (in_array($chunkType, ['BOOK', 'PART', 'CHAPTER', 'SECTION', 'ARTICLE', 'CLAUSE', 'PARAGRAPH', 'ITEM'], true)) {
+                if (app(LegalStructures::class)->countsAsSection($block['meta']['chunk_type'] ?? null)) {
                     $count++;
                 }
             }

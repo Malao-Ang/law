@@ -224,7 +224,7 @@
           </div>
           <div v-if="rootMeta?.law_group">
             <div class="rel-root__meta-label"><v-icon icon="mdi-folder-outline" size="14" /> กลุ่มกฎหมาย</div>
-            <div class="rel-root__meta-value">{{ rootMeta.law_group }}</div>
+            <div class="rel-root__meta-value">{{ categoryLabel(rootMeta.law_group) }}</div>
           </div>
         </div>
       </v-card>
@@ -391,6 +391,8 @@
 </template>
 
 <script setup lang="ts">
+import { useLookups } from '../../composables/useLookups';
+import { useLawType } from '../../composables/useLawType';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { downloadPublishedPdf, fetchReportSummary, fetchReview, fetchIncomingRelationDocumentIds, relatedDocumentsZipUrl } from '../../api/client';
@@ -422,12 +424,16 @@ import {
   isCancelledStatus,
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PAGE_SIZE = 20;
 
 const props = defineProps<{ documentId?: string }>();
 const route = useRoute();
 const router = useRouter();
+const { inForceCode, statusLabel } = useLawStatus();
+const { categoryLabel } = useLawCategory();
 
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -486,6 +492,9 @@ const sortOptions = [
   { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
+const { typeLabel, typeItem } = useLawType();
+const { documentTypes } = useLookups();
+
 const typeOptions = computed(() => {
   const counts = new Map<string, number>();
   for (const row of rows.value) {
@@ -494,8 +503,9 @@ const typeOptions = computed(() => {
   return [
     { label: 'ทุกประเภท', value: null },
     ...[...counts.entries()]
+      .filter(([key]) => documentTypes.value.some((item) => item.code === typeItem(key)?.code || item.title === key))
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => ({ label: key, value: key })),
+      .map(([key]) => ({ label: typeLabel(key), value: key })),
   ];
 });
 
@@ -603,7 +613,7 @@ const stats = computed(() => {
   const nodes = flattenTree(rootNode.value);
   return [
     { label: 'กฎหมายลำดับรองทั้งหมด', value: `${nodes.length} ฉบับ`, tone: '', icon: 'mdi-layers-outline' },
-    { label: 'มีผลบังคับใช้', value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
+    { label: statusLabel(inForceCode.value), value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
     { label: 'ถูกยกเลิก', value: String(nodes.filter((n) => isCancelledStatus(n.row.metaStatus)).length), tone: 'is-muted', icon: '' },
     { label: 'ต้องตรวจสอบ', value: String(nodes.filter((n) => !n.row.metaStatus).length), tone: 'is-warning', icon: '' },
     { label: 'ระดับสูงสุด', value: String(maxTreeLevel(rootNode.value)), tone: 'is-primary', icon: '' },

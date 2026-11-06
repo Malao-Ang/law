@@ -12,13 +12,13 @@
       :extra-icon="isOld ? undefined : 'mdi-draw-pen'"
       :next-loading="documentStore.saving && !esignLeaving"
       :extra-loading="!isOld && documentStore.saving && esignLeaving"
-      :next-disabled="documentStore.saving"
-      :extra-disabled="isOld || documentStore.saving"
+      :next-disabled="documentStore.saving || !can.edit"
+      :extra-disabled="isOld || documentStore.saving || !can.edit || !can.esign"
       @back="router.back()"
       @next="saveAndNext"
       @extra="saveAndEsign"
     />
-    <div class="mx-auto relations-page" style="max-width:1400px; padding-bottom:60px">
+    <div class="mx-auto relations-page" :inert="!can.edit" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -28,7 +28,7 @@
         <v-alert type="info" variant="tonal" density="compact" class="mb-4">
           ขั้นตอนนี้ยังไม่บังคับ กรอกตอนนี้หรือส่งไป E-Sign ก่อนแล้วค่อยกลับมาก็ได้
           <span v-if="changeStatus">
-            — อิงสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย: <strong>{{ changeStatus }}</strong>
+            — อิงสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย: <strong>{{ changeStatusCS.label(changeStatus) }}</strong>
           </span>
         </v-alert>
 
@@ -224,6 +224,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDocumentStore } from '../../stores/documentStore';
@@ -242,14 +243,17 @@ import {
   normalizeChangeDetail,
   proclamationDueLabel,
 } from '../../types/lawRelation';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 const router = useRouter();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
+const changeStatusCS = useChangeStatus();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 
 const catalog = ref<DocumentListItem[]>([]);
@@ -272,20 +276,17 @@ const relations = computed<LawRelation[]>(() => documentStore.review?.relations 
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
 const changeDetails = computed(() => documentStore.review?.law_meta?.change_details ?? []);
 const hasSectionCancelDetail = computed(() =>
-  changeDetails.value.some((detail) => normalizeChangeDetail(detail) === 'ยกเลิกข้อ'),
+  changeDetails.value.some((detail) => changeStatusCS.detailRole(detail) === 'repeals'),
 );
-const isWholeDocumentChange = computed(() =>
-  changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ยกเลิกทั้งฉบับ',
-);
-const isSectionChange = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
-);
+const isWholeDocumentChange = computed(() => changeStatusCS.isWhole(changeStatus.value ?? ''));
+const isSectionChange = computed(() => changeStatusCS.isSection(changeStatus.value ?? ''));
 const showDocumentRelations = computed(() => !isSectionChange.value);
 const showSectionRelations = computed(() => isSectionChange.value);
 const suggestedRelationType = computed<RelationType | undefined>(() => {
   if (hasSectionCancelDetail.value) return 'repeals';
-  if (changeStatus.value === 'ปรับปรุงทั้งฉบับ' || changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา') return 'amends';
+  // Legacy names ยกเลิกทั้งฉบับ / ยกเลิกรายมาตรา (aliases of CHG02 / CHG04) still suggest repeals.
   if (changeStatus.value === 'ยกเลิกทั้งฉบับ' || changeStatus.value === 'ยกเลิกรายมาตรา') return 'repeals';
+  if (changeStatusCS.isWhole(changeStatus.value ?? '') || changeStatusCS.isSection(changeStatus.value ?? '')) return 'amends';
   return undefined;
 });
 const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
@@ -294,7 +295,7 @@ const relationCatalogMode = computed<'all' | 'siblings' | 'parents'>(() => {
   return relationDialog.value.scope === 'document' ? 'siblings' : 'all';
 });
 const documentRelationsHint = computed(() => {
-  if (changeStatus.value === 'กฎหมายใหม่') {
+  if (changeStatusCS.isNew(changeStatus.value ?? '')) {
     return 'ระบุความสัมพันธ์ของข้อบังคับ ระเบียบ หรือประกาศที่มีระดับสูงกว่าหรือระดับเดียวกัน';
   }
   if (isWholeDocumentChange.value) {
@@ -338,7 +339,7 @@ const parentItems = computed(() =>
 
 const parentPickerHint = computed(() => {
   const lawType = documentStore.review?.law_meta?.law_type;
-  if (changeStatus.value === 'กฎหมายใหม่') {
+  if (changeStatusCS.isNew(changeStatus.value ?? '')) {
     return 'เลือก พ.ร.บ. ข้อบังคับ ระเบียบ ประกาศ หรือกฎหมายภายนอกที่ต้องการอ้างอิง';
   }
   if (isUniversityAnnouncementType(lawType)) {

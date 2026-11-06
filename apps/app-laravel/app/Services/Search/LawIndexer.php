@@ -3,6 +3,9 @@
 namespace App\Services\Search;
 
 use App\Services\LawMetaNormalizer;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 
 class LawIndexer
@@ -10,6 +13,9 @@ class LawIndexer
     public function __construct(
         private readonly ElasticClient $client,
         private readonly ReviewStore $store,
+        private readonly ?LawTypes $lawTypes = null,
+        private readonly ?LawCategories $lawCategories = null,
+        private readonly ?ChangeStatuses $changeStatuses = null,
     ) {}
 
     /** Extract a 4-digit year from a freeform date string (Buddhist or Gregorian). */
@@ -31,6 +37,8 @@ class LawIndexer
     {
         $review = $this->store->getReviewDocument($documentId) ?? [];
         $meta = $review['law_meta'] ?? [];
+        $status = $this->store->getStatus($documentId) ?? [];
+        $meta['is_published'] = \App\Services\Auth\DocumentAccess::isPublished(array_merge($meta, $status));
 
         $docs = [];
         $exportPath = $this->store->absolutePath($this->store->exportRelativePath($documentId));
@@ -89,6 +97,26 @@ class LawIndexer
         $permissionGroupIds = is_array($meta['permission_group_ids'] ?? null)
             ? array_values(array_filter(array_map('strval', $meta['permission_group_ids'])))
             : [];
+        $lawTypes = $this->lawTypes ?? app(LawTypes::class);
+        $lawType = $lawTypes->resolve($meta['law_type'] ?? '');
+        $lawTypeCode = (string) ($lawType['code'] ?? ($meta['law_type'] ?? ''));
+        $lawFamilyCode = (string) ($lawType['attrs']['family_code'] ?? '');
+        $lawCategories = $this->lawCategories ?? app(LawCategories::class);
+        $lawGroupValues = is_array($meta['law_groups'] ?? null) ? $meta['law_groups'] : [];
+        if ($lawGroupValues === [] && trim((string) ($meta['law_group'] ?? '')) !== '') {
+            $lawGroupValues = [$meta['law_group']];
+        }
+        $lawGroupCodes = $lawCategories->codesOf($lawGroupValues);
+        $lawGroupLabels = $lawCategories->labelsOf($lawGroupCodes);
+        $changeStatuses = $this->changeStatuses ?? app(ChangeStatuses::class);
+        $changeStatus = $changeStatuses->resolve($meta['change_status'] ?? null);
+        $changeStatusCode = (string) ($changeStatus['code'] ?? ($meta['change_status'] ?? ''));
+        $allowedUnits = $allowedUsers = [];
+        foreach ($permissionGroupIds as $id) {
+            $group = app(\App\Services\Permissions\PermissionStore::class)->findGroup($id);
+            $allowedUnits = array_merge($allowedUnits, $group['unit_ids'] ?? []);
+            $allowedUsers = array_merge($allowedUsers, $group['user_ids'] ?? []);
+        }
 
         return [
             'law_id'         => $documentId,
@@ -100,16 +128,26 @@ class LawIndexer
             'text'           => $chunk['text'] ?? '',
             'title'          => $meta['title'] ?? null,
             'title_suggest'  => $meta['title'] ?? null,
-            'law_type'       => $meta['law_type'] ?? null,
-            'status'         => LawMetaNormalizer::legacyStatus($meta['status'] ?? null) ?: null,
-            'change_status'  => $meta['change_status'] ?? null,
+            'law_type'       => $lawTypeCode !== '' ? $lawTypeCode : null,
+            'law_family'     => $lawFamilyCode !== '' ? $lawFamilyCode : null,
+            'law_type_label' => $lawType === null ? ($meta['law_type'] ?? null) : (string) ($lawType['name'] ?? ''),
+            'status'         => LawMetaNormalizer::statusCode($meta['status'] ?? null) ?: null,
+            'change_status'  => $changeStatusCode !== '' ? $changeStatusCode : null,
+            'change_status_label' => $changeStatus === null ? ($meta['change_status'] ?? null) : (string) ($changeStatus['name'] ?? ''),
             'agency'         => $meta['agency'] ?? null,
             'agencies'       => $meta['agencies'] ?? [],
-            'law_group'      => $meta['law_group'] ?? null,
-            'law_groups'     => $meta['law_groups'] ?? [],
+            'law_group'      => $lawGroupCodes[0] ?? null,
+            'law_groups'     => $lawGroupCodes,
+            'law_group_labels' => $lawGroupLabels,
             'signer_group'   => $meta['signer_group'] ?? null,
             'access_scope'   => ($meta['access_scope'] ?? 'public') === 'private' ? 'private' : 'public',
             'permission_group_ids' => $permissionGroupIds,
+            'owner_unit_code' => $meta['owner_unit_code'] ?? null,
+            'responsible_username' => $meta['responsible']['username'] ?? null,
+            'co_editor_usernames' => array_column($meta['co_editors'] ?? [], 'username'),
+            'allowed_unit_codes' => array_values(array_unique($allowedUnits)),
+            'allowed_usernames' => array_values(array_unique($allowedUsers)),
+            'is_published' => (bool) ($meta['is_published'] ?? false),
             'visibility'     => LawMetaNormalizer::effectiveVisibility($meta),
             'keywords'       => $keywords,
             'keywords_text'  => implode(' ', $keywords),

@@ -19,6 +19,14 @@ return [
     'client_id' => env('BUU_CLIENT_ID', ''),
     'client_secret' => env('BUU_CLIENT_SECRET', ''),
 
+    'ums_faculty' => [
+        'domain' => env('BUU_UMS_FACULTY_DOMAIN', ''),
+        'client_id' => env('BUU_UMS_FACULTY_CLIENT_ID', ''),
+        'client_secret' => env('BUU_UMS_FACULTY_CLIENT_SECRET', ''),
+        'provision_key' => env('BUU_UMS_FACULTY_PROVISION_KEY', ''),
+        'authenticated_userid' => env('BUU_UMS_FACULTY_AUTHENTICATED_USERID', ''),
+    ],
+
     /** Default authenticated_userid sent when requesting password-grant tokens */
     'authenticated_userid' => env('BUU_AUTHENTICATED_USERID', 'library-buu'),
 
@@ -59,6 +67,12 @@ return [
             'path' => 'service-api/ldap.loginBuu',
             'scope' => 'read',
             'provision_key' => env('BUU_PROVISION_LDAP_LOGIN', ''),
+        ],
+
+        'ums.person' => [
+            'path' => 'service-api/ums.SPerson',
+            'scope' => 'read',
+            'provision_key' => env('BUU_PROVISION_UMS_PERSON', ''),
         ],
 
         'minio.list' => [

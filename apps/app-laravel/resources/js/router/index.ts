@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { useAuthStore } from '../stores/authStore';
 
 // Use dynamic imports (route-level code splitting)
 const PublicHomePage = () => import('../pages/public/PublicHomePage.vue');
@@ -14,6 +15,11 @@ const AdminAuditLogPage = () => import('../pages/admin/AdminAuditLogPage.vue');
 const AdminOcrQueuePage = () => import('../pages/admin/AdminOcrQueuePage.vue');
 const AdminRelationsHubPage = () => import('../pages/admin/AdminRelationsHubPage.vue');
 const AdminShowRelationsPage = () => import('../pages/admin/AdminShowRelationsPage.vue');
+const EnforcementStatusPage = () => import('../pages/admin/master/EnforcementStatusPage.vue');
+const LawTypePage = () => import('../pages/admin/master/LawTypePage.vue');
+const LawCategoryPage = () => import('../pages/admin/master/LawCategoryPage.vue');
+const LegalStructurePage = () => import('../pages/admin/master/LegalStructurePage.vue');
+const ChangeStatusPage = () => import('../pages/admin/master/ChangeStatusPage.vue');
 const UploadPage = () => import('../pages/UploadPage.vue');
 const ReviewPage = () => import('../pages/review/ReviewPage.vue');
 const ComposePage = () => import('../pages/compose/ComposePage.vue');
@@ -34,8 +40,10 @@ const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
+  { path: '/select-unit', name: 'select-unit', component: () => import('../pages/auth/SelectUnitPage.vue'), meta: { bareLayout: true } },
   { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
+  { path: '/admin/units', name: 'admin-units', component: () => import('../pages/admin/UnitsPage.vue'), meta: { bareLayout: true } },
   { path: '/admin', name: 'admin', component: AdminDashboardPage, meta: { bareLayout: true } },
   { path: '/admin/laws', name: 'admin-laws', component: AdminLawListPage, meta: { bareLayout: true } },
   { path: '/admin/reports', name: 'admin-reports', component: AdminReportPage, meta: { bareLayout: true } },
@@ -46,6 +54,11 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/ocr-queue', name: 'admin-ocr-queue', component: AdminOcrQueuePage, meta: { bareLayout: true } },
   { path: '/admin/relations', name: 'admin-relations', component: AdminRelationsHubPage, meta: { bareLayout: true } },
   { path: '/admin/show-relations/:documentId?', name: 'admin-show-relations', component: AdminShowRelationsPage, props: true, meta: { bareLayout: true } },
+  { path: '/admin/master/law-types', name: 'admin-master-law-types', component: LawTypePage, meta: { bareLayout: true } },
+  { path: '/admin/master/categories', name: 'admin-master-categories', component: LawCategoryPage, meta: { bareLayout: true } },
+  { path: '/admin/master/legal-structures', name: 'admin-master-legal-structures', component: LegalStructurePage, meta: { bareLayout: true } },
+  { path: '/admin/master/change-status', name: 'admin-master-change-status', component: ChangeStatusPage, meta: { bareLayout: true } },
+  { path: '/admin/master/enforcement-status', name: 'admin-master-enforcement-status', component: EnforcementStatusPage, meta: { bareLayout: true } },
   { path: '/upload', name: 'upload-legacy', component: UploadPage },
   { path: '/documents/:documentId/review', name: 'review', component: ReviewPage, props: true, meta: { bareLayout: true } },
   { path: '/documents/:documentId/edit', name: 'edit', component: EditPage, props: true, meta: { bareLayout: true } },
@@ -77,4 +90,34 @@ export const router = createRouter({
     }
     return { top: 0 };
   },
+});
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+  await auth.fetchMe(auth.isAuthenticated);
+
+  if (auth.isAuthenticated && auth.needs_unit_selection && to.path !== '/select-unit') {
+    return { path: '/select-unit' };
+  }
+  if (to.path === '/select-unit' && (!auth.isAuthenticated || auth.is_super_admin)) {
+    return { path: '/' };
+  }
+
+  if (to.path === '/admin/units' && !auth.canManageUnits) {
+    return auth.authEnforced && !auth.isAuthenticated
+      ? { path: '/login', query: { redirect: to.fullPath } }
+      : { path: '/' };
+  }
+
+  if (!auth.authEnforced) return true;
+
+  const guarded = to.path.startsWith('/admin') || to.path.startsWith('/documents');
+  if (guarded && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } };
+  }
+  if (to.path.startsWith('/admin') && !auth.isAdminRole && !(to.path === '/admin/units' && auth.canManageUnits)) {
+    return { path: '/' };
+  }
+
+  return true;
 });

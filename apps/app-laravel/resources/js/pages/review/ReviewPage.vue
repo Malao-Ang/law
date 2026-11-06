@@ -19,6 +19,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import DocumentEditorShell from '../../components/review/DocumentEditorShell.vue';
@@ -32,6 +33,7 @@ import type { DocumentStatus } from '../../types/document';
 const props = defineProps<{
   documentId: string;
 }>();
+const { can } = useDocumentAccess(() => props.documentId);
 
 const documentStore = useDocumentStore();
 const reviewUiStore = useReviewUiStore();
@@ -40,7 +42,7 @@ const docStatus = ref<DocumentStatus | null>(null);
 
 useHistoricalRedirect(props.documentId);
 
-const locked = computed(() => docStatus.value?.esign_exported_at != null);
+const locked = computed(() => !can.value.edit || docStatus.value?.esign_exported_at != null);
 
 onMounted(async () => {
   const [, status] = await Promise.all([

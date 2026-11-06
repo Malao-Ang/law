@@ -12,7 +12,7 @@ const fullMeta: LawMeta = {
   law_type: 'ประกาศ',
   promulgation_date: '2025-01-01',
   access_scope: 'public',
-  status: 'มีผลบังคับใช้',
+  status: 'STA01',
 } as LawMeta;
 
 // New doc, e-sign submitted + confirmed_at set, but sign_status NOT 'Y' → must FAIL e-sign gate.

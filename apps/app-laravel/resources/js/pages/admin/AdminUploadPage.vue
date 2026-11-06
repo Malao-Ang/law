@@ -6,9 +6,11 @@
     show-bell
   >
     <div class="adm-up">
+      <v-alert v-if="auth.authEnforced && !auth.canUpload" type="info" variant="tonal" class="mb-4">คุณไม่มีสิทธิ์อัปโหลดเอกสารในหน่วยงานที่เลือก</v-alert>
 
+      <v-select v-if="auth.is_super_admin" v-model="ownerUnitCode" :items="ownerUnits" item-title="name" item-value="code" label="หน่วยงานเจ้าของเอกสาร" variant="outlined" />
       <!-- ── Document type selection cards ─────────────────── -->
-      <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row">
+      <div class="d-flex ga-4 mb-6 flex-nowrap flex-column flex-md-row" :inert="auth.authEnforced && !auth.canUpload">
         <v-card class="flex-1-1 pa-6" elevation="0" rounded="lg" style="min-width:300px">
           <v-icon size="32" color="admin-primary" class="mb-2">mdi-file-document-edit-outline</v-icon>
           <h3 class="text-h6">เอกสารใหม่ (New Document)</h3>
@@ -184,7 +186,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, onMounted } from 'vue';
+import { useAuthStore } from '../../stores/authStore';
+import { jsonRequest } from '../../api/client';
+import type { Unit } from '../../types/unit';
 import Swal from 'sweetalert2';
 import AppShell from '../../components/shared/AppShell.vue';
 import DocumentPipelineTable from '../../components/admin/DocumentPipelineTable.vue';
@@ -209,6 +214,15 @@ interface UploadPreset {
 }
 
 const uploadStore = useUploadStore();
+const auth = useAuthStore();
+const ownerUnitCode = ref(auth.active_unit?.code || '');
+const ownerUnits = ref<Unit[]>([]);
+onMounted(async () => {
+  if (auth.is_super_admin) {
+    try { ownerUnits.value = (await jsonRequest<{ items: Unit[] }>('/api/units')).items.filter(u => u.is_active); }
+    catch { snackbar.error('ไม่สามารถโหลดหน่วยงานได้'); }
+  }
+});
 const snackbar = useSnackbarStore();
 
 const fileInputEl = ref<HTMLInputElement | null>(null);
@@ -356,6 +370,7 @@ function onInputChange(event: Event): void {
 }
 
 async function uploadAll(): Promise<void> {
+  if (auth.authEnforced && !auth.canUpload) return;
   const toUpload = pendingItems.value.filter(i => !i.done && !i.uploading);
   if (!toUpload.length) return;
 
@@ -367,6 +382,7 @@ async function uploadAll(): Promise<void> {
         const documentId = await uploadStore.upload(item.file, item.scanMode, engineFor(item), {
           documentType: uploadMode.value,
           source: uploadPreset.value.source,
+          ownerUnitCode: ownerUnitCode.value,
         });
         item.done = true;
       } catch (err) {

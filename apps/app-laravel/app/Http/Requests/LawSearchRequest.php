@@ -2,6 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LawSearchRequest extends FormRequest
@@ -9,6 +13,50 @@ class LawSearchRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $filters = $this->input('filters');
+        if (is_array($filters) && is_array($filters['status'] ?? null)) {
+            $statuses = app(EnforcementStatuses::class);
+            $filters['status'] = array_values(array_map(
+                static fn (mixed $status): string => (string) ($statuses->resolve($status)['code'] ?? trim((string) $status)),
+                $filters['status'],
+            ));
+        }
+        if (is_array($filters) && is_array($filters['law_type'] ?? null)) {
+            $lawTypes = app(LawTypes::class);
+            $filters['law_type'] = array_values(array_map(
+                static function (mixed $type) use ($lawTypes): string {
+                    $resolvedType = $lawTypes->resolve($type);
+                    if ($resolvedType !== null) {
+                        return (string) $resolvedType['code'];
+                    }
+
+                    $resolvedFamily = $lawTypes->family($type);
+
+                    return $resolvedFamily === null ? trim((string) $type) : (string) $resolvedFamily['code'];
+                },
+                $filters['law_type'],
+            ));
+        }
+        if (is_array($filters) && is_array($filters['law_group'] ?? null)) {
+            $categories = app(LawCategories::class);
+            $filters['law_group'] = array_values(array_unique(array_map(
+                static fn (mixed $group): string => (string) ($categories->resolve($group)['code'] ?? trim((string) $group)),
+                $filters['law_group'],
+            )));
+        }
+        if (is_array($filters) && is_array($filters['change_status'] ?? null)) {
+            $changeStatuses = app(ChangeStatuses::class);
+            $filters['change_status'] = array_values(array_unique(array_map(
+                static fn (mixed $status): string => (string) ($changeStatuses->resolve($status)['code'] ?? trim((string) $status)),
+                $filters['change_status'],
+            )));
+        }
+
+        $this->merge(['filters' => $filters]);
     }
 
     /**

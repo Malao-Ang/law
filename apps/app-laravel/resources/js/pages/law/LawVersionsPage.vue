@@ -24,7 +24,7 @@
       <template v-else>
         <div class="lvp-title mb-6">
           <h1 class="text-h6 font-weight-bold">{{ meta.title || documentStore.review?.source_file }}</h1>
-          <div v-if="meta.law_type" class="text-caption text-medium-emphasis mt-1">{{ meta.law_type }}</div>
+          <div v-if="meta.law_type" class="text-caption text-medium-emphasis mt-1">{{ typeLabel(meta.law_type) }}</div>
           <v-btn
             size="small"
             variant="outlined"
@@ -57,7 +57,7 @@
                   <span class="font-weight-bold text-body-2">{{ v.version_label }}</span>
                   <div class="d-flex ga-1">
                     <v-chip size="x-small" :color="v.is_current ? 'success' : 'default'" variant="tonal" rounded="pill">
-                      {{ v.is_current ? (v.status || 'มีผลบังคับใช้') : 'ถูกแทนที่' }}
+                      {{ v.is_current ? statusLabel(v.status || inForceCode.value) : 'ถูกแทนที่' }}
                     </v-chip>
                     <v-chip
                       v-if="v.document_id === props.documentId"
@@ -74,10 +74,10 @@
                   <span v-if="v.promulgation_date">
                     <v-icon icon="mdi-calendar" size="11" /> ประกาศ {{ formatLawDate(v.promulgation_date) }}
                   </span>
-                  <span v-if="v.issuer || v.agency">
-                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.issuer || v.agency }}
+                  <span v-if="v.agency">
+                    <v-icon icon="mdi-office-building-outline" size="11" /> {{ v.agency }}
                   </span>
-                  <span v-if="v.change_status" class="text-caption">{{ v.change_status }}</span>
+                  <span v-if="v.change_status" class="text-caption">{{ changeStatusLabel(v.change_status) }}</span>
                 </div>
 
                 <div class="d-flex ga-2 flex-wrap">
@@ -192,11 +192,18 @@ import type { VersionChainItem } from '../../types/versionChain';
 import { formatThaiDate } from '../../utils/thaiDate';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+import { useChangeStatus } from '../../composables/useChangeStatus';
+
+const { typeLabel } = useLawType();
 
 const props = defineProps<{ documentId: string }>();
 const router = useRouter();
 const versionStore = useVersionStore();
 const documentStore = useDocumentStore();
+const { inForceCode, statusLabel } = useLawStatus();
+const { label: changeStatusLabel } = useChangeStatus();
 
 watch(() => props.documentId, (id) => {
   void versionStore.fetch(id);

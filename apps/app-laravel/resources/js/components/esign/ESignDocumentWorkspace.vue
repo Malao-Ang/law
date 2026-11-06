@@ -13,7 +13,7 @@
         class="text-none"
         @click="router.push(`/documents/${documentId}/esign/preview`)"
       >ดูตัวอย่าง</v-btn>
-      <v-btn
+      <v-btn v-show="can.edit"
         color="admin-primary"
         size="small"
         prepend-icon="mdi-file-document-edit-outline"
@@ -110,7 +110,7 @@
         <section class="esign-headcard">
           <div class="d-flex flex-wrap ga-2 mb-3">
             <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
-              {{ meta.law_type || 'เอกสาร' }}
+              {{ meta.law_type ? typeLabel(meta.law_type) : 'เอกสาร' }}
             </v-chip>
             <v-chip size="small" :color="ESIGN_STAGE_COLOR[stage]" variant="flat" class="font-weight-bold">
               {{ ESIGN_STAGE_LABEL[stage] }}
@@ -231,7 +231,7 @@
                 </div>
               </div>
             </div>
-            <v-btn
+            <v-btn v-show="can.esign"
               v-if="stage === 'draft' || stage === 'cancelled'"
               block
               color="warning"
@@ -273,7 +273,7 @@
             </div>
             <div class="esign-kv">
               <span>ประเภท</span>
-              <strong>{{ meta.law_type || '—' }}</strong>
+              <strong>{{ meta.law_type ? typeLabel(meta.law_type) : '—' }}</strong>
             </div>
             <div class="esign-kv">
               <span>กลุ่มกฎหมาย</span>
@@ -290,7 +290,7 @@
             <div class="esign-kv">
               <span>การเผยแพร่</span>
               <v-switch
-                v-if="isEdit"
+                v-if="isEdit && can.publish"
                 :model-value="isPublished"
                 :loading="publishToggleSaving"
                 :disabled="publishToggleSaving"
@@ -347,26 +347,26 @@
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/esign/preview`)"
           >ดูตัวอย่างเอกสาร</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             variant="outlined"
             prepend-icon="mdi-pencil-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/law-info?mode=edit`)"
           >แก้ไขข้อมูลเอกสาร</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             variant="outlined"
             prepend-icon="mdi-graph-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/relations`)"
           >ความสัมพันธ์กฎหมาย</v-btn>
-          <v-btn
+          <v-btn v-show="can.edit"
             v-if="isEdit"
             variant="outlined"
             prepend-icon="mdi-file-document-edit-outline"
             class="justify-start text-none"
             @click="router.push(`/documents/${documentId}/review`)"
           >แก้ไขเนื้อหา</v-btn>
-          <v-btn
+          <v-btn v-show="can.publish"
             v-else
             variant="outlined"
             prepend-icon="mdi-shield-lock-outline"
@@ -381,6 +381,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
@@ -395,16 +396,24 @@ import { documentFileUrl, fetchStatus } from '../../api/client';
 import Swal from 'sweetalert2';
 import { useVersionStore } from '../../stores/versionStore';
 import VersionHistoryTimeline from '../law/VersionHistoryTimeline.vue';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
+
+const { typeLabel } = useLawType();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = withDefaults(defineProps<{ documentId: string; mode?: 'esign' | 'edit' }>(), {
   mode: 'esign',
 });
+const { can } = useDocumentAccess(() => props.documentId);
 const isEdit = computed(() => props.mode === 'edit');
 const isOldDoc = computed(() => documentStore.review?.law_meta?.document_type === 'old');
 const fileUrl = computed(() => documentFileUrl(props.documentId));
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
+const { inForceCode, isDraft } = useLawStatus();
 
 const tocQuery = ref('');
 const sideTab = ref('info');
@@ -448,6 +457,7 @@ const isPublished = computed(() => !!meta.value.published_date);
 const publishToggleSaving = ref(false);
 
 async function togglePublished(next: boolean | null): Promise<void> {
+  let promoteStatus = false;
   if (next) {
     const status = await fetchStatus(props.documentId);
     if (status?.rag_skipped) {
@@ -468,7 +478,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     }
   }
   // Draft status check — after RAG check passes
-  if (next && (!meta.value.status || meta.value.status === 'ร่าง')) {
+  if (next && (!meta.value.status || isDraft(meta.value.status))) {
     const result = await Swal.fire({
       title: 'เอกสารยังเป็นร่าง',
       html: 'สถานะบังคับใช้ยังเป็น <strong>ร่าง</strong><br>หากเผยแพร่ สถานะจะเปลี่ยนเป็น <strong>มีผลบังคับใช้</strong> โดยอัตโนมัติ',
@@ -482,7 +492,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     });
 
     if (result.isConfirmed) {
-      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+      promoteStatus = true;
     } else if (result.isDenied) {
       router.push(`/documents/${props.documentId}/law-info`);
       return;
@@ -493,6 +503,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   publishToggleSaving.value = true;
   try {
     await documentStore.saveLawMeta({
+      ...(promoteStatus ? { status: inForceCode.value } : {}),
       published_date: next ? new Date().toISOString().slice(0, 10) : '',
     });
   } finally {
@@ -526,8 +537,8 @@ const agencyLabel = computed(() => {
 });
 
 const lawGroupLabel = computed(() => {
-  if (meta.value.law_groups?.length) return meta.value.law_groups.join(', ');
-  return meta.value.law_group || '—';
+  if (meta.value.law_groups?.length) return categoryLabels(meta.value.law_groups).join(', ');
+  return categoryLabel(meta.value.law_group) || '—';
 });
 
 const updatedAtLabel = computed(() => {

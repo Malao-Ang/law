@@ -1,3 +1,5 @@
+import { createLawTypeCatalog } from '../composables/useLawType';
+
 // map law_type → DocBadge law-type badge + สี border หัวเอกสาร.
 // ค่าสีตรงกับ DocBadge.vue (Figma design system).
 // ponytail: 4 hex นี้ mirror DocBadge STYLES โดยตรง — ถ้า DocBadge เปลี่ยนสี ให้แก้ที่นี่ด้วย.
@@ -11,10 +13,13 @@ export const LAW_BADGE_COLORS: Record<LawBadgeType, string> = {
   'ประกาศ': '#fb923c',
 };
 
-/** external ทุกประเภท → "กฎหมายภายนอก"; internal → สีเฉพาะประเภท (default = ประกาศ). */
+const lawTypes = createLawTypeCatalog();
+
+/** external ทุกประเภท → "กฎหมายภายนอก"; internal → สีตามกลุ่มประเภท. */
 export function lawBadgeType(lawType: string | null | undefined, isExternal: boolean): LawBadgeType {
-  if (isExternal) return 'กฎหมายภายนอก';
-  if (lawType === 'ระเบียบ') return 'ระเบียบ';
-  if (lawType === 'ข้อบังคับ') return 'ข้อบังคับ';
+  if (isExternal || lawTypes.typeSource(lawType) === 'external') return 'กฎหมายภายนอก';
+  const familyCode = lawTypes.familyItem(lawType)?.code ?? lawTypes.typeFamily(lawType);
+  if (familyCode === 'LFM02') return 'ระเบียบ';
+  if (familyCode === 'LFM01') return 'ข้อบังคับ';
   return 'ประกาศ';
 }

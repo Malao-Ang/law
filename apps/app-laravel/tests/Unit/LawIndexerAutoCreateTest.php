@@ -22,6 +22,7 @@ class LawIndexerAutoCreateTest extends TestCase
         $store->shouldReceive('absolutePath')->andReturn($tmpFile);
         $store->shouldReceive('exportRelativePath')->andReturn('exports/test.rag.json');
         $store->shouldReceive('getReviewDocument')->andReturn(['law_meta' => ['title' => 'Test', 'access_scope' => 'public']]);
+        $store->shouldReceive('getStatus')->andReturn(null);
 
         $client = Mockery::mock(ElasticClient::class);
         $client->shouldReceive('indexExists')->once()->andReturn(false);
@@ -46,6 +47,7 @@ class LawIndexerAutoCreateTest extends TestCase
         $store->shouldReceive('absolutePath')->andReturn($tmpFile);
         $store->shouldReceive('exportRelativePath')->andReturn('exports/test.rag.json');
         $store->shouldReceive('getReviewDocument')->andReturn(['law_meta' => ['title' => 'Test', 'access_scope' => 'public']]);
+        $store->shouldReceive('getStatus')->andReturn(null);
 
         $client = Mockery::mock(ElasticClient::class);
         $client->shouldReceive('indexExists')->once()->andReturn(true);

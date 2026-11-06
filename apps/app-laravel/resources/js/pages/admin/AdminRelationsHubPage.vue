@@ -81,7 +81,7 @@
             </td>
             <td>
               <v-chip v-if="doc.lawType" size="small" variant="flat" :color="typeColor(doc.lawType)" rounded="pill" class="font-weight-bold text-white">
-                {{ doc.lawType }}
+                {{ typeLabel(doc.lawType) }}
               </v-chip>
             </td>
             <td>
@@ -411,8 +411,14 @@ import { createClientId } from '../../utils/createClientId';
 import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { createLawTypeCatalog } from '../../composables/useLawType';
+import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
+
+const { typeLabel } = useLawType();
+const changeStatusCS = useChangeStatus();
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {
@@ -443,6 +449,8 @@ interface ChangeLogEntry {
 // ── Stores ────────────────────────────────────────────────
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
+const { statusColor } = useLawStatus();
+const lawTypes = createLawTypeCatalog();
 
 // ── Table state ───────────────────────────────────────────
 const PAGE_SIZE = 20;
@@ -496,14 +504,11 @@ const sortOptions = [
   { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
-// ── Type colors (same as AdminLawListPage) ─────────────────
-const TYPE_META: Record<string, { color: string }> = {
-  กฎหมายภายนอก: { color: 'doc-phaainok' },
-  ข้อบังคับ: { color: 'doc-kho-bangkhab' },
-  ระเบียบ: { color: 'doc-rabiap' },
-  ประกาศ: { color: 'doc-prakat' },
-  ประกาศที่ออกโดยมหาวิทยาลัย: { color: 'doc-prakat' },
-  ประกาศที่ออกโดยสภามหาวิทยาลัย: { color: 'doc-prakat' },
+const FAMILY_COLOR_CLASS: Record<string, string> = {
+  LFM04: 'doc-phaainok',
+  LFM01: 'doc-kho-bangkhab',
+  LFM02: 'doc-rabiap',
+  LFM03: 'doc-prakat',
 };
 
 // ── Derived table rows ─────────────────────────────────────
@@ -576,9 +581,7 @@ watch([search, filterStatus, sortOrder], () => { page.value = 1; });
 // ── Relations computed (from staged pendingRelations) ──────
 const relations = computed<LawRelation[]>(() => pendingRelations.value);
 const changeStatus = computed(() => documentStore.review?.law_meta?.change_status?.trim() || null);
-const showSectionRelations = computed(() =>
-  changeStatus.value === 'ปรับปรุงรายข้อ' || changeStatus.value === 'ปรับปรุงรายมาตรา',
-);
+const showSectionRelations = computed(() => changeStatusCS.isSection(changeStatus.value ?? ''));
 const sections = computed(() => buildSections(documentStore.review));
 const sectionLabels = computed<Record<string, string>>(() =>
   Object.fromEntries(sections.value.map((s) => [s.id, s.badge])),
@@ -618,7 +621,7 @@ function formatDateTime(date: Date): string {
 
 // ── Table helpers ─────────────────────────────────────────
 function typeColor(type: string): string {
-  return TYPE_META[type]?.color ?? (type.includes('ประกาศ') ? 'doc-prakat' : 'grey');
+  return FAMILY_COLOR_CLASS[lawTypes.typeFamily(type)] ?? 'grey';
 }
 
 function workflowStageColor(stage: string): string {
@@ -631,8 +634,9 @@ function workflowStageColor(stage: string): string {
 }
 
 function metaStatusColor(status: string): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'success';
-  if (status === 'ยกเลิก' || status === 'ถูกยกเลิก') return 'error';
+  const color = statusColor(status);
+  if (color) return color;
+  if (status === 'ถูกยกเลิก') return 'error';
   if (status === 'พักใช้' || status === 'ระงับใช้') return 'warning';
   return 'grey';
 }

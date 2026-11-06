@@ -2,6 +2,8 @@
 
 namespace App\Services\Buu;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -13,45 +15,64 @@ use Illuminate\Support\Facades\Log;
  */
 class BuuOAuthService
 {
+    private const CACHE_PREFIX = 'buu.oauth.';
+
+    private const REFRESH_PREFIX = 'buu.oauth.refresh.';
+
+    private const LOCK_PREFIX = 'buu.oauth.lock.';
+
+    private const RENEW_BEFORE_SECONDS = 300;
+
     public function __construct(private readonly HttpFactory $http) {}
 
     /**
-     * @return array{access_token: string, refresh_token?: string, expires_in?: int, token_type?: string}
+     * Cached access token. Renewed (refresh_token grant, then password grant) when fewer than
+     * RENEW_BEFORE_SECONDS remain; forceRefresh always requests a new password-grant token.
+     *
+     * @return array{access_token: string, refresh_token?: string, expires_in?: int, expires_at?: int, token_type?: string}
      */
     public function getAccessToken(string $endpointKey, bool $forceRefresh = false): array
     {
-        $endpoint = $this->endpoint($endpointKey);
-        $cacheKey = 'buu.oauth.'.$endpointKey;
+        $cacheKey = self::CACHE_PREFIX.$endpointKey;
 
         if (! $forceRefresh) {
-            /** @var array{access_token: string, refresh_token?: string, expires_in?: int, token_type?: string}|null $cached */
-            $cached = Cache::get($cacheKey);
-            if (is_array($cached) && ($cached['access_token'] ?? '') !== '') {
+            $cached = $this->cachedToken($cacheKey);
+            if ($cached !== null && $this->secondsLeft($cached) >= self::RENEW_BEFORE_SECONDS) {
                 return $cached;
             }
         }
 
-        $token = $this->requestToken($endpoint['path'], [
-            'client_id' => (string) config('buu.client_id'),
-            'client_secret' => (string) config('buu.client_secret'),
-            'grant_type' => 'password',
-            'scope' => $endpoint['scope'],
-            'provision_key' => $endpoint['provision_key'],
-            'authenticated_userid' => (string) config('buu.authenticated_userid'),
-        ]);
+        try {
+            return Cache::lock(self::LOCK_PREFIX.$endpointKey, 10)->block(5, function () use ($endpointKey, $cacheKey, $forceRefresh): array {
+                if (! $forceRefresh) {
+                    $current = $this->cachedToken($cacheKey);
+                    if ($current !== null && $this->secondsLeft($current) >= self::RENEW_BEFORE_SECONDS) {
+                        return $current;
+                    }
+                }
 
-        $this->remember($cacheKey, $token);
+                return $this->renew($endpointKey, $forceRefresh);
+            });
+        } catch (LockTimeoutException) {
+            return $this->renew($endpointKey, $forceRefresh);
+        } catch (BuuApiException|ConnectionException $exception) {
+            $stale = $forceRefresh ? null : $this->cachedToken($cacheKey);
+            if ($stale !== null && $this->secondsLeft($stale) > 10) {
+                Log::warning('BUU OAuth renewal failed, using token that is still valid', ['endpoint' => $endpointKey]);
 
-        return $token;
+                return $stale;
+            }
+
+            throw $exception;
+        }
     }
 
     /**
-     * @return array{access_token: string, refresh_token?: string, expires_in?: int, token_type?: string}
+     * @return array{access_token: string, refresh_token?: string, expires_in?: int, expires_at?: int, token_type?: string}
      */
     public function refreshToken(string $endpointKey, string $refreshToken): array
     {
         $endpoint = $this->endpoint($endpointKey);
-        $cacheKey = 'buu.oauth.'.$endpointKey;
 
         $token = $this->requestToken($endpoint['path'], [
             'client_id' => (string) config('buu.client_id'),
@@ -60,9 +81,7 @@ class BuuOAuthService
             'refresh_token' => $refreshToken,
         ]);
 
-        $this->remember($cacheKey, $token);
-
-        return $token;
+        return $this->remember($endpointKey, $token);
     }
 
     public function bearerToken(string $endpointKey, bool $forceRefresh = false): string
@@ -74,7 +93,54 @@ class BuuOAuthService
 
     public function forgetCachedToken(string $endpointKey): void
     {
-        Cache::forget('buu.oauth.'.$endpointKey);
+        Cache::forget(self::CACHE_PREFIX.$endpointKey);
+        Cache::forget(self::REFRESH_PREFIX.$endpointKey);
+    }
+
+    /**
+     * @return array{access_token: string, refresh_token?: string, expires_in?: int, expires_at?: int, token_type?: string}
+     */
+    private function renew(string $endpointKey, bool $passwordGrantOnly): array
+    {
+        $refresh = $passwordGrantOnly ? null : Cache::get(self::REFRESH_PREFIX.$endpointKey);
+
+        if (is_string($refresh) && $refresh !== '') {
+            try {
+                return $this->refreshToken($endpointKey, $refresh);
+            } catch (BuuApiException|ConnectionException) {
+                Log::info('BUU OAuth refresh_token grant failed, falling back to password grant', ['endpoint' => $endpointKey]);
+                Cache::forget(self::REFRESH_PREFIX.$endpointKey);
+            }
+        }
+
+        $endpoint = $this->endpoint($endpointKey);
+
+        return $this->remember($endpointKey, $this->requestToken($endpoint['path'], [
+            'client_id' => (string) config('buu.client_id'),
+            'client_secret' => (string) config('buu.client_secret'),
+            'grant_type' => 'password',
+            'scope' => $endpoint['scope'],
+            'provision_key' => $endpoint['provision_key'],
+            'authenticated_userid' => (string) config('buu.authenticated_userid'),
+        ]));
+    }
+
+    /**
+     * @return array{access_token: string, refresh_token?: string, expires_in?: int, expires_at?: int, token_type?: string}|null
+     */
+    private function cachedToken(string $cacheKey): ?array
+    {
+        $cached = Cache::get($cacheKey);
+
+        return is_array($cached) && ($cached['access_token'] ?? '') !== '' ? $cached : null;
+    }
+
+    /**
+     * @param  array{expires_at?: int}  $token
+     */
+    private function secondsLeft(array $token): int
+    {
+        return (int) ($token['expires_at'] ?? 0) - time();
     }
 
     /**
@@ -131,12 +197,24 @@ class BuuOAuthService
     }
 
     /**
+     * Stores the access token with an absolute expires_at; the refresh_token lives in its own
+     * cache entry that outlives the access token so a renewal is still possible near expiry.
+     *
      * @param  array{access_token: string, refresh_token?: string, expires_in?: int, token_type?: string}  $token
+     * @return array{access_token: string, refresh_token?: string, expires_in?: int, expires_at?: int, token_type?: string}
      */
-    private function remember(string $cacheKey, array $token): void
+    private function remember(string $endpointKey, array $token): array
     {
-        $ttl = max(60, ((int) ($token['expires_in'] ?? 7200)) - 120);
-        Cache::put($cacheKey, $token, $ttl);
+        $expiresIn = max(60, (int) ($token['expires_in'] ?? 7200));
+        $token['expires_at'] = time() + $expiresIn;
+
+        Cache::put(self::CACHE_PREFIX.$endpointKey, $token, $expiresIn);
+
+        if (($token['refresh_token'] ?? '') !== '') {
+            Cache::put(self::REFRESH_PREFIX.$endpointKey, $token['refresh_token'], $expiresIn + 86400);
+        }
+
+        return $token;
     }
 
     /**

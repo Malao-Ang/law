@@ -62,7 +62,7 @@
                     v-for="item in filteredItems"
                     :key="item.id"
                     :title="item.name"
-                    :subtitle="'email' in item ? (item.email || undefined) : undefined"
+                    :subtitle="item.id"
                   >
                     <template #append>
                       <v-btn
@@ -198,12 +198,12 @@ const filteredItems = computed(() => {
   if (tab.value === 'units') {
     return (props.directory?.units ?? [])
       .filter((item) => !unitIds.value.includes(item.id))
-      .filter((item) => needle === '' || item.name.toLowerCase().includes(needle));
+      .filter((item) => needle === '' || item.name.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle));
   }
 
   return (props.directory?.users ?? [])
     .filter((item) => !userIds.value.includes(item.id))
-    .filter((item) => needle === '' || item.name.toLowerCase().includes(needle) || (item.email ?? '').toLowerCase().includes(needle));
+    .filter((item) => needle === '' || item.name.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle) || (item.email ?? '').toLowerCase().includes(needle));
 });
 
 const saveDisabled = computed(() => name.value.trim() === '' || totalSelected.value === 0);

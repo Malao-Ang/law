@@ -109,12 +109,16 @@ import ApexChart from 'vue3-apexcharts/core';
 import 'apexcharts/bar';
 import 'apexcharts/donut';
 import 'apexcharts/features/legend';
+import { useLookups } from '../../composables/useLookups';
+import { useLawType } from '../../composables/useLawType';
 import { fetchReportSummary } from '../../api/client';
 import type { ReportBucket, ReportFilters, ReportSummary } from '../../types/document';
 import AdminStatCard from '../../components/admin/AdminStatCard.vue';
 import AppShell from '../../components/shared/AppShell.vue';
 
 const router = useRouter();
+const { documentTypes, lawGroups } = useLookups();
+const { typeItem } = useLawType();
 
 const summary = ref<ReportSummary>({
   totals: { all: 0, published: 0, processing: 0, failed: 0, esign: 0, relations: 0, legacy_links: 0 },
@@ -137,8 +141,8 @@ async function load(): Promise<void> {
 onMounted(load);
 watch(filters, load, { deep: true });
 
-const typeOptions = computed(() => summary.value.by_type.map((b) => b.key).filter((k) => k !== 'ไม่ระบุ'));
-const groupOptions = computed(() => summary.value.by_group.map((b) => b.key).filter((k) => k !== 'ไม่ระบุ'));
+const typeOptions = computed(() => summary.value.by_type.map((b) => b.key).filter((key) => documentTypes.value.some((item) => item.code === typeItem(key)?.code || item.title === key)));
+const groupOptions = computed(() => summary.value.by_group.map((b) => b.key).filter((key) => lawGroups.value.some((item) => item.code === key || item.title === key)));
 const agencyOptions = computed(() => summary.value.by_agency.map((b) => b.key).filter((k) => k !== 'ไม่ระบุ'));
 
 const statCards = computed(() => [

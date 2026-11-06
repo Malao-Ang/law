@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LawSuggestRequest;
+use App\Services\MasterData\ChangeStatuses;
+use App\Services\MasterData\EnforcementStatuses;
+use App\Services\MasterData\LawCategories;
+use App\Services\MasterData\LawTypes;
 use App\Services\ReviewStore;
 use App\Services\Search\LawSuggestService;
 use Illuminate\Http\JsonResponse;
@@ -11,6 +15,13 @@ use Illuminate\Support\Facades\Log;
 
 class LawSuggestController extends Controller
 {
+    public function __construct(
+        private readonly EnforcementStatuses $enforcementStatuses,
+        private readonly LawTypes $lawTypes,
+        private readonly LawCategories $lawCategories,
+        private readonly ChangeStatuses $changeStatuses,
+    ) {}
+
     public function suggest(LawSuggestRequest $request, LawSuggestService $service, ReviewStore $store): JsonResponse
     {
         $params = $request->validated();
@@ -21,7 +32,7 @@ class LawSuggestController extends Controller
             if (
                 ($metaRow['status'] ?? '') === 'ingested'
                 && ($metaRow['published_date'] ?? '') !== ''
-                && ($metaRow['meta_status'] ?? '') !== 'ร่าง'
+                && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
             ) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
             }
@@ -59,7 +70,7 @@ class LawSuggestController extends Controller
 
         $rows = [];
         foreach ($store->listLawMeta() as $row) {
-            // Published gate: status=ingested, has published_date, not draft (ร่าง)
+            // Published gate: status=ingested, has published_date, not draft.
             if (! isset($publishedIds[(string) ($row['document_id'] ?? '')])) {
                 continue;
             }
@@ -119,25 +130,29 @@ class LawSuggestController extends Controller
             (string) ($row['title'] ?? ''),
             (string) ($row['law_type'] ?? ''),
             (string) ($row['meta_status'] ?? ''),
-            (string) ($row['change_status'] ?? ''),
+            $this->changeStatuses->labelOf($row['change_status'] ?? ''),
             (string) ($row['signer_group'] ?? ''),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
-            ...array_map('strval', (array) ($row['law_groups'] ?? [])),
+            ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
         ], static fn (string $value): bool => trim($value) !== ''));
     }
 
     private function suggestionFromMeta(array $row): array
     {
         $keywords = array_values(array_unique(array_filter([
-            ...array_map('strval', (array) ($row['law_groups'] ?? [])),
+            ...$this->lawCategories->labelsOf((array) ($row['law_groups'] ?? [])),
             ...array_map('strval', (array) ($row['agencies'] ?? [])),
-            (string) ($row['change_status'] ?? ''),
+            $this->changeStatuses->labelOf($row['change_status'] ?? ''),
         ], static fn (string $value): bool => trim($value) !== '')));
+
+        $rawType = (string) ($row['law_type'] ?? '');
+        $type = $this->lawTypes->resolve($rawType);
 
         return [
             'law_id' => (string) ($row['document_id'] ?? ''),
             'title' => $row['title'] ?? null,
-            'law_type' => $row['law_type'] ?? null,
+            'law_type' => $type === null ? ($row['law_type'] ?? null) : (string) ($type['name'] ?? $rawType),
+            'law_type_code' => $type === null ? $rawType : (string) ($type['code'] ?? $rawType),
             'agency' => $row['agencies'][0] ?? null,
             'published_date' => $row['promulgation_date'] ?? null,
             'keywords' => $keywords,

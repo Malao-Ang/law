@@ -165,7 +165,7 @@
         <div class="rel-root__title mb-3">{{ selectedRow.title }}</div>
         <div class="d-flex flex-wrap ga-2 mb-4">
           <v-chip v-if="selectedRow.lawType" size="small" variant="tonal" color="grey" rounded="lg">
-            {{ selectedRow.lawType }}
+            {{ typeLabel(selectedRow.lawType) }}
           </v-chip>
           <v-chip v-if="selectedRow.isParent" size="small" variant="tonal" color="grey" rounded="lg">
             กฎหมายแม่
@@ -357,6 +357,7 @@
 </template>
 
 <script setup lang="ts">
+import { useLookups } from '../../composables/useLookups';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchReportSummary, fetchReview, fetchIncomingRelationDocumentIds, documentFileDownloadUrl, downloadPdfExport } from '../../api/client';
@@ -385,12 +386,17 @@ import {
   isCancelledStatus,
   isKeptInRelationGraph,
 } from '../../composables/useShowRelations';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+
+const { typeLabel, typeItem } = useLawType();
 
 const PAGE_SIZE = 20;
 
 const props = defineProps<{ documentId?: string }>();
 const route = useRoute();
 const router = useRouter();
+const { inForceCode, statusLabel } = useLawStatus();
 
 const loading = ref(false);
 const detailLoading = ref(false);
@@ -450,6 +456,8 @@ const sortOptions = [
   { label: 'ชื่อ ก-ฮ', value: 'name' },
 ];
 
+const { documentTypes } = useLookups();
+
 const typeOptions = computed(() => {
   const counts = new Map<string, number>();
   for (const row of rows.value) {
@@ -458,8 +466,9 @@ const typeOptions = computed(() => {
   return [
     { label: 'ทุกประเภท', value: null },
     ...[...counts.entries()]
+      .filter(([key]) => documentTypes.value.some((item) => item.code === typeItem(key)?.code || item.title === key))
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => ({ label: key, value: key })),
+      .map(([key]) => ({ label: typeLabel(key), value: key })),
   ];
 });
 
@@ -549,7 +558,7 @@ const stats = computed(() => {
   const nodes = flattenTree(rootNode.value);
   return [
     { label: 'กฎหมายลำดับรองทั้งหมด', value: `${nodes.length} ฉบับ`, tone: '', icon: 'mdi-layers-outline' },
-    { label: 'มีผลบังคับใช้', value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
+    { label: statusLabel(inForceCode.value), value: String(nodes.filter((n) => isActiveStatus(n.row.metaStatus)).length), tone: 'is-success', icon: '' },
     { label: 'ถูกยกเลิก', value: String(nodes.filter((n) => isCancelledStatus(n.row.metaStatus)).length), tone: 'is-muted', icon: '' },
     { label: 'ต้องตรวจสอบ', value: String(nodes.filter((n) => !n.row.metaStatus).length), tone: 'is-warning', icon: '' },
     { label: 'ระดับสูงสุด', value: String(maxTreeLevel(rootNode.value)), tone: 'is-primary', icon: '' },

@@ -30,7 +30,7 @@
           <div class="edit-hub-hero">
             <div class="d-flex flex-wrap ga-2 mb-3">
               <v-chip size="small" color="doc-prakat" variant="flat" class="font-weight-bold">
-                {{ meta.law_type || 'เอกสาร' }}
+                {{ meta.law_type ? typeLabel(meta.law_type) : 'เอกสาร' }}
               </v-chip>
               <v-chip
                 size="small"
@@ -38,7 +38,7 @@
                 variant="flat"
                 class="font-weight-bold"
               >
-                {{ meta.status || 'ร่าง' }}
+                {{ statusLabel(meta.status || draftCode.value) }}
               </v-chip>
               <v-chip
                 size="small"
@@ -135,7 +135,7 @@
                   <p class="text-caption text-medium-emphasis mb-0">อ่านตัวบทแบบ read-only</p>
                 </div>
                 <v-btn
-                  v-if="!isOldDoc"
+                  v-if="!isOldDoc && can.edit"
                   color="admin-primary"
                   variant="tonal"
                   size="small"
@@ -215,7 +215,7 @@
                   :key="`publish-switch-${isPublished}`"
                   :model-value="isPublished"
                   :loading="publishToggleSaving"
-                  :disabled="publishToggleSaving"
+                  :disabled="publishToggleSaving || !can.publish"
                   color="success"
                   density="compact"
                   hide-details
@@ -240,6 +240,7 @@
 </template>
 
 <script setup lang="ts">
+import { useDocumentAccess } from '../../composables/useDocumentAccess';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AppShell from '../shared/AppShell.vue';
@@ -254,12 +255,20 @@ import type { LawMeta, LawRelation, RelationType } from '../../types/document';
 import { evaluatePublishGates } from '../../composables/usePublishGates';
 import { formatThaiDate } from '../../utils/thaiDate';
 import { isEsignApproved, isEsignRejected } from '../../utils/esignStatus';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
+
+const { typeLabel } = useLawType();
+const { categoryLabel, categoryLabels } = useLawCategory();
 
 const props = defineProps<{ documentId: string }>();
+const { can } = useDocumentAccess(() => props.documentId);
 
 const router = useRouter();
 const documentStore = useDocumentStore();
 const versionStore = useVersionStore();
+const { draftCode, inForceCode, isDraft, statusColor, statusLabel } = useLawStatus();
 
 const EMPTY_META: LawMeta = {
   status: '',
@@ -321,8 +330,8 @@ const agencyLabel = computed(() => {
 });
 
 const lawGroupLabel = computed(() => {
-  if (meta.value.law_groups?.length) return meta.value.law_groups.join(', ');
-  return meta.value.law_group || '-';
+  if (meta.value.law_groups?.length) return categoryLabels(meta.value.law_groups).join(', ');
+  return categoryLabel(meta.value.law_group) || '-';
 });
 
 const updatedAtLabel = computed(() => {
@@ -439,13 +448,11 @@ const actions = computed(() => {
     });
   }
 
-  return list;
+  return list.filter(action => action.key === 'permissions' ? can.value.publish : ['esign', 'preview'].includes(action.key) ? can.value.esign : can.value.edit);
 });
 
 function metaStatusColor(status: string): string {
-  if (status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ') return 'success';
-  if (status === 'ยกเลิกการใช้งาน' || status === 'ยกเลิก') return 'error';
-  return 'warning'; // ร่าง or empty
+  return statusColor(status) || 'warning';
 }
 
 function relationTypeLabel(type: RelationType): string {
@@ -459,7 +466,9 @@ function relationTypeLabel(type: RelationType): string {
   return labels[type] ?? type;
 }
 
+const promoteOnPublish = ref(false);
 async function togglePublished(next: boolean | null): Promise<void> {
+  promoteOnPublish.value = false;
   // ปิดเผยแพร่ — ไม่ต้องตรวจอะไร เปิด confirm dialog ตรงๆ
   if (!next) {
     publishDialogNext.value = false;
@@ -543,7 +552,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   }
 
   // All required gates pass — special handling for ร่าง status (post-gate)
-  if (!meta.value.status || meta.value.status === 'ร่าง') {
+  if (!meta.value.status || isDraft(meta.value.status)) {
     const r = await Swal.fire({
       icon: 'question',
       title: 'เอกสารยังเป็นร่าง',
@@ -557,7 +566,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       confirmButtonColor: '#1a3673',
     });
     if (r.isConfirmed) {
-      await documentStore.saveLawMeta({ status: 'มีผลบังคับใช้' });
+      promoteOnPublish.value = true;
     } else if (r.isDenied) {
       router.push(`/documents/${props.documentId}/law-info?mode=edit`);
       return;
@@ -575,6 +584,7 @@ async function confirmPublishChange(): Promise<void> {
   publishToggleSaving.value = true;
   try {
     const saved = await documentStore.saveLawMeta({
+      ...(next && promoteOnPublish.value ? { status: inForceCode.value } : {}),
       published_date: next ? new Date().toISOString().slice(0, 10) : '',
     });
     if (!saved) return;

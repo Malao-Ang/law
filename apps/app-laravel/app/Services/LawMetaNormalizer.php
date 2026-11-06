@@ -2,17 +2,37 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\EnforcementStatuses;
+
 class LawMetaNormalizer
 {
+    public static function coEditors(mixed $entries): array
+    {
+        $people = [];
+        foreach (is_array($entries) ? $entries : [] as $entry) {
+            if (! is_array($entry)) continue;
+            $username = \App\Services\Auth\MongoUserStore::key((string) ($entry['username'] ?? ''));
+            if ($username === '') continue;
+            $people[$username] = [
+                'username' => $username, 'name' => $entry['name'] ?? $username,
+                'actions' => array_values(array_intersect(['edit', 'delete', 'esign', 'publish'], (array) ($entry['actions'] ?? []))),
+                'added_by' => $entry['added_by'] ?? null, 'added_at' => $entry['added_at'] ?? null,
+            ];
+        }
+        return array_values($people);
+    }
+
+    public static function statusCode(mixed $value): string
+    {
+        $statuses = app(EnforcementStatuses::class);
+        $item = $statuses->resolve($value);
+
+        return $item === null ? trim((string) $value) : (string) $item['code'];
+    }
+
     public static function legacyStatus(mixed $value): string
     {
-        $status = trim((string) $value);
-
-        if ($status === '') {
-            return 'ร่าง';
-        }
-
-        return $status === 'ยกเลิก' ? 'ยกเลิกการใช้งาน' : $status;
+        return self::statusCode($value);
     }
 
     /**

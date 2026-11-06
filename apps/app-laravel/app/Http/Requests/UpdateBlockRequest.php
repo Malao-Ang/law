@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Services\MasterData\LegalStructures;
+use App\Services\ReviewStore;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\ValidationException;
 
 class UpdateBlockRequest extends FormRequest
 {
@@ -13,9 +16,41 @@ class UpdateBlockRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
+        $data = [
             'mark_uncertain' => filter_var($this->input('mark_uncertain', false), FILTER_VALIDATE_BOOL),
-        ]);
+        ];
+
+        if ($this->has('chunk_type')) {
+            $chunkType = $this->input('chunk_type');
+            if ($chunkType === null || trim((string) $chunkType) === '') {
+                $data['chunk_type'] = null;
+            } else {
+                $item = app(LegalStructures::class)->resolve($chunkType);
+                if ($item === null) {
+                    throw ValidationException::withMessages([
+                        'chunk_type' => ['ไม่พบโครงสร้างกฎหมายที่เลือก'],
+                    ]);
+                }
+                if (! $item['is_active']) {
+                    $document = app(ReviewStore::class)->getReviewDocument((string) $this->route('documentId'));
+                    $current = null;
+                    foreach ($document['pages'] ?? [] as $page) {
+                        if ((int) ($page['page_no'] ?? 0) !== (int) $this->input('page_no')) continue;
+                        foreach ($page['blocks'] ?? [] as $block) {
+                            if (($block['block_id'] ?? '') === $this->route('blockId')) {
+                                $current = app(LegalStructures::class)->resolve($block['meta']['chunk_type'] ?? null);
+                            }
+                        }
+                    }
+                    if (($current['code'] ?? null) !== $item['code']) {
+                        throw ValidationException::withMessages(['chunk_type' => ['รายการนี้ถูกปิดใช้งาน กรุณาเลือกรายการอื่น']]);
+                    }
+                }
+                $data['chunk_type'] = (string) $item['code'];
+            }
+        }
+
+        $this->merge($data);
     }
 
     /**
@@ -31,7 +66,7 @@ class UpdateBlockRequest extends FormRequest
             'mark_uncertain' => ['boolean'],
             'type' => ['nullable', 'string', 'in:title,section_header,paragraph,list_item,table,figure_caption,footnote,unknown'],
             'reading_order' => ['nullable', 'integer', 'min:0'],
-            'chunk_type' => ['nullable', 'string', 'in:TITLE,PREAMBLE,AUTHORITY,CLAUSE,EFFECTIVE_DATE,REPEAL,DEFINITION_SECTION,DEFINITION,CUSTODIAN,TRANSITIONAL_PROVISION'],
+            'chunk_type' => ['nullable', 'string'],
             'bbox' => ['nullable', 'array', 'size:4'],
             'bbox.*' => ['numeric'],
             'reviewed_html' => ['nullable', 'string'],

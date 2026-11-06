@@ -361,7 +361,7 @@
                     </span>
                     <span v-if="law.law_group">
                       <v-icon size="13" icon="mdi-sitemap-outline" />
-                      {{ law.law_group }}
+                      {{ lawCategories.categoryLabel(law.law_group) }}
                     </span>
                     <span v-if="law.signer_group">
                       <v-icon size="13" icon="mdi-folder-outline" />
@@ -409,7 +409,7 @@
                     />
                   </div>
                 </div>
-                <div v-if="law.restricted && !auth.isAuthenticated" class="law-list-card__restricted">
+                <div v-if="law.restricted || law.can?.read === false" class="law-list-card__restricted">
                   <v-icon icon="mdi-lock-outline" size="16" />
                   <span class="law-list-card__restricted-label">Private · เฉพาะผู้ได้รับสิทธิ์</span>
                   <button type="button" class="law-restricted-btn" @click.stop="openLaw(law)">
@@ -460,8 +460,7 @@ import DocBadge from '../../components/shared/DocBadge.vue';
 import ELawFooter from '../../components/shared/ELawFooter.vue';
 import ELawNavbar from '../../components/shared/ELawNavbar.vue';
 import {
-  LAW_TYPE_TO_BADGE,
-  LAW_TYPE_TO_DOC_TYPE,
+  lawTypeToBadge,
   type ChangeStatus,
   type LawTypeBadge,
   type LawTypeCardClass,
@@ -473,91 +472,18 @@ import { canDisplayLawResult } from '../../utils/lawAccess';
 import { sanitizeHighlight } from '../../utils/highlightSanitizer';
 import { cardChangeState } from '../../utils/cardChangeState';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useLawType } from '../../composables/useLawType';
+import { useLawCategory } from '../../composables/useLawCategory';
 
 const PER_PAGE = 20;
 
-const LAW_TYPE_LABELS: Record<string, string> = {
-  phrb: 'กฎหมายภายนอก',
-  'พ.ร.บ.': 'กฎหมายภายนอก',
-  พระราชกำหนด: 'กฎหมายภายนอก',
-  พระราชบัญญัติ: 'กฎหมายภายนอก',
-  กฎกระทรวง: 'กฎหมายภายนอก',
-  ประกาศกระทรวง: 'กฎหมายภายนอก',
-  'kotmai-krung': 'กฎหมายภายนอก',
-  'kotmai-phaainok': 'กฎหมายภายนอก',
-  กฎหมายภายนอก: 'กฎหมายภายนอก',
-  'kho-bangkhab': 'ข้อบังคับ',
-  ข้อบังคับ: 'ข้อบังคับ',
-  rabiap: 'ระเบียบ',
-  ระเบียบ: 'ระเบียบ',
-  prakat: 'ประกาศ',
-  ประกาศ: 'ประกาศ',
-  command: 'ประกาศ',
-  คำสั่ง: 'ประกาศ',
-  resolution: 'ประกาศ',
-  มติ: 'ประกาศ',
-};
-
-const CHANGE_STATUS_LABELS: Record<string, string> = {
-  new: 'ออกใหม่',
-  amended: 'แก้ไขเพิ่มเติม',
-  repealed: 'ยกเลิก',
-  consolidated: 'ฉบับรวม',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  active: 'มีผลบังคับใช้',
-  มีผลบังคับใช้: 'มีผลบังคับใช้',
-  มีผลใช้บังคับ: 'มีผลบังคับใช้',
-  ใช้บังคับ: 'มีผลบังคับใช้',
-  บังคับใช้: 'มีผลบังคับใช้',
-  cancelled: 'ยกเลิกการใช้งาน',
-  ยกเลิก: 'ยกเลิกการใช้งาน',
-  ยกเลิกการใช้งาน: 'ยกเลิกการใช้งาน',
-  draft: 'ร่าง',
-  ร่าง: 'ร่าง',
-};
-
-const LAW_TYPE_CANONICAL_VALUES: Record<string, string> = {
-  phrb: 'kotmai-phaainok',
-  'พ.ร.บ.': 'kotmai-phaainok',
-  พระราชกำหนด: 'kotmai-phaainok',
-  พระราชบัญญัติ: 'kotmai-phaainok',
-  กฎกระทรวง: 'kotmai-phaainok',
-  ประกาศกระทรวง: 'kotmai-phaainok',
-  'kotmai-krung': 'kotmai-phaainok',
-  'kotmai-phaainok': 'kotmai-phaainok',
-  กฎหมายภายนอก: 'kotmai-phaainok',
-  'kho-bangkhab': 'kho-bangkhab',
-  ข้อบังคับ: 'kho-bangkhab',
-  rabiap: 'rabiap',
-  ระเบียบ: 'rabiap',
-  prakat: 'prakat',
-  ประกาศ: 'prakat',
-  command: 'prakat',
-  คำสั่ง: 'prakat',
-  resolution: 'prakat',
-  มติ: 'prakat',
-};
-
-const LAW_TYPE_FILTER_ALIASES: Record<string, string[]> = {
-  'kotmai-phaainok': [
-    'kotmai-phaainok',
-    'kotmai-krung',
-    'phrb',
-    'พ.ร.บ.',
-    'พระราชกำหนด',
-    'พระราชบัญญัติ',
-    'กฎกระทรวง',
-    'ประกาศกระทรวง',
-    'กฎหมายภายนอก',
-  ],
-  'kho-bangkhab': ['kho-bangkhab', 'ข้อบังคับ'],
-  rabiap: ['rabiap', 'ระเบียบ'],
-  prakat: ['prakat', 'ประกาศ', 'command', 'คำสั่ง', 'resolution', 'มติ', 'ประกาศที่ออกโดยมหาวิทยาลัย', 'ประกาศที่ออกโดยสภามหาวิทยาลัย'],
-};
-
 const CHILD_CHIP_LABELS: Record<string, string> = {
+  LFM04: 'กฎหมายภายนอก',
+  LFM01: 'ข้อบังคับ',
+  LFM02: 'ระเบียบ',
+  LFM03: 'ประกาศ',
   'kotmai-phaainok': 'กฎหมายภายนอก',
   'kho-bangkhab': 'ข้อบังคับ',
   rabiap: 'ระเบียบ',
@@ -565,19 +491,11 @@ const CHILD_CHIP_LABELS: Record<string, string> = {
   other: 'อื่น ๆ',
 };
 
-const LAW_TYPE_ORDER = ['kotmai-phaainok', 'prakat', 'kho-bangkhab', 'rabiap'];
-const DRAFT_EXCLUDED_STATUSES = ['มีผลบังคับใช้', 'ยกเลิกการใช้งาน'];
-
-const LAW_GROUP_ALIAS_VALUES: Record<string, string> = {
-  academic: 'ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร',
-  'student-affairs': 'ด้านกิจการนิสิต',
-  'research-innovation': 'ด้านการวิจัย นวัตกรรม และการนำไปใช้ประโยชน์',
-  'academic-service': 'ด้านบริการวิชาการ',
-  'organization-admin': 'ด้านโครงสร้างองค์กรและระบบการบริหาร',
-  'hr-discipline': 'ด้านการบริหารงานบุคคล สิทธิประโยชน์ วินัยและจรรยาบรรณ',
-  'finance-assets-risk': 'ด้านการเงินและทรัพย์สิน พัสดุ การตรวจสอบ และการบริหารความเสี่ยง',
-  other: 'ด้านอื่น ๆ',
-};
+const lawStatus = useLawStatus();
+const changeStatusCatalog = useChangeStatus();
+const lawTypes = useLawType();
+const lawCategories = useLawCategory();
+const DRAFT_EXCLUDED_STATUSES = [lawStatus.inForceCode.value, lawStatus.repealedCode.value];
 
 type SortValue = 'relevance' | 'thai-asc' | 'thai-desc' | 'newest' | 'oldest';
 
@@ -662,12 +580,27 @@ function canonicalFacetOptions(
     if (!canonical || (whitelist && !whitelist.includes(canonical))) continue;
     counts.set(canonical, (counts.get(canonical) ?? 0) + bucket.count);
   }
-  const values = whitelist ?? Array.from(counts.keys());
+  const allowed = new Set((lookupFacets.value?.[key] ?? []).map((bucket) => canonicalize(bucket.value)));
+  const values = (whitelist ?? Array.from(counts.keys())).filter((value) => !lookupFacets.value || allowed.has(value));
   return values.map((value) => ({ label: labelResolver(value), value, count: counts.get(value) ?? 0 }));
 }
 
-const typeFilters = computed(() => canonicalFacetOptions('law_type', canonicalLawTypeValue, lawTypeLabel, LAW_TYPE_ORDER, true));
-const groupFilters = computed(() => mapFacetOptions(stableFacet('law_group')));
+const typeFilters = computed(() => {
+  const counts = new Map<string, number>();
+  for (const bucket of stableFacet('law_type')) {
+    const familyCode = canonicalLawTypeValue(bucket.value);
+    if (!familyCode) continue;
+    counts.set(familyCode, (counts.get(familyCode) ?? 0) + bucket.count);
+  }
+  return lawTypes.familiesOrdered.value.map((family) => ({
+    label: family.title,
+    value: family.code,
+    count: counts.get(family.code) ?? 0,
+  }));
+});
+const groupFilters = computed(() =>
+  mapFacetOptions(stableFacet('law_group').filter((bucket) => !lookupFacets.value || lookupFacets.value.law_group.some((item) => item.value === bucket.value)), (value) => lawCategories.categoryLabel(value)),
+);
 const agencyFilters = computed(() => {
   const allowed = new Set((lookupFacets.value?.agency ?? []).map((b) => b.value));
   // ponytail: whitelist by current lookups so removed agencies don't bleed in from old documents
@@ -1045,20 +978,16 @@ function lookupDataToFacets(data: LookupData): LawSearchFacets {
 }
 
 function canonicalLawTypeValue(value: string): string {
-  if (LAW_TYPE_CANONICAL_VALUES[value]) return LAW_TYPE_CANONICAL_VALUES[value];
-  if (value.includes('ประกาศ')) return 'prakat';
-  return value;
+  const familyCode = lawTypes.typeFamily(value) || lawTypes.familyItem(value)?.code;
+  return familyCode || value;
 }
 
 function expandLawTypeFilterValues(values: string[]): string[] {
-  return Array.from(new Set(values.flatMap((value) => {
-    const canonical = canonicalLawTypeValue(value);
-    return LAW_TYPE_FILTER_ALIASES[canonical] ?? [canonical];
-  })));
+  return Array.from(new Set(values.map(canonicalLawTypeValue)));
 }
 
 function normalizeLawGroupValue(value: string): string {
-  return LAW_GROUP_ALIAS_VALUES[value] ?? value;
+  return lawCategories.normalizeCategory(value) || value;
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -1067,21 +996,21 @@ function uniqueStrings(values: string[]): string[] {
 
 function lawTypeLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุประเภท';
-  return LAW_TYPE_LABELS[value] ?? value;
+  return lawTypes.familyItem(value)?.title ?? lawTypes.typeLabel(value) ?? value;
 }
 
 function changeStatusLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุสถานะ';
-  return CHANGE_STATUS_LABELS[value] ?? value;
+  return changeStatusCatalog.label(value);
 }
 
 function statusLabel(value: string | null): string {
   if (!value) return 'ไม่ระบุสถานะ';
-  return STATUS_LABELS[value] ?? value;
+  return lawStatus.statusLabel(value);
 }
 
 function canonicalUseStatusValue(value: string): string {
-  return STATUS_LABELS[value] ?? value;
+  return lawStatus.statusItem(value)?.code ?? value;
 }
 
 function extractYear(item: LawSearchResult): number {
@@ -1090,10 +1019,12 @@ function extractYear(item: LawSearchResult): number {
 }
 
 function toDocType(lawType: string | null | undefined): LawTypeCardClass {
-  const raw = lawType ?? '';
-  return LAW_TYPE_TO_DOC_TYPE[raw]
-    ?? LAW_TYPE_TO_DOC_TYPE[canonicalLawTypeValue(raw)]
-    ?? (raw.includes('ประกาศ') ? 'prakat' : 'other');
+  const familyCode = lawTypes.typeFamily(lawType);
+  if (familyCode === 'LFM01') return 'kho-bangkhab';
+  if (familyCode === 'LFM02') return 'rabiap';
+  if (familyCode === 'LFM03') return 'prakat';
+  if (familyCode === 'LFM04') return 'kotmai-phaainok';
+  return 'other';
 }
 
 function childChips(law: LawSearchResult): Array<{ type: string; label: string; count: number }> {
@@ -1156,12 +1087,17 @@ function toChangeStatus(cs: string | null | undefined): ChangeStatus | undefined
 
 function lawTypeBadgeKey(lawType: string | null | undefined): LawTypeBadge | null {
   if (!lawType) return null;
-  return LAW_TYPE_TO_BADGE[lawType] ?? LAW_TYPE_TO_BADGE[canonicalLawTypeValue(lawType)] ?? null;
+  const familyCode = canonicalLawTypeValue(lawType);
+  if (familyCode === 'LFM04') return 'กฎหมายภายนอก';
+  if (familyCode === 'LFM01') return 'ข้อบังคับ';
+  if (familyCode === 'LFM02') return 'ระเบียบ';
+  if (familyCode === 'LFM03') return 'ประกาศ';
+  return lawTypeToBadge(lawType);
 }
 
 function useStatusClass(status: string | null | undefined): string {
-  if (status === 'active' || status === 'มีผลบังคับใช้' || status === 'มีผลใช้บังคับ' || status === 'ใช้บังคับ' || status === 'บังคับใช้') return 'law-use-status--active';
-  if (status === 'cancelled' || status === 'ยกเลิก' || status === 'ยกเลิกการใช้งาน') return 'law-use-status--cancelled';
+  if (lawStatus.isInForce(status)) return 'law-use-status--active';
+  if (lawStatus.isRepealed(status)) return 'law-use-status--cancelled';
   return 'law-use-status--draft';
 }
 

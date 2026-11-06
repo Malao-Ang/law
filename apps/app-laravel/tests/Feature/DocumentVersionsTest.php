@@ -55,7 +55,7 @@ class DocumentVersionsTest extends TestCase
         $this->assertSame([$v1, $v2, $v3], array_column($res['versions'], 'document_id'));
         $this->assertSame(['v1.0', 'v2.0', 'v3.0'], array_column($res['versions'], 'version_label'));
         $this->assertSame([false, false, true], array_column($res['versions'], 'is_current'));
-        $this->assertSame('มีผลบังคับใช้', $res['versions'][2]['status']);
+        $this->assertSame('STA01', $res['versions'][2]['status']);
     }
 
     public function test_same_level_chain_excludes_different_law_type_children(): void

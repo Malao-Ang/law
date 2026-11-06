@@ -1,27 +1,53 @@
 import { ref } from 'vue';
-import { getLookups, type LookupData, type SelectableOption } from '../api/client';
+import {
+  getLookups,
+  type DocumentTypeOption,
+  type LawFamilyOption,
+  type LegalStructureOption,
+  type LawStatusOption,
+  type LookupData,
+  type SelectableOption,
+} from '../api/client';
 
-const documentTypes = ref<(SelectableOption & { source?: string })[]>([]);
-const statuses = ref<SelectableOption[]>([]);
-const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean })[]>([]);
-const changeStatusDetails = ref<(SelectableOption & { source?: string })[]>([]);
+const documentTypes = ref<DocumentTypeOption[]>([]);
+const documentTypesAll = ref<DocumentTypeOption[]>([]);
+const lawFamilies = ref<LawFamilyOption[]>([]);
+const lawFamiliesAll = ref<LawFamilyOption[]>([]);
+const statuses = ref<LawStatusOption[]>([]);
+const statusesAll = ref<LawStatusOption[]>([]);
+const changeStatusTypes = ref<(SelectableOption & { source?: string; has_details?: boolean; role?: string })[]>([]);
+const changeStatusTypesAll = ref<(SelectableOption & { source?: string; has_details?: boolean; role?: string })[]>([]);
+const changeStatusDetails = ref<(SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[]>([]);
+const changeStatusDetailsAll = ref<(SelectableOption & { source?: string; role?: string; color?: string | null; icon?: string | null })[]>([]);
 const agencies = ref<SelectableOption[]>([]);
-const lawGroups = ref<SelectableOption[]>([]);
+const lawGroups = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
+const lawGroupsAll = ref<(SelectableOption & { code: string; sort_order?: number })[]>([]);
+const legalStructures = ref<LegalStructureOption[]>([]);
+const legalStructuresAll = ref<LegalStructureOption[]>([]);
 const lawSources = ref<SelectableOption[]>([]);
 let loaded = false;
 let inFlight: Promise<void> | null = null;
 
-async function load(): Promise<void> {
-  if (loaded) return;
+async function load(force = false): Promise<void> {
+  if (loaded && !force) return;
 
   if (!inFlight) {
     inFlight = getLookups().then((data: LookupData) => {
       documentTypes.value = data.document_types;
+      documentTypesAll.value = data.document_types_all ?? data.document_types;
+      lawFamilies.value = data.law_families;
+      lawFamiliesAll.value = data.law_families_all ?? data.law_families;
       statuses.value = data.statuses;
+      statusesAll.value = data.statuses_all ?? data.statuses;
       changeStatusTypes.value = data.change_status_types;
+      changeStatusTypesAll.value = data.change_status_types_all ?? data.change_status_types;
       changeStatusDetails.value = data.change_status_details;
+      changeStatusDetailsAll.value = data.change_status_details_all ?? data.change_status_details;
       agencies.value = data.agencies;
       lawGroups.value = data.law_groups;
+      lawGroupsAll.value = data.law_groups_all ?? data.law_groups;
+      legalStructures.value = data.legal_structures ?? [];
+      legalStructuresAll.value = data.legal_structures_all ?? data.legal_structures ?? [];
       lawSources.value = data.law_sources;
       loaded = true;
     }).finally(() => {
@@ -32,6 +58,39 @@ async function load(): Promise<void> {
   await inFlight;
 }
 
+async function reload(): Promise<void> {
+  await load(true);
+}
+
 export function useLookups() {
-  return { documentTypes, statuses, changeStatusTypes, changeStatusDetails, agencies, lawGroups, lawSources, load };
+  return {
+    documentTypes,
+    documentTypesAll,
+    lawFamilies,
+    lawFamiliesAll,
+    statuses,
+    statusesAll,
+    changeStatusTypes,
+    changeStatusTypesAll,
+    changeStatusDetails,
+    changeStatusDetailsAll,
+    agencies,
+    lawGroups,
+    lawGroupsAll,
+    legalStructures,
+    legalStructuresAll,
+    lawSources,
+    load,
+    reload,
+  };
+}
+
+export function withInactiveCurrent<T extends SelectableOption>(active: T[], all: T[], current: string | string[] | null | undefined): T[] {
+  const values = new Set(Array.isArray(current) ? current : [current]);
+  const activeValues = new Set(active.map((item) => item.value));
+  return [
+    ...active,
+    ...all.filter((item) => values.has(item.value) && !activeValues.has(item.value))
+      .map((item) => ({ ...item, title: `${item.title} (ปิดใช้งาน)` })),
+  ];
 }

@@ -25,45 +25,59 @@
       />
     </div>
 
-    <v-list nav density="comfortable" class="pt-2">
+    <v-list nav density="comfortable" class="pt-2 app-drawer__nav">
       <template v-for="group in resolvedNavGroups" :key="group.label">
         <v-list-subheader v-if="!rail" class="text-caption font-weight-bold">
           {{ group.label }}
         </v-list-subheader>
         <v-divider v-else class="my-1 mx-2" />
-        <v-list-item
-          v-for="item in group.items"
-          :key="item.label"
-          :prepend-icon="item.icon"
-          :title="item.label"
-          :active="isActive(item)"
-          color="admin-primary"
-          rounded="lg"
-          @click="item.to ? router.push(item.to) : undefined"
-        />
+        <template v-for="(item, index) in group.items" :key="item.label">
+          <v-list-subheader
+            v-if="showSectionHeader(item, index, group.items)"
+            class="app-drawer__section text-caption"
+          >
+            {{ item.section }}
+          </v-list-subheader>
+          <v-list-item
+            :prepend-icon="item.icon"
+            :title="item.label"
+            :active="isActive(item)"
+            color="admin-primary"
+            rounded="lg"
+            @click="item.to ? router.push(item.to) : undefined"
+          />
+        </template>
       </template>
     </v-list>
 
     <template #append>
       <v-divider />
       <div class="app-drawer__user" :class="{ 'app-drawer__user--rail': rail }">
-        <v-badge dot color="success" location="bottom end" offset-x="2" offset-y="2">
+        <v-badge dot :color="auth.isAuthenticated ? 'success' : 'grey'" location="bottom end" offset-x="2" offset-y="2">
           <v-avatar color="secondary" size="36" class="flex-shrink-0">
-            <span class="text-caption font-weight-bold">AD</span>
+            <span class="text-caption font-weight-bold">{{ userInitials }}</span>
           </v-avatar>
         </v-badge>
         <Transition name="fade-slide">
           <div v-if="!rail" class="min-width-0 flex-1">
-            <p class="text-body-2 font-weight-bold mb-0 text-truncate">ผู้ดูแลระบบ</p>
-            <p class="text-caption text-medium-emphasis mb-0">Admin</p>
+            <template v-if="auth.isAuthenticated">
+              <p class="text-body-2 font-weight-bold mb-0 text-truncate" data-testid="shell-user-name">{{ auth.user?.name }}</p>
+              <p class="text-caption text-medium-emphasis mb-0 text-truncate" data-testid="shell-user-role">{{ auth.roleLabel }}</p>
+            </template>
+            <router-link v-else to="/login" class="text-body-2 font-weight-bold" data-testid="shell-login-link">
+              เข้าสู่ระบบ
+            </router-link>
           </div>
         </Transition>
         <v-btn
-          v-if="!rail"
+          v-if="!rail && auth.isAuthenticated"
           icon="mdi-logout"
           variant="text"
           size="small"
           class="flex-shrink-0"
+          title="ออกจากระบบ"
+          data-testid="shell-logout"
+          @click="auth.logout()"
         />
       </div>
     </template>
@@ -87,6 +101,7 @@
       </v-breadcrumbs>
       <div class="app-shell__topbar-right">
         <slot name="actions" />
+        <ActiveUnitMenu />
         <v-badge v-if="showBell" color="error" content="3" offset-x="4" offset-y="4">
           <v-btn icon="mdi-bell-outline" variant="text" size="small" />
         </v-badge>
@@ -120,10 +135,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ActiveUnitMenu from './ActiveUnitMenu.vue';
+import { useAuthStore } from '../../stores/authStore';
 
 const RAIL_KEY = 'lawspace.nav.rail';
 
-interface NavItem { label: string; icon: string; to?: string; exact?: boolean; }
+interface NavItem { label: string; icon: string; to?: string; exact?: boolean; section?: string; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 const props = defineProps<{
@@ -140,6 +157,15 @@ const props = defineProps<{
 
 const router = useRouter();
 const route = useRoute();
+const auth = useAuthStore();
+
+const userInitials = computed(() => {
+  const name = auth.user?.name?.trim();
+  if (!name) return '?';
+  const parts = name.split(/\s+/);
+  const chars = parts.length > 1 ? [parts[0], parts[parts.length - 1]].map((p) => Array.from(p)[0]) : Array.from(name).slice(0, 2);
+  return chars.join('').toUpperCase();
+});
 const rail = ref(localStorage.getItem(RAIL_KEY) === '1');
 watch(rail, (v) => localStorage.setItem(RAIL_KEY, v ? '1' : '0'));
 
@@ -164,9 +190,19 @@ const defaultNavGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'จัดการข้อมูลระบบ (META DATA)',
+    items: [
+      { label: 'ประเภทเอกสาร', icon: 'mdi-file-document-outline', to: '/admin/master/law-types', section: 'ข้อมูลเอกสาร' },
+      { label: 'หมวดเอกสาร', icon: 'mdi-folder-outline', to: '/admin/master/categories', section: 'ข้อมูลเอกสาร' },
+      { label: 'โครงสร้างกฎหมาย', icon: 'mdi-file-tree', to: '/admin/master/legal-structures', section: 'โครงสร้างและความสัมพันธ์' },
+      { label: 'สถานะการเปลี่ยนแปลง', icon: 'mdi-history', to: '/admin/master/change-status', section: 'สถานะกฎหมาย' },
+      { label: 'สถานะการบังคับใช้', icon: 'mdi-shield-check-outline', to: '/admin/master/enforcement-status', section: 'สถานะกฎหมาย' },
+    ],
+  },
+  {
     label: 'ตั้งค่า & ผู้ใช้งาน',
     items: [
-      { label: 'จัดการผู้ใช้งาน', icon: 'mdi-account-multiple-outline' },
+      { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },
       { label: 'ตั้งค่า', icon: 'mdi-cog-outline' },
     ],
   },
@@ -178,13 +214,21 @@ const defaultNavGroups: NavGroup[] = [
   },
 ];
 
-const resolvedNavGroups = computed(() => props.navGroups ?? defaultNavGroups);
+const resolvedNavGroups = computed(() => (props.navGroups ?? defaultNavGroups).map((group) => ({
+  ...group,
+  items: group.items.filter((item) => item.to !== '/admin/units' || auth.canManageUnits),
+})));
 
 function isActive(item: NavItem): boolean {
   if (!item.to) return false;
   if (item.exact) return route.path === item.to;
   if (item.to === '/admin') return route.path === item.to;
   return route.path === item.to || route.path.startsWith(`${item.to}/`);
+}
+
+function showSectionHeader(item: NavItem, index: number, items: NavItem[]): boolean {
+  if (rail.value || !item.section) return false;
+  return index === 0 || item.section !== items[index - 1]?.section;
 }
 </script>
 
@@ -193,6 +237,14 @@ function isActive(item: NavItem): boolean {
 .app-drawer :deep(.v-navigation-drawer__content) {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-drawer__nav {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .app-drawer__header {
@@ -250,6 +302,13 @@ function isActive(item: NavItem): boolean {
 .app-drawer__user--rail {
   justify-content: center;
   padding: 12px 0;
+}
+
+.app-drawer__section {
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-weight: 700;
+  min-height: 28px;
+  padding-inline-start: 20px !important;
 }
 
 /* ─── Main ───────────────────────────────────────────────── */

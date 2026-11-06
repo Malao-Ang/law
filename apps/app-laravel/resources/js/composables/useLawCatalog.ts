@@ -1,4 +1,6 @@
 import type { DocumentListItem } from '../types/document';
+import { createLawTypeCatalog } from './useLawType';
+import { createChangeStatusCatalog } from './useChangeStatus';
 
 const PICKABLE_STATUSES = new Set(['done', 'exported', 'ingested']);
 const RELATION_READY_STEP = 4;
@@ -36,13 +38,7 @@ export function rootDocuments(
   });
 }
 
-const SAME_LEVEL_EDITION_STATUSES = new Set([
-  'ปรับปรุงทั้งฉบับ',
-  'ยกเลิกทั้งฉบับ',
-  'ปรับปรุงรายข้อ',
-  'ปรับปรุงรายมาตรา',
-  'ยกเลิกรายมาตรา',
-]);
+const _changeStatus = createChangeStatusCatalog({ types: [], typesAll: [], details: [], detailsAll: [] });
 
 export function documentsWithoutParent(
   documents: DocumentListItem[],
@@ -52,8 +48,8 @@ export function documentsWithoutParent(
     if (excludeDocumentId && doc.document_id === excludeDocumentId) return false;
     if (!isPickableDocument(doc)) return false;
     if (parentIdsOf(doc).length > 0) return false;
-    const changeStatus = doc.change_status?.trim() ?? '';
-    return !SAME_LEVEL_EDITION_STATUSES.has(changeStatus);
+    const cs = doc.change_status?.trim() ?? '';
+    return !_changeStatus.isWhole(cs) && !_changeStatus.isSection(cs);
   });
 }
 
@@ -144,38 +140,23 @@ export function filterByQuery(items: Array<{ title: string }>, query: string): A
 
 export type ParentLawFamily = 'act' | 'regulation' | 'ordinance' | 'announcement';
 
+const lawTypes = createLawTypeCatalog();
+
 export function isUniversityAnnouncementType(lawType: string | null | undefined): boolean {
-  const type = (lawType ?? '').trim();
-  if (type === 'ประกาศที่ออกโดยมหาวิทยาลัย') return true;
-  return type.includes('ประกาศ') && type.includes('มหาวิทยาลัย') && !type.includes('สภา');
+  return lawTypes.typeItem(lawType)?.code === 'LTY01';
 }
 
 export function isCouncilAnnouncementType(lawType: string | null | undefined): boolean {
-  const type = (lawType ?? '').trim();
-  if (type === 'ประกาศที่ออกโดยสภามหาวิทยาลัย') return true;
-  return type.includes('ประกาศ') && type.includes('สภา');
+  return lawTypes.typeItem(lawType)?.code === 'LTY09';
 }
 
 export function matchesParentLawFamily(lawType: string | null | undefined, family: ParentLawFamily): boolean {
-  const type = (lawType ?? '').trim();
-  if (!type) return false;
-  if (family === 'regulation') return type.includes('ระเบียบ');
-  if (family === 'ordinance') return type.includes('ข้อบังคับ');
-  if (family === 'announcement') return type.includes('ประกาศ');
-  return type.includes('พระราชบัญญัติ')
-    || type.includes('พระราชกำหนด')
-    || type.includes('กฎกระทรวง')
-    || type.includes('ประกาศกระทรวง')
-    || type.includes('พ.ร.บ')
-    || type.includes('พ.ร.ก')
-    || type.includes('กฎหมายภายนอก')
-    || type === 'phrb'
-    || type === 'prb'
-    || type === 'phrk'
-    || type === 'kot-krathruang'
-    || type === 'kotmai-krw'
-    || type === 'prakat-krw'
-    || type === 'kotmai-phaainok';
+  const familyCode = lawTypes.typeFamily(lawType);
+  if (!familyCode) return false;
+  if (family === 'regulation') return familyCode === 'LFM02';
+  if (family === 'ordinance') return familyCode === 'LFM01';
+  if (family === 'announcement') return familyCode === 'LFM03';
+  return lawTypes.typeSource(lawType) === 'external';
 }
 
 export function allowedParentFamiliesForChild(childLawType: string | null | undefined): ParentLawFamily[] | null {

@@ -189,7 +189,31 @@ export interface ComposeState {
   metadata: DocumentMetadata;
 }
 
+export interface DocumentCapabilities {
+  edit: boolean;
+  delete: boolean;
+  esign: boolean;
+  publish: boolean;
+  transfer: boolean;
+  cancel_esign: boolean;
+  manage_co_editors: boolean;
+  read: boolean;
+}
+
+export type CoEditorAction = 'edit' | 'delete' | 'esign' | 'publish';
+export interface DocumentCoEditor {
+  username: string;
+  name: string | null;
+  actions: CoEditorAction[];
+  added_by?: string | null;
+  added_at?: string;
+}
+
 export interface LawMeta {
+  uploaded_by?: { username: string | null; name: string | null; at: string } | null;
+  responsible?: { username: string; name: string | null } | null;
+  co_editors?: DocumentCoEditor[];
+  owner_unit_code?: string | null;
   status: string;
   law_type: string;
   law_group: string;       // kept for backward compat
@@ -198,7 +222,6 @@ export interface LawMeta {
   law_groups: string[];    // multi-select ด้านกฎหมาย
   agency: string;          // kept for backward compat
   signer_group?: string | null;
-  issuer?: string | null;   // ผู้ออกประกาศ — only set when law_type === 'ประกาศ'
   agencies: string[];      // multi-chip หน่วยงานที่รับผิดชอบ
   keywords: string[];
   promulgation_date: string;
@@ -250,6 +273,11 @@ export interface LawRelation {
 }
 
 export interface DocumentListItem {
+  can?: DocumentCapabilities;
+  uploaded_by?: { username: string | null; name: string | null; at: string } | null;
+  responsible?: { username: string; name: string | null } | null;
+  co_editors?: DocumentCoEditor[];
+  owner_unit_code?: string | null;
   document_id: string;
   title: string;
   status: string;
@@ -289,6 +317,7 @@ export interface LawRelationTarget {
 }
 
 export interface ReviewDocument {
+  can?: DocumentCapabilities;
   document_id: string;
   source_file: string;
   source_type: 'docx' | 'pdf_text' | 'pdf_scan' | 'pdf_mixed';
@@ -332,6 +361,7 @@ export interface ReviewDocument {
 }
 
 export interface DocumentStatus {
+  can?: DocumentCapabilities;
   document_id: string;
   document_type?: DocumentType;
   status: 'queued' | 'processing' | 'done' | 'failed' | 'exported' | 'ingesting' | 'ingested';
@@ -424,10 +454,17 @@ export interface ReportBucket {
 }
 
 export interface ReportDocument {
+  law_type_code?: string;
+  law_family_code?: string;
+  group_codes?: string[];
+  meta_status_code?: string;
+  change_status_code?: string;
+  structure_codes?: string[];
   id: string;
   title: string;
   type: string;
   group: string;
+  group_code?: string;
   agency: string;
   status: string;
   meta_status: string;

@@ -23,7 +23,7 @@
               {{ publicationScopeLabel }}
             </v-chip>
             <v-chip v-if="version.isCurrent" size="x-small" color="success" variant="tonal" rounded="pill">
-              มีผลบังคับใช้
+              {{ statusLabel(inForceCode) }}
             </v-chip>
           </div>
 
@@ -50,6 +50,8 @@
 import { computed } from 'vue';
 import type { DocumentType, DocumentVersion, PublicationScope } from '../../types/document-version';
 import { formatThaiDate } from '../../utils/thaiDate';
+import { useLawStatus } from '../../composables/useLawStatus';
+import { useLawType } from '../../composables/useLawType';
 
 const props = defineProps<{
   version: DocumentVersion;
@@ -59,14 +61,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ click: [] }>();
-
-const documentTypeLabelMap: Record<DocumentType, string> = {
-  'kotmai-phaainok': 'กฎหมายภายนอก',
-  rabiap: 'ระเบียบ',
-  'kho-bangkhab': 'ข้อบังคับ',
-  prakat: 'ประกาศ',
-  other: 'อื่น ๆ',
-};
+const { inForceCode, statusLabel } = useLawStatus();
+const lawTypes = useLawType();
 
 const documentTypeColorMap: Record<DocumentType, string> = {
   'kotmai-phaainok': 'doc-phaainok',
@@ -88,7 +84,7 @@ const scopeColorMap: Record<PublicationScope, string> = {
   organization: 'primary',
 };
 
-const documentTypeLabel = computed(() => documentTypeLabelMap[props.version.metadata.documentType] ?? props.version.metadata.documentType);
+const documentTypeLabel = computed(() => lawTypes.familyItem(props.version.metadata.documentType)?.title ?? props.version.metadata.documentType);
 const documentTypeColor = computed(() => documentTypeColorMap[props.version.metadata.documentType] ?? 'secondary');
 const publicationScopeLabel = computed(() => publicationScopeLabelMap[props.version.metadata.publicationScope] ?? props.version.metadata.publicationScope);
 const scopeColor = computed(() => scopeColorMap[props.version.metadata.publicationScope] ?? 'secondary');

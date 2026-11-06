@@ -29,16 +29,16 @@ class ReportSummaryTest extends TestCase
         $agency = 'AGENCY_'.uniqid();
 
         $this->seedDocument($store, 'd1_'.uniqid(), [
-            'law_type' => 'พระราชบัญญัติ', 'agencies' => [$agency],
-            'law_groups' => ['ด้านวิชาการ'], 'promulgation_date' => '1 มีนาคม 2551',
+            'law_type' => 'LTY05', 'agencies' => [$agency],
+            'law_groups' => ['academic'], 'promulgation_date' => '1 มีนาคม 2551',
         ]);
         $this->seedDocument($store, 'd2_'.uniqid(), [
-            'law_type' => 'พระราชบัญญัติ', 'agencies' => [$agency],
+            'law_type' => 'LTY05', 'agencies' => [$agency],
             'law_groups' => ['ด้านการเงิน'], 'promulgation_date' => '2 มีนาคม 2552',
         ]);
         $this->seedDocument($store, 'd3_'.uniqid(), [
-            'law_type' => 'ประกาศ', 'agencies' => [$agency],
-            'law_groups' => ['ด้านวิชาการ'], 'promulgation_date' => 'ไม่มีปี',
+            'law_type' => 'LTY01', 'agencies' => [$agency],
+            'law_groups' => ['DCT001'], 'promulgation_date' => 'ไม่มีปี',
         ], 'ingested');
 
         $res = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency));
@@ -48,12 +48,18 @@ class ReportSummaryTest extends TestCase
         $res->assertJsonPath('totals.published', 1);
 
         $byType = collect($res->json('by_type'))->keyBy('key');
-        $this->assertSame(2, $byType['พระราชบัญญัติ']['count']);
-        $this->assertSame(1, $byType['ประกาศ']['count']);
+        $this->assertSame(2, $byType['LTY05']['count']);
+        $this->assertSame('พระราชบัญญัติ', $byType['LTY05']['label']);
+        $this->assertSame(1, $byType['LTY01']['count']);
+        $this->assertSame('ประกาศที่ออกโดยมหาวิทยาลัย', $byType['LTY01']['label']);
 
         $byGroup = collect($res->json('by_group'))->keyBy('key');
-        $this->assertSame(2, $byGroup['ด้านวิชาการ']['count']);
+        $this->assertSame(2, $byGroup['DCT001']['count']);
+        $this->assertSame('ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร', $byGroup['DCT001']['label']);
         $this->assertSame(1, $byGroup['ด้านการเงิน']['count']);
+
+        $academicOnly = $this->getJson('/api/reports/summary?agency[]='.rawurlencode($agency).'&group[]='.rawurlencode('ด้านวิชาการ การผลิตบัณฑิต การเรียนรู้ตลอดชีวิต และการบริหารหลักสูตร'));
+        $academicOnly->assertJsonPath('totals.all', 2);
 
         $byYear = collect($res->json('by_year'))->keyBy('key');
         $this->assertSame(1, $byYear['2551']['count']);
