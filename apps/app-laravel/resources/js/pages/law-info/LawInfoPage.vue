@@ -425,10 +425,27 @@ const documentTypePlaceholder = computed(() =>
   documentTypeDisabled.value ? 'กรุณาเลือกแหล่งที่มาก่อน' : '- เลือกประเภทเอกสาร -',
 );
 
+/** Selectable source for the type list: old documents pick it explicitly, new documents are always internal. */
+const typeSourceFilter = computed<string | null>(() => (isOld.value ? (hasText(form.value.source) ? String(form.value.source) : null) : 'internal'));
+
+/** Keep only types of the chosen source; drop family headers left without items, and the header entirely when only one family remains. */
+function typesForSource(source: string | null) {
+  if (source === null) return [];
+  type Option = (typeof lawTypes.groupedTypeOptions.value)[number];
+  const groups = new Map<string, { header: Option | null; items: Option[] }>();
+  for (const option of lawTypes.groupedTypeOptions.value) {
+    const family = option.option_type === 'subheader' ? String(option.value).replace(/^family:/, '') : String(option.family_code ?? '');
+    const group = groups.get(family) ?? { header: null, items: [] };
+    if (option.option_type === 'subheader') group.header = option;
+    else if (option.source === source) group.items.push(option);
+    groups.set(family, group);
+  }
+  const filled = [...groups.values()].filter((group) => group.items.length > 0);
+  return filled.flatMap((group) => (filled.length > 1 && group.header ? [group.header, ...group.items] : group.items));
+}
+
 const filteredDocumentTypes = computed(() => {
-  const items = isOld.value
-    ? lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || (hasText(form.value.source) && t.source === form.value.source))
-    : lawTypes.groupedTypeOptions.value.filter((t) => t.option_type === 'subheader' || t.source !== 'external');
+  const items = typesForSource(typeSourceFilter.value);
   const current = normalizeSavedLawType(savedMeta.value?.law_type ?? '');
   const existing = lawTypes.typeItem(current);
   if (existing && !documentTypes.value.some((item) => item.code === existing.code)) {
@@ -437,11 +454,12 @@ const filteredDocumentTypes = computed(() => {
   return items;
 });
 
-const documentTypeHint = computed(() =>
-  lawTypes.typeSource(form.value.law_type) === 'external'
-    ? 'ภายนอก · นับเป็น "มาตรา"'
-    : 'ภายใน · นับเป็น "ข้อ"',
-);
+const documentTypeHint = computed(() => {
+  const source = hasText(form.value.law_type) ? lawTypes.typeSource(form.value.law_type) : typeSourceFilter.value;
+  if (source === 'external') return 'ภายนอก · นับเป็น "มาตรา"';
+  if (source === 'internal') return 'ภายใน · นับเป็น "ข้อ"';
+  return '';
+});
 
 const sourceRules = [
   (v: unknown) => !isOld.value || hasText(v) || 'กรุณาเลือกแหล่งที่มาของเอกสาร',
