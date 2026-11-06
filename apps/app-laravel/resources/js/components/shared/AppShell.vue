@@ -1,4 +1,5 @@
 <template>
+  <v-defaults-provider :defaults="adminDefaults" :disabled="!isAdmin">
   <v-navigation-drawer
     :rail="rail"
     :model-value="true"
@@ -130,6 +131,7 @@
       <slot />
     </v-container>
   </v-main>
+  </v-defaults-provider>
 </template>
 
 <script setup lang="ts">
@@ -158,6 +160,16 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+const isAdmin = computed(() => route.path.startsWith('/admin'));
+const adminDefaults = {
+  VBtn: { rounded: 'lg', height: 40, class: 'text-none' },
+  VCard: { rounded: 'lg' },
+  VTextField: { density: 'compact', rounded: 'sm' },
+  VSelect: { density: 'compact', rounded: 'sm' },
+  VAutocomplete: { density: 'compact', rounded: 'sm' },
+  VTextarea: { density: 'compact', rounded: 'sm' },
+  VSwitch: { inset: true, color: 'success' },
+};
 
 const userInitials = computed(() => {
   const name = auth.user?.name?.trim();
