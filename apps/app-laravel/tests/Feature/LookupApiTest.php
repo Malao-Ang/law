@@ -21,7 +21,7 @@ class LookupApiTest extends TestCase
                 'change_status_types_all' => [['title', 'value', 'code', 'source', 'has_details', 'role']],
                 'change_status_details' => [['title', 'value', 'code', 'source', 'role', 'color', 'icon']],
                 'change_status_details_all' => [['title', 'value', 'code', 'source', 'role', 'color', 'icon']],
-                'agencies' => [['title', 'value', 'subtitle']],
+                'agencies' => [['title', 'value', 'subtitle', 'code']],
                 'law_groups' => [['title', 'value']],
             ]);
 
@@ -38,7 +38,9 @@ class LookupApiTest extends TestCase
         $this->assertSame('internal', $announcement['source'] ?? null);
         $this->assertArrayNotHasKey('requires_issuer', $announcement);
         $this->assertContains('LFM04', array_column($data['law_families'], 'value'));
-        $this->assertContains('มหาวิทยาลัยบูรพา', array_column($data['agencies'], 'value'));
+        $firstUnit = app(\App\Services\MasterData\UnitStore::class)->all()[0];
+        $this->assertContains($firstUnit['code'], array_column($data['agencies'], 'code'));
+        $this->assertContains($firstUnit['name'], array_column($data['agencies'], 'value'));
         $this->assertContains('STA01', array_column($data['statuses'], 'value'));
         $inForce = collect($data['statuses'])->firstWhere('value', 'STA01');
         $this->assertSame('success', $inForce['color'] ?? null);

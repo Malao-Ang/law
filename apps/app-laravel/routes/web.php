@@ -23,6 +23,8 @@ Route::view('/admin/reports', 'app');
 Route::view('/admin/oversight', 'app');
 Route::view('/admin/oversight-mail', 'app');
 Route::view('/admin/audit-logs', 'app');
+Route::view('/admin/users', 'app');
+Route::view('/admin/users/{username}', 'app');
 Route::view('/upload', 'app');
 Route::view('/documents/{documentId}/review', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/documents/{documentId}/edit', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
@@ -38,4 +40,7 @@ Route::view('/documents/{documentId}/esign/preview', 'app')->where('documentId',
 Route::view('/documents/{documentId}/esign/status', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 Route::view('/law/{documentId}', 'app')->where('documentId', '[A-Za-z0-9_\-]+');
 
-Route::fallback(fn () => view('app'));
+Route::fallback(function (\Illuminate\Http\Request $request) {
+    abort_if($request->is('api', 'api/*'), 404);
+    return view('app');
+});

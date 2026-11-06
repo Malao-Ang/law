@@ -62,19 +62,7 @@ class LawSuggestService
             '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
-                    'filter' => [...(config('auth_ldap.enforced') ? [
-                        ['term' => ['is_published' => true]],
-                        ['bool' => ['must_not' => [['term' => ['access_scope' => 'private']], ['term' => ['visibility' => 'restricted']]]]],
-                    ] : []), [
-                        'bool' => [
-                            'should' => [
-                                ['term' => ['visibility' => 'public']],
-                                ['term' => ['access_scope' => 'public']],
-                                ['bool' => ['must_not' => [['exists' => ['field' => 'visibility']]]]],
-                            ],
-                            'minimum_should_match' => 1,
-                        ],
-                    ]],
+                    'filter' => [app(\App\Services\Auth\DocumentAccess::class)->searchVisibilityFilter(request())],
                     'should' => [
                         [
                             'multi_match' => [
@@ -131,19 +119,7 @@ class LawSuggestService
             '_source' => ['law_id', 'title', 'law_type', 'law_type_label', 'agency', 'published_date', 'keywords'],
             'query' => [
                 'bool' => [
-                    'filter' => [...(config('auth_ldap.enforced') ? [
-                        ['term' => ['is_published' => true]],
-                        ['bool' => ['must_not' => [['term' => ['access_scope' => 'private']], ['term' => ['visibility' => 'restricted']]]]],
-                    ] : []), [
-                        'bool' => [
-                            'should' => [
-                                ['term' => ['visibility' => 'public']],
-                                ['term' => ['access_scope' => 'public']],
-                                ['bool' => ['must_not' => [['exists' => ['field' => 'visibility']]]]],
-                            ],
-                            'minimum_should_match' => 1,
-                        ],
-                    ]],
+                    'filter' => [app(\App\Services\Auth\DocumentAccess::class)->searchVisibilityFilter(request())],
                     'should' => [
                         [
                             'multi_match' => [

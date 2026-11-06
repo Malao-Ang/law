@@ -34,13 +34,40 @@ class LookupController extends Controller
             'change_status_types_all' => $this->changeStatusItems($allChangeStatuses),
             'change_status_details' => $this->changeDetailItems(array_values(array_filter($allChangeDetails, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'change_status_details_all' => $this->changeDetailItems($allChangeDetails),
-            'agencies' => config('lookups.agencies'),
+            'agencies' => $this->agencyItems(),
             'law_groups' => $this->lawCategoryItems(array_values(array_filter($allLawCategories, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'law_groups_all' => $this->lawCategoryItems($allLawCategories),
             'legal_structures' => $this->legalStructureItems(array_values(array_filter($allLegalStructures, static fn (array $item): bool => (bool) ($item['is_active'] ?? false)))),
             'legal_structures_all' => $this->legalStructureItems($allLegalStructures),
             'law_sources' => config('lookups.law_sources'),
         ]);
+    }
+
+    /**
+     * Responsible units come from the real unit master (active only). Value stays the unit name because saved documents and the search index store names.
+     *
+     * @return list<array{title: string, value: string, subtitle: string, code: string}>
+     */
+    private function agencyItems(): array
+    {
+        $units = app(\App\Services\MasterData\UnitStore::class)->all();
+        $names = array_column($units, 'name', 'code');
+        $types = ['faculty' => 'คณะ/วิทยาลัย/สถาบัน', 'division' => 'กอง', 'department' => 'ฝ่าย/ภาควิชา', 'law_subunit' => 'หน่วยงานย่อย'];
+        $items = [];
+        foreach ($units as $unit) {
+            if (! ($unit['is_active'] ?? false) || trim((string) ($unit['name'] ?? '')) === '') {
+                continue;
+            }
+            $parent = $unit['parent_code'] ? ($names[$unit['parent_code']] ?? null) : null;
+            $items[] = [
+                'title' => $unit['name'],
+                'value' => $unit['name'],
+                'subtitle' => $unit['code'].' · '.($parent ?? ($types[$unit['type']] ?? '')),
+                'code' => $unit['code'],
+            ];
+        }
+
+        return $items;
     }
 
     /**

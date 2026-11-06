@@ -14,7 +14,7 @@
       @next="saveAndPublish"
     />
 
-    <div :inert="!can.publish" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
+    <div :inert="!can.manage_permissions" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -45,7 +45,7 @@
             <v-col cols="12" md="6">
               <AccessScopeCard
                 title="Private"
-                subtitle="เฉพาะผู้รับผิดชอบ สมาชิกหน่วยงานเจ้าของ และกลุ่มที่เลือก"
+                subtitle="ผู้เข้าสู่ระบบอ่านได้ หากเลือกกลุ่มจะจำกัดตามหน่วยงานที่ใช้งานหรือบุคคลที่ได้รับสิทธิ์"
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
@@ -119,7 +119,7 @@
             <div v-if="selectedGroups.length === 0" class="permission-empty-state">
               <v-icon icon="mdi-lock-outline" size="36" color="grey-lighten-1" />
               <div class="text-subtitle-2 font-weight-bold mt-2">ยังไม่ได้เลือกกลุ่มสิทธิ์</div>
-              <div class="text-body-2 text-medium-emphasis">เอกสารนี้จะอ่านได้โดยผู้ดูแลระบบสูงสุด ผู้รับผิดชอบหลัก/ร่วม และสมาชิกหน่วยงานเจ้าของ</div>
+              <div class="text-body-2 text-medium-emphasis">เมื่อไม่เลือกกลุ่มสิทธิ์ ผู้ที่เข้าสู่ระบบทุกคนสามารถอ่านเอกสารนี้ได้</div>
             </div>
 
             <div v-else class="d-flex flex-column ga-3">
@@ -251,6 +251,7 @@ async function showGroupDetail(groupId: string): Promise<void> {
 }
 
 async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Promise<void> {
+  if (!can.value.manage_permissions || groupSaving.value) return;
   groupSaving.value = true;
   try {
     const group = await createPermissionGroup(payload);
@@ -265,13 +266,16 @@ async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Pro
 }
 
 async function saveAndPublish(): Promise<void> {
+  if (!can.value.publish || documentStore.saving) return;
   documentStore.setSaveError();
 
-  const saved = await documentStore.saveLawMeta({
-    access_scope: scope.value,
-    permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
-  });
-  if (!saved) return;
+  if (can.value.manage_permissions) {
+    const saved = await documentStore.saveLawMeta({
+      access_scope: scope.value,
+      permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
+    });
+    if (!saved) return;
+  }
 
   if (isOld.value) {
     // Old docs: if status is still ร่าง/empty, just save permissions and go to edit page.
@@ -324,7 +328,7 @@ onMounted(async () => {
 
   scope.value = documentStore.review?.law_meta?.access_scope === 'private' ? 'private' : 'public';
   selectedGroupIds.value = [...(documentStore.review?.law_meta?.permission_group_ids ?? [])];
-  await loadPermissionResources();
+  if (documentStore.review?.can?.manage_permissions) await loadPermissionResources();
 });
 
 onBeforeUnmount(() => documentStore.reset());

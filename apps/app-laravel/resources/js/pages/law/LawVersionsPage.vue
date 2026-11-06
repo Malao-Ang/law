@@ -49,7 +49,7 @@
               </div>
               <div
                 v-for="v in orderedVersions"
-                :key="v.document_id"
+                :key="v.document_id || v.version_label"
                 class="lvp-ver-card"
                 :class="{ 'is-current': v.is_current, 'is-viewing': v.document_id === props.documentId }"
               >
@@ -82,7 +82,7 @@
 
                 <div class="d-flex ga-2 flex-wrap">
                   <v-btn
-                    v-if="v.document_id !== props.documentId"
+                    v-if="v.document_id && v.document_id !== props.documentId"
                     size="x-small"
                     variant="outlined"
                     prepend-icon="mdi-eye-outline"

@@ -24,11 +24,24 @@ class UploadController extends Controller
 
     public function index(): JsonResponse
     {
-        $documents = array_map(function (array $row): array {
-            $row['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $this->reviewStore->getStatus($row['document_id']) ?? []);
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $rows = array_values(array_filter($this->reviewStore->listDocuments(), fn (array $row): bool => $access->inWorkingScope(request(), $row)));
+        $documents = array_map(function (array $row) use ($access): array {
+            $row = $access->sanitizeReferences(request(), $row);
+            $row['can'] = $access->capabilities(request(), $this->reviewStore->getStatus($row['document_id']) ?? []);
             return $row;
-        }, $this->reviewStore->listDocuments());
+        }, $rows);
         return response()->json(['documents' => $documents]);
+    }
+
+    public function relationCandidates(): JsonResponse
+    {
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $rows = array_values(array_filter($this->reviewStore->listDocuments(), fn (array $row): bool => $access->visible(request(), $row)));
+        $rows = array_map(fn ($row) => $access->sanitizeReferences(request(), $row), $rows);
+        return response()->json(['documents' => $rows]);
     }
 
     public function store(StoreDocumentRequest $request): JsonResponse
@@ -125,6 +138,7 @@ class UploadController extends Controller
             ], 404);
         }
 
+        unset($status['co_editors'], $status['law_meta']['co_editors']);
         $status['can'] = app(\App\Services\Auth\DocumentAccess::class)->capabilities(request(), $status);
         return response()->json($status);
     }
@@ -151,6 +165,7 @@ class UploadController extends Controller
 
     public function destroy(string $documentId): JsonResponse
     {
+        $before = $this->reviewStore->getStatus($documentId) ?? [];
         try {
             if (! $this->reviewStore->deleteDocument($documentId)) {
                 return response()->json([
@@ -161,7 +176,7 @@ class UploadController extends Controller
             return response()->json(['message' => $exception->getMessage()], 409);
         }
 
-        $this->audit->record('delete', 'document', $documentId, 'ลบเอกสาร', [], $documentId, $documentId);
+        $this->audit->record('delete', 'document', $documentId, 'ลบเอกสาร', [], $documentId, $documentId, ['unit_code' => $before['owner_unit_code'] ?? null, 'before' => $before]);
 
         return response()->json([
             'document_id' => $documentId,
@@ -172,7 +187,7 @@ class UploadController extends Controller
     private function auditCreated(string $documentId, string $sourceFile, string $kind): void
     {
         $this->audit->record(
-            'create',
+            'upload',
             'document',
             $documentId,
             'นำเข้าเอกสาร',

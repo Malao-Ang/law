@@ -39,7 +39,6 @@ class LawIndexDefinition
                     'access_scope'  => ['type' => 'keyword'],
                     'owner_unit_code' => ['type' => 'keyword'],
                     'responsible_username' => ['type' => 'keyword'],
-                    'co_editor_usernames' => ['type' => 'keyword'],
                     'allowed_unit_codes' => ['type' => 'keyword'],
                     'allowed_usernames' => ['type' => 'keyword'],
                     'permission_group_ids' => ['type' => 'keyword'],

@@ -256,7 +256,9 @@ class OversightTest extends TestCase
 
         $this->postJson('/api/oversight/mail/send')->assertOk()->assertJsonPath('sent', 0);
 
-        $summaries = collect($this->getJson('/api/audit-logs')->json('items'))->pluck('summary');
+        app(\App\Services\Auth\MongoUserStore::class)->upsertFromLogin('audit_admin', ['name' => 'ผู้ตรวจสอบ'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin'])->withSession(['auth_username' => 'audit_admin']);
+        $summaries = collect($this->getJson('/api/audit-logs')->assertOk()->json('items'))->pluck('summary');
         $this->assertTrue($summaries->contains('แก้ไขข้อความอีเมลแจ้งเตือน'));
         $this->assertTrue($summaries->contains('ส่งอีเมลแจ้งเตือนตามรอบด้วยตนเอง'));
     }

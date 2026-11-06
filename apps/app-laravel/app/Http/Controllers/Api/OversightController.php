@@ -18,11 +18,16 @@ class OversightController extends Controller
 
     public function summary(): JsonResponse
     {
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
         return response()->json($this->oversight->summary());
     }
 
     public function update(UpdateOversightRequest $request, string $documentId): JsonResponse
     {
+        $access = app(\App\Services\Auth\DocumentAccess::class);
+        $document = $access->readDocument($documentId);
+        abort_if($document === null, 404);
+        $access->authorize($request, 'edit', $document);
         try {
             $item = $this->oversight->update($documentId, $request->validated());
         } catch (RuntimeException $e) {

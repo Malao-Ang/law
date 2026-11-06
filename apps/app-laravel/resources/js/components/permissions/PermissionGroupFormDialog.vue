@@ -1,6 +1,6 @@
 <template>
   <v-dialog :model-value="modelValue" max-width="980" @update:model-value="$emit('update:modelValue', $event)">
-    <v-card rounded="xl" class="permission-group-dialog">
+    <v-card rounded="xl" class="permission-group-dialog lawspace-workflow-form">
       <v-card-title class="d-flex align-center justify-space-between ga-4 px-5 pt-5 pb-2">
         <div>
           <div class="text-h6 font-weight-black">เพิ่มกลุ่มสิทธิ์ผู้ใช้ใหม่</div>

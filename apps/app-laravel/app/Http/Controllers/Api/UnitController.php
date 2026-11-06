@@ -14,11 +14,21 @@ class UnitController extends Controller
 {
     public function __construct(private readonly UnitStore $units, private readonly CurrentUser $currentUser) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, MongoUserStore $users): JsonResponse
     {
         $this->authorizeUser($request);
 
-        return response()->json(['items' => $this->units->all()]);
+        $counts = [];
+        foreach ($users->all() as $user) {
+            foreach ((array) ($user['memberships'] ?? []) as $membership) {
+                $code = $membership['unit_code'];
+                $counts[$code] = ($counts[$code] ?? 0) + 1;
+            }
+        }
+
+        return response()->json(['items' => array_map(fn (array $unit) => array_merge($unit, [
+            'member_count' => $counts[$unit['code']] ?? 0,
+        ]), $this->units->all())]);
     }
 
     public function show(Request $request, string $code): JsonResponse
@@ -72,8 +82,13 @@ class UnitController extends Controller
     public function members(Request $request, string $code, MongoUserStore $users): JsonResponse
     {
         $actor = $this->authorizeUser($request);
-        abort_unless(($actor['is_super_admin'] ?? false) || in_array(MongoUserStore::unitRole($actor, $code), ['inner_admin', 'outer_admin'], true), 403, 'ไม่มีสิทธิ์ดูสมาชิกหน่วยงานนี้');
+        abort_unless(($actor['is_super_admin'] ?? false) || (request()->session()->get(CurrentUser::ACTIVE_UNIT_KEY) === $code && in_array(MongoUserStore::unitRole($actor, $code), ['inner_admin', 'outer_admin'], true)), 403, 'ไม่มีสิทธิ์ดูสมาชิกหน่วยงานนี้');
         abort_if($this->units->find($code) === null, 404, 'ไม่พบหน่วยงาน');
+        return $this->membersResponse($code, $users);
+    }
+
+    private function membersResponse(string $code, MongoUserStore $users): JsonResponse
+    {
         $items = [];
         foreach ($users->all() as $user) {
             foreach ((array) ($user['memberships'] ?? []) as $membership) {
@@ -102,9 +117,47 @@ class UnitController extends Controller
         ]);
         $data['actions'] = $data['actions'] ?? [];
         abort_if($this->units->find($code) === null, 404, 'ไม่พบหน่วยงาน');
-        $member = $users->changeMembership($actor, $code, $username, $data, $ums->directoryPerson($username));
+        $member = $users->changeMembership($actor, $code, $username, $data, $users->find($username) === null ? $ums->directoryPerson($username) : null);
 
         return response()->json(['member' => $member]);
+    }
+
+    public function updateMembers(Request $request, string $code, MongoUserStore $users, \App\Services\Buu\UmsPersonService $ums): JsonResponse
+    {
+        $actor = $this->authorizeUser($request);
+        $this->authorizeMemberWrite($actor, $code);
+        abort_if($this->units->find($code) === null, 404, 'ไม่พบหน่วยงาน');
+        $data = $request->validate(['changes' => ['required', 'array', 'min:1']], [
+            'required' => 'กรุณาระบุรายการเปลี่ยนแปลง', 'array' => 'รูปแบบรายการเปลี่ยนแปลงไม่ถูกต้อง', 'min' => 'กรุณาระบุอย่างน้อยหนึ่งรายการ',
+        ]);
+        $prepared = [];
+        foreach ($data['changes'] as $row) {
+            $username = is_array($row) && is_string($row['username'] ?? null) ? MongoUserStore::key($row['username']) : '(ไม่ระบุชื่อผู้ใช้)';
+            $validator = \Illuminate\Support\Facades\Validator::make(is_array($row) ? $row : [], [
+                'username' => ['required', 'string', 'max:255'],
+                'remove' => ['sometimes', 'boolean'],
+                'role' => ['required_unless:remove,true', 'string', 'in:inner_admin,outer_admin,editor,user'],
+                'actions' => ['sometimes', 'array'], 'actions.*' => ['string', 'distinct', 'in:upload,edit,delete,esign,publish'],
+            ]);
+            abort_if($validator->fails(), 422, "ผู้ใช้ {$username}: บทบาทหรือรายการสิทธิ์ไม่ถูกต้อง");
+            abort_if(isset($prepared[$username]), 422, "ผู้ใช้ {$username}: รายการชื่อผู้ใช้ซ้ำกัน");
+            $validated = $validator->validated();
+            $change = ($validated['remove'] ?? false) ? null : ['role' => $validated['role'], 'actions' => $validated['actions'] ?? []];
+            $user = $users->find($username);
+            $person = $user === null && $change !== null ? $ums->directoryPerson($username) : null;
+            try {
+                MongoUserStore::validateMembershipChange($actor, $code, $user, $change, $person);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                abort($e->getStatusCode() === 403 ? 403 : 422, "ผู้ใช้ {$username}: {$e->getMessage()}");
+            }
+            $prepared[$username] = ['change' => $change, 'person' => $person];
+        }
+        foreach ($prepared as $username => $row) {
+            $users->changeMembership($actor, $code, $username, $row['change'], $row['person']);
+        }
+
+        // The actor may have changed their own role, but can still receive this save result.
+        return $this->membersResponse($code, $users);
     }
 
     public function removeMember(Request $request, string $code, string $username, MongoUserStore $users): \Illuminate\Http\Response
@@ -120,14 +173,14 @@ class UnitController extends Controller
     {
         $actor = $this->currentUser->user($request);
         abort_if($actor === null, 401, 'กรุณาเข้าสู่ระบบ');
-        abort_if($super && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่จัดการรายการนี้ได้');
+        abort_if($super && ! ($actor['is_super_admin'] ?? false), 403, 'เฉพาะ Super Admin เท่านั้นที่จัดการรายการนี้ได้');
 
         return $actor;
     }
 
     private function authorizeMemberWrite(array $actor, string $code): void
     {
-        abort_unless(($actor['is_super_admin'] ?? false) || MongoUserStore::unitRole($actor, $code) === 'inner_admin', 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
+        abort_unless(($actor['is_super_admin'] ?? false) || MongoUserStore::unitRole($actor, $code) === 'inner_admin' && request()->session()->get(CurrentUser::ACTIVE_UNIT_KEY) === $code, 403, 'ไม่มีสิทธิ์แก้ไขสมาชิกหน่วยงานนี้');
     }
 
     private function validateUnit(Request $request, bool $create = false): array

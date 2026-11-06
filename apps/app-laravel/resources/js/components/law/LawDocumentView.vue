@@ -484,8 +484,7 @@ async function downloadPdf(): Promise<void> {
       } catch {
         // non-fatal — fall through to regular export
       }
-      await downloadPdfExport(props.documentId, safeFileName.value);
-      await documentStore.fetch(props.documentId, true);
+      window.open(`/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`, '_blank', 'noopener');
       return;
     }
 
@@ -521,7 +520,7 @@ async function printPage(): Promise<void> {
     // non-fatal
   }
   // No signed PDF yet — open the review export PDF.
-  const url = `/api/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
+  const url = `/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
   window.open(url, '_blank', 'noopener');
 }
 

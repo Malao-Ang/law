@@ -69,7 +69,7 @@
         <template #item.title="{ item }">
           <div>
             <div class="text-body-2 font-weight-medium text-truncate" style="max-width:260px">
-              {{ item.title }}
+              {{ tableValue(item.title) }}
             </div>
             <div class="text-caption text-medium-emphasis">{{ item.id }}</div>
           </div>
@@ -100,16 +100,16 @@
 
         <template #item.engine="{ item }">
           <v-chip size="x-small" variant="tonal" :color="item.engine === 'fast' ? 'teal' : 'orange'" rounded="pill">
-            {{ item.engine ?? '-' }}
+            {{ tableValue(item.engine) }}
           </v-chip>
         </template>
 
         <template #item.scanMode="{ item }">
-          <span class="text-caption">{{ item.scanMode ?? '-' }}</span>
+          <span class="text-caption">{{ tableValue(item.scanMode) }}</span>
         </template>
 
         <template #item.duration="{ item }">
-          <span class="text-caption">{{ item.duration }}</span>
+          <span class="text-caption">{{ tableValue(item.duration) }}</span>
         </template>
 
         <template #item.error="{ item }">
@@ -122,11 +122,12 @@
         </template>
 
         <template #item.updatedAt="{ item }">
-          <span class="text-caption">{{ item.updatedAt }}</span>
+          <span class="text-caption">{{ tableValue(item.updatedAt) }}</span>
         </template>
 
         <template #item.actions="{ item }">
-          <div class="d-flex align-center justify-end ga-1">
+          <div class="d-flex align-center justify-center ga-1">
+            <span v-if="!['done', 'exported', 'ingested', 'failed'].includes(item.status)">-</span>
             <v-btn
               v-if="item.status === 'done' || item.status === 'exported' || item.status === 'ingested'"
               icon="mdi-pencil-outline"
@@ -158,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Swal from 'sweetalert2';
 import { deleteDocument, listDocuments } from '../../api/client';
@@ -187,14 +189,14 @@ const filterEngine = ref<string | null>(null);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 const headers = [
-  { title: 'เอกสาร', key: 'title', sortable: false, minWidth: '220px' },
-  { title: 'สถานะ', key: 'status', sortable: false },
-  { title: 'Engine', key: 'engine', sortable: false },
-  { title: 'OCR Mode', key: 'scanMode', sortable: false },
-  { title: 'ใช้เวลา', key: 'duration', sortable: false },
-  { title: 'ข้อผิดพลาด', key: 'error', sortable: false },
-  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: true },
-  { title: '', key: 'actions', sortable: false, align: 'end' as const },
+  { title: 'เอกสาร', key: 'title', sortable: false, minWidth: '220px', align: 'center' as const, headerProps: { align: 'center' as const }, cellProps: ({ item }: { item: QueueRow }) => ({ align: isEmptyTableValue(item.title) ? 'center' as const : 'start' as const }) },
+  { title: 'สถานะ', key: 'status', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'Engine', key: 'engine', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'OCR Mode', key: 'scanMode', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'ใช้เวลา', key: 'duration', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'ข้อผิดพลาด', key: 'error', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const }, cellProps: ({ item }: { item: QueueRow }) => ({ align: isEmptyTableValue(item.error) ? 'center' as const : 'start' as const }) },
+  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: true, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: '', key: 'actions', sortable: false, align: 'center' as const, headerProps: { align: 'center' as const } },
 ];
 
 const statusOptions = [

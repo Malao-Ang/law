@@ -53,7 +53,7 @@ class BuuKongClient
     {
         $path = $this->path($endpointKey);
         $url = $this->apiUrl($path);
-        $timeout = (int) config('buu.timeout', 60);
+        $timeout = (int) ((config('buu.endpoints')[$endpointKey]['timeout'] ?? null) ?: config('buu.timeout', 60));
         $started = microtime(true);
 
         Log::info('BUU Kong request start', [

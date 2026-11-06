@@ -26,14 +26,6 @@ class DocumentFileController extends Controller
             abort(404, 'Document not found.');
         }
 
-        // NOTE: no server-side visibility gate here yet. Backend auth is not wired
-        // (mock login is client-only, so $request->user() is always null). A
-        // `! $request->user()` check would 403 every private document for everyone,
-        // including logged-in users. Visibility is enforced client-side for now
-        // (canDisplayLawResult); the real server-side gate lands with the auth/RBAC
-        // work (see docs/superpowers/specs/2026-09-26-auth-rbac-api-middleware-design.md,
-        // LawVisibility service).
-
         $relative = (string) ($status['source_path'] ?? '');
         if ($relative === '') {
             abort(404, 'Original file not available.');

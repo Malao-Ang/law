@@ -208,7 +208,7 @@ async function submitDev(): Promise<void> {
   errorMessage.value = '';
   try {
     await auth.devLogin(devUsername.value.trim());
-    await router.push(redirectPath.value);
+    if (!auth.needs_unit_selection) await router.push(redirectPath.value);
   } catch (error) {
     errorMessage.value = messageFor(error as ApiRequestError);
   } finally {
@@ -223,7 +223,7 @@ async function submit(): Promise<void> {
   try {
     await auth.login(username.value.trim(), password.value);
     password.value = '';
-    await router.push(redirectPath.value);
+    if (!auth.needs_unit_selection) await router.push(redirectPath.value);
   } catch (error) {
     errorMessage.value = messageFor(error as ApiRequestError);
   } finally {

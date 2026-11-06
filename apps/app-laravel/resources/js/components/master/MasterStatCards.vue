@@ -2,22 +2,22 @@
   <div class="master-stat-cards">
     <AdminStatCard
       icon="mdi-link-variant"
-      icon-color="#1d4ed8"
-      icon-bg="#dbeafe"
+      icon-color="#1e3a8a"
+      icon-bg="#eff6ff"
       :number="stats.total"
       :label="labels.total"
     />
     <AdminStatCard
       icon="mdi-check-circle-outline"
-      icon-color="#047857"
-      icon-bg="#d1fae5"
+      icon-color="#10b981"
+      icon-bg="#ecfdf5"
       :number="stats.active"
       :label="labels.active"
     />
     <AdminStatCard
       icon="mdi-power"
-      icon-color="#4b5563"
-      icon-bg="#e5e7eb"
+      icon-color="#64748b"
+      icon-bg="#f1f5f9"
       :number="stats.inactive"
       :label="labels.inactive"
     />
@@ -46,4 +46,10 @@ defineProps<{
     grid-template-columns: 1fr;
   }
 }
+.master-stat-cards :deep(.admin-stat-card),
+.master-stat-cards :deep(.admin-stat-card__body) { min-height: 86px; }
+.master-stat-cards :deep(.admin-stat-card__body) { padding: 18px 22px; }
+.master-stat-cards :deep(.admin-stat-card__content) { display: flex; flex-direction: column; }
+.master-stat-cards :deep(.admin-stat-card__label) { order: -1; color: #64748b !important; opacity: 1; font-size: 13px !important; }
+.master-stat-cards :deep(.admin-stat-card__number) { color: #1e293b; font-size: 24px !important; line-height: 1.4; }
 </style>

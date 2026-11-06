@@ -15,6 +15,8 @@ class CurrentUser
 
     public const ACTIVE_UNIT_KEY = 'active_unit_code';
 
+    public const ACTING_MODE_KEY = 'acting_mode';
+
     public function __construct(private readonly MongoUserStore $users, private readonly UnitStore $units) {}
 
     /** @return array<string, mixed>|null */
@@ -31,19 +33,31 @@ class CurrentUser
 
         $user = $this->users->find($username);
         if ($user === null || ($user['is_disabled'] ?? false) === true) {
-            $request->session()->forget([self::SESSION_KEY, self::ACTIVE_UNIT_KEY]);
+            $request->session()->forget([self::SESSION_KEY, self::ACTIVE_UNIT_KEY, self::ACTING_MODE_KEY]);
 
             return null;
         }
 
+        $canActAsSuperAdmin = (bool) ($user['is_super_admin'] ?? false);
+        $mode = $request->session()->get(self::ACTING_MODE_KEY);
         $active = $request->session()->get(self::ACTIVE_UNIT_KEY);
         if ($active !== null) {
             $unit = is_string($active) ? $this->units->find($active) : null;
-            if ($unit === null || ! $unit['is_active'] || (! ($user['is_super_admin'] ?? false)
-                && ! in_array($active, array_column((array) ($user['memberships'] ?? []), 'unit_code'), true))) {
-                $request->session()->forget(self::ACTIVE_UNIT_KEY);
+            if ($unit === null || ! $unit['is_active']
+                || ! in_array($active, array_column((array) ($user['memberships'] ?? []), 'unit_code'), true)) {
+                $request->session()->forget([self::ACTIVE_UNIT_KEY, self::ACTING_MODE_KEY]);
+                $active = $mode = null;
             }
         }
+        if ($mode === 'super_admin' && ! $canActAsSuperAdmin) {
+            $request->session()->forget(self::ACTING_MODE_KEY);
+            $mode = null;
+        }
+        if ($mode === 'user') {
+            $request->session()->forget(self::ACTIVE_UNIT_KEY);
+        }
+        $user['can_act_as_super_admin'] = $canActAsSuperAdmin;
+        $user['is_super_admin'] = $canActAsSuperAdmin && $mode === 'super_admin';
 
         return $user;
     }
@@ -52,15 +66,7 @@ class CurrentUser
     {
         $request->session()->regenerate();
         $request->session()->put(self::SESSION_KEY, MongoUserStore::key($username));
-        $request->session()->forget(self::ACTIVE_UNIT_KEY);
-        $user = $this->users->find($username);
-        $memberships = (array) ($user['memberships'] ?? []);
-        if (! ($user['is_super_admin'] ?? false) && count($memberships) === 1) {
-            $unit = $this->units->find($memberships[0]['unit_code']);
-            if ($unit !== null && $unit['is_active']) {
-                $request->session()->put(self::ACTIVE_UNIT_KEY, $unit['code']);
-            }
-        }
+        $request->session()->forget([self::ACTIVE_UNIT_KEY, self::ACTING_MODE_KEY]);
     }
 
     public function logout(Request $request): void
@@ -89,6 +95,8 @@ class CurrentUser
             return $membership;
         }, (array) ($user['memberships'] ?? []));
 
+        $needsSelection = $request->session()->get(self::ACTING_MODE_KEY) === null;
+
         return [
             'user' => [
                 'username' => $user['username'] ?? null,
@@ -105,9 +113,13 @@ class CurrentUser
             ],
             'role' => $this->role($user, $request),
             'is_super_admin' => (bool) ($user['is_super_admin'] ?? false),
+            'can_act_as_super_admin' => (bool) ($user['can_act_as_super_admin'] ?? false),
+            'acting_mode' => $request->session()->get(self::ACTING_MODE_KEY) === 'user' ? 'user'
+                : (($user['is_super_admin'] ?? false) ? 'super_admin' : ($activeCode !== null ? 'unit' : null)),
+            'needs_role_selection' => $needsSelection,
             'memberships' => array_values($memberships),
             'active_unit' => is_string($activeCode) ? $this->units->find($activeCode) : null,
-            'needs_unit_selection' => ! ($user['is_super_admin'] ?? false) && count($memberships) > 0 && $activeCode === null,
+            'needs_unit_selection' => $needsSelection,
             'can_upload' => app(DocumentAccess::class)->allows($request, 'upload'),
             'auth_enforced' => (bool) config('auth_ldap.enforced'),
         ];

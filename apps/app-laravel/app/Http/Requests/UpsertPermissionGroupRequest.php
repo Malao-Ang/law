@@ -8,7 +8,9 @@ class UpsertPermissionGroupRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $current = app(\App\Services\Auth\CurrentUser::class);
+        $actor = $current->user($this);
+        return $actor !== null && (($actor['is_super_admin'] ?? false) || $current->role($actor, $this) === 'inner_admin');
     }
 
     /**
