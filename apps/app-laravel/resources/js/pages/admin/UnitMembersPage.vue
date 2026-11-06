@@ -1,7 +1,7 @@
 <template>
   <AppShell :breadcrumbs="[{ title: 'หน้าแรก', to: '/admin' }, { title: 'จัดการหน่วยงาน', to: '/admin/units' }, { title: selectedUnit?.name || 'สมาชิกหน่วยงาน' }]" :title="selectedUnit?.name || 'สมาชิกหน่วยงาน'" subtitle="จัดการสมาชิกและสิทธิ์ดำเนินการ">
     <template #title-actions><v-btn variant="outlined" prepend-icon="mdi-arrow-left" :disabled="saving" to="/admin/units">กลับไปตารางหน่วยงาน</v-btn></template>
-    <v-autocomplete :key="selectorRevision" :model-value="code" :items="visibleUnits" item-title="name" item-value="code" no-data-text="ไม่พบหน่วยงาน" label="เลือกหน่วยงาน" variant="outlined" :disabled="saving" @update:model-value="switchUnit" />
+    <v-autocomplete :key="selectorRevision" :model-value="code" :items="visibleUnits" item-title="name" item-value="code" no-data-text="ไม่พบหน่วยงาน" label="เลือกหน่วยงาน" variant="outlined" class="mb-4" hide-details :disabled="saving" @update:model-value="switchUnit" />
     <v-card v-if="selectedUnit" flat border rounded="lg" class="mb-4">
       <v-card-title class="d-flex align-center ga-3 flex-wrap"><span>สมาชิกหน่วยงาน</span><v-spacer /><v-btn v-if="auth.is_super_admin" color="admin-primary" :disabled="saving" @click="openPeople">เพิ่มคน</v-btn></v-card-title>
       <v-card-text>
