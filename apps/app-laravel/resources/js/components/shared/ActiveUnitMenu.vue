@@ -24,11 +24,36 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore, ROLE_LABELS } from '../../stores/authStore';
+import Swal from 'sweetalert2';
 import { alertError } from '../master/masterDialogs';
 const auth = useAuthStore();
 const router = useRouter();
 const busy = ref(false);
+function isCurrent(code: string): boolean {
+  return code === 'super_admin' ? auth.acting_mode === 'super_admin' : auth.acting_mode !== 'super_admin' && auth.active_unit?.code === code;
+}
+function targetLabel(code: string): string {
+  if (code === 'super_admin') return ROLE_LABELS.super_admin;
+  const membership = auth.memberships.find((item) => item.unit_code === code);
+  const name = membership?.unit_name || code;
+  return membership ? `${name} (${ROLE_LABELS[membership.role]})` : name;
+}
+async function confirmSwitch(code: string): Promise<boolean> {
+  const result = await Swal.fire({
+    icon: 'question',
+    title: 'เปลี่ยนบทบาทการใช้งาน',
+    text: `ต้องการเปลี่ยนไปเป็น ${targetLabel(code)} ใช่หรือไม่`,
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, เปลี่ยน',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#1a3673',
+    cancelButtonColor: '#64748b',
+    reverseButtons: true,
+  });
+  return result.isConfirmed;
+}
 async function switchUnit(code: string): Promise<void> {
+  if (isCurrent(code) || !(await confirmSwitch(code))) return;
   busy.value = true;
   try {
     if (code === 'super_admin') await auth.selectSuperAdmin();
