@@ -20,7 +20,7 @@
           <v-col v-for="membership in auth.memberships" :key="membership.unit_code" cols="12" sm="6" md="4">
             <v-card border flat rounded="lg" class="pa-5 h-100 d-flex flex-column">
               <h2 class="text-h6 mb-2">{{ membership.unit_name || membership.unit_code }}</h2>
-              <p class="text-body-2 mb-3">หน่วยงานแม่: {{ parentName(membership.unit?.parent_code) }}</p>
+              <p v-if="membership.unit?.parent_code" class="text-body-2 mb-3">หน่วยงานแม่: {{ parentName(membership.unit.parent_code) }}</p>
               <div><v-chip size="small" color="admin-primary" class="mb-3">{{ ROLE_LABELS[membership.role] }}</v-chip></div>
               <p class="mb-4">สิทธิ์ดำเนินการ: {{ membership.actions.map((action) => ACTION_LABELS[action]).join(', ') || 'ดูเอกสารตามสิทธิ์การเข้าถึง' }}</p>
               <v-spacer />
@@ -57,8 +57,8 @@ const units = ref<Unit[]>([]);
 const loading = ref(false);
 const busy = ref(false);
 const selected = ref('');
-function parentName(code?: string | null): string {
-  return code ? units.value.find((u) => u.code === code)?.name || code : 'ไม่มีหน่วยงานแม่';
+function parentName(code: string): string {
+  return units.value.find((u) => u.code === code)?.name || code;
 }
 watch(open, async (value) => {
   if (!value || units.value.length > 0) return;
