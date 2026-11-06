@@ -105,7 +105,7 @@ class RelationsTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('relations.0.type', 'amends');
         $response->assertJsonPath('relations.0.target_block_id', 'p1-b0042');
-        $response->assertJsonPath('relations.0.change_detail', 'แก้ไขข้อความ');
+        $response->assertJsonPath('relations.0.change_detail', 'CHD04');
         $response->assertJsonPath('relations.1.type', 'supersedes');
         $response->assertJsonPath('relations.1.target_block_id', 'p2-b0001');
         $response->assertJsonPath('relations.2.type', 'issued_under');

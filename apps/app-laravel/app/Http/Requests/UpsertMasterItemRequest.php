@@ -3,14 +3,25 @@
 namespace App\Http\Requests;
 
 use App\Services\MasterData\MasterDataKind;
+use App\Services\MasterData\MasterDataStore;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpsertMasterItemRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if ($this->isMethod('PUT') && $this->route('kind') === MasterDataKind::ChangeStatus->value) {
-            abort(403, 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
+        if (! $this->isMethod('PUT')) {
+            return true;
+        }
+
+        $kind = MasterDataKind::tryFrom((string) $this->route('kind'));
+        if ($kind !== MasterDataKind::ChangeStatus && $kind !== MasterDataKind::ChangeDetail) {
+            return true;
+        }
+
+        $item = app(MasterDataStore::class)->find($kind, (string) $this->route('code'));
+        if ($item !== null && ($item['is_system'] ?? false) === true) {
+            abort(403, 'รายการนี้เป็นข้อมูลของระบบ แก้ไขไม่ได้ กรุณาสร้างรายการใหม่');
         }
 
         return true;

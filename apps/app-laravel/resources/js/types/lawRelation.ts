@@ -105,10 +105,16 @@ export function changeDetailMeta(detail: string | null | undefined) {
   return SECTION_CHANGE_DETAILS.find((item) => item.value === normalized) ?? null;
 }
 
-export function uniqueRelationChangeDetails(relations: LawRelation[]): string[] {
+export function uniqueRelationChangeDetails(
+  relations: LawRelation[],
+  normalize: (detail: string | null | undefined) => string | null = (detail) => {
+    const value = detail?.trim() ?? '';
+    return value === '' ? null : value;
+  },
+): string[] {
   const details: string[] = [];
   for (const relation of relations) {
-    const value = normalizeChangeDetail(relation.change_detail);
+    const value = normalize(relation.change_detail);
     if (value && !details.includes(value)) details.push(value);
   }
   return details;

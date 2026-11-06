@@ -217,6 +217,7 @@
       :existing-relations="relations"
       :section-labels="sectionLabels"
       :change-status="changeStatus"
+      :detail-source="detailSource"
       @close="closeRelationDialog"
       @save="onRelationSave"
     />
@@ -239,11 +240,10 @@ import {
   formatRelationTarget,
   relationTypeLabel,
   uniqueRelationChangeDetails,
-  changeDetailMeta,
-  normalizeChangeDetail,
   proclamationDueLabel,
 } from '../../types/lawRelation';
 import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useLawType } from '../../composables/useLawType';
 import AppShell from '../../components/shared/AppShell.vue';
 import WorkflowFooterBar from '../../components/shared/WorkflowFooterBar.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
@@ -254,7 +254,15 @@ const router = useRouter();
 const documentStore = useDocumentStore();
 const snackbar = useSnackbarStore();
 const changeStatusCS = useChangeStatus();
+const { typeSource } = useLawType();
 const isOld = computed(() => documentStore.review?.law_meta?.document_type === 'old');
+const detailSource = computed<'internal' | 'external'>(() =>
+  typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
+);
+
+function changeDetailMeta(detail: string | null | undefined) {
+  return changeStatusCS.detailMeta(detail);
+}
 
 const catalog = ref<DocumentListItem[]>([]);
 const catalogLoading = ref(false);
@@ -376,7 +384,7 @@ function closeRelationDialog(): void {
 function persistRelations(next: LawRelation[]): Promise<boolean> {
   return documentStore.saveRelations(
     next,
-    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next) } : undefined,
+    isSectionChange.value ? { change_details: uniqueRelationChangeDetails(next, (detail) => changeStatusCS.normalizeDetail(detail) || null) } : undefined,
   );
 }
 

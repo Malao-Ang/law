@@ -58,7 +58,7 @@ class MasterDataController extends Controller
         if ($masterKind === null) {
             return $this->unknownKind();
         }
-        if ($masterKind->readOnly() || $masterKind === MasterDataKind::ChangeStatus) {
+        if ($masterKind->readOnly() || in_array($masterKind, [MasterDataKind::ChangeStatus, MasterDataKind::ChangeDetail], true)) {
             return $this->readOnlyKind();
         }
 
@@ -95,10 +95,6 @@ class MasterDataController extends Controller
         }
         if ($masterKind->readOnly()) {
             return $this->readOnlyKind();
-        }
-
-        if ($masterKind === MasterDataKind::ChangeStatus) {
-            return response()->json(['message' => 'สถานะการเปลี่ยนแปลงแก้ไขไม่ได้ กรุณาสร้างรายการใหม่'], 403);
         }
 
         $validated = $request->validated();

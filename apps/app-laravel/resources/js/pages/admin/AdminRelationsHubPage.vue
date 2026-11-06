@@ -385,6 +385,7 @@
       :existing-relations="relations"
       :section-labels="sectionLabels"
       :change-status="documentStore.review?.law_meta?.change_status"
+      :detail-source="detailSource"
       @close="closeRelationDialog"
       @save="onRelationAdd"
     />
@@ -404,7 +405,6 @@ import {
   formatRelationTarget,
   relationTypeLabel,
   uniqueRelationChangeDetails,
-  changeDetailMeta,
   proclamationDueLabel,
 } from '../../types/lawRelation';
 import { createClientId } from '../../utils/createClientId';
@@ -412,13 +412,20 @@ import { formatThaiDate, formatThaiDateTime } from '../../utils/thaiDate';
 import { parentIdsOf } from '../../composables/useLawCatalog';
 import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
-import { createLawTypeCatalog } from '../../composables/useLawType';
+import { createLawTypeCatalog, useLawType } from '../../composables/useLawType';
 import { useChangeStatus } from '../../composables/useChangeStatus';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
-const { typeLabel } = useLawType();
+const { typeLabel, typeSource } = useLawType();
 const changeStatusCS = useChangeStatus();
+const detailSource = computed<'internal' | 'external'>(() =>
+  typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
+);
+
+function changeDetailMeta(detail: string | null | undefined) {
+  return changeStatusCS.detailMeta(detail);
+}
 
 // ── Types ─────────────────────────────────────────────────
 interface DocRow {
@@ -689,7 +696,7 @@ async function confirmSave(): Promise<void> {
   const ok = await documentStore.saveRelations(
     pendingRelations.value,
     isSectionEditionChange(changeStatus)
-      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value) }
+      ? { change_details: uniqueRelationChangeDetails(pendingRelations.value, (detail) => changeStatusCS.normalizeDetail(detail) || null) }
       : undefined,
   );
   if (ok) {
