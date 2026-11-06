@@ -53,9 +53,9 @@
                   :class="{ 'report-count-row--active': isDrill(dim.key, b.key) }"
                   @click="toggleDrill(dim.key, b.key)"
                 >
-                  <td>{{ b.label }}</td>
-                  <td class="text-right font-weight-bold">{{ b.count }}</td>
-                  <td class="text-right text-caption text-medium-emphasis">{{ pct(b.count, dim.total) }}%</td>
+                  <td :class="isEmptyTableValue(b.label) ? 'text-center' : 'text-start'">{{ tableValue(b.label) }}</td>
+                  <td class="text-center font-weight-bold">{{ tableValue(b.count) }}</td>
+                  <td class="text-center text-caption text-medium-emphasis">{{ pct(b.count, dim.total) }}%</td>
                 </tr>
               </tbody>
             </v-table>
@@ -88,13 +88,13 @@
             <td colspan="5" class="text-center pa-6 text-medium-emphasis">ไม่พบเอกสาร</td>
           </tr>
           <tr v-for="doc in drilledDocuments" :key="doc.id" class="report-doc-row" @click="router.push(`/documents/${doc.id}/review`)">
-            <td class="py-2" style="max-width:320px">
-              <span class="d-block text-body-2 font-weight-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ doc.title }}</span>
+            <td class="py-2" style="max-width:320px" :class="isEmptyTableValue(doc.title) ? 'text-center' : 'text-start'">
+              <span class="d-block text-body-2 font-weight-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tableValue(doc.title) }}</span>
             </td>
-            <td class="text-caption">{{ doc.type }}</td>
-            <td class="text-caption">{{ doc.group }}</td>
-            <td class="text-caption">{{ doc.agency }}</td>
-            <td><v-chip size="x-small" rounded="pill">{{ doc.status }}</v-chip></td>
+            <td class="text-center text-caption">{{ tableValue(doc.type) }}</td>
+            <td class="text-center text-caption">{{ tableValue(doc.group) }}</td>
+            <td class="text-caption" :class="isEmptyTableValue(doc.agency) ? 'text-center' : 'text-start'">{{ tableValue(doc.agency) }}</td>
+            <td class="text-center"><v-chip size="x-small" rounded="pill">{{ tableValue(doc.status) }}</v-chip></td>
           </tr>
         </tbody>
       </v-table>
@@ -103,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ApexChart from 'vue3-apexcharts/core';

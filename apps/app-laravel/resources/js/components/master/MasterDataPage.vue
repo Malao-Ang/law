@@ -68,7 +68,7 @@
             <v-chip v-if="column.key === 'usage_count'" size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline" :to="usageLink(kind, slotProps.item.code, slotProps.item.usage_count) ?? undefined">
               {{ (slotProps.item.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
             </v-chip>
-            <template v-else>{{ slotProps.value || '-' }}</template>
+            <template v-else>{{ tableValue(slotProps.value) }}</template>
           </slot>
         </template>
       </MasterDataTable>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue } from '../../utils/tableValue';
 import { computed, onMounted, ref } from 'vue';
 import AppShell from '../shared/AppShell.vue';
 import { usageLink } from './masterLock';

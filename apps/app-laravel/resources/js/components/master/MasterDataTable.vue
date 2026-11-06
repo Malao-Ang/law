@@ -10,7 +10,7 @@
             v-for="column in columns"
             :key="column.key"
             :style="{ width: column.width }"
-            :class="column.align === 'end' ? 'text-right' : undefined"
+            class="text-center"
           >
             {{ column.title }}
           </th>
@@ -30,22 +30,23 @@
           </td>
         </tr>
         <tr v-for="(item, index) in items" v-else :key="item.code">
-          <td class="master-table__index">{{ offset + index + 1 }}</td>
-          <td>
+          <td class="text-center master-table__index">{{ offset + index + 1 }}</td>
+          <td class="text-center">
             <v-chip size="small" variant="tonal" color="admin-primary" class="master-table__code-chip">
-              {{ item.code }}
+              {{ tableValue(item.code) }}
             </v-chip>
           </td>
           <td
             v-for="column in columns"
             :key="column.key"
-            :class="column.align === 'end' ? 'text-right' : undefined"
+            :class="isEmptyTableValue(itemValue(item, column.key)) || column.align !== 'start' && !['name', 'description'].includes(column.key) ? 'text-center' : 'text-start'"
           >
-            <slot :name="`item.${column.key}`" :item="item" :value="itemValue(item, column.key)">
-              {{ itemValue(item, column.key) || '-' }}
+            <span v-if="['name', 'description'].includes(column.key) && isEmptyTableValue(itemValue(item, column.key))">-</span>
+            <slot v-else :name="`item.${column.key}`" :item="item" :value="itemValue(item, column.key)">
+              {{ tableValue(itemValue(item, column.key)) }}
             </slot>
           </td>
-          <td>
+          <td class="text-center">
             <v-chip
               size="small"
               :color="item.is_active ? 'success' : 'grey'"
@@ -55,8 +56,16 @@
               {{ item.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
             </v-chip>
           </td>
-          <td class="master-table__actions-cell">
-            <div class="master-table__action-row">
+          <td class="master-table__actions-cell text-center">
+            <div class="master-table__action-row justify-center">
+              <MasterToggleCell
+                v-if="!readonly"
+                :item="item"
+                :kind="kind"
+                :busy="pendingCodes?.has(item.code) || togglingCode === item.code"
+                :epoch="switchEpoch"
+                @toggle="$emit('toggle', item, $event)"
+              />
               <v-tooltip text="ดูรายละเอียด" location="top">
                 <template #activator="{ props: tip }">
                   <v-btn
@@ -95,14 +104,6 @@
                 :loading="pendingCodes?.has(item.code)"
                 @click="$emit('delete', item)"
               />
-              <MasterToggleCell
-                v-if="!readonly"
-                :item="item"
-                :kind="kind"
-                :busy="pendingCodes?.has(item.code) || togglingCode === item.code"
-                :epoch="switchEpoch"
-                @toggle="$emit('toggle', item, $event)"
-              />
             </div>
           </td>
         </tr>
@@ -127,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed } from 'vue';
 import MasterToggleCell from './MasterToggleCell.vue';
 import type { MasterItem, MasterKind } from '../../types/masterData';
@@ -217,7 +219,6 @@ function itemValue(item: MasterItem, key: string): unknown {
   display: flex;
   flex-wrap: nowrap;
   gap: 2px;
-  justify-content: flex-end;
   min-height: 40px;
 }
 

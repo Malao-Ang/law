@@ -61,20 +61,19 @@
       <template #item.title="{ item }">
         <v-tooltip :text="item.title" location="top">
           <template #activator="{ props: tooltipProps }">
-            <span v-bind="tooltipProps" class="pipeline-title text-body-2 font-weight-medium">{{ item.title }}</span>
+            <span v-bind="tooltipProps" class="pipeline-title text-body-2 font-weight-medium">{{ tableValue(item.title) }}</span>
           </template>
         </v-tooltip>
       </template>
 
       <template #item.ownership="{ item }">
-        <span class="text-body-2">{{ item.uploadedBy }}</span>
+        <span class="text-body-2">{{ tableValue(item.uploadedBy) }}</span>
       </template>
       <template #item.lawType="{ item }">
         <v-chip v-if="item.lawType" size="small" color="admin-primary" variant="tonal">
           {{ typeLabel(item.lawType) }}
         </v-chip>
-        <v-chip v-else-if="item.documentType === 'old'" size="small" color="warning" variant="tonal">รอกรอกข้อมูล</v-chip>
-        <v-chip v-else size="small" color="grey" variant="tonal">รอประมวลผล</v-chip>
+        <span v-else>-</span>
       </template>
 
       <template #item.lawStatus="{ item }">
@@ -86,7 +85,7 @@
         >
           {{ statusLabel(item.lawStatus) }}
         </v-chip>
-        <v-chip v-else size="small" color="warning" variant="tonal">{{ statusLabel(draftCode) }}</v-chip>
+        <span v-else>-</span>
       </template>
 
       <template #item.lifecycle="{ item }">
@@ -112,11 +111,11 @@
       </template>
 
       <template #item.updatedAt="{ item }">
-        <span class="text-caption">{{ item.updatedAt }}</span>
+        <span class="text-caption">{{ tableValue(item.updatedAt) }}</span>
       </template>
 
       <template #item.actions="{ item }">
-        <div class="d-flex align-center ga-1 justify-end">
+        <div class="d-flex align-center ga-1 justify-center">
           <v-progress-circular
             v-if="stageDef(item.stage).action.type === 'none' && item.stage !== 'failed' && item.stage !== 'public'"
             indeterminate
@@ -170,6 +169,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
@@ -244,15 +244,15 @@ const lawTypeOptions = computed(() =>
 );
 
 const headers = [
-  { title: 'ลำดับ', key: 'no', sortable: false, align: 'center' as const, width: 56 },
-  { title: 'เอกสาร', key: 'title', sortable: false, width: 260 },
-  { title: 'ประเภท', key: 'lawType', sortable: false, align: 'center' as const, width: 100 },
-  { title: 'ความคืบหน้า', key: 'lifecycle', sortable: false, align: 'center' as const, width: 200 },
-  { title: 'สถานะบังคับใช้', key: 'lawStatus', sortable: false, align: 'center' as const, width: 120 },
-  { title: 'การเข้าถึง', key: 'access', sortable: false, align: 'center' as const, width: 100 },
-  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, align: 'center' as const, width: 130 },
-  { title: 'ผู้อัปโหลด', key: 'ownership', sortable: false, width: 180 },
-  { title: 'การดำเนินการ', key: 'actions', sortable: false, align: 'center' as const, width: 170 },
+  { title: 'ลำดับ', key: 'no', sortable: false, width: 56, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'เอกสาร', key: 'title', sortable: false, width: 260, align: 'center' as const, headerProps: { align: 'center' as const }, cellProps: ({ item }: { item: Row }) => ({ align: isEmptyTableValue(item.title) ? 'center' as const : 'start' as const }) },
+  { title: 'ประเภท', key: 'lawType', sortable: false, width: 100, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'ความคืบหน้า', key: 'lifecycle', sortable: false, width: 200, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'สถานะบังคับใช้', key: 'lawStatus', sortable: false, width: 120, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'การเข้าถึง', key: 'access', sortable: false, width: 100, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'อัปเดตล่าสุด', key: 'updatedAt', sortable: false, width: 130, align: 'center' as const, headerProps: { align: 'center' as const } },
+  { title: 'ผู้อัปโหลด', key: 'ownership', sortable: false, width: 180, align: 'center' as const, headerProps: { align: 'center' as const }, cellProps: ({ item }: { item: Row }) => ({ align: isEmptyTableValue(item.uploadedBy) ? 'center' as const : 'start' as const }) },
+  { title: 'การดำเนินการ', key: 'actions', sortable: false, width: 170, align: 'center' as const, headerProps: { align: 'center' as const } },
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
@@ -417,11 +417,6 @@ defineExpose({ load });
   color: rgba(var(--v-theme-secondary), 0.6) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
-  text-align: center !important;
-}
-
-.pipeline-table :deep(thead th:nth-child(2)) {
-  text-align: left !important;
 }
 
 .pipeline-title {

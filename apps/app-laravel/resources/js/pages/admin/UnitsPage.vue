@@ -17,10 +17,10 @@
         <thead><tr><th>รหัส</th><th>ชื่อหน่วยงาน</th><th>ชนิด</th><th>หน่วยงานแม่</th><th>จำนวนสมาชิก</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
         <tbody>
           <tr v-for="unit in rows" :key="unit.code" :data-unit="unit.code" class="unit-row" tabindex="0" @click="router.push(`/admin/units/${unit.code}`)" @keydown.enter.self="router.push(`/admin/units/${unit.code}`)">
-            <td>{{ unit.code }}</td><td>{{ unit.name }}</td><td>{{ typeOptions.find((t) => t.value === unit.type)?.title }}</td>
-            <td>{{ allUnits.find((u) => u.code === unit.parent_code)?.name || '—' }}</td><td>{{ unit.member_count ?? 0 }}</td>
-            <td @click.stop @keydown.stop><v-switch :key="controlRevision" :model-value="unit.is_active" :disabled="saving || !auth.is_super_admin" :aria-label="`เปิดใช้งาน ${unit.name}`" color="success" hide-details density="compact" @update:model-value="toggleUnit(unit, Boolean($event))" /></td>
-            <td @click.stop @keydown.stop>
+            <td class="text-center">{{ tableValue(unit.code) }}</td><td :class="isEmptyTableValue(unit.name) ? 'text-center' : 'text-start'">{{ tableValue(unit.name) }}</td><td class="text-center">{{ tableValue(typeOptions.find((t) => t.value === unit.type)?.title) }}</td>
+            <td :class="isEmptyTableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') ? 'text-center' : 'text-start'">{{ tableValue(allUnits.find((u) => u.code === unit.parent_code)?.name || '-') }}</td><td class="text-center">{{ unit.member_count ?? 0 }}</td>
+            <td @click.stop @keydown.stop class="text-center"><div class="d-flex justify-center"><v-switch :key="controlRevision" :model-value="unit.is_active" :disabled="saving || !auth.is_super_admin" :aria-label="`เปิดใช้งาน ${unit.name}`" color="success" hide-details density="compact" @update:model-value="toggleUnit(unit, Boolean($event))" /></div></td>
+            <td @click.stop @keydown.stop class="text-center">
               <v-btn v-if="auth.is_super_admin" variant="text" size="small" :disabled="saving" @click="openUnit(unit)">แก้ไขหน่วยงาน</v-btn>
               <v-btn variant="text" size="small" :to="`/admin/units/${unit.code}`">จัดการสมาชิก</v-btn>
             </td>
@@ -62,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';
