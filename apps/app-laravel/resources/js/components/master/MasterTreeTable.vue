@@ -8,7 +8,7 @@
           <th class="master-tree__code">รหัส</th>
           <th>ชื่อ</th>
           <th class="master-tree__source">ที่มา · หน่วย</th>
-          <th class="master-tree__usage text-right">เอกสาร</th>
+          <th class="master-tree__usage text-center">เอกสาร</th>
           <th class="master-tree__status">สถานะ</th>
           <th class="master-tree__actions">จัดการ</th>
         </tr>
@@ -30,34 +30,34 @@
             @dragover.prevent
             @drop="handleDrop($event, 'family', row.family.code)"
           >
-            <td class="master-tree__order-cell">{{ familyIndex + 1 }}</td>
-            <td>
+            <td class="text-center master-tree__order-cell">{{ familyIndex + 1 }}</td>
+            <td class="text-center">
               <button v-if="row.family.attrs.has_subtypes !== false" type="button" class="master-tree__toggle" :disabled="reorderMode" @click="$emit('toggleExpand', row.family.code)">
                 <v-icon :icon="expandedCodes.includes(row.family.code) ? 'mdi-chevron-down' : 'mdi-chevron-right'" size="18" />
               </button>
               <span v-else class="master-tree__toggle-spacer" aria-hidden="true" />
               <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
-                {{ row.family.code }}
+                {{ tableValue(row.family.code) }}
               </v-chip>
             </td>
-            <td>
+            <td :class="isEmptyTableValue(row.family.name) ? 'text-center' : 'text-start'">
               <span class="master-tree__dot" :style="{ background: row.color }" />
-              <span class="font-weight-bold">{{ row.family.name }}</span>
+              <span class="font-weight-bold">{{ tableValue(row.family.name) }}</span>
             </td>
-            <td>{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
-            <td class="text-right font-weight-bold">
+            <td class="text-start">{{ sourceLabel(row.source) }} · {{ unitLabel(row.source) }}</td>
+            <td class="text-center font-weight-bold">
               <v-chip
                 size="small" variant="tonal" color="admin-primary" prepend-icon="mdi-file-document-outline"
                 :to="usageLink('law_family', row.family.code, row.family.usage_count) ?? undefined"
               >{{ (row.family.usage_count ?? 0).toLocaleString('th-TH') }} รายการ</v-chip>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip size="small" :color="row.family.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
                 {{ row.family.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
               </v-chip>
             </td>
-            <td>
-              <div class="master-tree__action-row">
+            <td class="text-center">
+              <div class="master-tree__action-row justify-center">
                 <template v-if="reorderMode">
                   <v-btn
                     icon="mdi-chevron-up"
@@ -76,6 +76,13 @@
                   <v-icon icon="mdi-drag-vertical" size="20" class="master-tree__drag-handle" />
                 </template>
                 <template v-else>
+                <MasterToggleCell
+                  :item="row.family"
+                  kind="law_family"
+                  :busy="pendingCodes?.has(row.family.code) || togglingCode === row.family.code"
+                  :epoch="switchEpoch"
+                  @toggle="$emit('toggleFamily', row.family, $event)"
+                />
                 <v-btn
                   size="x-small" variant="tonal" color="admin-primary" prepend-icon="mdi-plus" class="text-none"
                   :class="{ 'master-tree__add-placeholder': row.family.attrs.has_subtypes === false }"
@@ -93,13 +100,6 @@
                   </template>
                 </v-tooltip>
                 <v-btn v-if="row.family.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(row.family.code)" :loading="pendingCodes?.has(row.family.code)" @click="$emit('deleteFamily', row.family)" />
-                <MasterToggleCell
-                  :item="row.family"
-                  kind="law_family"
-                  :busy="pendingCodes?.has(row.family.code) || togglingCode === row.family.code"
-                  :epoch="switchEpoch"
-                  @toggle="$emit('toggleFamily', row.family, $event)"
-                />
                 </template>
               </div>
             </td>
@@ -116,15 +116,15 @@
             @dragover.prevent
             @drop="handleDrop($event, 'type', type.code, row.family.code)"
           >
-            <td class="master-tree__order-cell master-tree__child-order">{{ familyIndex + 1 }}.{{ typeIndex + 1 }}</td>
-            <td class="master-tree__child-code">
+            <td class="text-center master-tree__order-cell master-tree__child-order">{{ familyIndex + 1 }}.{{ typeIndex + 1 }}</td>
+            <td class="text-center master-tree__child-code">
               <v-chip size="small" variant="tonal" color="admin-primary" class="master-tree__code-chip">
-                {{ type.code }}
+                {{ tableValue(type.code) }}
               </v-chip>
             </td>
-            <td class="master-tree__child-name">{{ type.name }}</td>
-            <td class="text-medium-emphasis">ตามกลุ่ม</td>
-            <td class="text-right">
+            <td class="master-tree__child-name" :class="isEmptyTableValue(type.name) ? 'text-center' : 'text-start'">{{ tableValue(type.name) }}</td>
+            <td class="text-start text-medium-emphasis">ตามกลุ่ม</td>
+            <td class="text-center">
               <v-chip
                 size="small"
                 variant="tonal"
@@ -135,13 +135,13 @@
                 {{ (type.usage_count ?? 0).toLocaleString('th-TH') }} รายการ
               </v-chip>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip size="small" :color="type.is_active ? 'success' : 'grey'" variant="tonal" class="font-weight-medium">
                 {{ type.is_active ? '• ใช้งาน' : '• ปิดใช้งาน' }}
               </v-chip>
             </td>
-            <td>
-              <div class="master-tree__action-row">
+            <td class="text-center">
+              <div class="master-tree__action-row justify-center">
                 <template v-if="reorderMode">
                   <v-btn
                     icon="mdi-chevron-up"
@@ -160,6 +160,13 @@
                   <v-icon icon="mdi-drag-vertical" size="20" class="master-tree__drag-handle" />
                 </template>
                 <template v-else>
+                <MasterToggleCell
+                  :item="type"
+                  kind="law_type"
+                  :busy="pendingCodes?.has(type.code) || togglingCode === type.code"
+                  :epoch="switchEpoch"
+                  @toggle="$emit('toggleType', type, $event)"
+                />
                 <v-tooltip text="ดูรายการเอกสาร" location="top">
                   <template #activator="{ props: tip }">
                     <v-btn v-bind="tip" icon="mdi-eye-outline" variant="text" size="small" :to="`/admin/laws?type=${encodeURIComponent(type.code)}`" />
@@ -171,13 +178,6 @@
                   </template>
                 </v-tooltip>
                 <v-btn v-if="type.can_delete" icon="mdi-delete-outline" variant="text" size="small" color="error" aria-label="ลบ" :disabled="pendingCodes?.has(type.code)" :loading="pendingCodes?.has(type.code)" @click="$emit('deleteType', type)" />
-                <MasterToggleCell
-                  :item="type"
-                  kind="law_type"
-                  :busy="pendingCodes?.has(type.code) || togglingCode === type.code"
-                  :epoch="switchEpoch"
-                  @toggle="$emit('toggleType', type, $event)"
-                />
                 </template>
               </div>
             </td>
@@ -189,6 +189,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import type { LawSource } from '../../api/client';
 import MasterToggleCell from './MasterToggleCell.vue';
 import { usageLink } from './masterLock';
@@ -384,7 +385,6 @@ function handleDrop(event: DragEvent, kind: DragPayload['kind'], code: string, f
   display: flex;
   gap: 2px;
   flex-wrap: nowrap;
-  justify-content: flex-end;
   min-height: 40px;
 }
 

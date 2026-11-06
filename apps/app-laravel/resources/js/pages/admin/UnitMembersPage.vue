@@ -14,16 +14,16 @@
       </v-card-text>
       <v-progress-linear v-if="loading || saving" indeterminate color="admin-primary" />
       <v-table class="members-table" aria-label="สมาชิกหน่วยงาน">
-        <thead><tr><th v-if="canWrite"><v-checkbox-btn :model-value="allSelected" :indeterminate="selected.length > 0 && !allSelected" :disabled="saving || !editableRows.length" aria-label="เลือกสมาชิกทั้งหมด" @update:model-value="selectAll(Boolean($event))" /></th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th v-for="action in actions" :key="action.value">{{ action.title }}</th><th>ที่มา</th><th>จัดการ</th></tr></thead>
+        <thead><tr><th v-if="canWrite"><v-checkbox-btn class="justify-center" :model-value="allSelected" :indeterminate="selected.length > 0 && !allSelected" :disabled="saving || !editableRows.length" aria-label="เลือกสมาชิกทั้งหมด" @update:model-value="selectAll(Boolean($event))" /></th><th>ชื่อ</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th v-for="action in actions" :key="action.value">{{ action.title }}</th><th>ที่มา</th><th>จัดการ</th></tr></thead>
         <tbody>
           <tr v-for="member in draft" :key="member.username" :data-username="member.username" :class="{ 'draft-row': state(member), 'removed-row': member.remove }">
-            <td v-if="canWrite"><v-checkbox-btn v-model="selected" :value="member.username" :disabled="saving || member.remove || !canEdit(member)" :aria-label="`เลือก ${member.username}`" /></td>
-            <td>{{ member.name || '—' }}<span v-if="member.is_disabled" class="text-error"> (ปิดใช้งาน)</span><v-chip v-if="state(member)" size="small" :color="member.remove ? 'error' : 'warning'" class="ml-2">{{ state(member) }}</v-chip></td>
-            <td>{{ member.username }}</td>
-            <td><v-select v-if="canEdit(member)" :model-value="member.role" :items="roleOptions" :disabled="saving || member.remove" :aria-label="`บทบาทของ ${member.username}`" variant="outlined" density="compact" hide-details @update:model-value="changeRole(member, $event)" /><span v-else>{{ ROLE_LABELS[member.role] }}</span></td>
-            <td v-for="action in actions" :key="action.value"><v-checkbox-btn :model-value="member.actions.includes(action.value)" :disabled="saving || member.remove || !canEdit(member) || isAdmin(member.role)" :aria-label="`${action.title} ${member.username}`" @update:model-value="changeAction(member, action.value, Boolean($event))" /></td>
-            <td>{{ sourceLabel(member.source) }}</td>
-            <td><v-btn v-if="auth.is_super_admin" variant="text" size="small" :color="member.remove ? 'primary' : 'error'" :disabled="saving" @click="toggleRemove(member)">{{ member.remove ? 'เลิกทำ' : 'ลบสมาชิก' }}</v-btn></td>
+            <td v-if="canWrite" class="text-center"><v-checkbox-btn class="justify-center" v-model="selected" :value="member.username" :disabled="saving || member.remove || !canEdit(member)" :aria-label="`เลือก ${member.username}`" /></td>
+            <td :class="isEmptyTableValue(member.name || '-') ? 'text-center' : 'text-start'">{{ tableValue(member.name || '-') }}<span v-if="member.is_disabled" class="text-error"> (ปิดใช้งาน)</span><v-chip v-if="state(member)" size="small" :color="member.remove ? 'error' : 'warning'" class="ml-2">{{ state(member) }}</v-chip></td>
+            <td :class="isEmptyTableValue(member.username) ? 'text-center' : 'text-start'">{{ tableValue(member.username) }}</td>
+            <td class="text-center"><v-select class="text-center" v-if="canEdit(member)" :model-value="member.role" :items="roleOptions" :disabled="saving || member.remove" :aria-label="`บทบาทของ ${member.username}`" variant="outlined" density="compact" hide-details @update:model-value="changeRole(member, $event)"><template #selection="{ item }"><span class="position-absolute w-100 text-center">{{ item.title }}</span></template></v-select><span v-else>{{ tableValue(ROLE_LABELS[member.role]) }}</span></td>
+            <td v-for="action in actions" :key="action.value" class="text-center"><v-checkbox-btn class="justify-center" :model-value="member.actions.includes(action.value)" :disabled="saving || member.remove || !canEdit(member) || isAdmin(member.role)" :aria-label="`${action.title} ${member.username}`" @update:model-value="changeAction(member, action.value, Boolean($event))" /></td>
+            <td class="text-center">{{ tableValue(sourceLabel(member.source)) }}</td>
+            <td class="text-center"><v-btn v-if="auth.is_super_admin" variant="text" size="small" :color="member.remove ? 'primary' : 'error'" :disabled="saving" @click="toggleRemove(member)">{{ member.remove ? 'เลิกทำ' : 'ลบสมาชิก' }}</v-btn><span v-else>-</span></td>
           </tr>
           <tr v-if="!loading && !draft.length"><td colspan="11" class="text-center pa-6">ยังไม่มีสมาชิก</td></tr>
         </tbody>
@@ -52,6 +52,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 import Swal from 'sweetalert2';

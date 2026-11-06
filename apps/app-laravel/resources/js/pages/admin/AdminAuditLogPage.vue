@@ -23,17 +23,17 @@
           <tr v-if="!loading && !items.length"><td colspan="8" class="text-center pa-8">ไม่มีบันทึกที่ตรงกับเงื่อนไข</td></tr>
           <template v-for="item in items" :key="item.id">
             <tr>
-              <td class="text-caption text-no-wrap">{{ formatThaiDateTime(item.at) }}</td>
-              <td>{{ item.actor_name }}<div class="text-caption">{{ item.actor_username }}</div><div class="text-caption">{{ roleLabel(item.actor_role) }} · {{ unitName(item.unit_code) }}</div></td>
-              <td>{{ item.action_label }}</td><td>{{ item.resource_label }}</td>
-              <td><RouterLink v-if="item.document_id" :to="`/documents/${encodeURIComponent(item.document_id)}/law-info`">{{ item.label || item.document_id }}</RouterLink><RouterLink v-else-if="item.resource === 'master_data'" :to="masterLink(item)">{{ item.label || item.resource_id }}</RouterLink><span v-else>{{ item.label || item.resource_id }}</span></td>
-              <td>{{ item.summary }}</td><td>{{ resultLabel(item.result) }}</td>
-              <td><v-btn variant="text" size="small" :aria-expanded="expanded === item.id" @click="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? 'ย่อ' : 'ดู' }}</v-btn></td>
+              <td class="text-center text-caption text-no-wrap">{{ tableValue(formatThaiDateTime(item.at)) }}</td>
+              <td :class="isEmptyTableValue(item.actor_name) ? 'text-center' : 'text-start'">{{ tableValue(item.actor_name) }}<div class="text-caption">{{ tableValue(item.actor_username) }}</div><div class="text-caption">{{ tableValue(roleLabel(item.actor_role)) }} · {{ tableValue(unitName(item.unit_code)) }}</div></td>
+              <td class="text-center">{{ tableValue(item.action_label) }}</td><td :class="isEmptyTableValue(item.resource_label) ? 'text-center' : 'text-start'">{{ tableValue(item.resource_label) }}</td>
+              <td :class="isEmptyTableValue(item.label || item.document_id || item.resource_id) ? 'text-center' : 'text-start'"><RouterLink v-if="item.document_id" :to="`/documents/${encodeURIComponent(item.document_id)}/law-info`">{{ tableValue(item.label || item.document_id) }}</RouterLink><RouterLink v-else-if="item.resource === 'master_data'" :to="masterLink(item)">{{ tableValue(item.label || item.resource_id) }}</RouterLink><span v-else>{{ tableValue(item.label || item.resource_id) }}</span></td>
+              <td :class="isEmptyTableValue(item.summary) ? 'text-center' : 'text-start'">{{ tableValue(item.summary) }}</td><td class="text-center">{{ tableValue(resultLabel(item.result)) }}</td>
+              <td class="text-center"><v-btn variant="text" size="small" :aria-expanded="expanded === item.id" @click="expanded = expanded === item.id ? '' : item.id">{{ expanded === item.id ? 'ย่อ' : 'ดู' }}</v-btn></td>
             </tr>
             <tr v-if="expanded === item.id"><td colspan="8" class="pa-4">
-              <div>IP: {{ item.ip || '—' }} <span v-if="item.on_behalf_of">· ทำแทน {{ item.on_behalf_of }}</span></div>
+              <div>IP: {{ tableValue(item.ip) }} <span v-if="item.on_behalf_of">· ทำแทน {{ item.on_behalf_of }}</span></div>
               <div v-for="change in item.changes" :key="change">{{ change }}</div>
-              <v-table density="compact"><thead><tr><th>ข้อมูล</th><th>ก่อนเปลี่ยน</th><th>หลังเปลี่ยน</th></tr></thead><tbody><tr v-for="field in changeFields(item)" :key="field"><td>{{ field }}</td><td class="audit-value">{{ item.before?.[field] ?? '—' }}</td><td class="audit-value">{{ item.after?.[field] ?? '—' }}</td></tr></tbody></v-table>
+              <v-table density="compact"><thead><tr><th>ข้อมูล</th><th>ก่อนเปลี่ยน</th><th>หลังเปลี่ยน</th></tr></thead><tbody><tr v-for="field in changeFields(item)" :key="field"><td :class="isEmptyTableValue(field) ? 'text-center' : 'text-start'">{{ tableValue(field) }}</td><td class="audit-value" :class="changeValueClass(field, item.before?.[field])">{{ tableValue(item.before?.[field] ?? '-') }}</td><td class="audit-value" :class="changeValueClass(field, item.after?.[field])">{{ tableValue(item.after?.[field] ?? '-') }}</td></tr></tbody></v-table>
             </td></tr>
           </template>
         </tbody>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { auditLogQuery, fetchAuditLogs, type AuditLogFilters } from '../../api/client';
@@ -112,6 +113,11 @@ function roleLabel(role: string): string { return ROLE_LABELS[role as AuthRole] 
 function unitName(code: string | null): string { return units.value.find((u) => u.code === code)?.name || code || '—'; }
 function resultLabel(result: string): string { return result === 'denied' ? 'ปฏิเสธ' : result === 'failed' ? 'ไม่สำเร็จ' : 'สำเร็จ'; }
 function changeFields(item: AuditLogItem): string[] { return [...new Set([...Object.keys(item.before || {}), ...Object.keys(item.after || {})])]; }
+function changeValueClass(field: string, value: unknown): string {
+  return isEmptyTableValue(value) || typeof value === 'number' || typeof value === 'boolean'
+    || /(^|_)(code|codes|type|types|status|role|mode|count|order|date|at|on|active|scope)($|_)/.test(field)
+    ? 'text-center' : 'text-start';
+}
 function masterLink(item: AuditLogItem): string { const kind = (item as AuditLogItem & {kind?: string}).kind || ''; const paths: Record<string, string> = { law_type: 'law-types', law_family: 'law-types', law_category: 'categories', legal_structure: 'legal-structures', change_status: 'change-status', enforcement_status: 'enforcement-status' }; return `/admin/master/${paths[kind] || 'law-types'}`; }
 function openExport(): void { exportResources.value = [...(filters.resource ?? [])]; exportFrom.value = filters.from; exportTo.value = filters.to; exportError.value = ''; exportDialog.value = true; }
 async function download(): Promise<void> {

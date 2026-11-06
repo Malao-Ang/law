@@ -82,10 +82,10 @@
               <td colspan="6" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
             </tr>
             <tr v-for="(law, idx) in pagedList" :key="law.id">
-              <td class="text-caption text-medium-emphasis">{{ (listPage - 1) * PAGE_SIZE + idx + 1 }}</td>
-              <td class="py-3" style="max-width: 420px">
-                <div class="d-flex align-center ga-2 flex-wrap mb-1">
-                  <span class="text-body-2 font-weight-bold">{{ law.title }}</span>
+              <td class="text-center text-caption text-medium-emphasis">{{ (listPage - 1) * PAGE_SIZE + idx + 1 }}</td>
+              <td class="py-3" style="max-width: 420px" :class="isEmptyTableValue(law.title) ? 'text-center' : 'text-start'">
+                <div class="d-flex align-center ga-2 flex-wrap mb-1" :class="{ 'justify-center': isEmptyTableValue(law.title) }">
+                  <span class="text-body-2 font-weight-bold">{{ tableValue(law.title) }}</span>
                   <v-chip v-if="law.isParent" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
                     <v-icon start icon="mdi-link-variant" size="11" />
                     กฎหมายที่อ้างถึง
@@ -94,19 +94,19 @@
                 <div v-if="law.childCount" class="mb-1">
                   <v-chip size="x-small" color="teal" variant="tonal" rounded="pill">
                     <v-icon start icon="mdi-sitemap" size="10" />
-                    มีกฎหมายลูก {{ law.childCount }} ฉบับ
+                    มีกฎหมายลูก {{ tableValue(law.childCount) }} ฉบับ
                   </v-chip>
                 </div>
                 <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
-                  <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
-                  <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
+                  <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ tableValue(law.org) }}</span>
+                  <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ tableValue(law.group) }}</span>
                   <span v-if="law.pages > 0 || law.sections != null">
                     <v-icon size="11" icon="mdi-file-multiple" />
-                    {{ law.pages }} หน้า<template v-if="law.sections != null"> / {{ law.sections }} ข้อ</template>
+                    {{ tableValue(law.pages) }} หน้า<template v-if="law.sections != null"> / {{ tableValue(law.sections) }} ข้อ</template>
                   </span>
                 </div>
               </td>
-              <td>
+              <td class="text-center">
                 <v-chip
                   v-if="law.lawType"
                   size="small"
@@ -114,9 +114,10 @@
                   :color="typeColor(law.lawType)"
                   rounded="pill"
                   class="font-weight-bold text-white"
-                >{{ law.typeShort }}</v-chip>
+                >{{ tableValue(law.typeShort) }}</v-chip>
+              <span v-else>-</span>
               </td>
-              <td>
+              <td class="text-center">
                 <v-chip
                   size="x-small"
                   :color="law.metaStatus ? metaStatusColor(law.metaStatus) : workflowStageColor(law.workflowStage)"
@@ -124,11 +125,11 @@
                   rounded="pill"
                 >
                   <v-icon start icon="mdi-circle" size="8" />
-                  {{ law.metaStatus || law.workflowStage }}
+                  {{ tableValue(law.metaStatus || law.workflowStage) }}
                 </v-chip>
               </td>
-              <td class="text-caption">{{ law.editedAt }}</td>
-              <td>
+              <td class="text-center text-caption">{{ tableValue(law.editedAt) }}</td>
+              <td class="text-center">
                 <v-btn
                   variant="text"
                   color="admin-primary"
@@ -357,6 +358,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { useLookups } from '../../composables/useLookups';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

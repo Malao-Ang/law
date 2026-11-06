@@ -965,3 +965,11 @@ textarea {
     padding: 10px;
   }
 }
+
+.v-theme--admin .v-table > .v-table__wrapper > table > thead > tr > th {
+  text-align: center;
+}
+
+.v-theme--admin .v-data-table-header__content {
+  justify-content: center;
+}

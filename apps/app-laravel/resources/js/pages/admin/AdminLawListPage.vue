@@ -138,12 +138,12 @@
             <td colspan="7" class="text-center pa-6 text-medium-emphasis">ไม่พบกฎหมายที่ตรงกับเงื่อนไข</td>
           </tr>
           <tr v-for="(law, idx) in pagedLaws" :key="law.id">
-            <td class="text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
-            <td class="py-3" style="max-width: 400px">
-              <div class="d-flex align-center ga-2 flex-wrap mb-1">
+            <td class="text-center text-caption text-medium-emphasis">{{ (page - 1) * PAGE_SIZE + idx + 1 }}</td>
+            <td class="py-3" style="max-width: 400px" :class="isEmptyTableValue(law.title) ? 'text-center' : 'text-start'">
+              <div class="d-flex align-center ga-2 flex-wrap mb-1" :class="{ 'justify-center': isEmptyTableValue(law.title) }">
                 <v-tooltip :text="law.title" location="top">
                   <template #activator="{ props: tooltipProps }">
-                    <span v-bind="tooltipProps" class="adm-law-title text-body-2 font-weight-bold">{{ law.title }}</span>
+                    <span v-bind="tooltipProps" class="adm-law-title text-body-2 font-weight-bold">{{ tableValue(law.title) }}</span>
                   </template>
                 </v-tooltip>
                 <v-chip v-if="law.isParent" size="x-small" color="deep-purple" variant="tonal" rounded="pill">
@@ -161,23 +161,24 @@
                   @click.stop
                 >
                   <v-icon start icon="mdi-sitemap" size="10" />
-                  มีเอกสารที่อ้างถึง {{ law.childCount }} ฉบับ
+                  มีเอกสารที่อ้างถึง {{ tableValue(law.childCount) }} ฉบับ
                 </v-chip>
               </div>
               <div class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
-                <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" variant="tonal">{{ law.workflowStage }}</v-chip>
-                <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ law.org }}</span>
-                <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ law.group }}</span>
+                <v-chip size="x-small" :color="workflowStageColor(law.workflowStage)" variant="tonal">{{ tableValue(law.workflowStage) }}</v-chip>
+                <span v-if="law.org"><v-icon size="11" icon="mdi-domain" /> {{ tableValue(law.org) }}</span>
+                <span v-if="law.group"><v-icon size="11" icon="mdi-tag" /> {{ tableValue(law.group) }}</span>
                 <span v-if="law.pages > 0 || law.sections != null">
                   <v-icon size="11" icon="mdi-file-multiple" />
-                  {{ law.pages }} หน้า<template v-if="law.sections != null"> / {{ law.sections }} ข้อ</template>
+                  {{ tableValue(law.pages) }} หน้า<template v-if="law.sections != null"> / {{ tableValue(law.sections) }} ข้อ</template>
                 </span>
               </div>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip v-if="law.lawType" size="small" variant="flat" :color="typeColor(law.lawType)" rounded="pill" class="font-weight-bold text-white">{{ lawTypes.typeLabel(law.lawType) }}</v-chip>
+              <span v-else>-</span>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip
                 size="x-small"
                 :color="effectiveStatusColor(law)"
@@ -188,14 +189,14 @@
                 {{ effectiveStatusLabel(law) }}
               </v-chip>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip size="x-small" :color="law.accessScope === 'public' ? 'success' : 'grey'" variant="tonal" rounded="pill">
-                {{ law.accessScope === 'public' ? 'สาธารณะ' : 'ส่วนตัว' }}
+                {{ tableValue(law.accessScope === 'public' ? 'สาธารณะ' : 'ส่วนตัว') }}
               </v-chip>
             </td>
-            <td class="text-caption">{{ law.editedAt }}</td>
-            <td>
-              <div class="d-flex align-center ga-1">
+            <td class="text-center text-caption">{{ tableValue(law.editedAt) }}</td>
+            <td class="text-center">
+              <div class="d-flex justify-center align-center ga-1">
                 <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="admin-primary" :to="`/documents/${law.id}/edit`" />
                 <v-btn icon="mdi-eye-outline" size="x-small" variant="text" color="grey" :to="`/law/${law.id}?from=admin`" />
                 <v-menu>
@@ -253,6 +254,7 @@ let cachedLawSummary: import('../../types/document').ReportSummary | null = null
 </script>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { fetchReportSummary } from '../../api/client';
