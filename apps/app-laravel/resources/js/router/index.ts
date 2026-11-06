@@ -39,7 +39,7 @@ const MinioTestPage = () => import('../pages/dev/MinioTestPage.vue');
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: PublicHomePage, meta: { bareLayout: true } },
-  { path: '/select-unit', name: 'select-unit', component: () => import('../pages/auth/SelectUnitPage.vue'), meta: { bareLayout: true } },
+  { path: '/select-unit', redirect: '/admin' },
   { path: '/login', name: 'login', component: LoginPage, meta: { bareLayout: true } },
   { path: '/database', name: 'law-database', component: LawDatabasePage, meta: { bareLayout: true } },
   { path: '/admin/units/:code', name: 'admin-unit-members', component: () => import('../pages/admin/UnitMembersPage.vue'), meta: { bareLayout: true } },
@@ -95,12 +95,6 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore();
   await auth.fetchMe(auth.isAuthenticated);
 
-  if (auth.isAuthenticated && auth.needs_unit_selection && to.path !== '/select-unit') {
-    return { path: '/select-unit' };
-  }
-  if (to.path === '/select-unit' && !auth.isAuthenticated) {
-    return { path: '/' };
-  }
 
   if ((to.path === '/admin/units' || to.path.startsWith('/admin/units/')) && !auth.canManageUnits) {
     return auth.authEnforced && !auth.isAuthenticated
