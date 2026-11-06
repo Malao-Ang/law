@@ -244,6 +244,31 @@
               {{ documentStore.saveError }}
             </v-alert>
 
+            <v-alert
+              v-if="showAmendedChildrenWarning"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนถ้ากฎหมายฉบับนี้ถูกแก้ไข ถ้ากฎหมายลูกที่บังคับใช้
+              <ul class="mt-1">
+                <li v-for="child in activeChildren" :key="child.document_id">{{ child.title }}</li>
+              </ul>
+            </v-alert>
+            <v-alert
+              v-if="repealedParentTitles.length"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4"
+            >
+              แจ้งเตือนให้ตรวจสอบกฎหมายลูก เมื่อกฎหมายแม่ถูกยกเลิก
+              <ul class="mt-1">
+                <li v-for="title in repealedParentTitles" :key="title">{{ title }}</li>
+              </ul>
+            </v-alert>
+
             <!-- Document-level relations -->
             <div class="rh-section-title mb-3">
               <v-icon icon="mdi-link-variant" color="admin-primary" size="16" />
@@ -414,11 +439,23 @@ import { isSectionEditionChange } from '../../composables/useShowRelations';
 import { useLawStatus } from '../../composables/useLawStatus';
 import { createLawTypeCatalog, useLawType } from '../../composables/useLawType';
 import { useChangeStatus } from '../../composables/useChangeStatus';
+import { useRelationWarnings } from '../../composables/useRelationWarnings';
 import AppShell from '../../components/shared/AppShell.vue';
 import AddRelationDialog from '../../components/shared/AddRelationDialog.vue';
 
 const { typeLabel, typeSource } = useLawType();
 const changeStatusCS = useChangeStatus();
+const relationWarnings = useRelationWarnings();
+const activeChildren = relationWarnings.activeChildren;
+const showAmendedChildrenWarning = computed(() =>
+  relationWarnings.showAmendedChildrenWarning(documentStore.review?.law_meta?.change_status),
+);
+const repealedParentTitles = computed(() => relationWarnings.repealedParentTitles(
+  quickEditParentIds.value.map((id) => {
+    const doc = summary.value.documents.find((item) => item.id === id);
+    return { title: doc?.title ?? id, status: doc?.meta_status };
+  }),
+));
 const detailSource = computed<'internal' | 'external'>(() =>
   typeSource(documentStore.review?.law_meta?.law_type) === 'external' ? 'external' : 'internal',
 );
@@ -655,6 +692,7 @@ async function openQuickEdit(doc: DocRow): Promise<void> {
   quickEditOpen.value = true;
   documentStore.reset();
   await documentStore.fetch(doc.id);
+  void relationWarnings.load(doc.id);
   // Seed pending relations from the loaded document
   pendingRelations.value = [...(documentStore.review?.relations ?? [])];
 }
