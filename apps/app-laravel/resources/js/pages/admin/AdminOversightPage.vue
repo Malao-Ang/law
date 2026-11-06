@@ -23,7 +23,7 @@
     <v-card border rounded="lg">
       <div class="pa-4 d-flex align-center flex-wrap ga-3">
         <span class="text-subtitle-1 font-weight-bold flex-grow-1">กฎหมายทั้งหมด</span>
-        <v-btn-toggle v-model="listFilter" mandatory density="compact" divided>
+        <v-btn-toggle v-model="listFilter" mandatory density="comfortable" divided variant="outlined" color="admin-primary" class="oversight-filter">
           <v-btn value="all" class="text-none">ทั้งหมด</v-btn>
           <v-btn value="overdue" class="text-none">เกินกำหนด</v-btn>
           <v-btn value="next" class="text-none">เดือนถัดไป</v-btn>
@@ -31,7 +31,7 @@
       </div>
       <v-divider />
       <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
-      <v-table density="comfortable">
+      <v-table density="comfortable" class="oversight-table">
         <thead>
           <tr>
             <th>ชื่อกฎหมาย</th>
@@ -270,3 +270,10 @@ function statusColor(status: string | null): string {
   return 'grey';
 }
 </script>
+
+<style scoped>
+.oversight-filter { height: 40px; border-radius: 8px; }
+.oversight-filter :deep(.v-btn) { min-width: 104px; font-weight: 500; }
+.oversight-table :deep(tbody td) { padding-block: 12px; }
+.oversight-table :deep(tbody tr) { height: 68px; }
+</style>

@@ -9,7 +9,6 @@
       </v-btn-toggle>
     </div>
 
-    <v-select v-if="auth.is_super_admin" v-model="ownerUnitCode" :items="units" item-title="name" item-value="code" label="หน่วยงานเจ้าของเอกสาร" variant="outlined" />
     <!-- Step 1: pick file -->
     <v-file-input
       v-if="!pendingFile"

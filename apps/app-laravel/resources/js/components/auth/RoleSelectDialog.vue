@@ -78,8 +78,10 @@ watch(open, async (value) => {
 }, { immediate: true });
 function targetPath(): string {
   const value = route.query.redirect;
-  if (route.path === '/login' && typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')) return value;
-  return '/admin';
+  if (route.path === '/login') {
+    return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/admin';
+  }
+  return route.fullPath;
 }
 async function logout(): Promise<void> {
   await auth.logout('/');

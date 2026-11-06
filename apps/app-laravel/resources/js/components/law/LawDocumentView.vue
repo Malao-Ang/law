@@ -24,7 +24,7 @@
       </v-container>
     </div>
 
-    <v-main class="lawx-main pt-8">
+    <v-main class="lawx-main pt-2">
       <div class="lawx-subbar">
         <v-btn variant="outlined" size="small" prepend-icon="mdi-arrow-left"
           @click="router.push('/database')">ย้อนกลับฐานข้อมูล</v-btn>
@@ -644,14 +644,14 @@ onBeforeUnmount(() => observer?.disconnect());
   margin: 0 auto;
   padding: 18px 24px 72px;
   display: grid;
-  grid-template-columns: 250px minmax(0, 820px) 280px;
+  grid-template-columns: 250px minmax(0, 1fr) 340px;
   justify-content: center;
   gap: 22px;
   align-items: start;
 }
 
 .lawx-grid.is-toc-hidden {
-  grid-template-columns: minmax(0, 880px) 280px;
+  grid-template-columns: minmax(0, 1fr) 340px;
 }
 
 .lawx-grid.is-info-hidden {
@@ -664,7 +664,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-grid.is-original-pdf,
 .lawx-grid.is-original-pdf.is-toc-hidden {
-  grid-template-columns: minmax(0, 960px) 280px;
+  grid-template-columns: minmax(0, 1fr) 340px;
 }
 
 .lawx-grid.is-original-pdf.is-info-hidden,

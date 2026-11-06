@@ -161,7 +161,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
-const isAdmin = computed(() => route.path.startsWith('/admin'));
+const isAdmin = computed(() => /^\/(admin|documents)(\/|$)/.test(route.path));
 const isWorkflowForm = computed(() => /^\/documents\/[^/]+\/(law-info|permissions|relations|esign)(\/|$)/.test(route.path));
 const adminDefaults = {
   VBtn: { rounded: 'lg', height: 40, class: 'text-none' },

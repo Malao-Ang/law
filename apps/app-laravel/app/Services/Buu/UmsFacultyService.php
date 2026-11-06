@@ -6,12 +6,13 @@ use App\Services\MasterData\UnitStore;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 
 class UmsFacultyService
 {
     public function __construct(private readonly HttpFactory $http) {}
 
-    public function sync(UnitStore $units): array
+    public function preview(UnitStore $units): array
     {
         $fallback = false;
         try {
@@ -20,11 +21,23 @@ class UmsFacultyService
             $rows = UnitStore::fallbackFaculties();
             $fallback = true;
         }
-        $units->syncFaculties($rows, $fallback);
+        $token = bin2hex(random_bytes(16));
+        Cache::put('units.sync.'.$token, ['rows' => $rows, 'fallback' => $fallback], 600);
 
-        return ['fallback' => $fallback, 'count' => count($rows), 'message' => $fallback
-            ? 'ไม่สามารถดึงข้อมูลจาก UMS ได้ ใช้ข้อมูลคณะสำรองจาก faculty.json แล้ว'
+        return ['token' => $token, 'fallback' => $fallback, 'count' => count($rows), 'changes' => $units->previewFaculties($rows, $fallback), 'message' => $fallback
+            ? 'ไม่สามารถดึงข้อมูลจาก UMS ได้ แสดงการเปรียบเทียบกับข้อมูลคณะสำรองจาก faculty.json'
             : 'ดึงข้อมูลคณะจาก UMS เรียบร้อยแล้ว'];
+    }
+
+    public function apply(UnitStore $units, string $token, array $selected): array
+    {
+        $cached = Cache::get('units.sync.'.$token);
+        if (! is_array($cached)) {
+            throw ValidationException::withMessages(['token' => ['ข้อมูลที่ดึงมาหมดอายุ กรุณากดดึงรายการคณะใหม่อีกครั้ง']]);
+        }
+        Cache::forget('units.sync.'.$token);
+
+        return $units->applyFaculties($cached['rows'], $selected, (bool) $cached['fallback']);
     }
 
     private function faculties(): array

@@ -17,6 +17,7 @@
 .v-theme--admin .v-field-label { color: #64748b; }
 .v-theme--admin .v-field--focused:not(.v-field--error):not(.v-field--disabled) .v-field__outline { color: #1e3a8a; }
 .v-theme--admin .v-field__input::placeholder { color: #94a3b8; opacity: 1; }
+.v-theme--admin .v-field:not(.v-field--active) .v-field__input::placeholder { opacity: 0; }
 .v-theme--admin .v-btn--variant-outlined { border-color: #e2e8f0; }
 /* Master status pills and switches, including teleported admin dialogs. */
 .v-theme--admin .master-status--active,
@@ -91,6 +92,6 @@
   .v-theme--admin :is(.unit-dialog, .user-detail) { border-radius: 16px; }
   .v-theme--admin :is(.unit-dialog, .user-detail) .v-card-title { color: #1e3a8a; font-weight: 700; white-space: normal; overflow-wrap: anywhere; }
   .v-theme--admin :is(.unit-dialog, .user-detail) .v-card-actions { background: #f8fafc; border-top: 1px solid #e2e8f0; }
-  .v-theme--admin .unit-dialog__actions { background: #f8fafc; box-shadow: 0 -1px #e2e8f0; }
+  .v-theme--admin .unit-dialog__actions { background: transparent; box-shadow: none; }
   .v-theme--admin .law-source-option:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 }

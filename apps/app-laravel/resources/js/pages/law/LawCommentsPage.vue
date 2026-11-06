@@ -235,7 +235,6 @@ onMounted(() => { void load(); });
 <style scoped>
 .comments-page {
   min-height: 100vh;
-  padding-top: 96px;
   background: #f6f4ef;
   color: #1e293b;
 }
