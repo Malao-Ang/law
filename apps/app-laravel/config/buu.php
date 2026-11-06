@@ -75,6 +75,14 @@ return [
             'provision_key' => env('BUU_PROVISION_UMS_PERSON', ''),
         ],
 
+        /** Same SPerson API for the admin people search; short timeout so the user can simply search again. */
+        'ums.person.search' => [
+            'path' => 'service-api/ums.SPerson',
+            'scope' => 'read',
+            'provision_key' => env('BUU_PROVISION_UMS_PERSON', ''),
+            'timeout' => (int) env('BUU_UMS_SEARCH_TIMEOUT', 10),
+        ],
+
         'minio.list' => [
             'path' => 'service-api/minio.GetFilesList',
             'scope' => 'read',

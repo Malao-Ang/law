@@ -154,14 +154,14 @@
       </div>
       <v-divider />
       <v-progress-linear v-if="loading" indeterminate color="admin-primary" />
-      <v-table density="comfortable">
+      <v-table density="comfortable" class="admin-table">
         <thead>
           <tr>
-            <th>กฎหมาย</th>
-            <th>ผู้รับ</th>
-            <th>กำหนดที่จะแจ้ง</th>
-            <th>สถานะ</th>
-            <th />
+            <th class="text-center">กฎหมาย</th>
+            <th class="text-center">ผู้รับ</th>
+            <th class="text-center">กำหนดที่จะแจ้ง</th>
+            <th class="text-center">สถานะ</th>
+            <th class="text-center" />
           </tr>
         </thead>
         <tbody>
@@ -177,17 +177,17 @@
             :class="{ 'bg-grey-lighten-4': previewItem?.document_id === item.document_id }"
             @click="selectedId = item.document_id"
           >
-            <td class="font-weight-medium">{{ item.title }}</td>
-            <td>{{ item.emails.join(', ') }}</td>
-            <td>
+            <td class="font-weight-medium" :class="isEmptyTableValue(item.title) ? 'text-center' : 'text-start'">{{ tableValue(item.title) }}</td>
+            <td :class="isEmptyTableValue(item.emails.join(', ')) ? 'text-center' : 'text-start'">{{ tableValue(item.emails.join(', ')) }}</td>
+            <td class="text-center">
               <div v-for="hit in item.hits" :key="`${hit.date}-${hit.label}`">
                 {{ hit.label }} {{ hit.display_date }} ({{ daysPhrase(hit.days_left) }})
               </div>
             </td>
-            <td>
+            <td class="text-center">
               <v-chip size="small" variant="tonal" :color="statusColor(item)">{{ statusLabel(item) }}</v-chip>
             </td>
-            <td class="text-right">
+            <td class="text-center">
               <v-btn
                 size="small"
                 variant="tonal"
@@ -221,6 +221,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { fetchOversightMail, saveOversightMail, sendOversightMail } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';

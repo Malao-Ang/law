@@ -1,3 +1,4 @@
+import { useAuthStore } from './authStore';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { searchLaws, suggestLaws } from '../api/client';
@@ -45,7 +46,7 @@ export const useLawSearchStore = defineStore('lawSearch', () => {
 
   async function search(q: string, filters: LawSearchFilters, page = 1, perPage = 20): Promise<void> {
     const query = q.trim();
-    const cacheKey = searchCacheKey(query, filters, page, perPage);
+    const cacheKey = `${useAuthStore().scopeRevision}:${searchCacheKey(query, filters, page, perPage)}`;
     const cached = cachedSearch(cacheKey);
     if (cached) {
       searchController?.abort();

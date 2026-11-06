@@ -144,7 +144,6 @@ class LawIndexer
             'permission_group_ids' => $permissionGroupIds,
             'owner_unit_code' => $meta['owner_unit_code'] ?? null,
             'responsible_username' => $meta['responsible']['username'] ?? null,
-            'co_editor_usernames' => array_column($meta['co_editors'] ?? [], 'username'),
             'allowed_unit_codes' => array_values(array_unique($allowedUnits)),
             'allowed_usernames' => array_values(array_unique($allowedUsers)),
             'is_published' => (bool) ($meta['is_published'] ?? false),

@@ -21,7 +21,8 @@ class OversightMailController extends Controller
 
     public function show(): JsonResponse
     {
-        $items = $this->oversight->reminderCatalog();
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        $items = $this->oversight->reminderCatalog(request());
 
         return response()->json([
             'template' => $this->oversight->mailTemplate(),
@@ -35,6 +36,8 @@ class OversightMailController extends Controller
 
     public function update(UpdateOversightMailRequest $request): JsonResponse
     {
+        $current = app(\App\Services\Auth\CurrentUser::class);
+        abort_unless($current->user($request)['is_super_admin'] ?? false, 403);
         $template = $this->oversight->saveMailTemplate($request->validated());
         $this->audit->record(
             'update',
@@ -53,11 +56,16 @@ class OversightMailController extends Controller
 
     public function send(SendOversightMailRequest $request): JsonResponse
     {
+        abort_if(app(\App\Services\Auth\CurrentUser::class)->user($request) === null, 401, 'กรุณาเข้าสู่ระบบ');
         $documentId = $request->validated('document_id');
         $documentId = is_string($documentId) ? $documentId : '';
 
         try {
             if ($documentId !== '') {
+                $access = app(\App\Services\Auth\DocumentAccess::class);
+                $document = $access->readDocument($documentId);
+                abort_if($document === null, 404);
+                $access->authorize($request, 'edit', $document);
                 $result = $this->mailer->sendDocument($documentId);
                 $this->audit->record(
                     'update',
@@ -72,7 +80,7 @@ class OversightMailController extends Controller
                 return response()->json($result);
             }
 
-            $result = $this->mailer->sendPending();
+            $result = $this->mailer->sendPending($request);
             $this->audit->record(
                 'update',
                 'oversight',

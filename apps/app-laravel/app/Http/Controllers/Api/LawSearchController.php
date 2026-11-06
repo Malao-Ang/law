@@ -54,18 +54,7 @@ class LawSearchController extends Controller
         // drops unpublished, draft, or stale-filter docs the ES index may still contain.
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
-            if (config('auth_ldap.enforced')) {
-                if ($this->rowSearchVisible($metaRow) && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])) {
-                    $publishedIds[(string) $metaRow['document_id']] = true;
-                }
-                continue;
-            }
-            if (
-                ($metaRow['status'] ?? '') === 'ingested'
-                && ($metaRow['published_date'] ?? '') !== ''
-                && ! $this->enforcementStatuses->isDraft($metaRow['meta_status'] ?? '')
-                && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])
-            ) {
+            if ($this->rowSearchVisible($metaRow) && $this->rowMatchesFilters($metaRow, is_array($params['filters'] ?? null) ? $params['filters'] : [])) {
                 $publishedIds[(string) $metaRow['document_id']] = true;
             }
         }
@@ -101,7 +90,7 @@ class LawSearchController extends Controller
                         'engine' => $supplement === [] ? 'elastic' : 'mixed',
                         'mode' => (string) ($esResult['meta']['mode'] ?? 'exact'),
                         'confidence' => $this->aggregateConfidence($results),
-                        'suggestions' => $esResult['meta']['suggestions'] ?? [],
+                        'suggestions' => [],
                     ],
                 ], $params, $suggestService));
             }
@@ -139,7 +128,7 @@ class LawSearchController extends Controller
      */
     private function overlayCurrentAccessState(array $row, ?array $fileRow): array
     {
-        if (config('auth_ldap.enforced') && $fileRow === null) {
+        if ($fileRow === null) {
             $access = app(\App\Services\Auth\DocumentAccess::class);
             $document = $access->readDocument((string) ($row['law_id'] ?? ''));
             $row['restricted'] = $document === null || ! $access->canRead(request(), $document);
@@ -180,7 +169,7 @@ class LawSearchController extends Controller
         $metaById = array_column($allMeta, null, 'document_id');
         $childTypeIndex = [];
         foreach ($allMeta as $meta) {
-            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($meta)) continue;
+            if (! $this->rowSearchVisible($meta)) continue;
             $type = $this->canonicalType((string) ($meta['law_type'] ?? ''));
             foreach (LawMetaNormalizer::parentDocumentIds($meta) as $parentId) {
                 $childTypeIndex[$parentId][$type] = ($childTypeIndex[$parentId][$type] ?? 0) + 1;
@@ -191,14 +180,14 @@ class LawSearchController extends Controller
         $deferredContentRows = [];
         $deferContentSearch = ! $query->isEmpty() && ! $query->isBoolean();
         foreach ($allMeta as $row) {
-            if (config('auth_ldap.enforced') && ! $this->rowSearchVisible($row)) continue;
-            if (! config('auth_ldap.enforced') && ($row['status'] ?? '') !== 'ingested') {
+            if (! $this->rowSearchVisible($row)) continue;
+            if (($row['status'] ?? '') !== 'ingested') {
                 continue;
             }
-            if (! config('auth_ldap.enforced') && ($row['published_date'] ?? '') === '') {
+            if (($row['published_date'] ?? '') === '') {
                 continue;
             }
-            if (! config('auth_ldap.enforced') && $this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
+            if ($this->enforcementStatuses->isDraft($row['meta_status'] ?? '')) {
                 continue; // Hide draft documents from public search
             }
 
@@ -310,7 +299,6 @@ class LawSearchController extends Controller
 
     private function rowRestricted(array $row): bool
     {
-        if (! config('auth_ldap.enforced')) return LawMetaNormalizer::effectiveVisibility($row) === 'restricted';
         $access = app(\App\Services\Auth\DocumentAccess::class);
         $document = $access->readDocument((string) ($row['document_id'] ?? ''));
         return $document === null || ! $access->canRead(request(), $document);
@@ -320,7 +308,9 @@ class LawSearchController extends Controller
     {
         $access = app(\App\Services\Auth\DocumentAccess::class);
         $document = $access->readDocument((string) ($row['document_id'] ?? ''));
-        return $document !== null && (\App\Services\Auth\DocumentAccess::isPublished($document) || $access->canRead(request(), $document));
+        return ($row['status'] ?? '') === 'ingested' && ! empty($row['published_date'])
+            && ! $this->enforcementStatuses->isDraft($row['meta_status'] ?? '')
+            && $document !== null && $access->publicScope(request(), $document);
     }
 
 
@@ -584,7 +574,10 @@ class LawSearchController extends Controller
 
         $terms = [];
         foreach ($suggestions as $suggestion) {
-            $title = trim((string) ($suggestion['title'] ?? ''));
+            $access = app(\App\Services\Auth\DocumentAccess::class);
+            $document = $access->readDocument((string) ($suggestion['law_id'] ?? ''));
+            if ($document === null || ! $access->publicScope(request(), $document)) continue;
+            $title = trim((string) ($document['title'] ?? ''));
             if ($title !== '') {
                 $terms[] = $title;
             }
@@ -863,7 +856,10 @@ class LawSearchController extends Controller
             }
 
             $targetId = trim((string) ($rel['target_document_id'] ?? ''));
-            if (config('auth_ldap.enforced') && ($targetId === '' || ! isset($metaById[$targetId]) || ! $this->rowSearchVisible($metaById[$targetId]))) continue;
+            if ($targetId !== '' && (! isset($metaById[$targetId]) || ! $this->rowSearchVisible($metaById[$targetId]))) {
+                $items[$targetId] = ['document_id' => '', 'title' => 'เอกสารจำกัดสิทธิ์', 'type' => (string) ($rel['type'] ?? 'related')];
+                continue;
+            }
             $title = trim((string) ($rel['target_title'] ?? ''));
             if ($title === '' && $targetId !== '' && isset($metaById[$targetId])) {
                 $title = trim((string) ($metaById[$targetId]['title'] ?? ''));
@@ -899,6 +895,13 @@ class LawSearchController extends Controller
         foreach ($relations as $rel) {
             if (! is_array($rel) || (($rel['scope'] ?? 'document') !== 'section')) {
                 continue;
+            }
+
+            $target = (string) ($rel['target_document_id'] ?? '');
+            if ($target !== '') {
+                $access = app(\App\Services\Auth\DocumentAccess::class);
+                $document = $access->readDocument($target);
+                if ($document === null || ! $access->publicScope(request(), $document)) continue;
             }
 
             $label = trim((string) ($rel['target_section'] ?? ''));
@@ -1046,9 +1049,7 @@ class LawSearchController extends Controller
         $changeCounts = ['new' => 0, 'amended' => 0, 'repealed' => 0];
 
         foreach ($store->listLawMeta() as $row) {
-            if (LawMetaNormalizer::effectiveVisibility($row) === 'restricted') {
-                continue;
-            }
+            if (! $this->rowSearchVisible($row)) continue;
             if (($row['published_date'] ?? '') === '') {
                 continue;
             }
@@ -1061,7 +1062,8 @@ class LawSearchController extends Controller
             if ($parentIdsList !== []) {
                 $childCount++;
                 foreach ($parentIdsList as $parentId) {
-                    $parentIds[$parentId] = true;
+                    $parent = app(\App\Services\Auth\DocumentAccess::class)->readDocument($parentId);
+                    if ($parent !== null && app(\App\Services\Auth\DocumentAccess::class)->publicScope(request(), $parent)) $parentIds[$parentId] = true;
                 }
             }
             $changeRole = $this->changeStatuses->role($row['change_status'] ?? '');

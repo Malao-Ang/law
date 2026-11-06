@@ -68,6 +68,10 @@ class PermissionGroupController extends Controller
 
     public function destroy(string $groupId): JsonResponse
     {
+        $current = app(\App\Services\Auth\CurrentUser::class);
+        $actor = $current->user(request());
+        abort_if($actor === null, 401, 'กรุณาเข้าสู่ระบบ');
+        abort_unless(($actor['is_super_admin'] ?? false) || $current->role($actor, request()) === 'inner_admin', 403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');
         $existing = $this->permissionStore->findGroup($groupId);
         if (! $this->permissionStore->deleteGroup($groupId)) {
             return response()->json(['message' => 'Permission group not found.'], 404);

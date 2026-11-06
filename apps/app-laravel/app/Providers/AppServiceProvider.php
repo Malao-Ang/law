@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use App\Services\Audit\AuditLogStore;
-use App\Services\Auth\MembershipAuditLog;
 use App\Services\Auth\MongoUserStore;
+use App\Services\Auth\MembershipAuditLog;
+use App\Services\Audit\AuditLogStore;
 use App\Services\DocumentExportService;
 use App\Services\DocumentHtmlService;
 use App\Services\Fast\LibreOfficeConverter;

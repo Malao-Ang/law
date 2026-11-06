@@ -61,7 +61,18 @@ function isActive(item: NavItem): boolean {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+@media (min-width: 769px) and (max-width: 1400px) {
+  .main-nav { gap: 0; }
+  .main-nav__item { padding-inline: 10px; }
+  .main-nav__item--active::after { left: 10px; right: 10px; }
+}
+
+@media (max-width: 768px) {
+  .main-nav { flex-wrap: wrap; }
 }
 
 .main-nav__item {

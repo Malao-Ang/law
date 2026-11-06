@@ -17,8 +17,7 @@ class UserSearchController extends Controller
     {
         $actor = $currentUser->user($request);
         abort_if($actor === null, 401, 'กรุณาเข้าสู่ระบบ');
-        $adminMemberships = array_filter((array) ($actor['memberships'] ?? []), fn (array $member): bool => in_array($member['role'], ['inner_admin', 'outer_admin'], true));
-        abort_unless(($actor['is_super_admin'] ?? false) || $adminMemberships !== [], 403, 'ไม่มีสิทธิ์ค้นหาผู้ใช้');
+        abort_unless(($actor['is_super_admin'] ?? false) || in_array($currentUser->role($actor, $request), ['inner_admin', 'outer_admin'], true), 403, 'ไม่มีสิทธิ์ค้นหาผู้ใช้');
         $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']], [
             'q.required' => 'กรุณาระบุชื่อหรือชื่อผู้ใช้ที่ต้องการค้นหา', 'q.string' => 'คำค้นหาไม่ถูกต้อง',
             'q.min' => 'กรุณาระบุคำค้นหาอย่างน้อย 2 ตัวอักษร', 'q.max' => 'คำค้นหายาวเกินกำหนด',
@@ -26,6 +25,8 @@ class UserSearchController extends Controller
         $query = mb_strtolower(trim($data['q']));
         $people = [];
         foreach ($users->all() as $user) {
+            if (! ($actor['is_super_admin'] ?? false)
+                && MongoUserStore::unitRole($user, (string) $request->session()->get(CurrentUser::ACTIVE_UNIT_KEY)) === null) continue;
             if (! empty($user['last_login_at']) && str_contains(mb_strtolower(($user['username'] ?? '').' '.($user['name'] ?? '')), $query)) {
                 $people[$user['username']] = $this->summary($user);
                 if (count($people) >= 50) {
@@ -35,7 +36,7 @@ class UserSearchController extends Controller
         }
         $unavailable = false;
         try {
-            foreach ($ums->searchPeople($data['q']) as $person) {
+            foreach (($actor['is_super_admin'] ?? false) ? $ums->searchPeople($data['q']) : [] as $person) {
                 $people[$person['username']] ??= $this->summary($person);
             }
         } catch (BuuApiException|ConnectionException) {
@@ -43,7 +44,7 @@ class UserSearchController extends Controller
         }
 
         return response()->json(['items' => array_slice(array_values($people), 0, 50), 'ums_unavailable' => $unavailable,
-            'message' => $unavailable ? 'ไม่สามารถค้นหาจาก UMS ได้ แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ' : null]);
+            'message' => $unavailable ? 'ระบบ UMS ไม่ตอบสนอง กรุณากดค้นหาอีกครั้ง (ตอนนี้แสดงเฉพาะผู้ใช้ที่เคยเข้าสู่ระบบ)' : null]);
     }
 
     private function summary(array $person): array

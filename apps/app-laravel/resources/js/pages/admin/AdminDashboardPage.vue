@@ -114,10 +114,10 @@
         <tbody>
           <template v-if="loading">
             <tr v-for="n in 3" :key="n">
-              <td><v-skeleton-loader type="text" width="260" /></td>
-              <td><v-skeleton-loader type="chip" width="80" /></td>
-              <td><v-skeleton-loader type="text" width="90" /></td>
-              <td><v-skeleton-loader type="text" width="60" /></td>
+              <td class="text-center"><v-skeleton-loader type="text" width="260" /></td>
+              <td class="text-center"><v-skeleton-loader type="chip" width="80" /></td>
+              <td class="text-center"><v-skeleton-loader type="text" width="90" /></td>
+              <td class="text-center"><v-skeleton-loader type="text" width="60" /></td>
             </tr>
           </template>
           <template v-else-if="recentDocs.length === 0">
@@ -132,16 +132,16 @@
               class="recent-row"
               @click="router.push(`/documents/${doc.id}/review`)"
             >
-              <td class="py-4 text-body-2 font-weight-medium recent-row__cell">
-                <span class="recent-row__title">{{ doc.title }}</span>
+              <td class="py-4 text-body-2 font-weight-medium recent-row__cell" :class="isEmptyTableValue(doc.title) ? 'text-center' : 'text-start'">
+                <span class="recent-row__title">{{ tableValue(doc.title) }}</span>
               </td>
-              <td>
+              <td class="text-center">
                 <v-chip size="small" :color="statusChipColor(doc.status)" rounded="pill" variant="tonal">
-                  {{ doc.meta_status ? statusLabel(doc.meta_status) : doc.status }}
+                  {{ tableValue(doc.meta_status ? statusLabel(doc.meta_status) : doc.status) }}
                 </v-chip>
               </td>
-              <td class="text-body-2">{{ complexityLabel(doc.section_count) }}</td>
-              <td>
+              <td class="text-center text-body-2">{{ complexityLabel(doc.section_count) }}</td>
+              <td class="text-center">
                 <v-btn
                   variant="text"
                   size="small"
@@ -162,6 +162,7 @@
 </template>
 
 <script setup lang="ts">
+import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchReportSummary } from '../../api/client';

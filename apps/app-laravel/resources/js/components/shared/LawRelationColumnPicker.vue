@@ -136,7 +136,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { fetchReview, listDocuments } from '../../api/client';
+import { fetchReview, jsonRequest } from '../../api/client';
 import { buildSections } from '../../composables/useLawSections';
 import {
   documentsByIds,
@@ -145,7 +145,7 @@ import {
   filterByQuery,
   pickableDocuments,
 } from '../../composables/useLawCatalog';
-import type { DocumentListItem, LawCatalogSection, LawRelationTarget } from '../../types/document';
+import type { ReviewDocument, DocumentListItem, LawCatalogSection, LawRelationTarget } from '../../types/document';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -284,7 +284,7 @@ async function loadDocuments(): Promise<void> {
 
   loading.value = true;
   try {
-    const res = await listDocuments();
+    const res = await jsonRequest<{ documents: DocumentListItem[] }>('/api/relation-candidates');
     documents.value = res.documents;
     documentsLoaded.value = true;
   } catch {
@@ -323,7 +323,7 @@ async function loadSections(documentId: string): Promise<void> {
 
   sectionsLoading.value = true;
   try {
-    const review = await fetchReview(documentId);
+    const review = await jsonRequest<ReviewDocument>(`/api/relation-candidates/${encodeURIComponent(documentId)}/review`);
     const built = buildSections(review).map((section) => ({
       block_id: section.id,
       badge: section.badge,

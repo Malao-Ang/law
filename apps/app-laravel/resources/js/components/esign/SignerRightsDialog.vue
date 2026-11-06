@@ -1,6 +1,6 @@
 <template>
   <v-dialog :model-value="modelValue" max-width="560" persistent @update:model-value="emitClose">
-    <v-card rounded="xl" class="signer-dialog">
+    <v-card rounded="xl" class="signer-dialog lawspace-workflow-form">
       <div class="signer-dialog__header">
         <div class="text-subtitle-1 font-weight-bold">กำหนดสิทธิ์ผู้ลงนามเอกสาร</div>
         <v-btn icon="mdi-close" variant="text" size="small" @click="emitClose(false)" />

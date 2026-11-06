@@ -120,7 +120,7 @@ class UpdateDocumentReviewRequest extends FormRequest
             'law_meta.parent_document_ids' => ['nullable', 'array'],
             'law_meta.parent_document_ids.*' => ['nullable', 'string', 'max:128'],
             'law_meta.access_scope' => ['nullable', 'string', 'in:public,private'],
-            'law_meta.permission_group_ids' => ['nullable', 'required_if:law_meta.access_scope,private', 'array', 'min:1'],
+            'law_meta.permission_group_ids' => ['nullable', 'array'],
             'law_meta.permission_group_ids.*' => ['nullable', 'string', 'max:128'],
             'relations' => ['nullable', 'array'],
             'relations.*.id' => ['nullable', 'string', 'max:64'],
@@ -146,6 +146,9 @@ class UpdateDocumentReviewRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
             $lawMeta = $this->input('law_meta');
             if (! is_array($lawMeta)) {
                 return;
@@ -154,6 +157,21 @@ class UpdateDocumentReviewRequest extends FormRequest
             $store = app(MasterDataStore::class);
             $document = app(ReviewStore::class)->getReviewDocument((string) $this->route('documentId'));
             $current = $document['law_meta'] ?? [];
+            $scope = $lawMeta['access_scope'] ?? $current['access_scope'] ?? 'public';
+            if ($scope === 'private') {
+                $groupIds = array_key_exists('permission_group_ids', $lawMeta)
+                    ? $lawMeta['permission_group_ids'] : ($current['permission_group_ids'] ?? []);
+                $groups = array_values(array_filter((array) $groupIds, fn ($id) => is_string($id) && trim($id) !== ''));
+                if ($groups === [] || count($groups) !== count((array) $groupIds)) {
+                    $validator->errors()->add('law_meta.permission_group_ids', 'กรุณาเลือกกลุ่มสิทธิ์อย่างน้อยหนึ่งกลุ่มสำหรับเอกสารจำกัดสิทธิ์');
+                } else {
+                    try {
+                        app(\App\Services\Permissions\PermissionStore::class)->validateGroupIds($groups);
+                    } catch (ValidationException $exception) {
+                        $validator->errors()->add('law_meta.permission_group_ids', 'พบกลุ่มสิทธิ์ที่ไม่อยู่ในระบบ');
+                    }
+                }
+            }
             foreach ([
                 'status' => MasterDataKind::EnforcementStatus,
                 'law_type' => MasterDataKind::LawType,
@@ -185,17 +203,44 @@ class UpdateDocumentReviewRequest extends FormRequest
             $lawTypes = app(LawTypes::class);
             $lawType = $lawTypes->resolve($lawTypeValue);
             if ($lawType === null) {
-                $validator->errors()->add('law_meta.law_type', 'Invalid law type.');
+                $validator->errors()->add('law_meta.law_type', 'ไม่พบประเภทเอกสารที่เลือก');
 
                 return;
             }
 
             $source = $lawMeta['source'] ?? null;
             if ($source !== null && $source !== '' && $lawTypes->sourceOf($lawTypeValue) !== $source) {
-                $validator->errors()->add('law_meta.source', 'Law type source does not match.');
+                $validator->errors()->add('law_meta.source', 'ประเภทเอกสารไม่ตรงกับแหล่งที่มา');
             }
 
         });
+    }
+
+    public function messages(): array
+    {
+        return [
+            'string' => 'กรุณาระบุข้อมูลเป็นข้อความ',
+            'array' => 'รูปแบบรายการข้อมูลไม่ถูกต้อง',
+            'integer' => 'กรุณาระบุข้อมูลเป็นจำนวนเต็ม',
+            'boolean' => 'ค่าสถานะไม่ถูกต้อง',
+            'in' => 'ค่าที่เลือกไม่ถูกต้อง',
+            'min' => 'ข้อมูลต้องมีค่าไม่น้อยกว่า :min',
+            'max' => 'ข้อมูลเกินขนาดที่กำหนด (:max)',
+            'prohibited' => 'ไม่อนุญาตให้แก้ไขข้อมูลผู้รับผิดชอบหรือหน่วยงานผ่านรายการนี้',
+            'url' => 'รูปแบบลิงก์ไม่ถูกต้อง',
+            'date_format' => 'รูปแบบวันที่ไม่ถูกต้อง กรุณาระบุปี-เดือน-วัน',
+            'law_meta.permission_group_ids.array' => 'รูปแบบรายการกลุ่มสิทธิ์ไม่ถูกต้อง',
+            'law_meta.permission_group_ids.*.string' => 'รหัสกลุ่มสิทธิ์ต้องเป็นข้อความ',
+            'law_meta.permission_group_ids.*.max' => 'รหัสกลุ่มสิทธิ์ยาวเกินกำหนด',
+        ];
+    }
+
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
+    {
+        throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+            'message' => 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบรายการที่ระบุ',
+            'errors' => $validator->errors()->messages(),
+        ], 422));
     }
 
     /**

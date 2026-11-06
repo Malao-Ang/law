@@ -1,4 +1,4 @@
-import { fetchPreview, fetchReview } from '../api/client';
+import { documentReadUrl, fetchPreview, fetchReview } from '../api/client';
 import type { PreviewData, ReviewDocument } from '../types/document';
 
 const reviewCache = new Map<string, ReviewDocument>();
@@ -9,7 +9,7 @@ const previewInFlight = new Map<string, { version: number; promise: Promise<Prev
 const previewVersion = new Map<string, number>();
 
 export function clearReviewCache(): void {
-  for (const id of new Set([...reviewCache.keys(), ...reviewInFlight.keys()])) invalidateReview(id);
+  for (const id of new Set([...reviewCache.keys(), ...reviewInFlight.keys(), ...previewCache.keys(), ...previewInFlight.keys()])) invalidateReview(id);
 }
 
 function currentVersion(versions: Map<string, number>, documentId: string): number {
@@ -24,6 +24,7 @@ function bumpVersion(versions: Map<string, number>, documentId: string): number 
 }
 
 export async function getReviewCached(documentId: string, force = false): Promise<ReviewDocument> {
+  documentId = documentReadUrl(`/api/documents/${documentId}`).includes('/public/') ? `public:${documentId.replace(/^public:/, '')}` : documentId;
   if (force) {
     reviewCache.delete(documentId);
     bumpVersion(reviewVersion, documentId);
@@ -40,7 +41,7 @@ export async function getReviewCached(documentId: string, force = false): Promis
     return inFlight.promise;
   }
 
-  const pending = fetchReview(documentId)
+  const pending = fetchReview(documentId.replace(/^public:/, ''))
     .then((review) => {
       if (currentVersion(reviewVersion, documentId) === version) {
         reviewCache.set(documentId, review);
@@ -64,6 +65,7 @@ export async function getReviewCached(documentId: string, force = false): Promis
 }
 
 export async function getPreviewCached(documentId: string, force = false): Promise<PreviewData> {
+  documentId = documentReadUrl(`/api/documents/${documentId}`).includes('/public/') ? `public:${documentId.replace(/^public:/, '')}` : documentId;
   if (force) {
     previewCache.delete(documentId);
     bumpVersion(previewVersion, documentId);
@@ -80,7 +82,7 @@ export async function getPreviewCached(documentId: string, force = false): Promi
     return inFlight.promise;
   }
 
-  const pending = fetchPreview(documentId)
+  const pending = fetchPreview(documentId.replace(/^public:/, ''))
     .then((preview) => {
       if (currentVersion(previewVersion, documentId) === version) {
         previewCache.set(documentId, preview);
@@ -104,6 +106,7 @@ export async function getPreviewCached(documentId: string, force = false): Promi
 }
 
 export function setReview(documentId: string, review: ReviewDocument): void {
+  documentId = documentReadUrl(`/api/documents/${documentId}`).includes('/public/') ? `public:${documentId.replace(/^public:/, '')}` : documentId;
   reviewCache.set(documentId, review);
   previewCache.delete(documentId);
   bumpVersion(previewVersion, documentId);

@@ -3,6 +3,7 @@
     v-model="open"
     :close-on-content-click="false"
     max-width="360"
+    content-class="lawspace-workflow-form"
     transition="scale-transition"
   >
     <template #activator="{ props: menuProps }">

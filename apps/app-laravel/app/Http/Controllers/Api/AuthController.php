@@ -128,7 +128,7 @@ class AuthController extends Controller
         $this->currentUser->login($request, $username);
         $this->audit($username, 'success', $request);
 
-        return response()->json($this->currentUser->payload($user, $request));
+        return response()->json($this->currentUser->payload($this->currentUser->user($request), $request));
     }
 
     public function me(Request $request): JsonResponse
@@ -148,21 +148,37 @@ class AuthController extends Controller
     {
         $user = $this->currentUser->user($request);
         abort_if($user === null, 401, 'กรุณาเข้าสู่ระบบ');
-        $data = $request->validate(['unit_code' => ['required', 'string', 'regex:/^DEP[0-9]{3}$/']], [
-            'unit_code.required' => 'กรุณาเลือกหน่วยงาน',
+        $data = $request->validate([
+            'mode' => ['sometimes', 'string', 'in:super_admin'],
+            'unit_code' => ['sometimes', 'string', 'regex:/^DEP[0-9]{3}$/'],
+        ], [
             'unit_code.string' => 'รหัสหน่วยงานไม่ถูกต้อง',
             'unit_code.regex' => 'รหัสหน่วยงานไม่ถูกต้อง',
+            'mode.in' => 'บทบาทไม่ถูกต้อง',
+            'mode.string' => 'บทบาทไม่ถูกต้อง',
         ]);
-        abort_unless(($user['is_super_admin'] ?? false) || in_array($data['unit_code'], array_column((array) ($user['memberships'] ?? []), 'unit_code'), true), 403, 'ไม่มีสิทธิ์เลือกหน่วยงานนี้');
-        $unit = $units->find($data['unit_code']);
-        abort_if($unit === null || ! $unit['is_active'], 422, 'ไม่พบหน่วยงานหรือหน่วยงานถูกปิดใช้งาน');
-        $request->session()->put(CurrentUser::ACTIVE_UNIT_KEY, $unit['code']);
+        abort_if(isset($data['mode']) === isset($data['unit_code']), 422, 'กรุณาเลือกบทบาทการใช้งานเพียงรายการเดียว');
+        $before = ['acting_mode' => $request->session()->get(CurrentUser::ACTING_MODE_KEY)];
+        if (($data['mode'] ?? null) === 'super_admin') {
+            abort_unless($user['can_act_as_super_admin'] ?? false, 403, 'ไม่มีสิทธิ์ใช้งานในบทบาท Super Admin');
+            $request->session()->forget(CurrentUser::ACTIVE_UNIT_KEY);
+            $request->session()->put(CurrentUser::ACTING_MODE_KEY, 'super_admin');
+        } else {
+            abort_unless(in_array($data['unit_code'], array_column((array) ($user['memberships'] ?? []), 'unit_code'), true), 403, 'ไม่มีสิทธิ์เลือกหน่วยงานนี้');
+            $unit = $units->find($data['unit_code']);
+            abort_if($unit === null || ! $unit['is_active'], 422, 'ไม่พบหน่วยงานหรือหน่วยงานถูกปิดใช้งาน');
+            $request->session()->put(CurrentUser::ACTIVE_UNIT_KEY, $unit['code']);
+            $request->session()->put(CurrentUser::ACTING_MODE_KEY, $unit['code']);
+        }
+        app(\App\Services\Audit\AuditLogger::class)->record('role_switch', 'auth', $user['username'], 'เลือกบทบาทการใช้งาน', [], $user['username'], null,
+            ['before' => $before, 'after' => ['acting_mode' => $request->session()->get(CurrentUser::ACTING_MODE_KEY)]]);
 
-        return response()->json($this->currentUser->payload($user, $request));
+        return response()->json($this->currentUser->payload($this->currentUser->user($request), $request));
     }
 
     public function logout(Request $request): Response
     {
+        app(\App\Services\Audit\AuditLogger::class)->record('logout', 'auth', $this->currentUser->user($request)['username'] ?? '', 'ออกจากระบบ');
         $this->currentUser->logout($request);
 
         return response()->noContent();
@@ -185,6 +201,7 @@ class AuthController extends Controller
 
     private function audit(string $username, string $result, Request $request): void
     {
+        app(\App\Services\Audit\AuditLogger::class)->record($result === 'success' ? 'login' : 'login_failed', 'auth', $username, $result === 'success' ? 'เข้าสู่ระบบ' : 'เข้าสู่ระบบไม่สำเร็จ', [], $username, null, ['result' => $result === 'success' ? 'success' : 'failed']);
         Log::channel('auth')->info('auth.login', [
             'username' => $username,
             'result' => $result,

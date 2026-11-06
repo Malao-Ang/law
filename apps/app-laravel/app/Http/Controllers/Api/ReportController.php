@@ -9,6 +9,8 @@ use App\Services\MasterData\LawCategories;
 use App\Services\MasterData\LawTypes;
 use App\Services\MasterData\LegalStructures;
 use App\Services\ReviewStore;
+use App\Services\Auth\DocumentAccess;
+use App\Services\Auth\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,6 +31,9 @@ class ReportController extends Controller
 
     public function summary(Request $request): JsonResponse
     {
+        if (app(DocumentAccess::class)->context($request) !== 'public') {
+            abort_if(app(CurrentUser::class)->user($request) === null, 401, 'กรุณาเข้าสู่ระบบ');
+        }
         $dateFrom = trim((string) $request->query('date_from', ''));
         $dateTo = trim((string) $request->query('date_to', ''));
         $type = trim((string) $request->query('type', ''));
@@ -45,7 +50,12 @@ class ReportController extends Controller
         )));
         $agencies = array_values(array_filter((array) $request->query('agency', []), 'is_string'));
 
-        $rows = array_filter($this->reviewStore->listLawMeta(), function (array $r) use ($dateFrom, $dateTo, $typeCode, $status, $metaStatus, $groups, $agencies): bool {
+        $public = app(DocumentAccess::class)->context($request) === 'public';
+        $access = app(DocumentAccess::class);
+        $rows = array_filter($this->reviewStore->listLawMeta(), function (array $r) use ($request, $access, $public, $dateFrom, $dateTo, $typeCode, $status, $metaStatus, $groups, $agencies): bool {
+            if (! ($public ? $access->publicScope($request, $r) : $access->adminScope($request, $r))) {
+                return false;
+            }
             $updated = (string) ($r['updated_at'] ?? '');
             if ($dateFrom !== '' && ($updated === '' || substr($updated, 0, 10) < $dateFrom)) {
                 return false;
@@ -71,6 +81,8 @@ class ReportController extends Controller
 
             return true;
         });
+
+        $rows = array_map(fn ($row) => $access->sanitizeReferences($request, $row), $rows);
 
         return response()->json([
             'totals' => $this->totals($rows),

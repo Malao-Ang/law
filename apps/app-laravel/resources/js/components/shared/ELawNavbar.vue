@@ -18,17 +18,8 @@
 
       <!-- Right buttons -->
       <div class="elaw-header__actions">
-        <ActiveUnitMenu />
         <v-btn
-          class="elaw-btn-login text-none"
-          :prepend-icon="auth.isAuthenticated ? 'mdi-account-check-outline' : 'mdi-login'"
-          variant="text"
-          rounded="pill"
-          @click="auth.isAuthenticated ? logout() : router.push('/login')"
-        >
-          {{ auth.isAuthenticated ? 'ออกจากระบบ' : 'เข้าสู่ระบบ' }}
-        </v-btn>
-        <v-btn
+          v-if="auth.isAuthenticated"
           class="elaw-btn-staff text-none"
           color="#343028"
           prepend-icon="mdi-shield-account-outline"
@@ -38,12 +29,32 @@
         >
           สำหรับบุคลากรองค์กร
         </v-btn>
+        <v-menu v-if="auth.isAuthenticated" location="bottom end" :close-on-content-click="false">
+          <template #activator="{ props }">
+            <v-btn v-bind="props" class="elaw-btn-login elaw-user-button text-none" variant="text" rounded="pill" append-icon="mdi-chevron-down" aria-label="เมนูผู้ใช้">
+              <v-avatar size="28" color="#94713b" class="mr-2 text-white">{{ initial }}</v-avatar>
+              <span class="elaw-user-name">{{ auth.user?.name || auth.user?.username }}</span>
+            </v-btn>
+          </template>
+          <v-card width="320" rounded="lg" class="pa-5 text-center">
+            <v-avatar size="64" color="#94713b" class="mb-3 text-white text-h4">{{ initial }}</v-avatar>
+            <div class="text-subtitle-1 font-weight-bold">{{ auth.user?.name }}</div>
+            <div class="text-body-2 text-medium-emphasis">{{ auth.user?.username }}</div>
+            <div class="d-flex justify-center mt-3">
+              <ActiveUnitMenu />
+            </div>
+            <v-divider class="my-4" />
+            <v-btn block variant="tonal" prepend-icon="mdi-logout" @click="logout">ออกจากระบบ</v-btn>
+          </v-card>
+        </v-menu>
+        <v-btn v-else class="elaw-btn-login text-none" prepend-icon="mdi-login" variant="text" rounded="pill" @click="router.push('/login')">เข้าสู่ระบบ</v-btn>
       </div>
     </v-container>
   </v-app-bar>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import ActiveUnitMenu from './ActiveUnitMenu.vue';
 import { useAuthStore } from '../../stores/authStore';
@@ -52,6 +63,7 @@ import MainNav from './MainNav.vue';
 const emit = defineEmits<{ 'go-admin': [] }>();
 const router = useRouter();
 const auth = useAuthStore();
+const initial = computed(() => Array.from(auth.user?.name || auth.user?.username || '?')[0]);
 
 function logout(): void {
   void auth.logout('/');
@@ -77,8 +89,8 @@ function logout(): void {
   justify-content: space-between;
   height: var(--elaw-navbar-height);
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 0 28px;
   gap: 24px;
   box-sizing: border-box;
@@ -142,6 +154,15 @@ function logout(): void {
   align-items: center;
   gap: 24px;
   flex-shrink: 0;
+}
+
+.elaw-user-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.elaw-user-button { min-width: 0; }
+@media (min-width: 769px) and (max-width: 1400px) {
+  .elaw-header__inner { gap: 12px; padding-inline: 20px; }
+  .elaw-header__actions { gap: 8px; }
+  .elaw-btn-staff { padding-inline: 16px; }
+  .elaw-user-name { max-width: 120px; }
 }
 
 .elaw-btn-login {
