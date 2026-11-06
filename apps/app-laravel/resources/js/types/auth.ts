@@ -23,7 +23,7 @@ export interface AuthMeResponse {
   role: AuthRole;
   is_super_admin: boolean;
   can_act_as_super_admin: boolean;
-  acting_mode: 'super_admin' | 'unit' | null;
+  acting_mode: 'super_admin' | 'unit' | 'user' | null;
   needs_role_selection: boolean;
   memberships: Membership[];
   active_unit: Unit | null;

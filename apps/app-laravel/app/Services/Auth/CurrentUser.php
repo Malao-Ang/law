@@ -53,9 +53,8 @@ class CurrentUser
             $request->session()->forget(self::ACTING_MODE_KEY);
             $mode = null;
         }
-        if ($canActAsSuperAdmin && ($user['memberships'] ?? []) === [] && $mode === null) {
-            $request->session()->put(self::ACTING_MODE_KEY, 'super_admin');
-            $mode = 'super_admin';
+        if ($mode === 'user') {
+            $request->session()->forget(self::ACTIVE_UNIT_KEY);
         }
         $user['can_act_as_super_admin'] = $canActAsSuperAdmin;
         $user['is_super_admin'] = $canActAsSuperAdmin && $mode === 'super_admin';
@@ -68,17 +67,6 @@ class CurrentUser
         $request->session()->regenerate();
         $request->session()->put(self::SESSION_KEY, MongoUserStore::key($username));
         $request->session()->forget([self::ACTIVE_UNIT_KEY, self::ACTING_MODE_KEY]);
-        $user = $this->users->find($username);
-        $memberships = (array) ($user['memberships'] ?? []);
-        if (($user['is_super_admin'] ?? false) && count($memberships) === 0) {
-            $request->session()->put(self::ACTING_MODE_KEY, 'super_admin');
-        } elseif (! ($user['is_super_admin'] ?? false) && count($memberships) === 1) {
-            $unit = $this->units->find($memberships[0]['unit_code']);
-            if ($unit !== null && $unit['is_active']) {
-                $request->session()->put(self::ACTIVE_UNIT_KEY, $unit['code']);
-                $request->session()->put(self::ACTING_MODE_KEY, $unit['code']);
-            }
-        }
     }
 
     public function logout(Request $request): void
@@ -107,7 +95,7 @@ class CurrentUser
             return $membership;
         }, (array) ($user['memberships'] ?? []));
 
-        $needsSelection = ! ($user['is_super_admin'] ?? false) && count($memberships) > 0 && $activeCode === null;
+        $needsSelection = $request->session()->get(self::ACTING_MODE_KEY) === null;
 
         return [
             'user' => [
@@ -126,7 +114,8 @@ class CurrentUser
             'role' => $this->role($user, $request),
             'is_super_admin' => (bool) ($user['is_super_admin'] ?? false),
             'can_act_as_super_admin' => (bool) ($user['can_act_as_super_admin'] ?? false),
-            'acting_mode' => ($user['is_super_admin'] ?? false) ? 'super_admin' : ($activeCode !== null ? 'unit' : null),
+            'acting_mode' => $request->session()->get(self::ACTING_MODE_KEY) === 'user' ? 'user'
+                : (($user['is_super_admin'] ?? false) ? 'super_admin' : ($activeCode !== null ? 'unit' : null)),
             'needs_role_selection' => $needsSelection,
             'memberships' => array_values($memberships),
             'active_unit' => is_string($activeCode) ? $this->units->find($activeCode) : null,

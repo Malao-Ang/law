@@ -131,6 +131,7 @@ class LawSearchController extends Controller
         if ($fileRow === null) {
             $access = app(\App\Services\Auth\DocumentAccess::class);
             $document = $access->readDocument((string) ($row['law_id'] ?? ''));
+            $row['access_scope'] = $document['access_scope'] ?? 'private';
             $row['restricted'] = $document === null || ! $access->canRead(request(), $document);
             $row['requires_permission'] = $row['restricted'] && $this->hasPermissionGroups($document ?? []);
             if ($row['restricted']) $row['snippets'] = [];
@@ -145,6 +146,7 @@ class LawSearchController extends Controller
         if (! isset($row['title_highlighted']) && isset($fileRow['title_highlighted'])) {
             $row['title_highlighted'] = $fileRow['title_highlighted'];
         }
+        $row['access_scope'] = $fileRow['access_scope'] ?? 'private';
         $row['restricted'] = (bool) ($fileRow['restricted'] ?? false);
         $row['requires_permission'] = (bool) ($fileRow['requires_permission'] ?? false);
         $row['related_laws'] = $fileRow['related_laws'] ?? [];
@@ -261,6 +263,7 @@ class LawSearchController extends Controller
                 'law_groups' => $this->lawCategories->labelsOf((array) ($r['law_groups'] ?? [])),
                 'law_group_codes' => $this->categoryCodesFromRow($r),
                 'signer_group' => $r['signer_group'],
+                'access_scope' => $r['access_scope'] ?? 'private',
                 'restricted' => $restricted,
                 'requires_permission' => $requiresPermission,
                 'child_types' => $childTypeIndex[$id] ?? [],

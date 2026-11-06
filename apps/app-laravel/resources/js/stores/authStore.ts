@@ -126,6 +126,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function selectUser(): Promise<void> {
+    await jsonRequest('/api/auth/active-unit', { method: 'POST', body: JSON.stringify({ mode: 'user' }) });
+    await fetchMe(true);
+    if (acting_mode.value !== 'user' || is_super_admin.value || active_unit.value !== null || role.value !== 'user') {
+      throw new Error('ไม่สามารถเลือกบทบาท User ได้ กรุณาลองอีกครั้ง');
+    }
+  }
+
   async function logout(redirectTo = '/login'): Promise<void> {
     try {
       await jsonRequest<void>('/api/auth/logout', { method: 'POST' });
@@ -147,5 +155,5 @@ export const useAuthStore = defineStore('auth', () => {
     });
   });
 
-  return { scopeRevision, can_act_as_super_admin, acting_mode, selectSuperAdmin, canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
+  return { selectUser, scopeRevision, can_act_as_super_admin, acting_mode, selectSuperAdmin, canViewAudit, canUpload, is_super_admin, memberships, active_unit, needs_unit_selection, canManageUnits, selectUnit, user, role, authEnforced, loaded, isAuthenticated, isAdminRole, roleLabel, fetchMe, login, devLogin, logout };
 });

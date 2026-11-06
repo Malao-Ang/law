@@ -19,7 +19,7 @@
       <!-- Right buttons -->
       <div class="elaw-header__actions">
         <v-btn
-          v-if="auth.isAuthenticated"
+          v-if="auth.isAuthenticated && auth.isAdminRole"
           class="elaw-btn-staff text-none"
           color="#343028"
           prepend-icon="mdi-shield-account-outline"
