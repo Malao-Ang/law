@@ -63,8 +63,9 @@
         <v-card-title>รายการคณะจาก {{ syncPreview?.fallback ? 'ข้อมูลสำรอง' : 'UMS' }}</v-card-title>
         <v-card-text>
           <v-alert :type="syncPreview?.fallback ? 'warning' : 'info'" variant="tonal" density="compact" class="mb-3">{{ syncPreview?.message }} (ทั้งหมด {{ syncPreview?.count }} รายการ)</v-alert>
-          <p v-if="syncPreview && !syncPreview.changes.length" class="mb-3">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
-          <v-table v-if="syncPreview?.items.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
+          <v-alert v-if="syncPreview && !Array.isArray(syncPreview.items)" type="warning" variant="tonal" density="compact" class="mb-3">เซิร์ฟเวอร์ยังไม่ส่งรายการคณะทั้งหมด กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง</v-alert>
+          <p v-if="syncPreview?.items && !syncPreview.changes.length" class="mb-3">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
+          <v-table v-if="syncPreview?.items?.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
             <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อ{{ syncPreview.fallback ? 'ในข้อมูลสำรอง' : 'ใน UMS' }}</th><th>ชื่อในระบบ</th></tr></thead>
             <tbody>
               <tr v-for="row in syncPreview.items" :key="`${row.status}-${row.fac_id}`">
@@ -114,7 +115,7 @@ const saving = ref(false);
 const syncing = ref(false);
 interface SyncChange { fac_id: string; status: 'new' | 'renamed' | 'missing'; name: string; current_code: string | null; current_name: string | null }
 interface SyncPreviewRow extends Omit<SyncChange, 'status'> { status: SyncChange['status'] | 'unchanged' }
-interface SyncPreview { token: string; fallback: boolean; count: number; message: string; items: SyncPreviewRow[]; changes: SyncChange[] }
+interface SyncPreview { token: string; fallback: boolean; count: number; message: string; items?: SyncPreviewRow[]; changes: SyncChange[] }
 const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS', unchanged: 'ตรงกัน' } as const;
 const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error', unchanged: 'info' } as const;
 const syncDialog = ref(false);
