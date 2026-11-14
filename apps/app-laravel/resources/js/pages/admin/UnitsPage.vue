@@ -60,15 +60,15 @@
     </v-dialog>
     <v-dialog v-model="syncDialog" max-width="760" persistent :retain-focus="false">
       <v-card rounded="lg" class="unit-dialog">
-        <v-card-title>รายการคณะจาก UMS ที่แตกต่างจากระบบ</v-card-title>
+        <v-card-title>รายการคณะจาก {{ syncPreview?.fallback ? 'ข้อมูลสำรอง' : 'UMS' }}</v-card-title>
         <v-card-text>
           <v-alert :type="syncPreview?.fallback ? 'warning' : 'info'" variant="tonal" density="compact" class="mb-3">{{ syncPreview?.message }} (ทั้งหมด {{ syncPreview?.count }} รายการ)</v-alert>
-          <p v-if="!syncPreview?.changes.length" class="py-4 text-center">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
-          <v-table v-else density="compact">
-            <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อใน UMS</th><th>ชื่อในระบบ</th></tr></thead>
+          <p v-if="syncPreview && !syncPreview.changes.length" class="mb-3">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
+          <v-table v-if="syncPreview?.items.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
+            <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อ{{ syncPreview.fallback ? 'ในข้อมูลสำรอง' : 'ใน UMS' }}</th><th>ชื่อในระบบ</th></tr></thead>
             <tbody>
-              <tr v-for="row in syncPreview.changes" :key="`${row.status}-${row.fac_id}`">
-                <td><v-checkbox-btn v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
+              <tr v-for="row in syncPreview.items" :key="`${row.status}-${row.fac_id}`">
+                <td><v-checkbox-btn v-if="row.status !== 'unchanged'" v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
                 <td><v-chip size="small" variant="tonal" :color="SYNC_COLORS[row.status]">{{ SYNC_LABELS[row.status] }}</v-chip></td>
                 <td>{{ row.fac_id }}</td>
                 <td>{{ row.status === 'missing' ? '-' : row.name }}</td>
@@ -113,9 +113,10 @@ const loading = ref(false);
 const saving = ref(false);
 const syncing = ref(false);
 interface SyncChange { fac_id: string; status: 'new' | 'renamed' | 'missing'; name: string; current_code: string | null; current_name: string | null }
-interface SyncPreview { token: string; fallback: boolean; count: number; message: string; changes: SyncChange[] }
-const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS' } as const;
-const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error' } as const;
+interface SyncPreviewRow extends Omit<SyncChange, 'status'> { status: SyncChange['status'] | 'unchanged' }
+interface SyncPreview { token: string; fallback: boolean; count: number; message: string; items: SyncPreviewRow[]; changes: SyncChange[] }
+const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS', unchanged: 'ตรงกัน' } as const;
+const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error', unchanged: 'info' } as const;
 const syncDialog = ref(false);
 const syncPreview = ref<SyncPreview | null>(null);
 const syncSelected = ref<string[]>([]);
@@ -229,5 +230,6 @@ async function applySync(): Promise<void> {
 .unit-dialog :deep(.master-dialog__switch) { margin-bottom: 8px; }
 .unit-action { font-weight: 600; }
 .unit-action + .unit-action { margin-left: 12px; }
+.sync-preview-table :deep(.v-table__wrapper) { max-height: 420px; overflow-y: auto; }
 .unit-row:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 </style>
