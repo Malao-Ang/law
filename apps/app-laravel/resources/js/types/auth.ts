@@ -30,4 +30,6 @@ export interface AuthMeResponse {
   needs_unit_selection: boolean;
   can_upload: boolean;
   auth_enforced: boolean;
+  session_expires_at: number;
+  session_idle_expires_at: number;
 }
