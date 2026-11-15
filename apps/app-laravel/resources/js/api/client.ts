@@ -118,12 +118,17 @@ function actorHeaders(): Record<string, string> {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-let unauthorizedHandler: (() => void) | null = null;
+let unauthorizedHandler: (() => Promise<boolean>) | null = null;
+let sessionActivityHandler: (() => void) | null = null;
 let csrfPending: Promise<void> | null = null;
 
-/** Called when a non-auth API call returns 401 (session ended). */
-export function setUnauthorizedHandler(handler: (() => void) | null): void {
+/** Wait for reauthentication after a non-auth API returns 401. */
+export function setUnauthorizedHandler(handler: (() => Promise<boolean>) | null): void {
   unauthorizedHandler = handler;
+}
+
+export function setSessionActivityHandler(handler: (() => void) | null): void {
+  sessionActivityHandler = handler;
 }
 
 function readXsrfToken(): string {
@@ -199,6 +204,17 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
     response = await send();
   }
 
+  if (response.status === 401 && !url.startsWith('/api/auth/')) {
+    const resumed = await unauthorizedHandler?.() ?? false;
+    // Never replay writes/uploads without server-side idempotency support.
+    if (resumed && SAFE_METHODS.has(method)) response = await send();
+    else if (resumed) {
+      const error = new Error('เข้าสู่ระบบแล้ว กรุณากดบันทึกอีกครั้ง') as ApiRequestError;
+      error.status = 401;
+      throw error;
+    }
+  }
+
   if (!response.ok) {
     const fallback = `HTTP ${response.status}`;
     let payload: ApiErrorPayload | null = null;
@@ -225,12 +241,10 @@ export async function jsonRequest<T>(input: RequestInfo, init?: RequestInit): Pr
         await alertError(error.message);
       }
     }
-    if (response.status === 401 && !url.startsWith('/api/auth/')) {
-      unauthorizedHandler?.();
-    }
     throw error;
   }
 
+  if (!url.startsWith('/api/auth/')) sessionActivityHandler?.();
   if (response.status === 204) return undefined as T;
 
   return (await response.json()) as T;
@@ -434,6 +448,10 @@ async function downloadBinaryExport(
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      await unauthorizedHandler?.();
+      throw new Error('เข้าสู่ระบบแล้ว กรุณากดดาวน์โหลดอีกครั้ง');
+    }
     if (response.status === 403) {
       const { alertError } = await import('../components/master/masterDialogs');
       await alertError('คุณไม่มีสิทธิ์ดำเนินการนี้กับเอกสารในหน่วยงานที่เลือก');
