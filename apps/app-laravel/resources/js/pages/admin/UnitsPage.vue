@@ -39,10 +39,10 @@
         <v-card-title>{{ editingCode ? 'แก้ไขหน่วยงาน' : 'เพิ่มหน่วยงาน' }}</v-card-title>
         <v-card-text>
           <v-form @submit.prevent="saveUnit">
+            <v-select v-model="unitForm.type" label="ชนิดหน่วยงาน" :items="typeOptions" variant="outlined" :disabled="saving || Boolean(editingCode)" />
             <v-text-field :model-value="editingCode || nextUnitCode || 'ช่วงรหัสเต็มแล้ว'" label="รหัสหน่วยงาน" variant="outlined" readonly
               :hint="editingCode ? undefined : `มี ${unitTypeCount} หน่วยงานในชนิดนี้ · ${nextUnitCode ? 'รหัสนี้เป็นตัวอย่างก่อนบันทึก' : 'ไม่สามารถเพิ่มหน่วยงานชนิดนี้ได้'}`" :persistent-hint="!editingCode" />
             <v-text-field v-model="unitForm.name" label="ชื่อหน่วยงาน" variant="outlined" :disabled="saving" maxlength="255" />
-            <v-select v-model="unitForm.type" label="ชนิดหน่วยงาน" :items="typeOptions" variant="outlined" :disabled="saving || Boolean(editingCode)" />
             <v-select v-if="unitForm.type === 'department'" v-model="unitForm.parent_code" label="คณะ / สำนักแม่"
               :items="allUnits.filter((u) => u.type === 'faculty')" item-title="name" item-value="code" variant="outlined" :disabled="saving" />
             <p v-else-if="unitForm.type === 'division'" class="mb-4">หน่วยงานแม่: สำนักงานอธิการบดี</p>
