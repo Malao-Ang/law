@@ -70,7 +70,7 @@
           <v-table v-if="syncPreview?.items?.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
             <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อ{{ syncPreview.fallback ? 'ในข้อมูลสำรอง' : 'ใน UMS' }}</th><th>ชื่อในระบบ</th></tr></thead>
             <tbody>
-              <tr v-for="row in syncPreview.items" :key="`${row.status}-${row.fac_id}`">
+              <tr v-for="row in sortedSyncItems" :key="`${row.status}-${row.fac_id}`">
                 <td><v-checkbox-btn v-if="row.status !== 'unchanged'" v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
                 <td><v-chip size="small" variant="tonal" :color="SYNC_COLORS[row.status]">{{ SYNC_LABELS[row.status] }}</v-chip></td>
                 <td>{{ row.fac_id }}</td>
@@ -123,6 +123,8 @@ const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error', unch
 const syncDialog = ref(false);
 const syncPreview = ref<SyncPreview | null>(null);
 const syncSelected = ref<string[]>([]);
+const SYNC_ORDER = { new: 0, renamed: 1, missing: 2, unchanged: 3 } as const;
+const sortedSyncItems = computed(() => [...(syncPreview.value?.items ?? [])].sort((a, b) => SYNC_ORDER[a.status] - SYNC_ORDER[b.status]));
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
