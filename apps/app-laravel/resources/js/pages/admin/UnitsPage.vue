@@ -148,7 +148,8 @@ watch(() => route.query, (q) => {
   page.value = positive(q.page, 1); perPage.value = positive(q.per_page, 10);
 });
 async function showError(error: unknown): Promise<void> {
-  if ((error as ApiRequestError)?.status === 403) return;
+  const status = (error as ApiRequestError)?.status;
+  if (status === 403 || (status === 401 && (!auth.isAuthenticated || auth.reauthRequired))) return;
   await alertError(error instanceof Error && /[ก-๙]/.test(error.message) ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง');
 }
 async function confirm(title: string, text: string): Promise<boolean> {

@@ -42,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
   let lastInteraction = Date.now();
   let lastHeartbeat = Date.now();
   let pendingReauth: Promise<boolean> | null = null;
+  let loginRedirectPending: Promise<boolean> | null = null;
   let finishReauth: ((resumed: boolean) => void) | null = null;
   let reauthenticating = false;
   let monitorStarted = false;
@@ -274,15 +275,24 @@ export const useAuthStore = defineStore('auth', () => {
     window.location.assign(redirectTo);
   }
 
+  function redirectToLoginOnce(): Promise<boolean> {
+    loginRedirectPending ??= (async () => {
+      try {
+        const { default: Swal } = await import('sweetalert2');
+        await Swal.fire({ icon: 'error', titleText: 'เซสชันหมดอายุ', text: 'กรุณาเข้าสู่ระบบใหม่',
+          confirmButtonText: 'ตกลง', confirmButtonColor: '#475467', allowOutsideClick: false, allowEscapeKey: false });
+      } finally {
+        window.location.assign('/login');
+      }
+      // Keep concurrent 401 callers suspended until the old page unloads.
+      return new Promise<boolean>(() => {});
+    })();
+    return loginRedirectPending;
+  }
+
   setUnauthorizedHandler(() => {
     if (reauthenticating) return Promise.resolve(false);
-    if (!user.value) {
-      void import('../router').then(({ router }) => {
-        const current = router.currentRoute.value;
-        if (current.path !== '/login') void router.push({ path: '/login', query: { redirect: current.fullPath } });
-      });
-      return Promise.resolve(false);
-    }
+    if (!user.value) return redirectToLoginOnce();
     reauthRequired.value = true;
     sessionWarning.value = false;
     pendingReauth ??= new Promise<boolean>((resolve) => { finishReauth = resolve; });
