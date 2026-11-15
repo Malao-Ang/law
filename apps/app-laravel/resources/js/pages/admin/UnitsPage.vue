@@ -48,9 +48,8 @@
             <p v-else-if="unitForm.type === 'division'" class="mb-4">หน่วยงานแม่: สำนักงานอธิการบดี</p>
             <p v-else-if="unitForm.type === 'law_subunit'" class="mb-4">หน่วยงานแม่: กองกฎหมาย</p>
             <v-text-field v-if="unitForm.type === 'faculty'" v-model="unitForm.ums_fac_id" label="รหัสคณะใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-model.number="unitForm.sort_order" label="ลำดับแสดงผล" type="number" min="0" variant="outlined" :disabled="saving"
-              :hint="editingCode ? undefined : 'กำหนดตามรหัสหน่วยงานอัตโนมัติ ปรับแก้ได้'" :persistent-hint="!editingCode" @update:model-value="sortOrderEdited = true" />
+            <v-text-field v-if="unitForm.type !== 'faculty'" v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS (ไม่บังคับ)" variant="outlined" :disabled="saving"
+              hint="ใช้จับคู่สังกัดของผู้ใช้จาก UMS เข้ากับหน่วยงานนี้ ถ้าไม่ทราบเว้นว่างได้" persistent-hint />
             <v-switch class="master-dialog__switch" v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
             <div class="unit-dialog__actions d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" :disabled="saving" @click="unitDialog = false">ยกเลิก</v-btn>
@@ -128,8 +127,7 @@ const sortedSyncItems = computed(() => [...(syncPreview.value?.items ?? [])].sor
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
-const sortOrderEdited = ref(false);
-const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', ums_dep_id: '', is_active: true, sort_order: 0 });
+const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', ums_dep_id: '', is_active: true });
 const statusOptions = [{ title: 'ทุกสถานะ', value: 'all' }, { title: 'เปิดใช้งาน', value: 'active' }, { title: 'ปิดใช้งาน', value: 'inactive' }];
 const typeOptions = [
   { title: 'คณะ / สำนัก', value: 'faculty' }, { title: 'กอง / ศูนย์', value: 'division' },
@@ -149,12 +147,6 @@ const nextUnitNumber = computed(() => {
   return next <= max ? next : null;
 });
 const nextUnitCode = computed(() => nextUnitNumber.value === null ? '' : `DEP${String(nextUnitNumber.value).padStart(3, '0')}`);
-watch(() => unitForm.type, () => {
-  if (unitDialog.value && !editingCode.value) {
-    unitForm.sort_order = nextUnitNumber.value ?? 0;
-    sortOrderEdited.value = false;
-  }
-});
 const visibleUnits = computed(() => allUnits.value.filter((u) => auth.is_super_admin || auth.active_unit?.code === u.code && ['inner_admin', 'outer_admin'].includes(auth.role ?? '')));
 // Status changes keep the current rows mounted until the viewer changes filters.
 const statusSnapshot = ref(new Map<string, boolean>());
@@ -189,10 +181,8 @@ onMounted(async () => { try { await loadUnits(); } catch (error) { await showErr
 function openUnit(unit?: Unit): void {
   if (!auth.is_super_admin || saving.value || syncing.value) return;
   editingCode.value = unit?.code || '';
-  sortOrderEdited.value = false;
   Object.assign(unitForm, { name: unit?.name || '', type: unit?.type || 'faculty', parent_code: unit?.parent_code || null,
-    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true,
-    sort_order: unit?.sort_order ?? nextUnitNumber.value ?? 0 });
+    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true });
   unitDialog.value = true;
 }
 async function saveUnit(): Promise<void> {
@@ -200,14 +190,12 @@ async function saveUnit(): Promise<void> {
   if (!unitForm.name.trim()) { await alertError('กรุณาระบุชื่อหน่วยงาน'); return; }
   if (!editingCode.value && nextUnitNumber.value === null) { await alertError('รหัสหน่วยงานในช่วงที่กำหนดเต็มแล้ว ไม่สามารถเพิ่มหน่วยงานได้'); return; }
   if (unitForm.type === 'department' && !unitForm.parent_code) { await alertError('กรุณาเลือกคณะหรือสำนักแม่'); return; }
-  if (!Number.isInteger(unitForm.sort_order) || unitForm.sort_order < 0) { await alertError('ลำดับต้องเป็นจำนวนเต็มตั้งแต่ศูนย์ขึ้นไป'); return; }
   saving.value = true;
   try {
     const payload = {
       name: unitForm.name.trim(), type: unitForm.type, parent_code: unitForm.parent_code,
       ums_fac_id: unitForm.ums_fac_id.trim() || null, ums_dep_id: unitForm.ums_dep_id.trim() || null,
       is_active: unitForm.is_active,
-      ...(editingCode.value || sortOrderEdited.value ? { sort_order: unitForm.sort_order } : {}),
     };
     const { item } = await jsonRequest<{ item: Unit }>(`/api/units${editingCode.value ? `/${editingCode.value}` : ''}`, {
       method: editingCode.value ? 'PUT' : 'POST', body: JSON.stringify(payload),
