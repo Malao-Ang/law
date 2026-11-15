@@ -39,7 +39,8 @@
         <v-card-title>{{ editingCode ? 'แก้ไขหน่วยงาน' : 'เพิ่มหน่วยงาน' }}</v-card-title>
         <v-card-text>
           <v-form @submit.prevent="saveUnit">
-            <v-text-field :model-value="editingCode || 'ระบบกำหนดรหัส DEP อัตโนมัติตามชนิดหน่วยงาน'" label="รหัสหน่วยงาน" variant="outlined" readonly />
+            <v-text-field :model-value="editingCode || nextUnitCode || 'ช่วงรหัสเต็มแล้ว'" label="รหัสหน่วยงาน" variant="outlined" readonly
+              :hint="editingCode ? undefined : `มี ${unitTypeCount} หน่วยงานในชนิดนี้ · ${nextUnitCode ? 'รหัสนี้เป็นตัวอย่างก่อนบันทึก' : 'ไม่สามารถเพิ่มหน่วยงานชนิดนี้ได้'}`" :persistent-hint="!editingCode" />
             <v-text-field v-model="unitForm.name" label="ชื่อหน่วยงาน" variant="outlined" :disabled="saving" maxlength="255" />
             <v-select v-model="unitForm.type" label="ชนิดหน่วยงาน" :items="typeOptions" variant="outlined" :disabled="saving || Boolean(editingCode)" />
             <v-select v-if="unitForm.type === 'department'" v-model="unitForm.parent_code" label="คณะ / สำนักแม่"
@@ -48,7 +49,8 @@
             <p v-else-if="unitForm.type === 'law_subunit'" class="mb-4">หน่วยงานแม่: กองกฎหมาย</p>
             <v-text-field v-if="unitForm.type === 'faculty'" v-model="unitForm.ums_fac_id" label="รหัสคณะใน UMS" variant="outlined" :disabled="saving" />
             <v-text-field v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-model.number="unitForm.sort_order" label="ลำดับแสดงผล" type="number" min="0" variant="outlined" :disabled="saving" />
+            <v-text-field v-model.number="unitForm.sort_order" label="ลำดับแสดงผล" type="number" min="0" variant="outlined" :disabled="saving"
+              :hint="editingCode ? undefined : 'กำหนดตามรหัสหน่วยงานอัตโนมัติ ปรับแก้ได้'" :persistent-hint="!editingCode" @update:model-value="sortOrderEdited = true" />
             <v-switch class="master-dialog__switch" v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
             <div class="unit-dialog__actions d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" :disabled="saving" @click="unitDialog = false">ยกเลิก</v-btn>
@@ -124,12 +126,33 @@ const syncSelected = ref<string[]>([]);
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
+const sortOrderEdited = ref(false);
 const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', ums_dep_id: '', is_active: true, sort_order: 0 });
 const statusOptions = [{ title: 'ทุกสถานะ', value: 'all' }, { title: 'เปิดใช้งาน', value: 'active' }, { title: 'ปิดใช้งาน', value: 'inactive' }];
 const typeOptions = [
   { title: 'คณะ / สำนัก', value: 'faculty' }, { title: 'กอง / ศูนย์', value: 'division' },
   { title: 'ฝ่าย / ภาควิชา', value: 'department' }, { title: 'หน่วยย่อยกองกฎหมาย', value: 'law_subunit' },
 ];
+const codeRanges: Record<UnitType, readonly [number, number]> = {
+  faculty: [1, 99], division: [100, 199], department: [200, 499], law_subunit: [500, 999],
+};
+const unitTypeCount = computed(() => allUnits.value.filter((unit) => unit.type === unitForm.type).length);
+const nextUnitNumber = computed(() => {
+  const [min, max] = codeRanges[unitForm.type];
+  const next = allUnits.value.reduce((highest, unit) => {
+    const match = /^DEP(\d{3})$/.exec(unit.code);
+    const number = match ? Number(match[1]) : 0;
+    return number >= min && number <= max ? Math.max(highest, number + 1) : highest;
+  }, min);
+  return next <= max ? next : null;
+});
+const nextUnitCode = computed(() => nextUnitNumber.value === null ? '' : `DEP${String(nextUnitNumber.value).padStart(3, '0')}`);
+watch(() => unitForm.type, () => {
+  if (unitDialog.value && !editingCode.value) {
+    unitForm.sort_order = nextUnitNumber.value ?? 0;
+    sortOrderEdited.value = false;
+  }
+});
 const visibleUnits = computed(() => allUnits.value.filter((u) => auth.is_super_admin || auth.active_unit?.code === u.code && ['inner_admin', 'outer_admin'].includes(auth.role ?? '')));
 // Status changes keep the current rows mounted until the viewer changes filters.
 const statusSnapshot = ref(new Map<string, boolean>());
@@ -164,19 +187,28 @@ onMounted(async () => { try { await loadUnits(); } catch (error) { await showErr
 function openUnit(unit?: Unit): void {
   if (!auth.is_super_admin || saving.value || syncing.value) return;
   editingCode.value = unit?.code || '';
+  sortOrderEdited.value = false;
   Object.assign(unitForm, { name: unit?.name || '', type: unit?.type || 'faculty', parent_code: unit?.parent_code || null,
-    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true, sort_order: unit?.sort_order || 0 });
+    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true,
+    sort_order: unit?.sort_order ?? nextUnitNumber.value ?? 0 });
   unitDialog.value = true;
 }
 async function saveUnit(): Promise<void> {
   if (saving.value || syncing.value || !auth.is_super_admin) return;
   if (!unitForm.name.trim()) { await alertError('กรุณาระบุชื่อหน่วยงาน'); return; }
+  if (!editingCode.value && nextUnitNumber.value === null) { await alertError('รหัสหน่วยงานในช่วงที่กำหนดเต็มแล้ว ไม่สามารถเพิ่มหน่วยงานได้'); return; }
   if (unitForm.type === 'department' && !unitForm.parent_code) { await alertError('กรุณาเลือกคณะหรือสำนักแม่'); return; }
   if (!Number.isInteger(unitForm.sort_order) || unitForm.sort_order < 0) { await alertError('ลำดับต้องเป็นจำนวนเต็มตั้งแต่ศูนย์ขึ้นไป'); return; }
   saving.value = true;
   try {
+    const payload = {
+      name: unitForm.name.trim(), type: unitForm.type, parent_code: unitForm.parent_code,
+      ums_fac_id: unitForm.ums_fac_id.trim() || null, ums_dep_id: unitForm.ums_dep_id.trim() || null,
+      is_active: unitForm.is_active,
+      ...(editingCode.value || sortOrderEdited.value ? { sort_order: unitForm.sort_order } : {}),
+    };
     const { item } = await jsonRequest<{ item: Unit }>(`/api/units${editingCode.value ? `/${editingCode.value}` : ''}`, {
-      method: editingCode.value ? 'PUT' : 'POST', body: JSON.stringify({ ...unitForm, name: unitForm.name.trim(), ums_fac_id: unitForm.ums_fac_id.trim() || null, ums_dep_id: unitForm.ums_dep_id.trim() || null }),
+      method: editingCode.value ? 'PUT' : 'POST', body: JSON.stringify(payload),
     });
     unitDialog.value = false;
     const index = allUnits.value.findIndex((u) => u.code === item.code);
