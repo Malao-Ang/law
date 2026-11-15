@@ -48,8 +48,6 @@
             <p v-else-if="unitForm.type === 'division'" class="mb-4">หน่วยงานแม่: สำนักงานอธิการบดี</p>
             <p v-else-if="unitForm.type === 'law_subunit'" class="mb-4">หน่วยงานแม่: กองกฎหมาย</p>
             <v-text-field v-if="unitForm.type === 'faculty'" v-model="unitForm.ums_fac_id" label="รหัสคณะใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-if="unitForm.type !== 'faculty'" v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS (ไม่บังคับ)" variant="outlined" :disabled="saving"
-              hint="ใช้จับคู่สังกัดของผู้ใช้จาก UMS เข้ากับหน่วยงานนี้ ถ้าไม่ทราบเว้นว่างได้" persistent-hint />
             <v-switch class="master-dialog__switch" v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
             <div class="unit-dialog__actions d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" :disabled="saving" @click="unitDialog = false">ยกเลิก</v-btn>
@@ -127,7 +125,7 @@ const sortedSyncItems = computed(() => [...(syncPreview.value?.items ?? [])].sor
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
-const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', ums_dep_id: '', is_active: true });
+const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', is_active: true });
 const statusOptions = [{ title: 'ทุกสถานะ', value: 'all' }, { title: 'เปิดใช้งาน', value: 'active' }, { title: 'ปิดใช้งาน', value: 'inactive' }];
 const typeOptions = [
   { title: 'คณะ / สำนัก', value: 'faculty' }, { title: 'กอง / ศูนย์', value: 'division' },
@@ -182,7 +180,7 @@ function openUnit(unit?: Unit): void {
   if (!auth.is_super_admin || saving.value || syncing.value) return;
   editingCode.value = unit?.code || '';
   Object.assign(unitForm, { name: unit?.name || '', type: unit?.type || 'faculty', parent_code: unit?.parent_code || null,
-    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true });
+    ums_fac_id: unit?.ums_fac_id || '', is_active: unit?.is_active ?? true });
   unitDialog.value = true;
 }
 async function saveUnit(): Promise<void> {
@@ -194,7 +192,7 @@ async function saveUnit(): Promise<void> {
   try {
     const payload = {
       name: unitForm.name.trim(), type: unitForm.type, parent_code: unitForm.parent_code,
-      ums_fac_id: unitForm.ums_fac_id.trim() || null, ums_dep_id: unitForm.ums_dep_id.trim() || null,
+      ums_fac_id: unitForm.ums_fac_id.trim() || null,
       is_active: unitForm.is_active,
     };
     const { item } = await jsonRequest<{ item: Unit }>(`/api/units${editingCode.value ? `/${editingCode.value}` : ''}`, {
