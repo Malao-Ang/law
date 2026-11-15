@@ -63,8 +63,8 @@
         <v-card-text>
           <v-alert :type="syncPreview?.fallback ? 'warning' : 'info'" variant="tonal" density="compact" class="mb-3">{{ syncPreview?.message }} (ทั้งหมด {{ syncPreview?.count }} รายการ)</v-alert>
           <v-alert v-if="syncPreview && !Array.isArray(syncPreview.items)" type="warning" variant="tonal" density="compact" class="mb-3">เซิร์ฟเวอร์ยังไม่ส่งรายการคณะทั้งหมด กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง</v-alert>
-          <p v-if="syncPreview?.items && !syncPreview.changes.length" class="mb-3">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
-          <v-table v-if="syncPreview?.items?.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
+          <p v-if="syncPreview?.items && !sortedSyncItems.length" class="mb-3">ไม่พบคณะใหม่หรือคณะที่เปลี่ยนชื่อจาก UMS ไม่มีรายการที่ต้องอัปเดต</p>
+          <v-table v-if="sortedSyncItems.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
             <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อ{{ syncPreview.fallback ? 'ในข้อมูลสำรอง' : 'ใน UMS' }}</th><th>ชื่อในระบบ</th></tr></thead>
             <tbody>
               <tr v-for="row in sortedSyncItems" :key="`${row.status}-${row.fac_id}`">
@@ -121,7 +121,9 @@ const syncDialog = ref(false);
 const syncPreview = ref<SyncPreview | null>(null);
 const syncSelected = ref<string[]>([]);
 const SYNC_ORDER = { new: 0, renamed: 1, missing: 2, unchanged: 3 } as const;
-const sortedSyncItems = computed(() => [...(syncPreview.value?.items ?? [])].sort((a, b) => SYNC_ORDER[a.status] - SYNC_ORDER[b.status]));
+// Show only faculties UMS has that differ from ours; extra local units and matches stay hidden.
+const sortedSyncItems = computed(() => (syncPreview.value?.items ?? []).filter((row) => row.status === 'new' || row.status === 'renamed')
+  .sort((a, b) => SYNC_ORDER[a.status] - SYNC_ORDER[b.status]));
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
