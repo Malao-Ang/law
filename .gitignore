@@ -46,7 +46,6 @@ docs/*
 !docs/law-types-and-statuses.md
 !docs/states-overview.md
 prompts/
-CLAUDE.md
 docling-arch.md
 *.jpg
 *.png

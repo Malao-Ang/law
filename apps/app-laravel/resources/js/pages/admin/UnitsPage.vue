@@ -39,16 +39,15 @@
         <v-card-title>{{ editingCode ? 'แก้ไขหน่วยงาน' : 'เพิ่มหน่วยงาน' }}</v-card-title>
         <v-card-text>
           <v-form @submit.prevent="saveUnit">
-            <v-text-field :model-value="editingCode || 'ระบบกำหนดรหัส DEP อัตโนมัติตามชนิดหน่วยงาน'" label="รหัสหน่วยงาน" variant="outlined" readonly />
-            <v-text-field v-model="unitForm.name" label="ชื่อหน่วยงาน" variant="outlined" :disabled="saving" maxlength="255" />
             <v-select v-model="unitForm.type" label="ชนิดหน่วยงาน" :items="typeOptions" variant="outlined" :disabled="saving || Boolean(editingCode)" />
+            <v-text-field :model-value="editingCode || nextUnitCode || 'ช่วงรหัสเต็มแล้ว'" label="รหัสหน่วยงาน" variant="outlined" readonly
+              :hint="editingCode ? undefined : `มี ${unitTypeCount} หน่วยงานในชนิดนี้ · ${nextUnitCode ? 'รหัสนี้เป็นตัวอย่างก่อนบันทึก' : 'ไม่สามารถเพิ่มหน่วยงานชนิดนี้ได้'}`" :persistent-hint="!editingCode" />
+            <v-text-field v-model="unitForm.name" label="ชื่อหน่วยงาน" variant="outlined" :disabled="saving" maxlength="255" />
             <v-select v-if="unitForm.type === 'department'" v-model="unitForm.parent_code" label="คณะ / สำนักแม่"
               :items="allUnits.filter((u) => u.type === 'faculty')" item-title="name" item-value="code" variant="outlined" :disabled="saving" />
             <p v-else-if="unitForm.type === 'division'" class="mb-4">หน่วยงานแม่: สำนักงานอธิการบดี</p>
             <p v-else-if="unitForm.type === 'law_subunit'" class="mb-4">หน่วยงานแม่: กองกฎหมาย</p>
             <v-text-field v-if="unitForm.type === 'faculty'" v-model="unitForm.ums_fac_id" label="รหัสคณะใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-model="unitForm.ums_dep_id" label="รหัสฝ่าย / หน่วยงานใน UMS" variant="outlined" :disabled="saving" />
-            <v-text-field v-model.number="unitForm.sort_order" label="ลำดับแสดงผล" type="number" min="0" variant="outlined" :disabled="saving" />
             <v-switch class="master-dialog__switch" v-model="unitForm.is_active" label="เปิดใช้งาน" color="success" hide-details :disabled="saving" />
             <div class="unit-dialog__actions d-flex justify-end ga-2 mt-4">
               <v-btn variant="text" :disabled="saving" @click="unitDialog = false">ยกเลิก</v-btn>
@@ -60,15 +59,16 @@
     </v-dialog>
     <v-dialog v-model="syncDialog" max-width="760" persistent :retain-focus="false">
       <v-card rounded="lg" class="unit-dialog">
-        <v-card-title>รายการคณะจาก UMS ที่แตกต่างจากระบบ</v-card-title>
+        <v-card-title>รายการคณะจาก {{ syncPreview?.fallback ? 'ข้อมูลสำรอง' : 'UMS' }}</v-card-title>
         <v-card-text>
           <v-alert :type="syncPreview?.fallback ? 'warning' : 'info'" variant="tonal" density="compact" class="mb-3">{{ syncPreview?.message }} (ทั้งหมด {{ syncPreview?.count }} รายการ)</v-alert>
-          <p v-if="!syncPreview?.changes.length" class="py-4 text-center">ข้อมูลคณะตรงกับระบบแล้ว ไม่มีรายการที่ต้องอัปเดต</p>
-          <v-table v-else density="compact">
-            <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อใน UMS</th><th>ชื่อในระบบ</th></tr></thead>
+          <v-alert v-if="syncPreview && !Array.isArray(syncPreview.items)" type="warning" variant="tonal" density="compact" class="mb-3">เซิร์ฟเวอร์ยังไม่ส่งรายการคณะทั้งหมด กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง</v-alert>
+          <p v-if="syncPreview?.items && !sortedSyncItems.length" class="mb-3">ไม่พบคณะใหม่หรือคณะที่เปลี่ยนชื่อจาก UMS ไม่มีรายการที่ต้องอัปเดต</p>
+          <v-table v-if="sortedSyncItems.length" class="sync-preview-table" density="compact" fixed-header :aria-label="`รายการคณะจาก${syncPreview.fallback ? 'ข้อมูลสำรอง' : ' UMS'}และสถานะเทียบกับระบบ`">
+            <thead><tr><th style="width:48px" /><th>สถานะ</th><th>รหัส UMS</th><th>ชื่อ{{ syncPreview.fallback ? 'ในข้อมูลสำรอง' : 'ใน UMS' }}</th><th>ชื่อในระบบ</th></tr></thead>
             <tbody>
-              <tr v-for="row in syncPreview.changes" :key="`${row.status}-${row.fac_id}`">
-                <td><v-checkbox-btn v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
+              <tr v-for="row in sortedSyncItems" :key="`${row.status}-${row.fac_id}`">
+                <td><v-checkbox-btn v-if="row.status !== 'unchanged'" v-model="syncSelected" :value="`${row.status}:${row.fac_id}`" :aria-label="`เลือก ${row.name}`" /></td>
                 <td><v-chip size="small" variant="tonal" :color="SYNC_COLORS[row.status]">{{ SYNC_LABELS[row.status] }}</v-chip></td>
                 <td>{{ row.fac_id }}</td>
                 <td>{{ row.status === 'missing' ? '-' : row.name }}</td>
@@ -113,21 +113,40 @@ const loading = ref(false);
 const saving = ref(false);
 const syncing = ref(false);
 interface SyncChange { fac_id: string; status: 'new' | 'renamed' | 'missing'; name: string; current_code: string | null; current_name: string | null }
-interface SyncPreview { token: string; fallback: boolean; count: number; message: string; changes: SyncChange[] }
-const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS' } as const;
-const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error' } as const;
+interface SyncPreviewRow extends Omit<SyncChange, 'status'> { status: SyncChange['status'] | 'unchanged' }
+interface SyncPreview { token: string; fallback: boolean; count: number; message: string; items?: SyncPreviewRow[]; changes: SyncChange[] }
+const SYNC_LABELS = { new: 'ใหม่', renamed: 'ชื่อเปลี่ยน', missing: 'ไม่พบใน UMS', unchanged: 'ตรงกัน' } as const;
+const SYNC_COLORS = { new: 'success', renamed: 'warning', missing: 'error', unchanged: 'info' } as const;
 const syncDialog = ref(false);
 const syncPreview = ref<SyncPreview | null>(null);
 const syncSelected = ref<string[]>([]);
+const SYNC_ORDER = { new: 0, renamed: 1, missing: 2, unchanged: 3 } as const;
+// Show only faculties UMS has that differ from ours; extra local units and matches stay hidden.
+const sortedSyncItems = computed(() => (syncPreview.value?.items ?? []).filter((row) => row.status === 'new' || row.status === 'renamed')
+  .sort((a, b) => SYNC_ORDER[a.status] - SYNC_ORDER[b.status]));
 const controlRevision = ref(0);
 const unitDialog = ref(false);
 const editingCode = ref('');
-const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', ums_dep_id: '', is_active: true, sort_order: 0 });
+const unitForm = reactive({ name: '', type: 'faculty' as UnitType, parent_code: null as string | null, ums_fac_id: '', is_active: true });
 const statusOptions = [{ title: 'ทุกสถานะ', value: 'all' }, { title: 'เปิดใช้งาน', value: 'active' }, { title: 'ปิดใช้งาน', value: 'inactive' }];
 const typeOptions = [
   { title: 'คณะ / สำนัก', value: 'faculty' }, { title: 'กอง / ศูนย์', value: 'division' },
   { title: 'ฝ่าย / ภาควิชา', value: 'department' }, { title: 'หน่วยย่อยกองกฎหมาย', value: 'law_subunit' },
 ];
+const codeRanges: Record<UnitType, readonly [number, number]> = {
+  faculty: [1, 99], division: [100, 199], department: [200, 499], law_subunit: [500, 999],
+};
+const unitTypeCount = computed(() => allUnits.value.filter((unit) => unit.type === unitForm.type).length);
+const nextUnitNumber = computed(() => {
+  const [min, max] = codeRanges[unitForm.type];
+  const next = allUnits.value.reduce((highest, unit) => {
+    const match = /^DEP(\d{3})$/.exec(unit.code);
+    const number = match ? Number(match[1]) : 0;
+    return number >= min && number <= max ? Math.max(highest, number + 1) : highest;
+  }, min);
+  return next <= max ? next : null;
+});
+const nextUnitCode = computed(() => nextUnitNumber.value === null ? '' : `DEP${String(nextUnitNumber.value).padStart(3, '0')}`);
 const visibleUnits = computed(() => allUnits.value.filter((u) => auth.is_super_admin || auth.active_unit?.code === u.code && ['inner_admin', 'outer_admin'].includes(auth.role ?? '')));
 // Status changes keep the current rows mounted until the viewer changes filters.
 const statusSnapshot = ref(new Map<string, boolean>());
@@ -146,7 +165,8 @@ watch(() => route.query, (q) => {
   page.value = positive(q.page, 1); perPage.value = positive(q.per_page, 10);
 });
 async function showError(error: unknown): Promise<void> {
-  if ((error as ApiRequestError)?.status === 403) return;
+  const status = (error as ApiRequestError)?.status;
+  if (status === 403 || (status === 401 && (!auth.isAuthenticated || auth.reauthRequired))) return;
   await alertError(error instanceof Error && /[ก-๙]/.test(error.message) ? error.message : 'ไม่สามารถดำเนินการได้ กรุณาลองอีกครั้ง');
 }
 async function confirm(title: string, text: string): Promise<boolean> {
@@ -162,18 +182,23 @@ function openUnit(unit?: Unit): void {
   if (!auth.is_super_admin || saving.value || syncing.value) return;
   editingCode.value = unit?.code || '';
   Object.assign(unitForm, { name: unit?.name || '', type: unit?.type || 'faculty', parent_code: unit?.parent_code || null,
-    ums_fac_id: unit?.ums_fac_id || '', ums_dep_id: unit?.ums_dep_id || '', is_active: unit?.is_active ?? true, sort_order: unit?.sort_order || 0 });
+    ums_fac_id: unit?.ums_fac_id || '', is_active: unit?.is_active ?? true });
   unitDialog.value = true;
 }
 async function saveUnit(): Promise<void> {
   if (saving.value || syncing.value || !auth.is_super_admin) return;
   if (!unitForm.name.trim()) { await alertError('กรุณาระบุชื่อหน่วยงาน'); return; }
+  if (!editingCode.value && nextUnitNumber.value === null) { await alertError('รหัสหน่วยงานในช่วงที่กำหนดเต็มแล้ว ไม่สามารถเพิ่มหน่วยงานได้'); return; }
   if (unitForm.type === 'department' && !unitForm.parent_code) { await alertError('กรุณาเลือกคณะหรือสำนักแม่'); return; }
-  if (!Number.isInteger(unitForm.sort_order) || unitForm.sort_order < 0) { await alertError('ลำดับต้องเป็นจำนวนเต็มตั้งแต่ศูนย์ขึ้นไป'); return; }
   saving.value = true;
   try {
+    const payload = {
+      name: unitForm.name.trim(), type: unitForm.type, parent_code: unitForm.parent_code,
+      ums_fac_id: unitForm.ums_fac_id.trim() || null,
+      is_active: unitForm.is_active,
+    };
     const { item } = await jsonRequest<{ item: Unit }>(`/api/units${editingCode.value ? `/${editingCode.value}` : ''}`, {
-      method: editingCode.value ? 'PUT' : 'POST', body: JSON.stringify({ ...unitForm, name: unitForm.name.trim(), ums_fac_id: unitForm.ums_fac_id.trim() || null, ums_dep_id: unitForm.ums_dep_id.trim() || null }),
+      method: editingCode.value ? 'PUT' : 'POST', body: JSON.stringify(payload),
     });
     unitDialog.value = false;
     const index = allUnits.value.findIndex((u) => u.code === item.code);
@@ -229,5 +254,6 @@ async function applySync(): Promise<void> {
 .unit-dialog :deep(.master-dialog__switch) { margin-bottom: 8px; }
 .unit-action { font-weight: 600; }
 .unit-action + .unit-action { margin-left: 12px; }
+.sync-preview-table :deep(.v-table__wrapper) { max-height: 420px; overflow-y: auto; }
 .unit-row:focus-visible { outline: 2px solid #1e3a8a; outline-offset: -2px; }
 </style>

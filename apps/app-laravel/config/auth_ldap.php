@@ -24,4 +24,7 @@ return [
 
     /** How long a UMS person lookup is cached per username. */
     'ums_cache_seconds' => 86400,
+
+    /** Absolute session cap, regardless of activity (12 hours). */
+    'max_session_seconds' => 12 * 60 * 60,
 ];

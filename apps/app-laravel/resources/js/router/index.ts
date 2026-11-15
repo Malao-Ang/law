@@ -105,7 +105,7 @@ router.beforeEach(async (to) => {
 
 
   if ((to.path === '/admin/units' || to.path.startsWith('/admin/units/')) && !auth.canManageUnits) {
-    return auth.authEnforced && !auth.isAuthenticated
+    return !auth.isAuthenticated
       ? { path: '/login', query: { redirect: to.fullPath } }
       : { path: auth.isAdminRole ? '/admin' : '/' };
   }

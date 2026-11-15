@@ -21,10 +21,43 @@ class UmsFacultyService
             $rows = UnitStore::fallbackFaculties();
             $fallback = true;
         }
+        $changes = $units->previewFaculties($rows, $fallback);
+        $changed = [];
+        foreach ($changes as $change) {
+            if ($change['status'] !== 'missing') {
+                $changed[$change['fac_id']] = $change;
+            }
+        }
+        $existing = [];
+        foreach ($units->all() as $unit) {
+            if ($unit['type'] === 'faculty' && ! empty($unit['ums_fac_id'])) {
+                $existing[$unit['ums_fac_id']] = $unit;
+            }
+        }
+        $items = [];
+        foreach ($rows as $row) {
+            $facId = trim((string) ($row['fac_id'] ?? ''));
+            $name = trim((string) ($row['fac_nameth'] ?? ''));
+            if ($facId === '' || $name === '') {
+                continue;
+            }
+            $current = $existing[$facId] ?? null;
+            $items[] = [
+                'fac_id' => $facId, 'name' => $name,
+                'status' => $changed[$facId]['status'] ?? 'unchanged',
+                'current_code' => $current['code'] ?? null,
+                'current_name' => $current['name'] ?? null,
+            ];
+        }
+        foreach ($changes as $change) {
+            if ($change['status'] === 'missing') {
+                $items[] = $change;
+            }
+        }
         $token = bin2hex(random_bytes(16));
         Cache::put('units.sync.'.$token, ['rows' => $rows, 'fallback' => $fallback], 600);
 
-        return ['token' => $token, 'fallback' => $fallback, 'count' => count($rows), 'changes' => $units->previewFaculties($rows, $fallback), 'message' => $fallback
+        return ['token' => $token, 'fallback' => $fallback, 'count' => count($rows), 'items' => $items, 'changes' => $changes, 'message' => $fallback
             ? 'ไม่สามารถดึงข้อมูลจาก UMS ได้ แสดงการเปรียบเทียบกับข้อมูลคณะสำรองจาก faculty.json'
             : 'ดึงข้อมูลคณะจาก UMS เรียบร้อยแล้ว'];
     }

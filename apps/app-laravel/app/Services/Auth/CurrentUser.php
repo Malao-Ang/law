@@ -17,6 +17,8 @@ class CurrentUser
 
     public const ACTING_MODE_KEY = 'acting_mode';
 
+    public const LOGIN_AT_KEY = 'auth_login_at';
+
     public function __construct(private readonly MongoUserStore $users, private readonly UnitStore $units) {}
 
     /** @return array<string, mixed>|null */
@@ -28,6 +30,18 @@ class CurrentUser
 
         $username = $request->session()->get(self::SESSION_KEY);
         if (! is_string($username) || $username === '') {
+            return null;
+        }
+        $loginAt = $request->session()->get(self::LOGIN_AT_KEY);
+        if (! is_numeric($loginAt)) {
+            // Existing sessions receive a fresh absolute window at rollout.
+            $loginAt = time();
+            $request->session()->put(self::LOGIN_AT_KEY, $loginAt);
+        }
+        if (time() >= (int) $loginAt + (int) config('auth_ldap.max_session_seconds')) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
             return null;
         }
 
@@ -66,6 +80,7 @@ class CurrentUser
     {
         $request->session()->regenerate();
         $request->session()->put(self::SESSION_KEY, MongoUserStore::key($username));
+        $request->session()->put(self::LOGIN_AT_KEY, time());
         $request->session()->forget([self::ACTIVE_UNIT_KEY, self::ACTING_MODE_KEY]);
     }
 
@@ -122,6 +137,8 @@ class CurrentUser
             'needs_unit_selection' => $needsSelection,
             'can_upload' => app(DocumentAccess::class)->allows($request, 'upload'),
             'auth_enforced' => (bool) config('auth_ldap.enforced'),
+            'session_expires_at' => ((int) $request->session()->get(self::LOGIN_AT_KEY) + (int) config('auth_ldap.max_session_seconds')) * 1000,
+            'session_idle_expires_at' => (time() + (int) config('session.lifetime') * 60) * 1000,
         ];
     }
 
