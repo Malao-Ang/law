@@ -23,7 +23,7 @@ _THAI_COMBINING_START = set("ิีึืุูั็่้๊๋์ํฺ๎า
 
 # Pixels between span end-x and next span start-x above which we treat the
 # whitespace as a real tab rather than a single space. ~12pt ≈ 4 monospaced
-# characters in body text — empirically large enough to skip normal word gaps
+# characters in body text   empirically large enough to skip normal word gaps
 # but small enough to catch deliberate indent stops in Thai legal documents.
 PDF_TAB_GAP_THRESHOLD_PT = 12.0
 
@@ -102,7 +102,7 @@ def _extract_line_text_with_tabs(
     """Build line text from PyMuPDF spans, inserting \\t where the gap between
     consecutive spans exceeds PDF_TAB_GAP_THRESHOLD_PT.  Returns (text, tabs)
     where `tabs` lists detected tab-stop positions in twips relative to
-    page_margin_x — suitable for `meta.layout.tabs`.
+    page_margin_x   suitable for `meta.layout.tabs`.
     """
     detected_tabs: list[dict] = []
     parts: list[str] = []
@@ -237,7 +237,7 @@ def _merge_column_pair_tables(blocks: list[dict], page_index: int) -> list[dict]
     Algorithm:
     1. Cluster block x0 values into column bands.
     2. Sort all para blocks by y0 and scan for runs where blocks from ≥2
-       distinct columns share overlapping y-bands — these are table rows.
+       distinct columns share overlapping y-bands   these are table rows.
     3. Consecutive matched-row runs (≥ _COL_TABLE_MIN_ROWS rows with ≥2 cols)
        become table blocks.
     """
@@ -322,7 +322,7 @@ def _merge_column_pair_tables(blocks: list[dict], page_index: int) -> list[dict]
             i += 1
             continue
 
-        # Start a run — collect consecutive multi-column slots whose y-bands
+        # Start a run   collect consecutive multi-column slots whose y-bands
         # are within _COL_CLUSTER_GAP_PT of each other.
         run = [slot]
         j = i + 1
@@ -859,7 +859,7 @@ class DoclingService:
             if block["type"] == 0:
                 block_rect = block["bbox"]
                 if any(self._rects_overlap(block_rect, tr) for tr in table_rects):
-                    continue  # covered by a table — handled below
+                    continue  # covered by a table   handled below
 
                 # Collect spans per-line so that:
                 #   - combining-mark-only spans are not lost by premature .strip()
@@ -886,7 +886,7 @@ class DoclingService:
                                 detected_tabs_all.append(t)
 
                 # Merge lines that share the same visual row (y_mid within
-                # median_line_height/2) but differ in x — these are table columns
+                # median_line_height/2) but differ in x   these are table columns
                 # placed side-by-side in the PDF.  Join them with \t so the tab
                 # renderer shows the horizontal gap correctly.
                 if line_records:
@@ -962,7 +962,7 @@ class DoclingService:
 
         # ── column-pair table detection ───────────────────────────────────
         # Some PDFs lay out tables as two (or more) independent PyMuPDF text
-        # blocks placed side-by-side — one per column — with no ruling lines.
+        # blocks placed side-by-side   one per column   with no ruling lines.
         # Neither Docling nor fitz.find_tables() detects these.  We reconstruct
         # them by clustering paragraph blocks whose y-ranges overlap into groups,
         # then checking whether multiple x-clusters exist within the group.
@@ -1019,7 +1019,7 @@ class DoclingService:
                     if tb:
                         blocks.append(tb)
         else:
-            # Reuse fitz_tables detected above for text masking — avoid a
+            # Reuse fitz_tables detected above for text masking   avoid a
             # second find_tables() call which could pick a different strategy.
             for i, table in enumerate(fitz_tables or []):
                 tb = self._extract_pdf_table(table, page, page_index, reading_order + i)
@@ -1202,8 +1202,8 @@ class DoclingService:
         - indent_first_line: first line is further RIGHT than continuation lines
 
         What cannot be trusted:
-        - alignment (center/justify/right) — needs right-edge analysis
-        - tab stops — PDFs don't encode them; only visual positions exist
+        - alignment (center/justify/right)   needs right-edge analysis
+        - tab stops   PDFs don't encode them; only visual positions exist
         - semantic meaning (numbered list vs. block quote vs. plain indent)
         """
         # Collect x0/x1 positions only from lines that have actual spans.
@@ -1238,7 +1238,7 @@ class DoclingService:
         rest_x0s = x0s[1:] if len(x0s) > 1 else [first_x0]
         avg_rest = sum(rest_x0s) / len(rest_x0s)
 
-        # Threshold from settings (default 2pt) — captures fine Thai first-line
+        # Threshold from settings (default 2pt)   captures fine Thai first-line
         # indents that the legacy 5pt floor dropped silently.
         from app.core.config import get_settings as _get_settings
         INDENT_THRESHOLD_PT = float(_get_settings().pdf_indent_threshold_pt)
@@ -1364,7 +1364,7 @@ class DoclingService:
                         for off in range(colspan):
                             next_merges[col + off] = mc
                     # else: vMerge continuation with no tracked restart (malformed DOCX).
-                    # Advance col but do not write next_merges — remaining columns stay
+                    # Advance col but do not write next_merges   remaining columns stay
                     # correctly indexed and the cell is silently skipped as intended.
                     col += colspan
                     continue

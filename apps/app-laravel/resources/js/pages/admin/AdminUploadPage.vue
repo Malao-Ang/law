@@ -289,7 +289,7 @@ function modeOptionsFor(file: File) {
 
 function hintFor(item: PendingItem): string {
   if (isPdf(item.file) && (item.scanMode === 'gemini' || item.scanMode === 'landingai')) {
-    return 'ใช้ cloud OCR ตามที่เลือก — ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
+    return 'ใช้ cloud OCR ตามที่เลือก   ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
   }
   return '';
 }

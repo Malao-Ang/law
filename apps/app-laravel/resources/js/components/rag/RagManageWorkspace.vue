@@ -887,7 +887,7 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-/* ponytail: custom checkbox grid layout — no Vuetify equivalent */
+/* ponytail: custom checkbox grid layout   no Vuetify equivalent */
 .rag-blockrow {
   display: grid;
   grid-template-columns: minmax(28px, 10%) minmax(0, 1fr) 32px;

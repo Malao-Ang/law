@@ -606,7 +606,7 @@ class ReviewStore
 
             $versions[] = [
                 'document_id' => $row['document_id'],
-                // ponytail: positional label, not a stable id — if a middle version is later
+                // ponytail: positional label, not a stable id   if a middle version is later
                 // inserted, labels shift. Add a persisted label to law_meta if stability is needed.
                 'version_label' => 'v'.($index + 1).'.0',
                 'is_current' => $row['document_id'] === $currentId,
@@ -1767,7 +1767,7 @@ class ReviewStore
     /**
      * Map edited draft_html back onto document blocks by data-block-id, so the
      * RAG and /law screens (which render from blocks) reflect review edits.
-     * v1: 1:1 block_id match only — structural edits (split/merge/new/delete)
+     * v1: 1:1 block_id match only   structural edits (split/merge/new/delete)
      * are not reconciled, matching the buildChunksFromHtml/export limitation.
      *
      * @param  array<string, mixed>  $document
@@ -1789,7 +1789,7 @@ class ReviewStore
         }
         $imgAlignments = $this->extractImageAlignmentsFromHtml($html);
 
-        // ponytail: no ?? [] on foreach with references — PHP copies the rvalue, breaking mutation
+        // ponytail: no ?? [] on foreach with references   PHP copies the rvalue, breaking mutation
         foreach (array_keys($document['pages'] ?? []) as $pi) {
             foreach (array_keys($document['pages'][$pi]['blocks'] ?? []) as $bi) {
                 $block = &$document['pages'][$pi]['blocks'][$bi];
@@ -1840,7 +1840,7 @@ class ReviewStore
                 if ($derivedAlignment !== null) {
                     $layout['alignment'] = $derivedAlignment;
                 } else {
-                    // Reverting to the default (left) drops the style entirely — clear it.
+                    // Reverting to the default (left) drops the style entirely   clear it.
                     unset($layout['alignment']);
                 }
                 if (is_numeric($derivedIndentLeft) && (float) $derivedIndentLeft > 0) {

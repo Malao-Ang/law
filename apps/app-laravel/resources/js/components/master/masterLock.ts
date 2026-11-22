@@ -20,7 +20,7 @@ export function toggleText(item: LockItem, _kind: MasterKind): LockText {
 }
 
 export function lockAriaLabel(item: LockItem, _kind: MasterKind): string {
-  return item.is_active ? 'ใช้งานอยู่ — ปิดใช้งาน' : 'ปิดใช้งานอยู่ — เปิดใช้งาน';
+  return item.is_active ? 'ใช้งานอยู่   ปิดใช้งาน' : 'ปิดใช้งานอยู่   เปิดใช้งาน';
 }
 
 export function usageLink(kind: MasterKind, code: string, count: number | undefined): string | null {

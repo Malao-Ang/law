@@ -101,7 +101,7 @@ const bodyHtml = computed<string>(() => {
 
 <style scoped>
 /* ponytail: entire component is a text/content renderer (image, table, rich-text);
-   no chrome (no buttons, no card wrapper, no header) — nothing to convert to Vuetify.
+   no chrome (no buttons, no card wrapper, no header)   nothing to convert to Vuetify.
    The outermost <div class="block-flow"> carries load-bearing CSS (line-height, font-size,
    margin, text rendering) and cannot be replaced by <v-card> without breaking layout. */
 .block-flow {

@@ -198,7 +198,7 @@ class LawSearchTest extends TestCase
             ]],
         ]);
 
-        // Deliberately NO export file written — content must come from review blocks.
+        // Deliberately NO export file written   content must come from review blocks.
         cache()->forget('law-meta-list');
 
         $this->postJson('/api/laws/search', ['q' => 'นิเทศศาสตร์'])

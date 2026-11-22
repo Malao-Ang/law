@@ -110,7 +110,7 @@ function search(): void { page.value = 1; void load(); }
 onMounted(() => { readQuery(); void load(); });
 watch(() => route.fullPath, () => { if (route.path !== '/admin/audit-logs') return; readQuery(); if (!loading.value) void load(); });
 function roleLabel(role: string): string { return ROLE_LABELS[role as AuthRole] || role; }
-function unitName(code: string | null): string { return units.value.find((u) => u.code === code)?.name || code || '—'; }
+function unitName(code: string | null): string { return units.value.find((u) => u.code === code)?.name || code || ' '; }
 function resultLabel(result: string): string { return result === 'denied' ? 'ปฏิเสธ' : result === 'failed' ? 'ไม่สำเร็จ' : 'สำเร็จ'; }
 function changeFields(item: AuditLogItem): string[] { return [...new Set([...Object.keys(item.before || {}), ...Object.keys(item.after || {})])]; }
 function changeValueClass(field: string, value: unknown): string {

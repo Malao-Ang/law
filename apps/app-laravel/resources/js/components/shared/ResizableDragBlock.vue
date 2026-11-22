@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: drag+resize positioning, keep — all rules below are load-bearing for
+/* ponytail: drag+resize positioning, keep   all rules below are load-bearing for
    absolute handle placement, cursor feedback, tooltip positioning, and selection outline.
    No structural chrome (no card, no toolbar, no header) exists in this component.
    Only the hardcoded Vuetify-primary hex (#1976d2) and surface-white (#ffffff) are

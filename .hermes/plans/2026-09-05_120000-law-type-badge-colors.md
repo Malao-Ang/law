@@ -1,4 +1,4 @@
-# Plan: Law Type Badge — สี + tag ครบทุกประเภท (Homepage + Database)
+# Plan: Law Type Badge   สี + tag ครบทุกประเภท (Homepage + Database)
 
 ## Goal
 ทุก card ทั้งหน้า homepage และ /database แสดง tag ประเภทกฎหมาย (ระเบียบ/ประกาศ/ข้อบังคับ/กฎกระทรวง/พ.ร.บ. ฯลฯ) ด้วยสีที่แตกต่างกันชัดเจน ไม่มี "กฎหมายภายนอก" เป็น catch-all
@@ -30,12 +30,12 @@ LAW_TYPE_TO_BADGE มีค่าบางส่วน แต่ไม่คร�
 | พระราชกำหนด | external | external | #6d28d9 (ม่วงเข้ม) |
 | กฎกระทรวง | external | external | #2563eb (น้ำเงินเข้ม) |
 | ประกาศกระทรวง | external | external | #0369a1 (ฟ้าเข้ม) |
-| คำสั่ง | — | — | #64748b (เทา) |
-| มติ | — | — | #475569 (เทาเข้ม) |
+| คำสั่ง |   |   | #64748b (เทา) |
+| มติ |   |   | #475569 (เทาเข้ม) |
 
 ## Tasks
 
-### Task 1: ขยาย DocBadge.vue — เพิ่ม BadgeType + สีครบ
+### Task 1: ขยาย DocBadge.vue   เพิ่ม BadgeType + สีครบ
 File: `apps/app-laravel/resources/js/components/shared/DocBadge.vue`
 
 เพิ่ม types และสีใน STYLES:
@@ -72,7 +72,7 @@ const STYLES: Record<BadgeType, { bg: string; fg: string; icon: string }> = {
 };
 ```
 
-### Task 2: ขยาย lawBadge.ts — map law_type → badge label ครบ
+### Task 2: ขยาย lawBadge.ts   map law_type → badge label ครบ
 File: `apps/app-laravel/resources/js/components/shared/lawBadge.ts`
 
 ```ts
@@ -101,7 +101,7 @@ const LAW_TYPE_TO_BADGE: Record<string, LawTypeBadge> = {
 };
 ```
 
-### Task 3: ELawLawCard.vue — ใช้ law_type แทน docType สำหรับ badge
+### Task 3: ELawLawCard.vue   ใช้ law_type แทน docType สำหรับ badge
 File: `apps/app-laravel/resources/js/components/shared/ELawLawCard.vue`
 
 เพิ่ม prop `lawType?: string` และแสดง badge จาก law_type ก่อน ถ้าไม่มีจึง fallback docType:
@@ -125,12 +125,12 @@ File: `apps/app-laravel/resources/js/pages/public/PublicHomePage.vue`
 
 หรือ approach ง่ายกว่า: เพิ่ม field `lawTypeName?: string` ใน `DocumentVersion.metadata` type แล้ว pass จาก search result
 
-### Task 5: LawDatabasePage.vue — ตรวจ LAW_TYPE_TO_BADGE ครบ
+### Task 5: LawDatabasePage.vue   ตรวจ LAW_TYPE_TO_BADGE ครบ
 File: `apps/app-laravel/resources/js/pages/public/LawDatabasePage.vue`
 
 ตรวจ `lawTypeBadgeKey()` และ `LAW_TYPE_TO_BADGE` ว่าครบไหม เพิ่ม mapping ที่ขาด
 
-### Task 6: Border-left colors — ELawLawCard.vue
+### Task 6: Border-left colors   ELawLawCard.vue
 เพิ่ม CSS class สำหรับ external types ใหม่:
 ```css
 .elaw-card--prb          { border-left-color: #7c3aed; }

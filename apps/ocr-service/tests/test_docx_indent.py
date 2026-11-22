@@ -31,7 +31,7 @@ def _make_paragraph(text: str, first_line_twips: int | None = None) -> ET.Elemen
 def _make_paragraph_with_tab(text_after_tab: str) -> ET.Element:
     """Build a w:p with an explicit w:tab element then a text run."""
     para = ET.Element(f"{{{W_NS}}}p")
-    ET.SubElement(para, f"{{{W_NS}}}pPr")  # empty pPr — no w:ind
+    ET.SubElement(para, f"{{{W_NS}}}pPr")  # empty pPr   no w:ind
     r = ET.SubElement(para, f"{{{W_NS}}}r")
     ET.SubElement(r, f"{{{W_NS}}}tab")
     t = ET.SubElement(r, f"{{{W_NS}}}t")
@@ -156,7 +156,7 @@ class TestNumberingNoCompoundIndent:
         """Numbered list items must not have indent_first_line inferred from the structural tab."""
         parser = self._get_parser()
         # Simulate a paragraph whose numbering resolver would fire but
-        # the numbering_context doesn't have a definition — the resolver
+        # the numbering_context doesn't have a definition   the resolver
         # returns None and the paragraph stays as a plain paragraph with
         # the body text unchanged.  We test the guard directly by calling
         # _parse_paragraph with a paragraph whose text does NOT start with
@@ -185,6 +185,6 @@ class TestNumberingNoCompoundIndent:
         from app.services import docx_parser
         source = inspect.getsource(docx_parser.DocxParser._parse_paragraph)
         assert "numbering_info is None" in source, (
-            "Phase B guard 'numbering_info is None' not found in _parse_paragraph — "
+            "Phase B guard 'numbering_info is None' not found in _parse_paragraph   "
             "regression: numbered list items will get compound indent"
         )

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\Auth\CurrentUser;
 use App\Services\Auth\MongoUserStore;
 use App\Services\ReviewStore;
 use Illuminate\Http\UploadedFile;
@@ -72,7 +73,7 @@ class LawCommentTest extends TestCase
             ->assertJsonPath('total', 0)
             ->assertJsonPath('counts.all', 0);
 
-        $this->as('staff')->getJson($this->uri())
+        $this->as('staff', true)->getJson($this->uri())
             ->assertOk()
             ->assertJsonPath('total', 1)
             ->assertJsonPath('can_reply', true)
@@ -92,7 +93,7 @@ class LawCommentTest extends TestCase
         $this->as('alice')->postJson($this->uri($id).'/reply', ['body' => 'รับทราบ'])
             ->assertStatus(403);
 
-        $this->as('staff')->postJson($this->uri($id).'/reply', ['body' => 'จะนำไปประกอบการพิจารณา'])
+        $this->as('staff', true)->postJson($this->uri($id).'/reply', ['body' => 'จะนำไปประกอบการพิจารณา'])
             ->assertOk()
             ->assertJsonPath('comment.status', 'answered')
             ->assertJsonPath('comment.reply.body', 'จะนำไปประกอบการพิจารณา')
@@ -177,6 +178,63 @@ class LawCommentTest extends TestCase
         $this->withHeaders($this->headers())->getJson($this->uri())->assertOk();
     }
 
+    public function test_admin_can_list_reply_change_visibility_and_archive(): void
+    {
+        $this->user('alice', 'Alice');
+        $this->user('staff', 'กองกฎหมาย', true);
+
+        $created = $this->as('alice')->post($this->uri(), [
+            'type' => 'question',
+            'body' => 'ติดต่อหน่วยงานใดได้บ้าง',
+            'section_ref' => 'มาตรา 3',
+            'visibility' => 'public',
+        ])->assertCreated()->json('comment');
+
+        $this->assertNotEmpty($created['code']);
+        $commentId = $created['id'];
+
+        $this->as('staff', true)->getJson('/api/admin/comments')
+            ->assertOk()
+            ->assertJsonPath('counts.pending', 1)
+            ->assertJsonFragment(['id' => $commentId, 'document_title' => 'พระราชบัญญัติทดสอบ']);
+
+        $this->as('staff', true)->getJson('/api/admin/comments/'.$commentId)
+            ->assertOk()
+            ->assertJsonPath('comment.code', $created['code'])
+            ->assertJsonPath('comment.body', 'ติดต่อหน่วยงานใดได้บ้าง');
+
+        $this->as('staff', true)->post('/api/admin/comments/'.$commentId.'/reply', [
+            'body' => 'ติดต่อกองกฎหมายได้โดยตรง',
+            'visibility' => 'public',
+            'forward_for_review' => '0',
+            'as_draft' => '0',
+        ])->assertOk()
+            ->assertJsonPath('comment.status', 'answered')
+            ->assertJsonPath('comment.reply.body', 'ติดต่อกองกฎหมายได้โดยตรง');
+
+        $this->as('staff', true)->patchJson('/api/admin/comments/'.$commentId.'/visibility', [
+            'visibility' => 'private',
+            'reason' => 'ข้อมูลภายในหน่วยงาน',
+        ])->assertOk()
+            ->assertJsonPath('comment.visibility', 'private');
+
+        $this->as('staff', true)->postJson('/api/admin/comments/'.$commentId.'/archive', [
+            'reason' => 'ปิดงานแล้ว',
+        ])->assertOk()
+            ->assertJsonPath('comment.status', 'archived');
+
+        $this->flushSession();
+        $this->withHeaders($this->headers())->getJson($this->uri())
+            ->assertOk()
+            ->assertJsonPath('total', 0);
+    }
+
+    public function test_plain_user_cannot_access_admin_comments(): void
+    {
+        $this->user('alice', 'Alice');
+        $this->as('alice')->getJson('/api/admin/comments')->assertStatus(403);
+    }
+
     private function seedLaw(string $id, string $title, string $publishedDate): void
     {
         app(ReviewStore::class)->writeReviewDocument($id, [
@@ -230,9 +288,14 @@ class LawCommentTest extends TestCase
         ];
     }
 
-    private function as(string $username): self
+    private function as(string $username, bool $asSuper = false): self
     {
-        return $this->withSession(['auth_username' => $username])->withHeaders($this->headers());
+        $session = ['auth_username' => $username];
+        if ($asSuper) {
+            $session[CurrentUser::ACTING_MODE_KEY] = 'super_admin';
+        }
+
+        return $this->withSession($session)->withHeaders($this->headers());
     }
 
     private function uri(?string $commentId = null): string

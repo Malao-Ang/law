@@ -13,14 +13,14 @@
 1. `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 2. `apps/app-laravel/resources/js/components/law/LawInfoPanel.vue`
 
-## Task 1: Info Panel — เพิ่มฟิลด์ที่ขาด
+## Task 1: Info Panel   เพิ่มฟิลด์ที่ขาด
 File: `LawInfoPanel.vue`
 
 เพิ่ม rows ที่ยังไม่มี (ถ้ามีค่า):
-- `agencies` (หน่วยงานที่รับผิดชอบ — multi-chip) — ปัจจุบันแสดง `agency` เดี่ยว ถ้ามี `agencies[]` แสดงทั้งหมด
-- `law_groups` (กลุ่มกฎหมาย — multi) — ปัจจุบันแสดง `law_group` เดี่ยว ถ้ามี `law_groups[]` แสดงทั้งหมด
-- `expiry_date` (วันหมดอายุ) — ถ้ามี
-- `parent_document_ids` — แสดงเป็น link ไปยังกฎหมายแม่
+- `agencies` (หน่วยงานที่รับผิดชอบ   multi-chip)   ปัจจุบันแสดง `agency` เดี่ยว ถ้ามี `agencies[]` แสดงทั้งหมด
+- `law_groups` (กลุ่มกฎหมาย   multi)   ปัจจุบันแสดง `law_group` เดี่ยว ถ้ามี `law_groups[]` แสดงทั้งหมด
+- `expiry_date` (วันหมดอายุ)   ถ้ามี
+- `parent_document_ids`   แสดงเป็น link ไปยังกฎหมายแม่
 
 Template เพิ่มหลัง agency row (around line 46):
 ```vue
@@ -42,7 +42,7 @@ Template เพิ่มหลัง agency row (around line 46):
 </div>
 ```
 
-## Task 2: Download card — ตั้งชื่อไฟล์ตามชื่อกฎหมาย
+## Task 2: Download card   ตั้งชื่อไฟล์ตามชื่อกฎหมาย
 File: `LawDocumentView.vue` around line 125-170
 
 ปัจจุบัน `downloadUrl` เป็น `/api/documents/:id/file?download=1` ซึ่ง browser ตั้งชื่อเป็น documentId
@@ -96,7 +96,7 @@ async function handlePdfExport(): Promise<void> {
 
 ถ้ามีแล้วไม่ต้องแก้ ถ้าไม่มีให้เพิ่ม
 
-## Task 4: กฎหมายแม่ card — ปรับ style ตาม Figma
+## Task 4: กฎหมายแม่ card   ปรับ style ตาม Figma
 File: `LawDocumentView.vue`
 
 ปัจจุบัน `.lawx-parentcard` (line 241-268) แสดง "กฎหมายแม่ / เกี่ยวข้องทั้งฉบับ" อยู่แล้ว
@@ -136,7 +136,7 @@ File: `LawDocumentView.vue`
 .lawx-relrow__icon.is-amends { color: #7c3aed; }
 ```
 
-## Task 5: Section relation card — ปรับ style
+## Task 5: Section relation card   ปรับ style
 File: `LawDocumentView.vue`
 
 ปัจจุบัน `.lawx-section-relcard` (line 207-235) มีอยู่แล้ว ตรวจ CSS:
@@ -176,5 +176,5 @@ feat(law-view): complete info panel fields, download file naming, relation card 
 
 ## Open Questions
 - เอกสาร old (PDF นำเข้า) ดาวน์โหลดจาก `/api/documents/:id/file` ได้ตรง ๆ
-- เอกสาร new ดาวน์โหลด PDF export จาก `downloadPdfExport()` — ต้องตรวจว่า endpoint ทำงาน
-- ถ้า PDF export ยังไม่พร้อม (ยังไม่ export) → แสดง error "ยังไม่มี PDF — กรุณาส่ง eSign ก่อน"
+- เอกสาร new ดาวน์โหลด PDF export จาก `downloadPdfExport()`   ต้องตรวจว่า endpoint ทำงาน
+- ถ้า PDF export ยังไม่พร้อม (ยังไม่ export) → แสดง error "ยังไม่มี PDF   กรุณาส่ง eSign ก่อน"

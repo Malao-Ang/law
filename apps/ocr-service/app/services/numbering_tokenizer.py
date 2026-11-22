@@ -1,6 +1,6 @@
 """Regex-based numbering tokenizer for Thai legal documents.
 
-Detects leading list/section markers in extracted block text — Word numbering
+Detects leading list/section markers in extracted block text   Word numbering
 (`w:numPr`) covers most DOCX cases, but Thai legal documents very often type
 the marker as literal text (e.g. ``มาตรา ๑``, ``ข้อ ๑.๑``, ``(ก)``).  This
 tokenizer recognises those literal markers and emits a structured
@@ -16,7 +16,7 @@ Design rules:
 * Patterns are tried in priority order; the first match wins.  Longer/more
   specific patterns come first so ``มาตรา ๑`` is not misclassified as a bare
   Thai numeral.
-* Pure-stdlib ``re`` — no third-party dependency.
+* Pure-stdlib ``re``   no third-party dependency.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ _THAI_LETTER = r"[ก-ฮ]"
 
 # Priority-ordered (most specific first).
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # 1. มาตรา N or มาตรา N/M  (highest specificity — legal "section")
+    # 1. มาตรา N or มาตรา N/M  (highest specificity   legal "section")
     (re.compile(rf"^(มาตรา\s+{_DIGIT}+(?:/{_DIGIT}+)?)\b"), "legal-มาตรา"),
     # 2. ข้อ N.N.N
     (re.compile(rf"^(ข้อ\s+{_DIGIT}+(?:\.{_DIGIT}+)*)\b"), "legal-ข้อ"),
@@ -106,7 +106,7 @@ def detect_list_marker(text: str) -> ListMarker | None:
     return None
 
 
-# Marker types that are top-level legal section headers — never retype a
+# Marker types that are top-level legal section headers   never retype a
 # block to ``list_item`` based on these.  ``วรรค`` ("paragraph" in legal
 # parlance) is a sub-unit; keep its existing type.
 _SECTION_HEADER_MARKERS = {"legal-มาตรา", "legal-ข้อ"}

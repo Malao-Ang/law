@@ -113,7 +113,7 @@ class ExportService
                     $title = $text;
                 }
 
-                // Solo types are never merged — flush current window first, emit solo, continue.
+                // Solo types are never merged   flush current window first, emit solo, continue.
                 if (in_array($type, self::SOLO_TYPES, true)) {
                     ($flush)();
                     $chunks[] = $this->buildSoloChunk($documentId, $counter++, $block, $pageNo, $sectionContext, $sectionHeadBlock);

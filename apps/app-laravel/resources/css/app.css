@@ -1,4 +1,4 @@
-/* SweetAlert2 — ต้องอยู่เหนือ Vuetify dialog (z-index 2400) */
+/* SweetAlert2   ต้องอยู่เหนือ Vuetify dialog (z-index 2400) */
 .swal2-container {
   z-index: 3000 !important;
 }
@@ -442,7 +442,7 @@ textarea {
   max-width: 100%;
 }
 
-/* Subtle marker for first-line indents inferred from a leading TAB —
+/* Subtle marker for first-line indents inferred from a leading TAB  
    reviewers can see the inference was automatic and override if wrong. */
 .document-rich-editor .doc-block p.has-inferred-indent {
   border-left: 2px dotted #c8b89a;
@@ -843,11 +843,11 @@ textarea {
 }
 
 .doc-block.needs-review {
-  /* yellow left-border removed — clean document view */
+  /* yellow left-border removed   clean document view */
 }
 
 .doc-block.is-editing {
-  /* no outline — Word-like seamless editing */
+  /* no outline   Word-like seamless editing */
 }
 
 .is-edit-mode .doc-block:not(.is-editing) .doc-block__body:hover {

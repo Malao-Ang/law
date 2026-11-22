@@ -244,7 +244,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   overflow: visible;
 }
 
-/* Eyebrow pill — exact Figma: white bg, border rgba(123,88,13,0.3), text #7b580d 12px */
+/* Eyebrow pill   exact Figma: white bg, border rgba(123,88,13,0.3), text #7b580d 12px */
 .elaw-hero__eyebrow {
   display: inline-flex;
   align-items: center;
@@ -282,7 +282,7 @@ async function applyPopularTag(tag: string): Promise<void> {
   margin-bottom: 28px;
 }
 
-/* ── Search card — exact Figma: rounded-32px, blur, border #e7e2d9, shadow ── */
+/* ── Search card   exact Figma: rounded-32px, blur, border #e7e2d9, shadow ── */
 .elaw-search-card {
   position: relative;
   z-index: 20;

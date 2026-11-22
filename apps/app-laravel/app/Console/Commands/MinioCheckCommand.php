@@ -100,7 +100,7 @@ class MinioCheckCommand extends Command
             return self::SUCCESS;
         }
 
-        // No documentId — list root
+        // No documentId   list root
         $this->info('Listing MinIO root /');
 
         try {

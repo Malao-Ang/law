@@ -89,7 +89,7 @@ const props = defineProps<{
   visibility?: Visibility;
   changeStatus?: ChangeStatus;
   amendedSections?: string[];
-  // When true (or non-private), the viewer can open the doc directly — button reads "เปิดอ่าน".
+  // When true (or non-private), the viewer can open the doc directly   button reads "เปิดอ่าน".
   // Private + cannot open (guest) → "เข้าสู่ระบบ".
   canOpen?: boolean;
 }>();

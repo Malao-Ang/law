@@ -2,25 +2,25 @@
 
 ## Goal
 
-Add download buttons to the `/law/:id` page so users can download: (1) the original source document, (2) a server-generated PDF from approved content, and (3) files of related/linked documents — with dual storage support (local dev vs BUU MinIO production).
+Add download buttons to the `/law/:id` page so users can download: (1) the original source document, (2) a server-generated PDF from approved content, and (3) files of related/linked documents   with dual storage support (local dev vs BUU MinIO production).
 
 ## Current Context
 
 ### What exists
-- `DocumentFileController::show()` at `GET /api/documents/{id}/file` — serves the original PDF inline (only if source is PDF; 404s for DOCX/DOC).
-- `OriginalPdfExportController::store()` at `POST /api/documents/{id}/export-pdf-original` — converts DOCX/DOC → PDF via LibreOffice, returns PDF download.
-- `downloadPdfExport()` (client.ts:278) — `POST /api/documents/{id}/export-pdf` — downloads a generated PDF from approved blocks.
-- `downloadOriginalPdfExport()` (client.ts:291) — calls the LibreOffice conversion endpoint.
-- `LawDocumentView.vue` line 112 — already has a "ดาวน์โหลด PDF" button, but only when `usesOriginalPdfLayout` is true (old docs / PDF source). It links to `/api/documents/{id}/file` (inline, not download).
+- `DocumentFileController::show()` at `GET /api/documents/{id}/file`   serves the original PDF inline (only if source is PDF; 404s for DOCX/DOC).
+- `OriginalPdfExportController::store()` at `POST /api/documents/{id}/export-pdf-original`   converts DOCX/DOC → PDF via LibreOffice, returns PDF download.
+- `downloadPdfExport()` (client.ts:278)   `POST /api/documents/{id}/export-pdf`   downloads a generated PDF from approved blocks.
+- `downloadOriginalPdfExport()` (client.ts:291)   calls the LibreOffice conversion endpoint.
+- `LawDocumentView.vue` line 112   already has a "ดาวน์โหลด PDF" button, but only when `usesOriginalPdfLayout` is true (old docs / PDF source). It links to `/api/documents/{id}/file` (inline, not download).
 - Relations exist in `review.relations[]` with `target_document_id` linking to other documents.
-- `BuuMinioService` has `putFile()` and `getPublicLinks()` but is NOT wired into file serving yet — only e-sign uses it.
-- `BUU_MINIO_ENABLED` env toggle pattern (from memory) — used to gate MinIO features.
+- `BuuMinioService` has `putFile()` and `getPublicLinks()` but is NOT wired into file serving yet   only e-sign uses it.
+- `BUU_MINIO_ENABLED` env toggle pattern (from memory)   used to gate MinIO features.
 
 ### What's missing
 1. No download button for non-PDF originals (DOCX/DOC) on `/law/:id`.
 2. No "generated PDF" download on `/law/:id` (only exists in compose/export flow).
 3. No way to download related documents' files from the relations panel.
-4. `DocumentFileController` only serves local files — no MinIO fallback.
+4. `DocumentFileController` only serves local files   no MinIO fallback.
 5. No `BUU_MINIO_ENABLED` toggle in `DocumentFileController`.
 
 ## Architecture
@@ -31,7 +31,7 @@ Three changes: (A) Enhance `DocumentFileController` to support both local and Mi
 
 - "เอกสารที่เชื่อมโยง" = documents linked via `relations[].target_document_id` (the relation system already exists).
 - "PDF ที่เราทำให้ user" = the generated PDF from approved blocks (existing `/export-pdf` endpoint).
-- Download buttons go on `/law/:id` (LawDocumentView) — the public-facing page.
+- Download buttons go on `/law/:id` (LawDocumentView)   the public-facing page.
 - MinIO feature toggle follows the `BUU_MINIO_ENABLED` env pattern already established.
 - For dev: files served from local `poc_storage` volume. For prod (MinIO enabled): redirect to presigned MinIO URL.
 
@@ -55,11 +55,11 @@ Add:
 BUU_MINIO_ENABLED=false
 ```
 
-**Verify:** `grep minio_enabled apps/app-laravel/config/buu.php` — should show the line.
+**Verify:** `grep minio_enabled apps/app-laravel/config/buu.php`   should show the line.
 
 ---
 
-### Task 2: Enhance `DocumentFileController` — support all file types + download disposition + MinIO fallback
+### Task 2: Enhance `DocumentFileController`   support all file types + download disposition + MinIO fallback
 
 **File:** `apps/app-laravel/app/Http/Controllers/Api/DocumentFileController.php`
 
@@ -168,7 +168,7 @@ class DocumentFileController extends Controller
 }
 ```
 
-**Route:** No change needed — `GET /api/documents/{documentId}/file` already exists at `routes/api.php:61`.
+**Route:** No change needed   `GET /api/documents/{documentId}/file` already exists at `routes/api.php:61`.
 
 **Verify:**
 ```bash
@@ -201,7 +201,7 @@ public function showRelated(Request $request, string $documentId, string $target
         abort(404, 'Related document not found.');
     }
 
-    // Delegate to the standard show() — it handles access check, local/MinIO
+    // Delegate to the standard show()   it handles access check, local/MinIO
     return $this->show($request, $targetDocumentId);
 }
 ```
@@ -228,7 +228,7 @@ export function relatedDocumentFileUrl(documentId: string, targetDocumentId: str
 }
 ```
 
-**Verify:** `grep -n documentFileDownloadUrl apps/app-laravel/resources/js/api/client.ts` — should show the new function.
+**Verify:** `grep -n documentFileDownloadUrl apps/app-laravel/resources/js/api/client.ts`   should show the new function.
 
 ---
 
@@ -262,7 +262,7 @@ const downloadableRelations = computed(() =>
 );
 ```
 
-**5c.** Add download card in template — insert after the `lawx-headcard` (after line 107, before the `usesOriginalPdfLayout` template):
+**5c.** Add download card in template   insert after the `lawx-headcard` (after line 107, before the `usesOriginalPdfLayout` template):
 
 ```html
 <v-card class="lawx-card lawx-download-card" elevation="0">
@@ -442,10 +442,10 @@ docker compose exec laravel-app php artisan test --filter=DocumentFileTest
 
 | Risk | Mitigation |
 |------|-----------|
-| MinIO `getPublicLinks()` may return different key structure than expected | Test with real MinIO in staging; the `$links['file']['view']` path is based on existing e-sign usage pattern — verify with `BuuMinioService` tests |
-| `showRelated()` opens a side channel to download any document if you know its ID and can create a relation pointing to it | The method validates the relation exists AND delegates to `show()` which checks `access_scope` — acceptable |
-| LibreOffice not available in all containers | `OriginalPdfExportController` already handles this with 503 — "PDF ดาวน์โหลด" button uses the export-pdf endpoint (block-based), not LibreOffice |
-| Large files (>100MB) served through PHP | Production should use MinIO presigned URLs (redirect, no PHP memory) — that's the MinIO path. For dev, files are typically small |
+| MinIO `getPublicLinks()` may return different key structure than expected | Test with real MinIO in staging; the `$links['file']['view']` path is based on existing e-sign usage pattern   verify with `BuuMinioService` tests |
+| `showRelated()` opens a side channel to download any document if you know its ID and can create a relation pointing to it | The method validates the relation exists AND delegates to `show()` which checks `access_scope`   acceptable |
+| LibreOffice not available in all containers | `OriginalPdfExportController` already handles this with 503   "PDF ดาวน์โหลด" button uses the export-pdf endpoint (block-based), not LibreOffice |
+| Large files (>100MB) served through PHP | Production should use MinIO presigned URLs (redirect, no PHP memory)   that's the MinIO path. For dev, files are typically small |
 
 ## Open Questions
 

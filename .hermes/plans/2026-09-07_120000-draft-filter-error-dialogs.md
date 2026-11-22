@@ -1,4 +1,4 @@
-# Plan: 3 Fixes — Search draft filter, MongoBlobStore error dialog, e-Sign error dialog
+# Plan: 3 Fixes   Search draft filter, MongoBlobStore error dialog, e-Sign error dialog
 
 ## Problem 1: เอกสาร "ร่าง" แสดงใน public search
 
@@ -21,10 +21,10 @@ if (($row['published_date'] ?? '') === '') continue;
 if (($row['law_status'] ?? $row['law_meta']['status'] ?? '') === 'ร่าง') continue;
 ```
 
-ต้องตรวจว่า `listLawMeta()` return `law_status` หรือ `law_meta.status` ใน key ไหน — อ่าน `ReviewStore::listLawMeta()` ก่อน
+ต้องตรวจว่า `listLawMeta()` return `law_status` หรือ `law_meta.status` ใน key ไหน   อ่าน `ReviewStore::listLawMeta()` ก่อน
 
 ### Also fix: ES search path
-ใน ES search path (line 67-74) มี published allowlist แต่ไม่ filter ร่าง — เพิ่มตรวจ `law_meta.status !== 'ร่าง'` ตรงนั้นด้วย
+ใน ES search path (line 67-74) มี published allowlist แต่ไม่ filter ร่าง   เพิ่มตรวจ `law_meta.status !== 'ร่าง'` ตรงนั้นด้วย
 
 ---
 
@@ -58,26 +58,26 @@ watch(() => composeStore.error, (err) => {
 เปลี่ยนจาก `v-alert` errorFlash → `Swal.fire({ icon: 'error' })` ทุกที่ที่ set `errorFlash`
 
 Files:
-- `components/esign/ESignPreviewWorkspace.vue` — เปลี่ยน errorFlash setter → Swal
-- `components/esign/ESignStatusWorkspace.vue` — เปลี่ยน errorFlash v-alert → Swal
-- `components/esign/ESignDocumentWorkspace.vue` — ตรวจสอบเพิ่มเติม
+- `components/esign/ESignPreviewWorkspace.vue`   เปลี่ยน errorFlash setter → Swal
+- `components/esign/ESignStatusWorkspace.vue`   เปลี่ยน errorFlash v-alert → Swal
+- `components/esign/ESignDocumentWorkspace.vue`   ตรวจสอบเพิ่มเติม
 
 ---
 
 ## Task list (ordered)
 
-### Task 1 — Filter ร่าง ออกจาก public search
+### Task 1   Filter ร่าง ออกจาก public search
 File: `app/Http/Controllers/Api/LawSearchController.php`
 1. อ่าน `ReviewStore::listLawMeta()` ดูว่า law status อยู่ key ไหน
 2. เพิ่ม filter ใน `fileBasedSearch()` หลัง published_date check
 3. เพิ่ม filter ใน ES path's `$publishedIds` loop
 
-### Task 2 — MongoBlobStore error → SweetAlert
+### Task 2   MongoBlobStore error → SweetAlert
 File: `components/rag/RagManageWorkspace.vue`
 - เพิ่ม `watch(composeStore.error, ...)` → `Swal.fire({ icon: 'error' })`
 - ลบ/ซ่อน inline error block (เพราะ Swal จะแทนที่)
 
-### Task 3 — e-Sign error → SweetAlert
+### Task 3   e-Sign error → SweetAlert
 Files:
 - `components/esign/ESignPreviewWorkspace.vue`
 - `components/esign/ESignStatusWorkspace.vue`

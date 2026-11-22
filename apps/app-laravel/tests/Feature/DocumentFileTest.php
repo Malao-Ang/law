@@ -31,7 +31,7 @@ class DocumentFileTest extends TestCase
     public function test_private_document_file_is_served_without_backend_auth(): void
     {
         // No backend auth exists yet (mock login is client-only), so $request->user()
-        // is always null. A private document must still serve its file — the previous
+        // is always null. A private document must still serve its file   the previous
         // `! $request->user()` gate 403'd every private doc for everyone.
         $store = app(ReviewStore::class);
         $id = $store->generateDocumentId();

@@ -2,7 +2,7 @@
 
 ## Goal
 
-เพิ่ม dialog confirm ก่อนเผยแพร่ทุกหน้า — แสดงเงื่อนไขที่ครบ/ไม่ครบ (RAG, relations, metadata, etc.) ให้ user ตัดสินใจ
+เพิ่ม dialog confirm ก่อนเผยแพร่ทุกหน้า   แสดงเงื่อนไขที่ครบ/ไม่ครบ (RAG, relations, metadata, etc.) ให้ user ตัดสินใจ
 
 ## Current Problem
 
@@ -64,16 +64,16 @@
 **File:** `apps/app-laravel/resources/js/components/shared/PublishConfirmDialog.vue`
 
 Props:
-- `modelValue: boolean` — v-model for open/close
-- `publishing: boolean` — true = กำลังจะเผยแพร่, false = กำลังจะยกเลิก
+- `modelValue: boolean`   v-model for open/close
+- `publishing: boolean`   true = กำลังจะเผยแพร่, false = กำลังจะยกเลิก
 - `documentId: string`
 - `loading: boolean`
 
 Component reads from `useDocumentStore()` to compute checklist items. Each item: `{ key, label, ok, status, level: 'required' | 'optional' }`.
 
 Emits:
-- `confirm` — user confirmed
-- `cancel` — user cancelled
+- `confirm`   user confirmed
+- `cancel`   user cancelled
 
 Template: `v-dialog` with `v-card`, checklist items with ✅/⚠️ icons, warning text if any optional skipped, confirm/cancel buttons.
 
@@ -94,7 +94,7 @@ Changes:
 
 **File:** `apps/app-laravel/resources/js/components/esign/ESignDocumentWorkspace.vue`
 
-Same pattern as Task 2 — add dialog before publish toggle in edit mode.
+Same pattern as Task 2   add dialog before publish toggle in edit mode.
 
 ### Task 4: Run typecheck
 
@@ -107,4 +107,4 @@ Commit: `feat(publish): add confirmation dialog with readiness checklist before 
 ## Risks
 
 - Old docs ที่ไม่มี blocks/relations ยังต้อง publish ได้ → checklist ต้อง mark เงื่อนไขเหล่านั้นเป็น optional สำหรับ old doc
-- Dialog ไม่ block publish — แค่แสดง warning ถ้า skip ขั้นตอน, user ยังกด confirm ได้
+- Dialog ไม่ block publish   แค่แสดง warning ถ้า skip ขั้นตอน, user ยังกด confirm ได้

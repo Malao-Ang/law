@@ -44,7 +44,7 @@ class OcrPipeline:
     def __init__(self, data_root: Path) -> None:
         self.data_root = data_root
         self._reader = None
-        # On GPU: allow N concurrent readtext() calls — PyTorch queues CUDA work
+        # On GPU: allow N concurrent readtext() calls   PyTorch queues CUDA work
         # so multiple callers share the GPU without corrupting model state.
         # On CPU: fall back to a plain Lock (N=1) to avoid thrashing.
         self._ocr_lock = self._make_ocr_lock()
@@ -111,7 +111,7 @@ class OcrPipeline:
     def extract_scanned_pdf(self, file_path: Path, document_id: str) -> list[dict]:
         """Extract scanned PDF with EasyOCR.
 
-        OCRmyPDF pre-pass is opt-in (``enable_ocrmypdf_prepass`` in config) —
+        OCRmyPDF pre-pass is opt-in (``enable_ocrmypdf_prepass`` in config)  
         it adds 5-10× latency for marginal benefit on Thai legal scans.
         Pages are rasterised concurrently via a thread pool; OCR calls are
         serialised by ``_ocr_lock`` so the GPU model is never called re-entrantly.
@@ -273,7 +273,7 @@ class OcrPipeline:
                 # Real tables are large; reject small noise regions.
                 if w < 200 or h < 100:
                     continue
-                # Reject detections that cover most of the page — those are background noise.
+                # Reject detections that cover most of the page   those are background noise.
                 if w * h > 0.70 * img_w * img_h:
                     continue
                 table_regions.append({
@@ -394,7 +394,7 @@ class OcrPipeline:
         """Create a table block from grouped OCR lines.
 
         Returns None (so lines fall back to paragraphs) when the detected region
-        has fewer than 2 rows or fewer than 2 columns — single-axis structures
+        has fewer than 2 rows or fewer than 2 columns   single-axis structures
         are not tables.
         """
         if not lines:
@@ -521,7 +521,7 @@ class OcrPipeline:
             if row:
                 table_rows.append(row)
 
-        # Step 2: naive rowspan detection — if a cell bbox spans into the next row's
+        # Step 2: naive rowspan detection   if a cell bbox spans into the next row's
         # y-range and there is no cell in the next row that covers the same x-range,
         # increment its rowspan.
         for r_idx in range(len(table_rows) - 1):

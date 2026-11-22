@@ -148,7 +148,7 @@ class DocumentHtmlService
         $indentLeft = $layout['indent_left'] ?? null;
 
         // When indent_level is not set but indent_left (twips) is, derive a level.
-        // This ensures TipTap—which strips inline styles from <p> tags—sees a
+        // This ensures TipTap which strips inline styles from <p> tags sees a
         // doc-indent-N CSS class it can preserve. Setting it on $layout also
         // suppresses the duplicate inline margin-left in buildLayoutStyleAttribute.
         // 360 twips ≈ 18pt ≈ one standard indent stop.
@@ -347,7 +347,7 @@ class DocumentHtmlService
                     'bbox' => null,
                     'reading_order' => $readingOrder !== '' ? (int) $readingOrder : null,
                     // TextAlign renders text-align on the wrapper element itself, which
-                    // innerHtml() drops — capture it here so alignment survives writeback.
+                    // innerHtml() drops   capture it here so alignment survives writeback.
                     'alignment' => $this->extractInlineTextAlign($wrapper),
                     'indent_left' => $this->extractInlineMarginLeftTwips($wrapper),
                     // First-line indent (text-indent) is set on the wrapper by
@@ -528,7 +528,7 @@ class DocumentHtmlService
         // too, or the two indent sources would compound.
         if (is_numeric($indentLeft) && ! is_int($indentLevel)) {
             // Word stores indent in twips (1/20 point), convert to points.
-            // Clamp to 200pt — values beyond that are almost always parsing
+            // Clamp to 200pt   values beyond that are almost always parsing
             // artefacts (e.g. a paragraph styled with a deeply-nested list
             // indent) and would push the text outside the canvas.
             $marginPt = min((float) $indentLeft / 20, 200.0);

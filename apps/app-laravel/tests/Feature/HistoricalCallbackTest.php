@@ -36,7 +36,7 @@ class HistoricalCallbackTest extends TestCase
         $export = json_decode(file_get_contents($exportPath), true);
         $this->assertStringContainsString('ข้อความจากการสแกน', $export['chunks'][0]['text']);
 
-        // Review blob (stub) NOT overwritten — still empty pages
+        // Review blob (stub) NOT overwritten   still empty pages
         $review = $store->getReviewDocument($id);
         $this->assertSame([], $review['pages']);
         $this->assertSame('old', $review['law_meta']['document_type']);

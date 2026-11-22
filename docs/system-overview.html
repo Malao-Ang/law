@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ภาพรวมระบบ — Thai Legal OCR / e-Law</title>
+<title>ภาพรวมระบบ   Thai Legal OCR / e-Law</title>
 <style>
   :root {
     --navy: #1a3673; --gold: #b68d40; --brown: #4e4538;
@@ -82,14 +82,14 @@
       <a href="#index">5. การทำ Index เข้า Elasticsearch</a><br>
       <a href="#search">6. ระบบค้นหา (Search / Suggest / Fuzzy / Highlight)</a><br>
       <a href="#queue">7. Redis &amp; คิวงานเบื้องหลัง (Queue)</a><br>
-      <a href="#cache">8. การทำ Cache — ทำไม doc โหลดเร็ว</a><br>
+      <a href="#cache">8. การทำ Cache   ทำไม doc โหลดเร็ว</a><br>
       <a href="#map">9. แผนที่โค้ด (ไฟล์ไหนทำอะไร)</a><br>
     </div>
   </div>
 
   <!-- 1 -->
   <h2 id="overview">1. ภาพรวมและ Flow ทั้งระบบ</h2>
-  <p>ระบบไม่มีฐานข้อมูลหลักถาวร — state เก็บเป็นไฟล์ใน <code>storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python) ผ่าน Docker volume ร่วมกัน. Elasticsearch ใช้เป็น index สำหรับค้นหา, MongoDB เก็บ blob เอกสาร, Redis เป็นคิว.</p>
+  <p>ระบบไม่มีฐานข้อมูลหลักถาวร   state เก็บเป็นไฟล์ใน <code>storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python) ผ่าน Docker volume ร่วมกัน. Elasticsearch ใช้เป็น index สำหรับค้นหา, MongoDB เก็บ blob เอกสาร, Redis เป็นคิว.</p>
   <div class="flow">
     <div class="step"><b>1) Upload</b><small>ผู้ใช้อัปโหลดไฟล์</small></div>
     <div class="arrow">→</div>
@@ -114,18 +114,18 @@
   <h2 id="read">2. การอ่าน / สกัดเอกสาร (Extraction)</h2>
   <p>เริ่มที่ <code>UploadController</code> → dispatch <code>ExtractDocumentJob</code> ซึ่ง<b>แยกเป็น 2 engine</b> ตามฟิลด์ <code>extraction_engine</code>:</p>
 
-  <h3><span class="tag fast">Fast</span> (ค่าเริ่มต้น — PHP ล้วน ไม่ต้องพึ่ง Python)</h3>
+  <h3><span class="tag fast">Fast</span> (ค่าเริ่มต้น   PHP ล้วน ไม่ต้องพึ่ง Python)</h3>
   <div class="card">
     <div class="kv">
       <div>Entry</div><div><code>app/Services/Fast/FastExtractionPipeline.php</code></div>
       <div>DOCX</div><div><code>FastDocxExtractor.php</code> → unzip ด้วย <code>DocxArchive</code>, แปลงย่อหน้าด้วย <code>ParagraphParser</code>, เลขข้อ/มาตราด้วย <code>NumberingResolver</code>, ตารางด้วย <code>TableParser</code></div>
-      <div>PDF (ข้อความ)</div><div><code>FastPdfTextExtractor.php</code> — อ่านชั้นข้อความของ PDF (ไม่ใช้ OCR)</div>
+      <div>PDF (ข้อความ)</div><div><code>FastPdfTextExtractor.php</code>   อ่านชั้นข้อความของ PDF (ไม่ใช้ OCR)</div>
       <div>.doc</div><div><code>LibreOfficeConverter.php</code> แปลง .doc → .docx ก่อน</div>
       <div>ถ้าเจอไฟล์ที่รองรับไม่ได้</div><div>โยน <code>FastPathUnsupportedException</code> → fallback ไป engine Standard อัตโนมัติ</div>
     </div>
   </div>
 
-  <h3><span class="tag std">Standard</span> (Python pipeline — สำหรับสแกน / bbox แม่นยำ)</h3>
+  <h3><span class="tag std">Standard</span> (Python pipeline   สำหรับสแกน / bbox แม่นยำ)</h3>
   <p>Laravel เรียก <code>DocumentPipelineClient::extract()</code> → <code>POST http://ocr-service:8010/pipeline/extract</code> (async 202) แล้ว Python ทำงานใน <code>apps/ocr-service/app/api/routes.py::_run_extraction</code>:</p>
   <table>
     <tr><th>ขั้น</th><th>ทำอะไร</th><th>โค้ด</th></tr>
@@ -144,17 +144,17 @@
   <p>ฝั่ง Fast path หลังสกัดเสร็จจะ dispatch <code>NormalizeDocumentJob</code> (ไม่ล้ม ถ้า Python ดับก็ข้าม) ส่ง block ที่ไม่ใช่ตาราง/รูปไปที่ <code>POST /pipeline/normalize</code> แล้วเขียนกลับด้วย <code>ReviewStore::applyNormalizationResults()</code>.</p>
   <ul class="tight">
     <li><b>Normalize</b> (<code>thai_normalizer.py</code>): จัดเรียงสระ, แก้วรรณยุกต์, <code>ํา</code>→<code>ำ</code>, ล้าง whitespace</li>
-    <li><b>Spellcheck</b> (<code>thai_spellchecker.py</code>): Norvig + <code>resources/legal_terms.txt</code> — ทำเฉพาะ block ที่ <code>needs_review=true</code></li>
-    <li><b>Autocorrect</b>: <code>normalize_autocorrect_min_confidence</code> (ปัจจุบันตั้ง <span class="pill">0.85</span>) — คำแนะนำที่มั่นใจ ≥85% จะแก้อัตโนมัติ</li>
+    <li><b>Spellcheck</b> (<code>thai_spellchecker.py</code>): Norvig + <code>resources/legal_terms.txt</code>   ทำเฉพาะ block ที่ <code>needs_review=true</code></li>
+    <li><b>Autocorrect</b>: <code>normalize_autocorrect_min_confidence</code> (ปัจจุบันตั้ง <span class="pill">0.85</span>)   คำแนะนำที่มั่นใจ ≥85% จะแก้อัตโนมัติ</li>
   </ul>
 
   <!-- 4 -->
   <h2 id="chunk">4. การทำ Chunk (RAG)</h2>
   <p>“chunk” คือหน่วยที่นำไปค้นหา. ขั้นตอนการสร้าง:</p>
   <ol>
-    <li><b>ตรวจทานทั้งเอกสาร</b> — หน้า <code>/documents/:id/review</code> ใช้ TipTap (<code>DocumentEditorShell.vue</code>) แก้ไขแล้วเซฟเป็น <code>draft_html</code></li>
-    <li><b>จัดกลุ่มเป็น section</b> — หน้า <code>/documents/:id/rag</code> (<code>RagManageWorkspace.vue</code>) รวม block เป็น “section” ตาม <code>chunk_type</code> ผ่าน <code>composables/useLawSections.ts</code> (<code>buildSections</code>). ผู้ใช้เลือกประเภทหัวข้อ (TITLE / ARTICLE=มาตรา / CLAUSE=ข้อ / CHAPTER=หมวด …), รวม/แยก/ลบบล็อกได้</li>
-    <li><b>Export → chunks</b> — <code>ExportService::export()</code> เรียก <code>DocumentHtmlService::buildChunksFromHtml(draft_html)</code> ตัดเป็น chunk ต่อ block (จับด้วย <code>data-block-id</code>) แต่ละ chunk มี: <code>chunk_id, page_no, block_ids, section_path, text, meta.type, meta.html</code> → เขียนเป็น export JSON</li>
+    <li><b>ตรวจทานทั้งเอกสาร</b>   หน้า <code>/documents/:id/review</code> ใช้ TipTap (<code>DocumentEditorShell.vue</code>) แก้ไขแล้วเซฟเป็น <code>draft_html</code></li>
+    <li><b>จัดกลุ่มเป็น section</b>   หน้า <code>/documents/:id/rag</code> (<code>RagManageWorkspace.vue</code>) รวม block เป็น “section” ตาม <code>chunk_type</code> ผ่าน <code>composables/useLawSections.ts</code> (<code>buildSections</code>). ผู้ใช้เลือกประเภทหัวข้อ (TITLE / ARTICLE=มาตรา / CLAUSE=ข้อ / CHAPTER=หมวด …), รวม/แยก/ลบบล็อกได้</li>
+    <li><b>Export → chunks</b>   <code>ExportService::export()</code> เรียก <code>DocumentHtmlService::buildChunksFromHtml(draft_html)</code> ตัดเป็น chunk ต่อ block (จับด้วย <code>data-block-id</code>) แต่ละ chunk มี: <code>chunk_id, page_no, block_ids, section_path, text, meta.type, meta.html</code> → เขียนเป็น export JSON</li>
   </ol>
   <div class="note"><b>โครงสร้าง 1 chunk (โดยย่อ):</b> <code>{ chunk_id, page_no, block_ids[], section_path, text, meta:{ type, html, layout } }</code>. v1 จับคู่ block 1:1 (การ merge/split/new ทำในหน้า RAG ก่อน export).</div>
   <p>สัญญา (schema) ของ chunk export อยู่ที่ <code>schemas/export-rag.schema.json</code>.</p>
@@ -164,7 +164,7 @@
   <p>เมื่อกด “บันทึกและเผยแพร่” จะ dispatch <code>IngestRagJob</code>:</p>
   <ol>
     <li>ถ้ายังไม่มี export → เรียก <code>ExportService::export()</code> (สร้าง chunks ตามข้อ 4)</li>
-    <li>เรียก <code>LawIndexer::index(documentId)</code> — อ่าน export chunks + <code>law_meta</code> แล้วสร้าง ES doc ต่อ chunk ด้วย <code>buildDoc()</code> ยัดเข้า index ชื่อ <code>laws</code></li>
+    <li>เรียก <code>LawIndexer::index(documentId)</code>   อ่าน export chunks + <code>law_meta</code> แล้วสร้าง ES doc ต่อ chunk ด้วย <code>buildDoc()</code> ยัดเข้า index ชื่อ <code>laws</code></li>
   </ol>
   <p>ฟิลด์ที่ index (จาก <code>LawIndexer.php</code> / <code>LawIndexDefinition.php</code>) เช่น:</p>
   <table>
@@ -183,19 +183,19 @@
   <div class="card">
     <p><code>LawSearchController::search()</code> ใช้ <b>ผลจากไฟล์เป็นหลัก (authoritative)</b> แล้วเสริมด้วย Elasticsearch:</p>
     <div class="flow">
-      <div class="step"><b>fileBasedSearch()</b><small>อ่าน status/บล็อกจริงผ่าน <code>ReviewStore::listLawMeta()</code> — สะท้อนสถานะ publish ล่าสุดเสมอ ไม่พึ่ง ES</small></div>
+      <div class="step"><b>fileBasedSearch()</b><small>อ่าน status/บล็อกจริงผ่าน <code>ReviewStore::listLawMeta()</code>   สะท้อนสถานะ publish ล่าสุดเสมอ ไม่พึ่ง ES</small></div>
       <div class="arrow">+</div>
       <div class="step"><b>LawSearchService (ES)</b><small>ให้คะแนน/จัดอันดับ + fuzzy + facets</small></div>
       <div class="arrow">→</div>
       <div class="step"><b>รวมผล</b><small>ES ที่มีคะแนน + เติมเอกสารที่ ES ตกหล่นจากฝั่งไฟล์</small></div>
     </div>
-    <p class="note" style="margin-top:8px"><b>ทำไมต้องมีฝั่งไฟล์:</b> ถ้า ES ยังไม่ได้ index (เช่น dev หรือ ES ดับ) การค้นหายังทำงาน — และ<b>ตรรกะ fuzzy จริงอยู่ที่ฝั่งไฟล์ด้วย</b> จึงค้นเจอแม้ ES ว่าง.</p>
+    <p class="note" style="margin-top:8px"><b>ทำไมต้องมีฝั่งไฟล์:</b> ถ้า ES ยังไม่ได้ index (เช่น dev หรือ ES ดับ) การค้นหายังทำงาน   และ<b>ตรรกะ fuzzy จริงอยู่ที่ฝั่งไฟล์ด้วย</b> จึงค้นเจอแม้ ES ว่าง.</p>
   </div>
 
   <h3>ค้นหาแบบตรงตัว + คำใกล้เคียง (Fuzzy)</h3>
   <ul class="tight">
     <li><b>ตรงตัว:</b> ฝั่งไฟล์ใช้ <code>mb_stripos</code> บนชื่อ/เนื้อหา; ES ใช้ <code>multi_match best_fields</code></li>
-    <li><b>คำใกล้เคียง (พิมพ์ผิด):</b> ถ้าตรงตัวไม่เจอ จะ fallback — ฝั่งไฟล์ใช้ Dice-similarity แบบ multibyte (รองรับไทย, sliding window) ใน <code>fileSearchMatch</code>/<code>textSimilarity</code>; ES ใช้ <code>fuzziness: AUTO</code>. ตัวอย่าง <b>“มหาวิทยาลับ” → เจอ “มหาวิทยาลัย”</b></li>
+    <li><b>คำใกล้เคียง (พิมพ์ผิด):</b> ถ้าตรงตัวไม่เจอ จะ fallback   ฝั่งไฟล์ใช้ Dice-similarity แบบ multibyte (รองรับไทย, sliding window) ใน <code>fileSearchMatch</code>/<code>textSimilarity</code>; ES ใช้ <code>fuzziness: AUTO</code>. ตัวอย่าง <b>“มหาวิทยาลับ” → เจอ “มหาวิทยาลัย”</b></li>
     <li>ผลลัพธ์แนบ <code>fuzzy</code> / <code>meta.mode=file_fuzzy</code> เพื่อให้ UI ขึ้นแบนเนอร์ “แสดงผลใกล้เคียง”</li>
   </ul>
 
@@ -207,15 +207,15 @@
 
   <h3>ฝั่งหน้าเว็บ (Vue)</h3>
   <div class="kv">
-    <div>หน้าค้นหา</div><div><code>pages/public/LawDatabasePage.vue</code> — ค้นหา + ตัวกรอง + ไฮไลต์ชื่อ + แบนเนอร์ใกล้เคียง + การ์ด private</div>
-    <div>กล่องค้นหน้าแรก</div><div><code>components/shared/ELawHeroSearch.vue</code> — dropdown แนะนำคำ (มี fuzzy)</div>
-    <div>state ค้นหา</div><div><code>stores/lawSearchStore.ts</code> — <code>search()</code> / <code>suggest()</code></div>
-    <div>หน้าอ่านกฎหมาย</div><div><code>components/law/LawDocumentView.vue</code> — สารบัญมาตรา + ความสัมพันธ์กฎหมาย + ข้อมูลกฎหมาย</div>
+    <div>หน้าค้นหา</div><div><code>pages/public/LawDatabasePage.vue</code>   ค้นหา + ตัวกรอง + ไฮไลต์ชื่อ + แบนเนอร์ใกล้เคียง + การ์ด private</div>
+    <div>กล่องค้นหน้าแรก</div><div><code>components/shared/ELawHeroSearch.vue</code>   dropdown แนะนำคำ (มี fuzzy)</div>
+    <div>state ค้นหา</div><div><code>stores/lawSearchStore.ts</code>   <code>search()</code> / <code>suggest()</code></div>
+    <div>หน้าอ่านกฎหมาย</div><div><code>components/law/LawDocumentView.vue</code>   สารบัญมาตรา + ความสัมพันธ์กฎหมาย + ข้อมูลกฎหมาย</div>
   </div>
 
   <!-- 7 -->
   <h2 id="queue">7. Redis &amp; คิวงานเบื้องหลัง (Queue)</h2>
-  <p>ในระบบนี้ <b>Redis ทำหน้าที่เดียว: เป็น “คิวงานเบื้องหลัง” (queue backend) ของ Laravel</b> — จากคอนฟิกจริง <code>QUEUE_CONNECTION=redis</code> (ส่วน <code>CACHE_STORE=file</code> และ <code>SESSION_DRIVER=file</code> ไม่ได้ใช้ Redis).</p>
+  <p>ในระบบนี้ <b>Redis ทำหน้าที่เดียว: เป็น “คิวงานเบื้องหลัง” (queue backend) ของ Laravel</b>   จากคอนฟิกจริง <code>QUEUE_CONNECTION=redis</code> (ส่วน <code>CACHE_STORE=file</code> และ <code>SESSION_DRIVER=file</code> ไม่ได้ใช้ Redis).</p>
   <div class="flow">
     <div class="step"><b>laravel-app</b><small>โยนงาน (dispatch) เข้าคิว แล้วตอบผู้ใช้ทันที</small></div>
     <div class="arrow">→</div>
@@ -232,26 +232,26 @@
     <tr><td><code>ReprocessBlockJob</code></td><td>สกัดบล็อกใหม่รายบล็อก</td></tr>
     <tr><td><code>IngestRagJob</code></td><td>export chunks + index เข้า Elasticsearch</td></tr>
   </table>
-  <div class="note"><b>ทำไมต้องมีคิว:</b> (1) <b>ไม่บล็อกผู้ใช้</b> — อัปโหลดเสร็จได้ response ทันที ส่วน OCR/สกัดที่กินเวลาทำเบื้องหลัง; (2) <b>ขยายกำลังได้</b> — <code>docker compose up -d --scale queue-worker=3</code> ทำหลายเอกสารพร้อมกัน; (3) <b>กันงานหาย</b> — worker ล้ม งานยังอยู่ใน Redis ให้ retry. ถ้า Redis ดับ งานเบื้องหลังหยุด แต่หน้าเว็บ/ค้นหายังทำงาน (ไม่พึ่ง Redis).</div>
+  <div class="note"><b>ทำไมต้องมีคิว:</b> (1) <b>ไม่บล็อกผู้ใช้</b>   อัปโหลดเสร็จได้ response ทันที ส่วน OCR/สกัดที่กินเวลาทำเบื้องหลัง; (2) <b>ขยายกำลังได้</b>   <code>docker compose up -d --scale queue-worker=3</code> ทำหลายเอกสารพร้อมกัน; (3) <b>กันงานหาย</b>   worker ล้ม งานยังอยู่ใน Redis ให้ retry. ถ้า Redis ดับ งานเบื้องหลังหยุด แต่หน้าเว็บ/ค้นหายังทำงาน (ไม่พึ่ง Redis).</div>
 
   <!-- 8 -->
-  <h2 id="cache">8. การทำ Cache — ทำไม doc โหลดเร็ว</h2>
-  <p>ระบบเก็บข้อมูลเป็นไฟล์/Mongo (ไม่มี DB หลัก) การอ่านซ้ำ ๆ จึงแพง — เลยมี cache <b>3 ชั้น</b> ทำให้หน้ารายการ/ค้นหา/เปิด doc เร็ว:</p>
+  <h2 id="cache">8. การทำ Cache   ทำไม doc โหลดเร็ว</h2>
+  <p>ระบบเก็บข้อมูลเป็นไฟล์/Mongo (ไม่มี DB หลัก) การอ่านซ้ำ ๆ จึงแพง   เลยมี cache <b>3 ชั้น</b> ทำให้หน้ารายการ/ค้นหา/เปิด doc เร็ว:</p>
   <table>
     <tr><th>ชั้น</th><th>อยู่ที่ไหน / เก็บอะไร</th><th>ล้าง (invalidate) เมื่อไหร่</th></tr>
     <tr>
       <td><b>1. Laravel cache</b><br><span class="pill">file driver</span></td>
-      <td><code>ReviewStore::listLawMeta()</code> ใช้ <code>Cache::remember('law-meta-list', 180, …)</code> — cache <b>รายการ meta ของกฎหมายทั้งหมด</b> (ชื่อ/สถานะ/หน่วยงาน/ปี…) ไว้ 180 วินาที. หน้า <code>/database</code> (ค้นหา + facets) และ dashboard อ่านจากตรงนี้ จึง<b>ไม่ต้องเปิดอ่าน review blob ทุกอันทุก request</b></td>
+      <td><code>ReviewStore::listLawMeta()</code> ใช้ <code>Cache::remember('law-meta-list', 180, …)</code>   cache <b>รายการ meta ของกฎหมายทั้งหมด</b> (ชื่อ/สถานะ/หน่วยงาน/ปี…) ไว้ 180 วินาที. หน้า <code>/database</code> (ค้นหา + facets) และ dashboard อ่านจากตรงนี้ จึง<b>ไม่ต้องเปิดอ่าน review blob ทุกอันทุก request</b></td>
       <td><code>MongoBlobStore</code> เรียก <code>Cache::forget('law-meta-list')</code> ทุกครั้งที่มีการเขียนเอกสาร (insert/update) → ข้อมูลสดเสมอหลังแก้</td>
     </tr>
     <tr>
       <td><b>2. Frontend cache</b><br><span class="pill">in-memory Map</span></td>
-      <td><code>resources/js/stores/reviewCache.ts</code> — เก็บใน browser: <code>reviewCache</code> (ReviewDocument ต่อ id) และ <code>previewCache</code> (HTML พรีวิว). เปิด doc/พรีวิวซ้ำ = ดึงจาก Map ไม่ยิง API ใหม่. ยิ่งกว่านั้น <code>ReviewPage</code> ยัง <b>อุ่นพรีวิวไว้ล่วงหน้า</b> (<code>getPreviewCached()</code> ทำงานเบื้องหลัง) ให้ก้าวถัดไปรู้สึกทันที</td>
-      <td>ล้างเมื่อเซฟ/แก้เอกสาร (<code>reviewCache.set</code> ใหม่ + <code>previewCache.delete</code>) — พรีวิวจะถูกสร้างใหม่จากข้อมูลล่าสุด</td>
+      <td><code>resources/js/stores/reviewCache.ts</code>   เก็บใน browser: <code>reviewCache</code> (ReviewDocument ต่อ id) และ <code>previewCache</code> (HTML พรีวิว). เปิด doc/พรีวิวซ้ำ = ดึงจาก Map ไม่ยิง API ใหม่. ยิ่งกว่านั้น <code>ReviewPage</code> ยัง <b>อุ่นพรีวิวไว้ล่วงหน้า</b> (<code>getPreviewCached()</code> ทำงานเบื้องหลัง) ให้ก้าวถัดไปรู้สึกทันที</td>
+      <td>ล้างเมื่อเซฟ/แก้เอกสาร (<code>reviewCache.set</code> ใหม่ + <code>previewCache.delete</code>)   พรีวิวจะถูกสร้างใหม่จากข้อมูลล่าสุด</td>
     </tr>
     <tr>
       <td><b>3. PHP OPcache</b><br><span class="pill">bytecode</span></td>
-      <td><code>apps/app-laravel/docker/opcache.ini</code> — cache <b>bytecode ที่คอมไพล์แล้ว</b> ของไฟล์ PHP (memory 256MB) ให้รันเร็วขึ้น ไม่ต้องคอมไพล์ใหม่ทุก request</td>
+      <td><code>apps/app-laravel/docker/opcache.ini</code>   cache <b>bytecode ที่คอมไพล์แล้ว</b> ของไฟล์ PHP (memory 256MB) ให้รันเร็วขึ้น ไม่ต้องคอมไพล์ใหม่ทุก request</td>
       <td>Dev: <code>revalidate_freq=60</code> (เช็ค mtime ทุก 60 วิ). Deploy: <code>php artisan optimize</code> แคช config/route เพิ่ม</td>
     </tr>
   </table>
@@ -277,7 +277,7 @@
   </table>
 
   <div class="note" style="margin-top:26px">
-    เอกสารนี้สรุปจากสถาปัตยกรรมจริงในโค้ด (ดูรายละเอียดเพิ่มใน <code>CLAUDE.md</code>, <code>README.md</code>, <code>docling-arch.md</code>). โครงสร้างอาจเปลี่ยนได้ — เมื่อแก้โค้ด ควรอัปเดตไฟล์นี้ตาม.
+    เอกสารนี้สรุปจากสถาปัตยกรรมจริงในโค้ด (ดูรายละเอียดเพิ่มใน <code>CLAUDE.md</code>, <code>README.md</code>, <code>docling-arch.md</code>). โครงสร้างอาจเปลี่ยนได้   เมื่อแก้โค้ด ควรอัปเดตไฟล์นี้ตาม.
   </div>
 
 </div>

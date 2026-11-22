@@ -8,7 +8,7 @@
 
 พบ 2 จุดบกพร่องที่ทำให้ counter ผิด:
 
-### Bug 1 — Backend: ES path ใช้จำนวนแค่หน้าปัจจุบันแทน total ข้ามทุกหน้า
+### Bug 1   Backend: ES path ใช้จำนวนแค่หน้าปัจจุบันแทน total ข้ามทุกหน้า
 
 **ไฟล์:** `apps/app-laravel/app/Http/Controllers/Api/LawSearchController.php` line 54
 
@@ -28,7 +28,7 @@ $paged = array_slice($rows, ($page - 1) * $perPage, $perPage);
 
 ES service ก็คืน total ที่ถูก (`$esResult['total']` = cardinality aggregation ของ law_id) แต่ controller ไม่ใช้มัน
 
-### Bug 2 — Frontend: `sortedResults` filter ซ่อน restricted docs แต่ counter ไม่ปรับ
+### Bug 2   Frontend: `sortedResults` filter ซ่อน restricted docs แต่ counter ไม่ปรับ
 
 **ไฟล์:** `apps/app-laravel/resources/js/pages/public/LawDatabasePage.vue`
 
@@ -41,8 +41,8 @@ ES service ก็คืน total ที่ถูก (`$esResult['total']` = card
 
 ## Architecture / Proposed Approach
 
-- Bug 1: ใช้ `max($fileBased['total'], count($results))` แทน `count($esRows) + count($supplement)` — file-based total เป็นตัวเลขที่ถูกต้องที่สุดเพราะนับ ALL matching published docs ไม่ใช่แค่หน้าปัจจุบัน
-- Bug 2: เอา `canDisplayLawResult` filter ออกจาก `sortedResults` — restricted docs จะแสดงพร้อม lock icon ตาม template ที่มีอยู่แล้ว (ดีกว่าซ่อนแล้ว counter ไม่ตรง)
+- Bug 1: ใช้ `max($fileBased['total'], count($results))` แทน `count($esRows) + count($supplement)`   file-based total เป็นตัวเลขที่ถูกต้องที่สุดเพราะนับ ALL matching published docs ไม่ใช่แค่หน้าปัจจุบัน
+- Bug 2: เอา `canDisplayLawResult` filter ออกจาก `sortedResults`   restricted docs จะแสดงพร้อม lock icon ตาม template ที่มีอยู่แล้ว (ดีกว่าซ่อนแล้ว counter ไม่ตรง)
 
 ## Step-by-step Tasks
 
@@ -50,7 +50,7 @@ ES service ก็คืน total ที่ถูก (`$esResult['total']` = card
 
 **ไฟล์:** `apps/app-laravel/app/Http/Controllers/Api/LawSearchController.php`
 
-**แก้ไข line 54 — เปลี่ยน total computation:**
+**แก้ไข line 54   เปลี่ยน total computation:**
 
 ```php
 // BEFORE (line 54):
@@ -70,7 +70,7 @@ docker compose exec laravel-app php artisan test --filter=LawSearchTest
 ```
 Expected: existing tests pass (test ปัจจุบัน mock ES service ทั้งหมด total ไม่ถูก assert ตรง ๆ ยกเว้น `test_search_endpoint_returns_results_and_facets` ที่ mock ทั้ง response)
 
-### Task 2: Fix frontend — stop hiding restricted docs (sortedResults filter)
+### Task 2: Fix frontend   stop hiding restricted docs (sortedResults filter)
 
 **ไฟล์:** `apps/app-laravel/resources/js/pages/public/LawDatabasePage.vue`
 
@@ -122,12 +122,12 @@ git commit -m "fix(search): correct document count on database page
 
 - Backend: use file-based total (all matching published docs) instead of
   current-page count for ES path
-- Frontend: stop hiding restricted docs from results — they already render
+- Frontend: stop hiding restricted docs from results   they already render
   with lock icon and login prompt, hiding them caused counter mismatch"
 ```
 
 ## Risks & Tradeoffs
 
-- **`$fileBased['total']` อาจน้อยกว่า ES total จริง** — เพราะ file-based ใช้ substring matching ส่วน ES ใช้ Thai tokenizer ที่ฉลาดกว่า แต่ `max(fileBased, count(results))` ป้องกัน total ต่ำกว่าจำนวนบนหน้า ในทางปฏิบัติ file-based total มักจะถูกต้องเพราะ search query ภาษาไทยส่วนใหญ่ match ทั้ง substring และ tokenized
-- **PublicHomePage.vue ก็ใช้ `canDisplayLawResult`** (line 234) — แต่หน้านั้นไม่มี counter ที่ต้องตรง ไม่จำเป็นต้องแก้ในรอบนี้ (แก้ได้ภายหลังถ้าต้องการ consistency)
-- **`lawAccess.ts` ยังถูกใช้ใน `PublicHomePage.vue`** — ไม่ลบไฟล์ ลบแค่ import ในหน้า database
+- **`$fileBased['total']` อาจน้อยกว่า ES total จริง**   เพราะ file-based ใช้ substring matching ส่วน ES ใช้ Thai tokenizer ที่ฉลาดกว่า แต่ `max(fileBased, count(results))` ป้องกัน total ต่ำกว่าจำนวนบนหน้า ในทางปฏิบัติ file-based total มักจะถูกต้องเพราะ search query ภาษาไทยส่วนใหญ่ match ทั้ง substring และ tokenized
+- **PublicHomePage.vue ก็ใช้ `canDisplayLawResult`** (line 234)   แต่หน้านั้นไม่มี counter ที่ต้องตรง ไม่จำเป็นต้องแก้ในรอบนี้ (แก้ได้ภายหลังถ้าต้องการ consistency)
+- **`lawAccess.ts` ยังถูกใช้ใน `PublicHomePage.vue`**   ไม่ลบไฟล์ ลบแค่ import ในหน้า database

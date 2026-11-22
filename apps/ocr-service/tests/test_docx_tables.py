@@ -44,7 +44,7 @@ def _make_block(table_dict: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Patch 1 — data-block-id must survive in reviewed_html for table blocks
+# Patch 1   data-block-id must survive in reviewed_html for table blocks
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_table_reviewed_html_has_data_block_id() -> None:
@@ -63,7 +63,7 @@ def test_table_reviewed_html_preserves_content() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Patch 2 — build_table_payload must prefer existing Python-built HTML
+# Patch 2   build_table_payload must prefer existing Python-built HTML
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_build_table_payload_prefers_existing_html() -> None:
@@ -98,7 +98,7 @@ def test_build_table_payload_falls_back_when_no_html() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Patch 3 — ThaiNormalizer applied to cell text
+# Patch 3   ThaiNormalizer applied to cell text
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_cell_text_verbatim_raw_text() -> None:
@@ -161,7 +161,7 @@ def test_rowspan_in_html() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Patch 5 — has_image flag and placeholder rendering
+# Patch 5   has_image flag and placeholder rendering
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_cell_with_drawing_sets_has_image_flag() -> None:

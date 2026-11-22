@@ -36,7 +36,7 @@ export const FontSizeExtension = TextStyle.extend({
     return {
       ...this.parent?.(),
       // setMark (not updateAttributes) so the textStyle mark is ADDED to a
-      // selection that has none yet — extracted text carries no textStyle mark,
+      // selection that has none yet   extracted text carries no textStyle mark,
       // and updateAttributes is a no-op when the mark is absent.
       setFontSize:
         (size: string) =>

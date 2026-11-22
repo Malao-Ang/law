@@ -44,7 +44,7 @@ class TestGhostToneMark:
         # Simulates ชั [empty 4pt tone-mark span] วโมง
         line = _line([
             _span("ชั", x0=72.0, x1=84.0),
-            _span("", x0=84.0, x1=88.0),   # 4pt — ghost tone mark
+            _span("", x0=84.0, x1=88.0),   # 4pt   ghost tone mark
             _span("วโมง", x0=88.0, x1=120.0),
         ])
         result = _extract(line)
@@ -55,7 +55,7 @@ class TestGhostToneMark:
     def test_narrow_empty_span_at_start_ignored(self):
         """A ghost-sentinel at the start of a line (no preceding part) is ignored."""
         line = _line([
-            _span("", x0=72.0, x1=75.0),   # leading ghost — no prior parts
+            _span("", x0=72.0, x1=75.0),   # leading ghost   no prior parts
             _span("ชั่วโมง", x0=75.0, x1=120.0),
         ])
         result = _extract(line)
@@ -65,7 +65,7 @@ class TestGhostToneMark:
         """An empty span wider than GHOST_TONE_MAX_WIDTH_PT is a real word gap."""
         line = _line([
             _span("คำ", x0=72.0, x1=90.0),
-            _span("", x0=90.0, x1=130.0),   # 40pt gap — real inter-word space
+            _span("", x0=90.0, x1=130.0),   # 40pt gap   real inter-word space
             _span("ว่า", x0=130.0, x1=150.0),
         ])
         result = _extract(line)

@@ -139,7 +139,7 @@ export function isKeptInRelationGraph(row: Pick<ShowRelRow, 'metaStatus' | 'work
 
 export function displayLawDate(value: string | null | undefined): string {
   const text = value?.trim() ?? '';
-  if (!text) return '—';
+  if (!text) return ' ';
   if (/[ก-๙]/.test(text)) return text;
   return formatThaiDate(text) || text;
 }

@@ -20,12 +20,12 @@ export interface PublishGateResult {
  * Single source of truth for all publish validation conditions.
  *
  * Gate list (in order):
- *   1. e-Sign          — required, skipped for old docs
- *   2. RAG             — required, skipped for old docs
- *   3. Access scope    — required
- *   4. Relations       — optional
- *   5. Status          — required (must not be ร่าง)
- *   6. Metadata        — required (title + law_type + date)
+ *   1. e-Sign            required, skipped for old docs
+ *   2. RAG               required, skipped for old docs
+ *   3. Access scope      required
+ *   4. Relations         optional
+ *   5. Status            required (must not be ร่าง)
+ *   6. Metadata          required (title + law_type + date)
  */
 export function evaluatePublishGates(
   meta: LawMeta | null | undefined,
@@ -82,7 +82,7 @@ export function evaluatePublishGates(
       status: ragOk
         ? 'พร้อมใช้งาน'
         : docStatus?.rag_skipped
-          ? 'ข้ามขั้นตอน — ต้องกลับไปทำ'
+          ? 'ข้ามขั้นตอน   ต้องกลับไปทำ'
           : 'ยังไม่ได้จัดลำดับเนื้อหา',
       level: 'required',
     });

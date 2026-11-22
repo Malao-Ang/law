@@ -21,6 +21,27 @@
 
       <v-window v-model="tab">
         <v-window-item value="status">
+          <v-alert type="info" variant="tonal" class="mb-4 role-guide" density="comfortable">
+            <div class="role-guide__title">
+              <v-icon icon="mdi-information-outline" size="20" />
+              บทบาทคืออะไร?
+            </div>
+            <p class="role-guide__lead">
+              บทบาทบอกระบบว่ากฎหมายฉบับนี้เกี่ยวข้องกับฉบับก่อนอย่างไร และจะเปิดหน้าจอผูกความสัมพันธ์แบบไหน
+            </p>
+            <div class="role-guide__list">
+              <div v-for="role in statusRoleOptions" :key="role.value" class="role-guide__item">
+                <v-chip size="small" :color="roleGuideColor(role.value)" variant="tonal" :prepend-icon="roleGuideIcon(role.value)">
+                  {{ role.title }}
+                </v-chip>
+                <div class="role-guide__text">
+                  <strong>{{ role.summary }}</strong>
+                  <span>{{ role.detail }}</span>
+                </div>
+              </div>
+            </div>
+          </v-alert>
+
           <MasterDataPage
             ref="statusPage"
             kind="change_status"
@@ -31,7 +52,7 @@
             :columns="statusColumns"
             search-placeholder="ค้นหาด้วยรหัส หรือชื่อสถานะ..."
             :dialog-title="{ create: 'เพิ่มสถานะการเปลี่ยนแปลง', edit: 'แก้ไขสถานะการเปลี่ยนแปลง' }"
-            dialog-subtitle="เลือกบทบาทเพื่อกำหนดวิธีผูกกฎหมาย รายการใหม่จะยังไม่แสดงในตัวเลือกจนกว่าจะเปิดใช้งาน"
+            dialog-subtitle="เลือกบทบาทตามวิธีผูกกับกฎหมายฉบับก่อน รายการใหม่จะยังไม่แสดงจนกว่าจะเปิดใช้งาน"
             :field-labels="fieldLabels"
             code-column-title="รหัสสถานะ"
             embedded
@@ -49,18 +70,33 @@
               </v-chip>
             </template>
             <template #attrs="{ form }">
+              <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+                <div class="text-body-2 font-weight-medium mb-1">{{ selectedRoleGuide(form.attrs?.role).title }}</div>
+                <div class="text-caption">{{ selectedRoleGuide(form.attrs?.role).detail }}</div>
+              </v-alert>
               <v-select
                 :model-value="String(form.attrs?.role ?? 'section')"
                 :items="statusRoleOptions"
                 item-title="title"
                 item-value="value"
                 label="บทบาท *"
-                hint="บทบาทกำหนดหน้าความสัมพันธ์ ไม่ใช่แค่ชื่อที่แสดง"
+                hint="เลือกตามวิธีที่กฎหมายนี้เกี่ยวข้องกับฉบับก่อน"
                 persistent-hint
                 variant="outlined"
                 density="comfortable"
                 @update:model-value="onStatusRole(form, $event)"
-              />
+              >
+                <template #selection="{ item }">
+                  <span class="text-truncate">{{ item?.title || roleLabel(form.attrs?.role) }}</span>
+                </template>
+                <template #item="{ props: itemProps, item }">
+                  <v-list-item
+                    v-bind="itemProps"
+                    :title="item.raw?.title ?? item.title"
+                    :subtitle="item.raw?.subtitle"
+                  />
+                </template>
+              </v-select>
               <v-select
                 v-model="form.attrs.source"
                 :items="sourceOptions"
@@ -117,6 +153,7 @@
                         >
                           {{ roleLabel(item.attrs.role) }}
                         </v-chip>
+                        <div class="text-caption text-medium-emphasis mt-1">{{ selectedRoleGuide(item.attrs.role).detail }}</div>
                       </div>
                       <div class="change-status-view__field">
                         <span>มีรายละเอียดย่อย</span>
@@ -326,10 +363,27 @@ const statusColumns = [
 ];
 
 const statusRoleOptions = [
-  { title: 'กฎหมายใหม่', value: 'new' },
-  { title: 'ปรับปรุงทั้งฉบับ', value: 'whole' },
-  { title: 'ปรับปรุงรายข้อหรือรายมาตรา', value: 'section' },
-  { title: 'ทั่วไป', value: 'general' },
+  {
+    title: 'กฎหมายใหม่',
+    value: 'new',
+    subtitle: 'ฉบับแรกของเรื่องนี้ ไม่ต้องเลือกรายละเอียดย่อย',
+    summary: 'ใช้เมื่อออกกฎหมายเรื่องนี้ครั้งแรก',
+    detail: 'ระบบจะมองว่าเป็นฉบับตั้งต้น ไม่เปิดโหมดปรับปรุงทั้งฉบับหรือรายข้อ และไม่ต้องเลือกรายละเอียดย่อย เช่น ยกเลิก/เพิ่ม/แก้ไข',
+  },
+  {
+    title: 'ปรับปรุงทั้งฉบับ',
+    value: 'whole',
+    subtitle: 'แทนที่หรือปรับปรุงทั้งเอกสาร ไม่ต้องเลือกรายละเอียดย่อย',
+    summary: 'ใช้เมื่อแก้หรือแทนที่กฎหมายทั้งฉบับ',
+    detail: 'ระบบจะให้ผูกความสัมพันธ์แบบทั้งเอกสาร กับฉบับก่อน/ฉบับอ้างอิง โดยไม่ต้องเลือกรายละเอียดย่อยทีละข้อ',
+  },
+  {
+    title: 'ปรับปรุงรายข้อหรือรายมาตรา',
+    value: 'section',
+    subtitle: 'แก้ทีละข้อ/มาตรา และเลือกประเภทย่อยได้ เช่น ยกเลิก เพิ่ม แก้ไข',
+    summary: 'ใช้เมื่อแก้เฉพาะบางข้อหรือบางมาตรา',
+    detail: 'ระบบจะเปิดให้ผูกทีละข้อ/มาตรา และเลือกประเภทย่อยได้ เช่น ยกเลิกข้อ เพิ่มข้อความ หรือแก้ไขข้อความ',
+  },
 ];
 
 const detailRoleOptions = [
@@ -370,14 +424,28 @@ function sourceLabel(source: unknown): string {
 }
 
 function roleLabel(role: unknown): string {
-  switch (role) {
-    case 'new': return 'กฎหมายใหม่';
-    case 'whole': return 'ปรับปรุงทั้งฉบับ';
-    case 'section': return 'ปรับปรุงรายข้อหรือรายมาตรา';
-    case 'repeals': return 'ยกเลิก';
-    case 'amends': return 'แก้ไขเพิ่มเติม';
-    default: return 'ทั่วไป';
-  }
+  if (role === 'repeals') return 'ยกเลิก';
+  if (role === 'amends') return 'แก้ไขเพิ่มเติม';
+  return statusRoleOptions.find((item) => item.value === role)?.title ?? 'กฎหมายใหม่';
+}
+
+function selectedRoleGuide(role: unknown): { title: string; detail: string } {
+  const found = statusRoleOptions.find((item) => item.value === role) ?? statusRoleOptions[0];
+  return { title: found.title, detail: found.detail };
+}
+
+function roleGuideColor(role: string): string {
+  if (role === 'new') return 'info';
+  if (role === 'whole') return 'warning';
+  if (role === 'section') return 'teal';
+  return 'grey';
+}
+
+function roleGuideIcon(role: string): string {
+  if (role === 'new') return 'mdi-file-plus-outline';
+  if (role === 'whole') return 'mdi-file-replace-outline';
+  if (role === 'section') return 'mdi-format-list-numbered';
+  return 'mdi-tag-outline';
 }
 
 function roleColor(item: MasterItem | null | undefined): string {
@@ -409,7 +477,7 @@ function setHasDetails(form: UpsertMasterItemPayload, value: unknown): void {
 }
 
 function onStatusRole(form: UpsertMasterItemPayload, role: unknown): void {
-  const next = role === 'new' || role === 'whole' || role === 'section' || role === 'general' ? role : 'general';
+  const next = role === 'new' || role === 'whole' || role === 'section' ? role : 'new';
   form.attrs = {
     ...(form.attrs ?? {}),
     role: next,
@@ -435,6 +503,51 @@ function onDetailRole(form: UpsertMasterItemPayload, role: unknown): void {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.role-guide__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.role-guide__lead {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.role-guide__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.role-guide__item {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 10px 14px;
+  align-items: start;
+}
+
+.role-guide__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.role-guide__text strong {
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .role-guide__item {
+    grid-template-columns: 1fr;
+  }
 }
 
 .change-status-view {

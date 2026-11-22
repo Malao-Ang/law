@@ -1,5 +1,13 @@
 import { jsonRequest } from './client';
-import type { LawComment, LawCommentList, LawCommentType, LawCommentVisibility } from '../types/lawComment';
+import type {
+  AdminLawComment,
+  AdminLawCommentList,
+  LawComment,
+  LawCommentList,
+  LawCommentStatus,
+  LawCommentType,
+  LawCommentVisibility,
+} from '../types/lawComment';
 
 export interface LawCommentQuery {
   type?: LawCommentType | '';
@@ -18,8 +26,31 @@ export interface CreateLawCommentInput {
   files: File[];
 }
 
+export interface AdminCommentQuery {
+  status?: 'all' | LawCommentStatus;
+  type?: LawCommentType | '';
+  unit?: string;
+  date?: string;
+  q?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface AdminReplyInput {
+  body: string;
+  visibility?: LawCommentVisibility;
+  forwardForReview?: boolean;
+  asDraft?: boolean;
+  files?: File[];
+}
+
 function commentPath(documentId: string): string {
   return `/api/laws/${encodeURIComponent(documentId)}/comments`;
+}
+
+function adminPath(commentId?: string): string {
+  const base = '/api/admin/comments';
+  return commentId ? `${base}/${encodeURIComponent(commentId)}` : base;
 }
 
 export function fetchLawComments(documentId: string, query: LawCommentQuery = {}): Promise<LawCommentList> {
@@ -55,4 +86,55 @@ export function replyLawComment(documentId: string, commentId: string, body: str
 
 export function lawCommentFileUrl(documentId: string, commentId: string, fileId: string): string {
   return `${commentPath(documentId)}/${encodeURIComponent(commentId)}/files/${encodeURIComponent(fileId)}`;
+}
+
+export function fetchAdminComments(query: AdminCommentQuery = {}): Promise<AdminLawCommentList> {
+  const params = new URLSearchParams();
+  if (query.status && query.status !== 'all') params.set('status', query.status);
+  if (query.type) params.set('type', query.type);
+  if (query.unit) params.set('unit', query.unit);
+  if (query.date) params.set('date', query.date);
+  if (query.q) params.set('q', query.q);
+  if (query.page) params.set('page', String(query.page));
+  if (query.per_page) params.set('per_page', String(query.per_page));
+  const search = params.toString();
+
+  return jsonRequest<AdminLawCommentList>(`${adminPath()}${search ? `?${search}` : ''}`);
+}
+
+export function fetchAdminComment(commentId: string): Promise<{ comment: AdminLawComment }> {
+  return jsonRequest<{ comment: AdminLawComment }>(adminPath(commentId));
+}
+
+export function replyAdminComment(commentId: string, input: AdminReplyInput): Promise<{ comment: AdminLawComment }> {
+  const form = new FormData();
+  form.append('body', input.body);
+  form.append('visibility', input.visibility ?? 'public');
+  form.append('forward_for_review', input.forwardForReview ? '1' : '0');
+  form.append('as_draft', input.asDraft ? '1' : '0');
+  (input.files ?? []).forEach((file) => form.append('attachments[]', file));
+
+  return jsonRequest<{ comment: AdminLawComment }>(`${adminPath(commentId)}/reply`, { method: 'POST', body: form });
+}
+
+export function updateAdminCommentVisibility(
+  commentId: string,
+  visibility: LawCommentVisibility,
+  reason: string,
+): Promise<{ comment: AdminLawComment }> {
+  return jsonRequest<{ comment: AdminLawComment }>(`${adminPath(commentId)}/visibility`, {
+    method: 'PATCH',
+    body: JSON.stringify({ visibility, reason }),
+  });
+}
+
+export function archiveAdminComment(commentId: string, reason: string): Promise<{ comment: AdminLawComment }> {
+  return jsonRequest<{ comment: AdminLawComment }>(`${adminPath(commentId)}/archive`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function adminCommentFileUrl(commentId: string, fileId: string): string {
+  return `${adminPath(commentId)}/files/${encodeURIComponent(fileId)}`;
 }

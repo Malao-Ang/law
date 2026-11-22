@@ -113,7 +113,7 @@ class TestContinuationRule:
         assert _run(blocks) == [1, 2]
 
     def test_kho_then_paren(self):
-        """(๑) after ข้อ ๑ stays at 1 — marker rule (6) wins over continuation."""
+        """(๑) after ข้อ ๑ stays at 1   marker rule (6) wins over continuation."""
         blocks = [
             _block("ข้อ ๑", marker=_marker("legal-ข้อ", level=1)),
             _block("(๑) sub-item", marker=_marker("paren", level=1)),
@@ -244,7 +244,7 @@ class TestDividerAndBy:
             _block("plain text"),
         ]
         levels = _run(blocks)
-        assert levels[2] == 2  # continuation still active — short dash not a divider
+        assert levels[2] == 2  # continuation still active   short dash not a divider
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -314,7 +314,7 @@ class TestTraceAndSafety:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Continuation override (rule 2.5) — quotation / Thai connector
+# Continuation override (rule 2.5)   quotation / Thai connector
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestContinuationOverride:
@@ -377,12 +377,12 @@ class TestParentChildVerification:
         assert _run(blocks) == [1, 2]
 
     def test_geometry_block_not_demoted_by_verification(self):
-        """Verification must NOT touch geometry-fallback blocks — they have
+        """Verification must NOT touch geometry-fallback blocks   they have
         no parent contract."""
         blocks = [_block("text", indent_level=3)]
         assert _run(blocks) == [3]
 
     def test_marker_block_not_demoted_by_verification(self):
-        """Markers know their own depth — verification must not demote them."""
+        """Markers know their own depth   verification must not demote them."""
         blocks = [_block("ข้อ ๑.๒", marker=_marker("legal-ข้อ", level=2))]
         assert _run(blocks) == [2]

@@ -10,6 +10,12 @@ export interface OversightStep {
   completed_on: string | null;
 }
 
+export interface OversightDueDate {
+  date: string;
+  label: string;
+  display_date: string;
+}
+
 export interface OversightItem {
   document_id: string;
   title: string;
@@ -19,6 +25,11 @@ export interface OversightItem {
   status: string | null;
   closed: boolean;
   publish_due_date: string | null;
+  effective_date: string | null;
+  is_draft: boolean;
+  due_date: string | null;
+  due_label: string | null;
+  due_dates: OversightDueDate[];
   days_left: number | null;
   overdue: boolean;
   in_next_month: boolean;
@@ -51,14 +62,18 @@ export interface OversightSummary {
   items: OversightItem[];
 }
 
+export type OversightMailChannel = 'deadline' | 'proclamation';
+
 export interface OversightMailTemplate {
   subject: string;
   body: string;
   link_label: string;
   reminder_days: number[];
+  channel?: OversightMailChannel;
 }
 
 export interface OversightMailHit {
+  kind?: string;
   label: string;
   date: string;
   display_date: string;
@@ -70,6 +85,7 @@ export interface OversightMailItem {
   document_id: string;
   title: string;
   emails: string[];
+  channel: OversightMailChannel;
   due_now: boolean;
   already_sent: boolean;
   hits: OversightMailHit[];
@@ -81,13 +97,27 @@ export interface OversightMailPlaceholder {
   fields: string;
 }
 
+export interface OversightMailChannelInfo {
+  key: OversightMailChannel;
+  label: string;
+}
+
 export interface OversightMailSettings {
-  template: OversightMailTemplate;
-  defaults: OversightMailTemplate;
+  templates: Record<OversightMailChannel, OversightMailTemplate>;
+  /** @deprecated Prefer templates.deadline */
+  template?: OversightMailTemplate;
+  defaults: Record<OversightMailChannel, OversightMailTemplate>;
+  channels: OversightMailChannelInfo[];
   placeholders: OversightMailPlaceholder[];
   reminder_days: number[];
   pending_count: number;
   items: OversightMailItem[];
+}
+
+export interface OversightMailSavePayload {
+  deadline: Pick<OversightMailTemplate, 'subject' | 'body' | 'link_label'>;
+  proclamation: Pick<OversightMailTemplate, 'subject' | 'body' | 'link_label'>;
+  reminder_days: number[];
 }
 
 export interface OversightMailSendResult {
@@ -99,9 +129,6 @@ export interface OversightMailSendResult {
 }
 
 export interface OversightUpdatePayload {
-  status: string;
-  publish_due_date: string | null;
-  steps: { key: string; due_date: string | null; completed_on: string | null }[];
   primary: OversightContact;
   backup: OversightContact;
 }

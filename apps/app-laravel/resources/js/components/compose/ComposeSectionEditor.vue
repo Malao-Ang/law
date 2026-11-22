@@ -353,7 +353,7 @@ async function saveAllBlocks(): Promise<void> {
 
   const failCount = results.filter((r) => r.status === 'rejected').length;
   if (failCount > 0) {
-    errorMessage.value = `บันทึกไม่สำเร็จ ${failCount} block — กดบันทึกอีกครั้ง`;
+    errorMessage.value = `บันทึกไม่สำเร็จ ${failCount} block   กดบันทึกอีกครั้ง`;
   } else {
     emit('allBlocksSaved');
   }

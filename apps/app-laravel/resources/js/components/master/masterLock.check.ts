@@ -43,7 +43,7 @@ assert(toggleText(item({ is_active: false, usage_count: 4 }), 'law_category').re
 
 // aria
 assert(
-  lockAriaLabel(item({ usage_count: 15 }), 'law_category') === 'ใช้งานอยู่ — ปิดใช้งาน',
+  lockAriaLabel(item({ usage_count: 15 }), 'law_category') === 'ใช้งานอยู่   ปิดใช้งาน',
   'aria label for locked row',
 );
 

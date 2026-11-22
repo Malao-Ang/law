@@ -572,7 +572,7 @@ class DocumentExportServiceTest extends TestCase
         $documentXml = $this->readDocxXml($this->makeService()->toDocx($document), 'word/document.xml');
 
         // Three paragraphs must survive: the two blocks plus the empty spacer,
-        // in that order — otherwise the blank line vanishes from the PDF.
+        // in that order   otherwise the blank line vanishes from the PDF.
         $this->assertSame(
             1,
             preg_match('/บรรทัดแรก.*<w:p\b[^>]*>(?:(?!บรรทัด).)*<\/w:p>.*บรรทัดสาม/su', $documentXml),
@@ -667,7 +667,7 @@ class DocumentExportServiceTest extends TestCase
         // Four paragraphs (2 text + 2 blank), each carrying the default line box so
         // LibreOffice cannot collapse the blanks.
         $this->assertSame(4, substr_count($xml, 'w:line="240"'));
-        // Every paragraph — including the two blanks — carries a preserved-whitespace
+        // Every paragraph   including the two blanks   carries a preserved-whitespace
         // text run so the blank lines hold their height. Assert the invariant, not
         // the exact filler character (it has churned between ZWSP and space).
         $this->assertSame(4, substr_count($xml, 'xml:space="preserve"'));

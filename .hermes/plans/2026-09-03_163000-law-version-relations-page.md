@@ -1,4 +1,4 @@
-# Plan: Public Version-Relations Page with Download — /law/:id/versions
+# Plan: Public Version-Relations Page with Download   /law/:id/versions
 
 ## Goal
 
@@ -10,31 +10,31 @@ Replace the inline `VersionHistoryTimeline` in the "ดำเนินการ"
 
 ### What exists
 
-- `LawInfoPanel.vue` (`resources/js/components/law/LawInfoPanel.vue`) — right-side info panel used by `LawDocumentView.vue`. Section "ดำเนินการ" at lines 73–87 renders:
+- `LawInfoPanel.vue` (`resources/js/components/law/LawInfoPanel.vue`)   right-side info panel used by `LawDocumentView.vue`. Section "ดำเนินการ" at lines 73–87 renders:
   - `<VersionHistoryTimeline>` inline when `versions.length >= 2`
   - disabled `<v-btn>ความสัมพันธ์กฎหมาย</v-btn>` (disabled, does nothing)
 
-- `VersionHistoryTimeline.vue` (`resources/js/components/law/VersionHistoryTimeline.vue`) — shows version cards with click→SweetAlert→navigate. No download buttons.
+- `VersionHistoryTimeline.vue` (`resources/js/components/law/VersionHistoryTimeline.vue`)   shows version cards with click→SweetAlert→navigate. No download buttons.
 
-- `VersionChainItem` type (`resources/js/types/versionChain.ts`) — fields: `document_id`, `version_label`, `is_current`, `status`, `change_status`, `issuer`, `agency`, `promulgation_date`, `title`. No `source_file`, no `source_type`, no download info.
+- `VersionChainItem` type (`resources/js/types/versionChain.ts`)   fields: `document_id`, `version_label`, `is_current`, `status`, `change_status`, `issuer`, `agency`, `promulgation_date`, `title`. No `source_file`, no `source_type`, no download info.
 
-- `ReviewStore::getVersionChain()` (PHP, `app/Services/ReviewStore.php:273`) — returns `{current_document_id, versions[]}`. Does NOT include `source_file`, `source_type`, or `source_path` per version item.
+- `ReviewStore::getVersionChain()` (PHP, `app/Services/ReviewStore.php:273`)   returns `{current_document_id, versions[]}`. Does NOT include `source_file`, `source_type`, or `source_path` per version item.
 
-- `GET /api/documents/{documentId}/versions` → `ReviewController::versions()` — returns the chain.
+- `GET /api/documents/{documentId}/versions` → `ReviewController::versions()`   returns the chain.
 
-- `DocumentFileController::show()` — `GET /api/documents/{id}/file?download=1` → downloads original file (PDF/DOCX/DOC). **Already implemented** in previous plan.
+- `DocumentFileController::show()`   `GET /api/documents/{id}/file?download=1` → downloads original file (PDF/DOCX/DOC). **Already implemented** in previous plan.
 
-- `documentFileDownloadUrl(documentId)` — already in `resources/js/api/client.ts`, returns `/api/documents/{id}/file?download=1`.
+- `documentFileDownloadUrl(documentId)`   already in `resources/js/api/client.ts`, returns `/api/documents/{id}/file?download=1`.
 
 - Router: `/documents/:documentId/relations` = admin `LawRelationsPage` (edit, protected). No public relations page yet.
 
-- `AdminShowRelationsPage.vue` — admin-only, shows relation tree. Source of the relation UI design to reference.
+- `AdminShowRelationsPage.vue`   admin-only, shows relation tree. Source of the relation UI design to reference.
 
-- `docRelations` and `sectionRelations` in `LawDocumentView.vue` — relations are already loaded via `documentStore.review.relations[]`.
+- `docRelations` and `sectionRelations` in `LawDocumentView.vue`   relations are already loaded via `documentStore.review.relations[]`.
 
 ### What's missing
 
-1. `VersionChainItem` does not expose `source_type` or `has_file` — need to add to PHP response so the download button knows whether a file is available.
+1. `VersionChainItem` does not expose `source_type` or `has_file`   need to add to PHP response so the download button knows whether a file is available.
 2. No public page for version timeline + relations + downloads.
 3. Router route `/law/:id/versions` not registered.
 4. "ดำเนินการ" section needs to replace inline timeline + disabled button with a single "ดูเวอร์ชันและความสัมพันธ์" redirect button.
@@ -49,7 +49,7 @@ Add `source_type` and `has_file` to each `VersionChainItem` in `ReviewStore::get
 
 ## Step-by-step Tasks
 
-### Task 1 — Add `source_type` and `has_file` to PHP version chain
+### Task 1   Add `source_type` and `has_file` to PHP version chain
 
 **File:** `apps/app-laravel/app/Services/ReviewStore.php`
 
@@ -99,7 +99,7 @@ Expected: existing version tests still pass (we only add fields, never remove).
 
 ---
 
-### Task 2 — Update `VersionChainItem` TypeScript type
+### Task 2   Update `VersionChainItem` TypeScript type
 
 **File:** `apps/app-laravel/resources/js/types/versionChain.ts`
 
@@ -134,7 +134,7 @@ Expected: no new type errors.
 
 ---
 
-### Task 3 — Create the new public page `LawVersionsPage.vue`
+### Task 3   Create the new public page `LawVersionsPage.vue`
 
 **File:** `apps/app-laravel/resources/js/pages/law/LawVersionsPage.vue`
 
@@ -260,7 +260,7 @@ This page:
                       <div v-if="rel.target_section" class="text-caption text-medium-emphasis">
                         {{ rel.target_section }}
                       </div>
-                      <div v-if="rel.note" class="text-caption text-medium-emphasis">— {{ rel.note }}</div>
+                      <div v-if="rel.note" class="text-caption text-medium-emphasis">  {{ rel.note }}</div>
                     </div>
                     <div class="d-flex ga-1 flex-shrink-0">
                       <v-btn
@@ -328,7 +328,7 @@ const router = useRouter();
 const versionStore = useVersionStore();
 const documentStore = useDocumentStore();
 
-// Fetch on mount / param change — same pattern as LawDocumentView
+// Fetch on mount / param change   same pattern as LawDocumentView
 import { watch } from 'vue';
 watch(() => props.documentId, (id) => {
   void versionStore.fetch(id);
@@ -429,7 +429,7 @@ function safeUrl(url: string | null | undefined): string | null {
 
 ---
 
-### Task 4 — Register the new route in the router
+### Task 4   Register the new route in the router
 
 **File:** `apps/app-laravel/resources/js/router/index.ts`
 
@@ -451,7 +451,7 @@ Expected: one match showing the route.
 
 ---
 
-### Task 5 — Update `LawInfoPanel.vue` "ดำเนินการ" section
+### Task 5   Update `LawInfoPanel.vue` "ดำเนินการ" section
 
 **File:** `apps/app-laravel/resources/js/components/law/LawInfoPanel.vue`
 
@@ -508,7 +508,7 @@ Expected: no new errors.
 
 ---
 
-### Task 6 — Add `source_type`, `has_file`, `source_file` to versions API test
+### Task 6   Add `source_type`, `has_file`, `source_file` to versions API test
 
 **File:** `apps/app-laravel/tests/Feature/ReviewControllerVersionsTest.php`
 
@@ -529,7 +529,7 @@ class VersionChainFileInfoTest extends TestCase
     {
         $store = app(ReviewStore::class);
 
-        // v1 — has a real PDF file
+        // v1   has a real PDF file
         $v1 = $store->generateDocumentId();
         $stored = $store->storeUpload(
             UploadedFile::fake()->create('law_v1.pdf', 10, 'application/pdf'),
@@ -552,7 +552,7 @@ class VersionChainFileInfoTest extends TestCase
             'pages' => [['page_no' => 1, 'blocks' => []]],
         ]);
 
-        // v2 — child of v1, no file
+        // v2   child of v1, no file
         $v2 = $store->generateDocumentId();
         $store->setStatus($v2, ['status' => 'done', 'source_file' => 'law_v2.pdf']);
         $store->writeReviewDocument($v2, [
@@ -601,7 +601,7 @@ Expected: PASS.
 
 ---
 
-### Task 7 — Run full relevant test suite + TypeScript check
+### Task 7   Run full relevant test suite + TypeScript check
 
 ```bash
 docker compose exec laravel-app php artisan test --filter=DocumentFileTest
@@ -616,7 +616,7 @@ Expected: no new errors.
 
 ---
 
-### Task 8 — Commit
+### Task 8   Commit
 
 ```bash
 git add -A
@@ -641,12 +641,12 @@ git commit -m "feat(law): version-relations page with per-version download and c
 
 | Risk | Mitigation |
 |------|-----------|
-| `getVersionChain()` calls `getStatus()` N times (one per version) — N = typical chain length 2–5, so acceptable | If chains grow to 50+, batch-load statuses with a `getStatusBatch()` method. Not needed now (YAGNI). |
-| `VersionHistoryTimeline.vue` is removed from `LawInfoPanel` — any other callers? | `grep -r VersionHistoryTimeline apps/app-laravel/resources/js` — only imported by `LawInfoPanel.vue`. Safe to remove from there. Component file itself is kept for backward compatibility (admin may use it later). |
-| Download `download` attribute hint is advisory — browser may ignore it for same-origin responses | `DocumentFileController` already sets `Content-Disposition: attachment; filename=...` server-side, so the correct filename is enforced regardless. The `download` attribute is a nice-to-have. |
+| `getVersionChain()` calls `getStatus()` N times (one per version)   N = typical chain length 2–5, so acceptable | If chains grow to 50+, batch-load statuses with a `getStatusBatch()` method. Not needed now (YAGNI). |
+| `VersionHistoryTimeline.vue` is removed from `LawInfoPanel`   any other callers? | `grep -r VersionHistoryTimeline apps/app-laravel/resources/js`   only imported by `LawInfoPanel.vue`. Safe to remove from there. Component file itself is kept for backward compatibility (admin may use it later). |
+| Download `download` attribute hint is advisory   browser may ignore it for same-origin responses | `DocumentFileController` already sets `Content-Disposition: attachment; filename=...` server-side, so the correct filename is enforced regardless. The `download` attribute is a nice-to-have. |
 | Relations shown on the new page are from the **viewed document** only, not all versions | This matches the user's intent: "เวอร์ชันและความสัมพันธ์ของเอกสารนี้". If cross-version relations are needed later, aggregate from all version IDs' `relations[]`. |
 
 ## Open Questions
 
 1. Should the new page also link to `AdminShowRelationsPage` (admin relation tree) for admins who are logged in? → Assumption: No, keep this page fully public and minimal. Admin link can be added in a follow-up.
-2. The `download` attribute on `<v-btn :href="...">` — Vuetify renders this as `<a>` so `download` attribute should pass through. Verify by inspecting DOM on first manual test.
+2. The `download` attribute on `<v-btn :href="...">`   Vuetify renders this as `<a>` so `download` attribute should pass through. Verify by inspecting DOM on first manual test.

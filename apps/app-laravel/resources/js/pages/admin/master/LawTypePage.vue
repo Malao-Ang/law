@@ -73,7 +73,7 @@
 
       <v-alert v-if="reorderMode" type="info" variant="tonal" density="compact" icon="mdi-swap-vertical">
         <div class="law-type-tree-page__reorder-bar">
-          <span>โหมดจัดลำดับ — ลากหรือกดลูกศรเพื่อเรียงใหม่</span>
+          <span>โหมดจัดลำดับ   ลากหรือกดลูกศรเพื่อเรียงใหม่</span>
           <span class="law-type-tree-page__reorder-actions">
             <v-btn variant="outlined" size="small" class="text-none" :disabled="saving" @click="cancelReorder">ยกเลิก</v-btn>
             <v-btn color="admin-primary" size="small" class="text-none" :loading="saving" @click="saveReorder">บันทึกลำดับ</v-btn>
@@ -149,7 +149,7 @@
               </div>
             </template>
           </v-tooltip>
-          <p class="text-caption text-medium-emphasis">ค่าเริ่มต้น: ไม่มีประเภทย่อย — ระบบจะสร้างประเภทเอกสารชื่อเดียวกับกลุ่มให้อัตโนมัติ ติ๊กเมื่อกลุ่มนี้ต้องแยกเป็นหลายประเภท</p>
+          <p class="text-caption text-medium-emphasis">ค่าเริ่มต้น: ไม่มีประเภทย่อย   ระบบจะสร้างประเภทเอกสารชื่อเดียวกับกลุ่มให้อัตโนมัติ ติ๊กเมื่อกลุ่มนี้ต้องแยกเป็นหลายประเภท</p>
           <v-select
             v-model="familyForm.source"
             :items="familySourceOptions"

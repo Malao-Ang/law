@@ -153,7 +153,7 @@ const props = defineProps<{
   navGroups?: NavGroup[];
   fullHeight?: boolean;
   showBell?: boolean;
-  // legacy props kept for compat — no longer affect layout
+  // legacy props kept for compat   no longer affect layout
   hideTopBar?: boolean;
   showTopBar?: boolean;
 }>();
@@ -201,6 +201,12 @@ const defaultNavGroups: NavGroup[] = [
       { label: 'ข้อความแจ้งเตือน', icon: 'mdi-email-edit-outline', to: '/admin/oversight-mail' },
       { label: 'ความสัมพันธ์กฎหมาย', icon: 'mdi-graph-outline', to: '/admin/relations' },
       { label: 'แสดงความสัมพันธ์', icon: 'mdi-file-tree-outline', to: '/admin/show-relations' },
+    ],
+  },
+  {
+    label: 'ข้อคิดเห็นและการสอบถาม',
+    items: [
+      { label: 'จัดการความคิดเห็น', icon: 'mdi-comment-text-outline', to: '/admin/comments' },
     ],
   },
   {

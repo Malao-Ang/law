@@ -9,6 +9,8 @@ final class LawCommentStore
     public function __construct(private readonly Collection $collection)
     {
         $this->collection->createIndex(['document_id' => 1, 'created_at' => -1]);
+        $this->collection->createIndex(['status' => 1, 'created_at' => -1]);
+        $this->collection->createIndex(['code' => 1], ['unique' => true, 'sparse' => true]);
     }
 
     /**
@@ -49,6 +51,31 @@ final class LawCommentStore
         }
 
         return $rows;
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function all(): array
+    {
+        $rows = [];
+        $cursor = $this->collection->find([], ['sort' => ['created_at' => -1]]);
+        foreach ($cursor as $document) {
+            $rows[] = (array) $document;
+        }
+
+        return $rows;
+    }
+
+    public function nextCode(): string
+    {
+        $highest = 0;
+        foreach ($this->collection->find([], ['projection' => ['code' => 1]]) as $row) {
+            $code = (string) ($row['code'] ?? '');
+            if (preg_match('/^CMT(\d+)$/i', $code, $matches) === 1) {
+                $highest = max($highest, (int) $matches[1]);
+            }
+        }
+
+        return 'CMT'.str_pad((string) ($highest + 1), 3, '0', STR_PAD_LEFT);
     }
 
     public function delete(string $id): void

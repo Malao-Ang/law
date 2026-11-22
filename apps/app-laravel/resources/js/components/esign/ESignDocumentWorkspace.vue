@@ -127,21 +127,21 @@
               <v-icon icon="mdi-calendar-outline" size="18" color="admin-primary" />
               <div>
                 <div class="esign-meta-cell__label">วันที่ประกาศ</div>
-                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.promulgation_date) || '—' }}</div>
+                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.promulgation_date) || ' ' }}</div>
               </div>
             </div>
             <div class="esign-meta-cell">
               <v-icon icon="mdi-calendar-check-outline" size="18" color="admin-primary" />
               <div>
                 <div class="esign-meta-cell__label">วันที่มีผล</div>
-                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.effective_date) || '—' }}</div>
+                <div class="esign-meta-cell__value">{{ formatThaiDate(meta.effective_date) || ' ' }}</div>
               </div>
             </div>
             <div class="esign-meta-cell">
               <v-icon icon="mdi-book-open-page-variant-outline" size="18" color="admin-primary" />
               <div>
                 <div class="esign-meta-cell__label">ราชกิจจาฯ</div>
-                <div class="esign-meta-cell__value">{{ meta.gazette_reference || '—' }}</div>
+                <div class="esign-meta-cell__value">{{ meta.gazette_reference || ' ' }}</div>
               </div>
             </div>
             <div class="esign-meta-cell">
@@ -273,7 +273,7 @@
             </div>
             <div class="esign-kv">
               <span>ประเภท</span>
-              <strong>{{ meta.law_type ? typeLabel(meta.law_type) : '—' }}</strong>
+              <strong>{{ meta.law_type ? typeLabel(meta.law_type) : ' ' }}</strong>
             </div>
             <div class="esign-kv">
               <span>กลุ่มกฎหมาย</span>
@@ -281,11 +281,11 @@
             </div>
             <div class="esign-kv">
               <span>วันที่ประกาศ</span>
-              <strong>{{ formatThaiDate(meta.promulgation_date) || '—' }}</strong>
+              <strong>{{ formatThaiDate(meta.promulgation_date) || ' ' }}</strong>
             </div>
             <div class="esign-kv">
               <span>วันที่มีผล</span>
-              <strong>{{ formatThaiDate(meta.effective_date) || '—' }}</strong>
+              <strong>{{ formatThaiDate(meta.effective_date) || ' ' }}</strong>
             </div>
             <div class="esign-kv">
               <span>การเผยแพร่</span>
@@ -315,11 +315,11 @@
             </div>
             <div class="esign-kv">
               <span>ผู้นำเข้า</span>
-              <strong>{{ meta.imported_by || '—' }}</strong>
+              <strong>{{ meta.imported_by || ' ' }}</strong>
             </div>
             <div class="esign-kv">
               <span>แก้ไขล่าสุด</span>
-              <strong>{{ updatedAtLabel || '—' }}</strong>
+              <strong>{{ updatedAtLabel || ' ' }}</strong>
             </div>
             <div v-if="signatoryLabel" class="esign-kv">
               <span>ผู้ลงนาม</span>
@@ -477,7 +477,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
   }
-  // Draft status check — after RAG check passes
+  // Draft status check   after RAG check passes
   if (next && (!meta.value.status || isDraft(meta.value.status))) {
     const result = await Swal.fire({
       title: 'เอกสารยังเป็นร่าง',
@@ -533,12 +533,12 @@ const articleUnitLabel = computed(() => {
 
 const agencyLabel = computed(() => {
   if (meta.value.agencies?.length) return meta.value.agencies.join(', ');
-  return meta.value.agency || '—';
+  return meta.value.agency || ' ';
 });
 
 const lawGroupLabel = computed(() => {
   if (meta.value.law_groups?.length) return categoryLabels(meta.value.law_groups).join(', ');
-  return categoryLabel(meta.value.law_group) || '—';
+  return categoryLabel(meta.value.law_group) || ' ';
 });
 
 const updatedAtLabel = computed(() => {

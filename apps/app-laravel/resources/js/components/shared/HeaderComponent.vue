@@ -132,7 +132,7 @@ const handleBack = () => {
   overflow: hidden;
 }
 
-/* ponytail: brand gold gradient — no Vuetify token expresses this, keep as CSS */
+/* ponytail: brand gold gradient   no Vuetify token expresses this, keep as CSS */
 .app-header__bg {
   position: absolute;
   inset: 0;

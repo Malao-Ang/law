@@ -8,33 +8,33 @@
 
 ### สิ่งที่มีอยู่แล้วบน main (มาจาก PR#4 e-sign)
 
-1. **`BuuKongClient`** (`app/Services/Buu/BuuKongClient.php`) — HTTP client ที่จัดการ OAuth2 token, retry 401, JSON/multipart POST ผ่าน Kong Gateway
-2. **`BuuMinioService`** (`app/Services/Buu/BuuMinioService.php`) — wrapper สำหรับ MinIO APIs:
-   - `putFile()` — upload file ผ่าน `minio.PutFile` endpoint, return stored object name
-   - `getPublicLinks()` — สร้าง presigned URL (view/download)
-   - `listFiles()` — list objects ใน bucket
-   - `deleteFile()` — ลบ object
-3. **`BuuOAuthService`** (`app/Services/Buu/BuuOAuthService.php`) — password-grant OAuth2 token cache
-4. **`config/buu.php`** — endpoint registry พร้อม provision_key สำหรับ `minio.put`, `minio.public`, `minio.list`, `minio.delete` + `BUU_MINIO_ENABLED` toggle + `BUU_MINIO_BUCKET`
-5. **`DocumentFileController`** — อ่าน file จาก local ก่อน, fallback ไป MinIO `getPublicLinks()` เมื่อ `buu.minio_enabled=true`
-6. **`EsignSubmitService`** — ใช้ `BuuEsignService::uploadAndSend()` ซึ่งเรียก `BuuMinioService::putFile()` → `sendDocumentSign()` ครบ flow แล้ว
+1. **`BuuKongClient`** (`app/Services/Buu/BuuKongClient.php`)   HTTP client ที่จัดการ OAuth2 token, retry 401, JSON/multipart POST ผ่าน Kong Gateway
+2. **`BuuMinioService`** (`app/Services/Buu/BuuMinioService.php`)   wrapper สำหรับ MinIO APIs:
+   - `putFile()`   upload file ผ่าน `minio.PutFile` endpoint, return stored object name
+   - `getPublicLinks()`   สร้าง presigned URL (view/download)
+   - `listFiles()`   list objects ใน bucket
+   - `deleteFile()`   ลบ object
+3. **`BuuOAuthService`** (`app/Services/Buu/BuuOAuthService.php`)   password-grant OAuth2 token cache
+4. **`config/buu.php`**   endpoint registry พร้อม provision_key สำหรับ `minio.put`, `minio.public`, `minio.list`, `minio.delete` + `BUU_MINIO_ENABLED` toggle + `BUU_MINIO_BUCKET`
+5. **`DocumentFileController`**   อ่าน file จาก local ก่อน, fallback ไป MinIO `getPublicLinks()` เมื่อ `buu.minio_enabled=true`
+6. **`EsignSubmitService`**   ใช้ `BuuEsignService::uploadAndSend()` ซึ่งเรียก `BuuMinioService::putFile()` → `sendDocumentSign()` ครบ flow แล้ว
 
 ### สิ่งที่มีอยู่บน feature/minio-old-doc (ยังไม่ merge)
 
-1. **`MinioUploadService`** (`app/Services/Buu/MinioUploadService.php`) — thin wrapper เรียก `BuuMinioService::putFile()` + ตรวจ `minio_enabled` + catch error + optional cleanup local file
+1. **`MinioUploadService`** (`app/Services/Buu/MinioUploadService.php`)   thin wrapper เรียก `BuuMinioService::putFile()` + ตรวจ `minio_enabled` + catch error + optional cleanup local file
 2. Integration ใน `ExtractDocumentJob`, `PipelineCallbackController`, `UploadController` (old-doc)
-3. `MigrateDocsToMinioCommand` — backfill command
+3. `MigrateDocsToMinioCommand`   backfill command
 4. Tests: `MinioUploadServiceTest`, `DocumentFileMinioTest`, `OldDocumentMinioUploadTest`, etc.
 
 ### ข้อสรุป: ใช้ได้เลย
 
-`BuuMinioService::putFile()` บน main ทำ MinIO upload ได้สมบูรณ์อยู่แล้ว — สิ่งที่ขาดคือ:
-- **`MinioUploadService` wrapper** (env toggle + error handling + local cleanup) — ยังอยู่บน feature/minio-old-doc
+`BuuMinioService::putFile()` บน main ทำ MinIO upload ได้สมบูรณ์อยู่แล้ว   สิ่งที่ขาดคือ:
+- **`MinioUploadService` wrapper** (env toggle + error handling + local cleanup)   ยังอยู่บน feature/minio-old-doc
 - **Integration points** ที่เรียก wrapper ตอน extraction เสร็จ
 
 ## Architecture
 
-เอา `MinioUploadService` จาก feature/minio-old-doc มา cherry-pick/merge เข้า main แล้วใช้เป็น safe wrapper เรียก `BuuMinioService::putFile()` — มันตรวจ `BUU_MINIO_ENABLED` แล้ว catch error ทั้งหมด (never throws) เพื่อให้ extraction flow ไม่พังถ้า MinIO down ฝั่ง e-sign ใช้ `BuuEsignService::uploadAndSend()` ตรงๆ ไม่ผ่าน wrapper นี้ (ต้อง throw ถ้า upload fail เพราะ e-sign ต้องมี file)
+เอา `MinioUploadService` จาก feature/minio-old-doc มา cherry-pick/merge เข้า main แล้วใช้เป็น safe wrapper เรียก `BuuMinioService::putFile()`   มันตรวจ `BUU_MINIO_ENABLED` แล้ว catch error ทั้งหมด (never throws) เพื่อให้ extraction flow ไม่พังถ้า MinIO down ฝั่ง e-sign ใช้ `BuuEsignService::uploadAndSend()` ตรงๆ ไม่ผ่าน wrapper นี้ (ต้อง throw ถ้า upload fail เพราะ e-sign ต้องมี file)
 
 ## Step-by-step Tasks
 
@@ -42,7 +42,7 @@
 
 ไฟล์: `apps/app-laravel/app/Services/Buu/MinioUploadService.php`
 
-สร้างไฟล์ใหม่ (copy จาก feature/minio-old-doc — content อยู่ข้างล่าง):
+สร้างไฟล์ใหม่ (copy จาก feature/minio-old-doc   content อยู่ข้างล่าง):
 
 ```php
 <?php
@@ -116,7 +116,7 @@ class MinioUploadService
 
 ไฟล์: `apps/app-laravel/tests/Unit/MinioUploadServiceTest.php`
 
-Cherry-pick จาก feature/minio-old-doc — test 3 cases:
+Cherry-pick จาก feature/minio-old-doc   test 3 cases:
 1. `minio_enabled=false` → returns null, ไม่เรียก putFile
 2. `minio_enabled=true` → calls putFile, returns stored name
 3. putFile throws → catches, returns null, logs warning
@@ -192,7 +192,7 @@ if (is_file($sourcePath)) {
 
 ไฟล์: `apps/app-laravel/app/Http/Controllers/Api/DocumentFileController.php`
 
-MinIO fallback (line 70-83) ปัจจุบันใช้ `source_path` เป็น key — ต้องเช็ค `minio_source_filename` ก่อน ถ้ามีให้ใช้เป็น filePath ตรงๆ (เป็น MinIO object name จริง) แทนที่จะส่ง relative path
+MinIO fallback (line 70-83) ปัจจุบันใช้ `source_path` เป็น key   ต้องเช็ค `minio_source_filename` ก่อน ถ้ามีให้ใช้เป็น filePath ตรงๆ (เป็น MinIO object name จริง) แทนที่จะส่ง relative path
 
 ```php
 // 2. MinIO fallback
@@ -212,11 +212,11 @@ if (config('buu.minio_enabled')) {
 
 ไฟล์: `apps/app-laravel/app/Console/Commands/MigrateDocsToMinioCommand.php`
 
-Cherry-pick จาก feature/minio-old-doc — scans all documents in storage, uploads missing ones to MinIO
+Cherry-pick จาก feature/minio-old-doc   scans all documents in storage, uploads missing ones to MinIO
 
 **Verify:** `docker compose exec laravel-app php artisan minio:migrate --dry-run`
 
-### Task 9: Integration test — full upload→MinIO flow
+### Task 9: Integration test   full upload→MinIO flow
 
 ไฟล์: `apps/app-laravel/tests/Feature/DocumentFileMinioTest.php`
 
@@ -236,12 +236,12 @@ Confirm no regressions.
 
 | Risk | Mitigation |
 |------|-----------|
-| Kong OAuth credentials ยังไม่ได้ตั้งค่า dev | ใช้ `BUU_MINIO_ENABLED=false` (default) — dev ไม่ต้อง config อะไร local file ทำงานปกติ |
-| MinIO upload fail ทำ extraction พัง | `MinioUploadService` catch all errors, returns null, log warning — non-fatal by design |
+| Kong OAuth credentials ยังไม่ได้ตั้งค่า dev | ใช้ `BUU_MINIO_ENABLED=false` (default)   dev ไม่ต้อง config อะไร local file ทำงานปกติ |
+| MinIO upload fail ทำ extraction พัง | `MinioUploadService` catch all errors, returns null, log warning   non-fatal by design |
 | Cherry-pick จาก feature/minio-old-doc อาจ conflict | diff เทียบแล้ว MinioUploadService.php ไม่มี conflict (file ใหม่), integration points ต้อง manual merge |
-| `minio_source_filename` vs `source_path` — 2 key ใน status | ใช้ `minio_source_filename` เป็น MinIO object name แยกจาก `source_path` (local relative) เพื่อไม่ break existing logic |
+| `minio_source_filename` vs `source_path`   2 key ใน status | ใช้ `minio_source_filename` เป็น MinIO object name แยกจาก `source_path` (local relative) เพื่อไม่ break existing logic |
 
 ## Open Questions
 
-1. **ลบ local file หลัง MinIO upload สำเร็จไหม?** — feature/minio-old-doc มี `uploadAndCleanup()` แต่ production อาจอยากเก็บ local ไว้ backup ช่วงแรก → แนะนำ: ใช้ `uploadIfEnabled()` (เก็บ local) ก่อน, ค่อย switch เป็น `uploadAndCleanup()` เมื่อมั่นใจ
-2. **Merge ทั้ง branch feature/minio-old-doc หรือ cherry-pick เฉพาะ?** — branch นั้นมี 10 commits + revert e-sign code → cherry-pick เฉพาะ MinioUploadService + tests + integration ปลอดภัยกว่า
+1. **ลบ local file หลัง MinIO upload สำเร็จไหม?**   feature/minio-old-doc มี `uploadAndCleanup()` แต่ production อาจอยากเก็บ local ไว้ backup ช่วงแรก → แนะนำ: ใช้ `uploadIfEnabled()` (เก็บ local) ก่อน, ค่อย switch เป็น `uploadAndCleanup()` เมื่อมั่นใจ
+2. **Merge ทั้ง branch feature/minio-old-doc หรือ cherry-pick เฉพาะ?**   branch นั้นมี 10 commits + revert e-sign code → cherry-pick เฉพาะ MinioUploadService + tests + integration ปลอดภัยกว่า

@@ -74,14 +74,14 @@ Create new component with:
 - Back button (`router.back()`)
 - Hero card: law_type chip + status chip + #ID + title (h5) + 6-cell meta grid (reuse exact same grid from ESignDocumentWorkspace lines 111-168)
 - 2-column grid below hero:
-  - **Left column: Action cards** — each is a `v-card flat border rounded="lg"` with icon, title, description, and button:
+  - **Left column: Action cards**   each is a `v-card flat border rounded="lg"` with icon, title, description, and button:
     1. แก้ไขเนื้อหา → `/documents/:id/review`
     2. แก้ไขข้อมูลกฎหมาย → `/documents/:id/law-info?mode=edit`
     3. ความสัมพันธ์ → `/documents/:id/relations`
     4. กำหนดสิทธิ์ → `/documents/:id/permissions`
     5. ดูตัวอย่าง → `/documents/:id/esign/preview`
     6. ส่งลงนาม e-Sign → `/documents/:id/esign`
-  - **Right column: Info panel** — no tabs, all sections visible:
+  - **Right column: Info panel**   no tabs, all sections visible:
     1. ข้อมูลเอกสาร (key-value list, same data as ESignDocumentWorkspace lines 252-311)
     2. ความสัมพันธ์กฎหมาย summary (count + type breakdown from `documentStore.review?.relations`)
     3. ประวัติเวอร์ชัน (`VersionHistoryTimeline` component)
@@ -89,9 +89,9 @@ Create new component with:
 - Collapsible read-only document view: `v-expansion-panels` with BlockFlow sections (same as ESignDocumentWorkspace lines 178-212 but in expansion panel)
 
 **Script:** Import from:
-- `useDocumentStore` — fetch document
-- `useVersionStore` — fetch versions
-- `buildSections` from `useLawSections` — for read-only doc view
+- `useDocumentStore`   fetch document
+- `useVersionStore`   fetch versions
+- `buildSections` from `useLawSections`   for read-only doc view
 - `formatThaiDate` from `utils/thaiDate`
 - `documentFileUrl` from `api/client`
 - `BlockFlow` from `shared/BlockFlow.vue`
@@ -99,7 +99,7 @@ Create new component with:
 
 **Style:**
 - `.edit-hub` background `#f8f7f5`
-- `.edit-hub-grid` — `grid-template-columns: 1fr 380px; gap: 20px;` (responsive: single column under 900px)
+- `.edit-hub-grid`   `grid-template-columns: 1fr 380px; gap: 20px;` (responsive: single column under 900px)
 - Action cards: `padding: 20px`, icon left, title bold, description caption, button right-aligned
 - Info panel: sticky top
 
@@ -141,5 +141,5 @@ Commit with: `feat(edit): redesign edit page as document management hub`
 
 ## Risks
 
-- `ESignDocumentWorkspace` `mode="edit"` code paths become dead — clean up after verifying edit hub works
-- BlockFlow component must work outside esign grid context — it's a standalone component, should be fine
+- `ESignDocumentWorkspace` `mode="edit"` code paths become dead   clean up after verifying edit hub works
+- BlockFlow component must work outside esign grid context   it's a standalone component, should be fine

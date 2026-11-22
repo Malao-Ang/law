@@ -13,19 +13,19 @@
 │  2   │ พ.ร.บ. มหาวิทยาลัยบูรพา │ [พ.ร.บ.]   │ [มีผลบังคับ]│ [เผยแพร่แล้ว] │ [เผยแพร่แล้ว]│ 4 ก.ย. 2569   │ [ดูเอกสาร] │
 │  3   │ ระเบียบ สวัสดิการ         │ [ระเบียบ]  │ [ร่าง]      │ [ยังไม่เผยแพร่]│ [รอตรวจทาน]  │ 3 ก.ย. 2569   │ [เริ่มตรวจ] │
 │  4   │ old-law.pdf              │ [รอกรอกข้อมูล]│ [ร่าง]    │ [ยังไม่เผยแพร่]│ [กรอกข้อมูล] │ 2 ก.ย. 2569   │ [แก้ไข]    │
-│  5   │ scan-document.pdf        │ [รอประมวลผล]│ —          │ —            │ [กำลังประมวล] │ 1 ก.ย. 2569   │ ⏳          │
+│  5   │ scan-document.pdf        │ [รอประมวลผล]│            │              │ [กำลังประมวล] │ 1 ก.ย. 2569   │ ⏳          │
 └──────┴──────────────────────────┴────────────┴─────────────┴──────────────┴──────────────┴────────────────┴────────────┘
 ```
 
 คำอธิบาย columns:
-- **ลำดับ** — ลำดับ row
-- **เอกสาร** — ชื่อเอกสาร (align left)
-- **ประเภท** — `law_type` เช่น "ประกาศ" "ระเบียบ" "พระราชบัญญัติ"; ถ้ายังไม่มี → chip "รอกรอกข้อมูล" (old) / "รอประมวลผล" (new)
-- **สถานะกฎหมาย** — `LawMeta.status` = "ร่าง" / "มีผลบังคับใช้" / "ยกเลิกการใช้งาน"; ถ้ายังไม่มี meta → "—"
-- **สถานะเผยแพร่** — ดูจาก `published_date`: มีวันที่ = "เผยแพร่แล้ว" (success), ว่าง = "ยังไม่เผยแพร่" (grey)
-- **ขั้นตอน** — Pipeline stage chip ที่มีอยู่แล้ว (`PipelineStageChip`)
-- **อัปเดตล่าสุด** — วันที่
-- **การดำเนินการ** — ปุ่ม action ตาม stage + ลบ
+- **ลำดับ**   ลำดับ row
+- **เอกสาร**   ชื่อเอกสาร (align left)
+- **ประเภท**   `law_type` เช่น "ประกาศ" "ระเบียบ" "พระราชบัญญัติ"; ถ้ายังไม่มี → chip "รอกรอกข้อมูล" (old) / "รอประมวลผล" (new)
+- **สถานะกฎหมาย**   `LawMeta.status` = "ร่าง" / "มีผลบังคับใช้" / "ยกเลิกการใช้งาน"; ถ้ายังไม่มี meta → " "
+- **สถานะเผยแพร่**   ดูจาก `published_date`: มีวันที่ = "เผยแพร่แล้ว" (success), ว่าง = "ยังไม่เผยแพร่" (grey)
+- **ขั้นตอน**   Pipeline stage chip ที่มีอยู่แล้ว (`PipelineStageChip`)
+- **อัปเดตล่าสุด**   วันที่
+- **การดำเนินการ**   ปุ่ม action ตาม stage + ลบ
 
 ## สีของ chip ที่ใช้
 
@@ -51,7 +51,7 @@
 | เอกสารเก่า stage=info | "แก้ไข" | `/documents/:id/edit` |
 | เอกสารเก่า stage อื่น | ตาม `STAGE_MAP[stage].action` เดิม | ตาม `STAGE_MAP` |
 | เอกสาร public | "ดูเอกสาร" | `/law/:id` |
-| เอกสาร failed | ไม่มีปุ่ม | — |
+| เอกสาร failed | ไม่มีปุ่ม |   |
 
 ## Current state / ปัญหาปัจจุบัน
 
@@ -61,18 +61,18 @@
 1. Header ไม่จัดกลาง
 2. ไม่มีคอลัมน์ "สถานะกฎหมาย" (`LawMeta.status`)
 3. ไม่มีคอลัมน์ "สถานะเผยแพร่" (`published_date`)
-4. คอลัมน์ "แหล่งที่มา" ยังมี fallback `<span>—</span>`
-5. คอลัมน์ "ประเภท" ยังมี fallback `<span>—</span>` และ chip "เอกสารเก่า" ที่ไม่ต้องการ
+4. คอลัมน์ "แหล่งที่มา" ยังมี fallback `<span> </span>`
+5. คอลัมน์ "ประเภท" ยังมี fallback `<span> </span>` และ chip "เอกสารเก่า" ที่ไม่ต้องการ
 6. `DocumentListItem` ไม่มี field `law_status` / `published_date` / `source_file` ที่ต้องใช้แสดงใหม่
-7. Backend `listDocuments()` อาจไม่ส่ง `law_meta.status` / `law_meta.published_date` มากับ list — ต้องตรวจ
+7. Backend `listDocuments()` อาจไม่ส่ง `law_meta.status` / `law_meta.published_date` มากับ list   ต้องตรวจ
 
 ## Architecture
 
-เพิ่ม field ที่ backend list response ส่ง `law_status` + `published_date` มาใน `DocumentListItem` เพื่อไม่ต้อง fetch review document ทีละ row. ถ้า `ReviewStore::listDocuments()` อ่าน law_meta อยู่แล้ว ให้เพิ่ม 2 field ในผลลัพธ์. Frontend แก้ `DocumentPipelineTable.vue` เพิ่มคอลัมน์ใหม่, ลบ `—` fallback, จัด header กลาง
+เพิ่ม field ที่ backend list response ส่ง `law_status` + `published_date` มาใน `DocumentListItem` เพื่อไม่ต้อง fetch review document ทีละ row. ถ้า `ReviewStore::listDocuments()` อ่าน law_meta อยู่แล้ว ให้เพิ่ม 2 field ในผลลัพธ์. Frontend แก้ `DocumentPipelineTable.vue` เพิ่มคอลัมน์ใหม่, ลบ ` ` fallback, จัด header กลาง
 
 ## Step-by-step tasks
 
-### Task 1 — ตรวจ backend listDocuments ว่าส่ง field อะไรบ้าง
+### Task 1   ตรวจ backend listDocuments ว่าส่ง field อะไรบ้าง
 
 อ่าน `apps/app-laravel/app/Services/ReviewStore.php` method `listDocuments()` เพื่อตรวจว่า response มี field อะไรบ้าง
 
@@ -90,9 +90,9 @@ Run:
 ```bash
 docker compose exec laravel-app php artisan test --filter="DocumentApi"
 ```
-(ถ้ามี test ที่เกี่ยว — ถ้าไม่มีก็ข้ามได้)
+(ถ้ามี test ที่เกี่ยว   ถ้าไม่มีก็ข้ามได้)
 
-### Task 2 — เพิ่ม field ใน `DocumentListItem` type
+### Task 2   เพิ่ม field ใน `DocumentListItem` type
 
 ไฟล์: `apps/app-laravel/resources/js/types/document.ts`
 
@@ -103,7 +103,7 @@ docker compose exec laravel-app php artisan test --filter="DocumentApi"
   source_file?: string | null;
 ```
 
-### Task 3 — เพิ่ม field ใน Row interface + rows computed
+### Task 3   เพิ่ม field ใน Row interface + rows computed
 
 ไฟล์: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
@@ -119,7 +119,7 @@ docker compose exec laravel-app php artisan test --filter="DocumentApi"
   publishedDate: doc.published_date ?? '',
 ```
 
-### Task 4 — แก้ headers + จัด align center
+### Task 4   แก้ headers + จัด align center
 
 ไฟล์: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
@@ -139,7 +139,7 @@ const headers = [
 
 ลบคอลัมน์ `source` (แหล่งที่มา) ออก เพราะ derive จาก law_type ได้ใน metadata page อยู่แล้ว ไม่ต้องแสดงซ้ำ
 
-### Task 5 — แก้ template slots ให้ใช้ chip ที่มีความหมาย
+### Task 5   แก้ template slots ให้ใช้ chip ที่มีความหมาย
 
 ไฟล์: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
@@ -171,7 +171,7 @@ const headers = [
   >
     {{ item.lawStatus }}
   </v-chip>
-  <span v-else class="text-caption text-medium-emphasis">—</span>
+  <span v-else class="text-caption text-medium-emphasis"> </span>
 </template>
 ```
 
@@ -190,7 +190,7 @@ const headers = [
 
 **คง** slot `#item.stage` เดิม (ใช้ `PipelineStageChip`)
 
-### Task 6 — เพิ่ม CSS จัด header ตรงกลาง
+### Task 6   เพิ่ม CSS จัด header ตรงกลาง
 
 ไฟล์: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
@@ -210,7 +210,7 @@ const headers = [
 
 คอลัมน์ "เอกสาร" (ที่ 2) ยังคง align left ส่วนที่เหลือ center ทั้งหมด
 
-### Task 7 — ลบ filter แหล่งที่มา
+### Task 7   ลบ filter แหล่งที่มา
 
 ไฟล์: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
@@ -219,7 +219,7 @@ const headers = [
 
 (ผู้ใช้จะเลือกแหล่งที่มาในหน้า metadata แทน ไม่ต้อง filter ที่นี่)
 
-### Task 8 — Verify
+### Task 8   Verify
 
 ```bash
 cd D:/workspace/outside/docling-thai-poc/apps/app-laravel
@@ -241,5 +241,5 @@ exit 0
 ## Risks / open questions
 
 - **Backend `listDocuments()` ต้องตรวจว่าอ่าน review JSON ได้**: ถ้า method ปัจจุบันอ่านแค่ status JSON (ไม่อ่าน review) ต้องเพิ่มการอ่าน `law_meta` จาก review file ด้วย ซึ่งอาจกระทบ performance ถ้ามีเอกสารเยอะ → mitigation: อ่านแค่ field ที่ต้องการ (`status`, `published_date`) ไม่อ่านทั้ง review
-- **เอกสารที่ยังไม่มี review file**: เอกสารที่ยัง processing จะไม่มี review file → `law_status` + `published_date` จะเป็น empty string → แสดง "—" ในคอลัมน์สถานะกฎหมาย / "ยังไม่เผยแพร่" ในเผยแพร่ ซึ่งถูกต้อง
+- **เอกสารที่ยังไม่มี review file**: เอกสารที่ยัง processing จะไม่มี review file → `law_status` + `published_date` จะเป็น empty string → แสดง " " ในคอลัมน์สถานะกฎหมาย / "ยังไม่เผยแพร่" ในเผยแพร่ ซึ่งถูกต้อง
 - **คอลัมน์เยอะขึ้น**: จาก 7 เป็น 8 คอลัมน์ (ลบ source +2 ใหม่) อาจแน่นบนจอเล็ก → responsive ตาราง horizontal scroll ของ Vuetify จัดการได้

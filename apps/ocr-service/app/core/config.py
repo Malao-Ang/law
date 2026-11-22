@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # PyTorch queues CUDA work so two concurrent calls share the GPU without
     # corrupting model state.  Set to 1 to restore the old serialised behaviour.
     ocr_gpu_concurrency: int = 2
-    # EasyOCR recogniser batch size — passes N crops to the CUDA kernel per call.
+    # EasyOCR recogniser batch size   passes N crops to the CUDA kernel per call.
     # Default 1 is conservative; 8 nearly doubles throughput on GPU.
     ocr_recognizer_batch_size: int = 8
 
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     # Set to False to revert to the two-pass fast→slow retry behaviour.
     ocr_render_zoom_heuristic_enabled: bool = True
 
-    # PDF text format parity — force-center headers (top-of-page short blocks)
+    # PDF text format parity   force-center headers (top-of-page short blocks)
     # and lift fine first-line indents that the legacy 5pt threshold dropped.
     pdf_header_top_fraction: float = 0.18   # blocks within top 18% of page count as headers
     pdf_header_min_font_pt: float = 14.0    # ≥14pt font also counts as header

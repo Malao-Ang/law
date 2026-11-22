@@ -63,7 +63,7 @@ function onUp(): void {
       display_width_px: width,
       display_height_px: null,
     }).catch(() => {
-      // non-fatal — width remains in draft_html regardless
+      // non-fatal   width remains in draft_html regardless
     });
   }
 }
