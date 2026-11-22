@@ -9,7 +9,7 @@
       :variant="isOld ? 'historical' : 'default'"
       :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
-      :next-disabled="nextDisabled || !can.publish"
+      :next-disabled="nextDisabled || (!can.publish && !can.manage_permissions)"
       @back="router.back()"
       @next="saveAndPublish"
     />
@@ -266,7 +266,7 @@ async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Pro
 }
 
 async function saveAndPublish(): Promise<void> {
-  if (!can.value.publish || documentStore.saving) return;
+  if (documentStore.saving || (!can.value.publish && !can.value.manage_permissions)) return;
   documentStore.setSaveError();
 
   if (can.value.manage_permissions) {
@@ -275,6 +275,10 @@ async function saveAndPublish(): Promise<void> {
       permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
     });
     if (!saved) return;
+    if (!can.value.publish) {
+      snackbar.success('บันทึกสิทธิ์แล้ว');
+      return;
+    }
   }
 
   if (isOld.value) {
