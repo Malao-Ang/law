@@ -10,7 +10,21 @@ class UpsertPermissionGroupRequest extends FormRequest
     {
         $current = app(\App\Services\Auth\CurrentUser::class);
         $actor = $current->user($this);
-        return $actor !== null && (($actor['is_super_admin'] ?? false) || $current->role($actor, $this) === 'inner_admin');
+        if ($actor === null) {
+            return false;
+        }
+        if (($actor['is_super_admin'] ?? false) || $current->role($actor, $this) === 'inner_admin') {
+            return true;
+        }
+        // An editor ticked "edit" in the active unit manages document permissions.
+        $active = $this->session()->get(\App\Services\Auth\CurrentUser::ACTIVE_UNIT_KEY);
+        foreach ((array) ($actor['memberships'] ?? []) as $membership) {
+            if ($membership['unit_code'] === $active) {
+                return in_array('edit', \App\Services\Auth\MongoUserStore::effectiveActions($membership), true);
+            }
+        }
+
+        return false;
     }
 
     /**

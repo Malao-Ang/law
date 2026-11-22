@@ -227,16 +227,10 @@ class DocumentAccess
         if ($actor['is_super_admin'] ?? false) return true;
         $role = $this->current->role($actor, $request);
         if ($role === 'inner_admin') return true;
+        if ($role === 'editor') return $this->allows($request, 'edit', $document);
         $document = $this->documentMeta($document);
         return $role === 'outer_admin' && ($document['responsible']['username'] ?? null) === $actor['username']
             && $this->allows($request, 'publish', $document);
-    }
-
-    /** Editors with edit rights may switch an open document to private; groups stay with permission managers. */
-    public function canSetScope(Request $request, array $document): bool
-    {
-        return $this->current->user($request) !== null && $this->context($request) !== 'public'
-            && $this->adminScope($request, $document) && $this->allows($request, 'edit', $document);
     }
 
     public function capabilities(Request $request, array $document): array
@@ -247,7 +241,6 @@ class DocumentAccess
         }
         if ($this->context($request) === 'public') $can = array_fill_keys(array_keys($can), false);
         $can['manage_permissions'] = $this->canManagePermissions($request, $document);
-        $can['set_scope'] = $can['manage_permissions'] || $this->canSetScope($request, $document);
         $can['read'] = $this->canRead($request, $document);
         return $can;
     }
@@ -272,28 +265,20 @@ class DocumentAccess
             abort(404, 'ไม่พบข้อมูลเอกสารสำหรับแก้ไข');
         }
         if (! $this->canManagePermissions($request, $this->readDocument($documentId) ?? [])) {
-            $document = $this->readDocument($documentId) ?? [];
             foreach (['permission_group_ids', 'access_scope'] as $key) {
-                $changed = $request->has('law_meta.'.$key) && $request->input('law_meta.'.$key) != ($review['law_meta'][$key] ?? ($key === 'access_scope' ? 'public' : []));
-                $openToPrivate = $key === 'access_scope' && $request->input('law_meta.access_scope') === 'private'
-                    && ($review['law_meta']['access_scope'] ?? 'public') === 'public' && $this->canSetScope($request, $document);
-                abort_if($changed && ! $openToPrivate, 403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');
+                abort_if($request->has('law_meta.'.$key) && $request->input('law_meta.'.$key) != ($review['law_meta'][$key] ?? ($key === 'access_scope' ? 'public' : [])),
+                    403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');
             }
         }
         $actions = [];
-        $scopeToPrivate = $request->input('law_meta.access_scope') === 'private' && ($review['law_meta']['access_scope'] ?? 'public') === 'public'
-            && $this->canSetScope($request, $this->readDocument($documentId) ?? []);
         $publishFields = ['published_date', 'access_scope', 'permission_group_ids'];
         $publishing = $request->has('law_meta.published_date')
             && $request->input('law_meta.published_date') != ($review['law_meta']['published_date'] ?? null);
         foreach ((array) $request->input('law_meta', []) as $key => $value) {
             if (in_array($key, DocumentOwnership::FIELDS, true)) continue;
             if ($value != ($review['law_meta'][$key] ?? null)) {
-                if ($key === 'access_scope' && $scopeToPrivate) {
-                    $actions[] = 'edit';
-                    continue;
-                }
-                $actions[] = (in_array($key, $publishFields, true) || ($key === 'status' && $publishing)) ? 'publish' : 'edit';
+                $permissionField = in_array($key, ['access_scope', 'permission_group_ids'], true);
+                $actions[] = (! $permissionField && (in_array($key, $publishFields, true) || ($key === 'status' && $publishing))) ? 'publish' : 'edit';
             }
         }
         foreach ($request->except(['law_meta', '_token']) as $key => $value) {
@@ -301,7 +286,7 @@ class DocumentAccess
             if ($key !== 'reset_to_generated' || $value) $actions[] = 'edit';
         }
         $keys = array_diff(array_keys((array) $request->input('law_meta', [])), DocumentOwnership::FIELDS);
-        $fallback = $keys !== [] && array_diff($keys, $publishFields) === [] ? 'publish' : 'edit';
+        $fallback = $keys !== [] && array_diff($keys, $publishFields) === [] && array_diff($keys, ['access_scope', 'permission_group_ids']) !== [] ? 'publish' : 'edit';
         return array_values(array_unique($actions ?: [$fallback]));
     }
 }

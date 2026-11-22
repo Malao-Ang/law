@@ -9,12 +9,12 @@
       :variant="isOld ? 'historical' : 'default'"
       :next-label="isOld ? 'เผยแพร่' : 'ไปหน้าลงนาม'"
       :next-loading="documentStore.saving"
-      :next-disabled="nextDisabled || !can.publish"
+      :next-disabled="nextDisabled || (!can.publish && !can.manage_permissions)"
       @back="router.back()"
       @next="saveAndPublish"
     />
 
-    <div :inert="!canSetScope" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
+    <div :inert="!can.manage_permissions" class="mx-auto" style="max-width:1400px; padding-bottom:60px">
       <div v-if="documentStore.loading" class="d-flex flex-column align-center justify-center pa-12 ga-3 text-medium-emphasis">
         <v-progress-circular indeterminate color="admin-primary" />
         <span>กำลังโหลด...</span>
@@ -32,7 +32,7 @@
           </div>
 
           <v-row dense class="mb-4">
-            <v-col cols="12" md="6" :inert="!can.manage_permissions && initialScope === 'private'">
+            <v-col cols="12" md="6">
               <AccessScopeCard
                 title="Public"
                 subtitle="ทุกคนเห็นได้"
@@ -49,7 +49,7 @@
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
-                @select="selectPrivate"
+                @select="scope = 'private'"
               />
             </v-col>
           </v-row>
@@ -58,12 +58,6 @@
             <v-icon icon="mdi-earth" size="40" color="grey" class="mb-2" />
             <div class="text-subtitle-1 font-weight-bold">เปิดเผยข้อมูลสู่สาธารณะ</div>
             <div class="text-body-2 text-medium-emphasis">ทุกคนสามารถสืบค้นและเข้าถึงได้จากหน้าสาธารณะ</div>
-          </v-card>
-
-          <v-card v-else-if="!can.manage_permissions" flat border rounded="xl" class="pa-8 text-center">
-            <v-icon icon="mdi-lock-outline" size="40" color="grey" class="mb-2" />
-            <div class="text-subtitle-1 font-weight-bold">เอกสารจำกัดสิทธิ์</div>
-            <div class="text-body-2 text-medium-emphasis">การกำหนดกลุ่ม หน่วยงาน และบุคคลที่เข้าถึงได้ ดำเนินการโดยผู้ดูแลหน่วยงาน</div>
           </v-card>
 
           <template v-else>
@@ -189,8 +183,6 @@ const documentStore = useDocumentStore();
 const { isDraft } = useLawStatus();
 
 const scope = ref<'public' | 'private'>('public');
-const initialScope = ref<'public' | 'private'>('public');
-const canSetScope = computed(() => can.value.manage_permissions || Boolean(can.value.set_scope));
 const selectedGroupIds = ref<string[]>([]);
 const search = ref('');
 const groups = ref<PermissionGroup[]>([]);
@@ -221,14 +213,6 @@ const availableGroups = computed(() => {
 });
 
 const nextDisabled = computed(() => false);
-
-async function selectPrivate(): Promise<void> {
-  scope.value = 'private';
-  if (can.value.manage_permissions || !canSetScope.value || initialScope.value === 'private') return;
-  documentStore.setSaveError();
-  if (await documentStore.saveLawMeta({ access_scope: 'private' })) initialScope.value = 'private';
-  else scope.value = 'public';
-}
 
 function addGroup(groupId: string): void {
   if (!selectedGroupIds.value.includes(groupId)) {
@@ -282,7 +266,7 @@ async function createGroupFromDialog(payload: UpsertPermissionGroupPayload): Pro
 }
 
 async function saveAndPublish(): Promise<void> {
-  if (!can.value.publish || documentStore.saving) return;
+  if (documentStore.saving || (!can.value.publish && !can.value.manage_permissions)) return;
   documentStore.setSaveError();
 
   if (can.value.manage_permissions) {
@@ -291,6 +275,10 @@ async function saveAndPublish(): Promise<void> {
       permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
     });
     if (!saved) return;
+    if (!can.value.publish) {
+      snackbar.success('บันทึกสิทธิ์แล้ว');
+      return;
+    }
   }
 
   if (isOld.value) {
@@ -343,7 +331,6 @@ onMounted(async () => {
   }
 
   scope.value = documentStore.review?.law_meta?.access_scope === 'private' ? 'private' : 'public';
-  initialScope.value = scope.value;
   selectedGroupIds.value = [...(documentStore.review?.law_meta?.permission_group_ids ?? [])];
   if (documentStore.review?.can?.manage_permissions) await loadPermissionResources();
 });
