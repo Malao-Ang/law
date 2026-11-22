@@ -191,6 +191,7 @@ export interface ComposeState {
 
 export interface DocumentCapabilities {
   manage_permissions: boolean;
+  set_scope?: boolean;
   edit: boolean;
   delete: boolean;
   esign: boolean;

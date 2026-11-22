@@ -232,6 +232,13 @@ class DocumentAccess
             && $this->allows($request, 'publish', $document);
     }
 
+    /** Editors with publish rights may switch an open document to private; groups stay with permission managers. */
+    public function canSetScope(Request $request, array $document): bool
+    {
+        return $this->current->user($request) !== null && $this->context($request) !== 'public'
+            && $this->adminScope($request, $document) && $this->allows($request, 'publish', $document);
+    }
+
     public function capabilities(Request $request, array $document): array
     {
         $can = [];
@@ -240,6 +247,7 @@ class DocumentAccess
         }
         if ($this->context($request) === 'public') $can = array_fill_keys(array_keys($can), false);
         $can['manage_permissions'] = $this->canManagePermissions($request, $document);
+        $can['set_scope'] = $can['manage_permissions'] || $this->canSetScope($request, $document);
         $can['read'] = $this->canRead($request, $document);
         return $can;
     }
@@ -264,9 +272,12 @@ class DocumentAccess
             abort(404, 'ไม่พบข้อมูลเอกสารสำหรับแก้ไข');
         }
         if (! $this->canManagePermissions($request, $this->readDocument($documentId) ?? [])) {
+            $document = $this->readDocument($documentId) ?? [];
             foreach (['permission_group_ids', 'access_scope'] as $key) {
-                abort_if($request->has('law_meta.'.$key) && $request->input('law_meta.'.$key) != ($review['law_meta'][$key] ?? ($key === 'access_scope' ? 'public' : [])),
-                    403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');
+                $changed = $request->has('law_meta.'.$key) && $request->input('law_meta.'.$key) != ($review['law_meta'][$key] ?? ($key === 'access_scope' ? 'public' : []));
+                $openToPrivate = $key === 'access_scope' && $request->input('law_meta.access_scope') === 'private'
+                    && ($review['law_meta']['access_scope'] ?? 'public') === 'public' && $this->canSetScope($request, $document);
+                abort_if($changed && ! $openToPrivate, 403, 'ไม่มีสิทธิ์กำหนดสิทธิ์ผู้อื่น');
             }
         }
         $actions = [];
