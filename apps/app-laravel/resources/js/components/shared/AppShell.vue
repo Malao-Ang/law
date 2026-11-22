@@ -204,6 +204,12 @@ const defaultNavGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'ข้อคิดเห็นและการสอบถาม',
+    items: [
+      { label: 'จัดการความคิดเห็น', icon: 'mdi-comment-text-outline', to: '/admin/comments' },
+    ],
+  },
+  {
     label: 'ผู้ใช้และสิทธิ์',
     items: [
       { label: 'จัดการหน่วยงาน', icon: 'mdi-account-multiple-outline', to: '/admin/units' },

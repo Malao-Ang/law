@@ -24,7 +24,7 @@
             <h1>ความคิดเห็นและข้อซักถามทั้งหมด</h1>
             <p>สอบถามหรือเสนอข้อคิดเห็นเกี่ยวกับ {{ title }} เพื่อให้เจ้าหน้าที่ผู้รับผิดชอบพิจารณาและตอบกลับ</p>
           </div>
-          <v-btn color="primary" size="large" prepend-icon="mdi-plus" class="text-none" @click="composer?.open()">
+          <v-btn color="#1a3d7c" size="large" prepend-icon="mdi-plus" class="text-none" @click="composer?.open()">
             แสดงความคิดเห็น
           </v-btn>
         </v-card>
@@ -125,8 +125,6 @@
                 v-for="comment in items"
                 :key="comment.id"
                 :comment="comment"
-                :can-reply="canReply"
-                @replied="load"
               />
             </div>
           </section>
@@ -161,7 +159,6 @@ const items = ref<LawComment[]>([]);
 const counts = ref<LawCommentCounts | null>(null);
 const total = ref(0);
 const title = ref('กฎหมาย');
-const canReply = ref(false);
 const loading = ref(false);
 const error = ref('');
 const type = ref<LawCommentType | ''>('');
@@ -220,7 +217,6 @@ async function load(): Promise<void> {
     items.value = result.items;
     counts.value = result.counts;
     total.value = result.total;
-    canReply.value = result.can_reply;
     if (result.document.title) title.value = result.document.title;
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : 'โหลดความคิดเห็นไม่สำเร็จ';
@@ -300,8 +296,8 @@ onMounted(() => { void load(); });
 }
 
 .filter-row.is-active {
-  background: #f3ead3;
-  color: #8a6418;
+  background: #e8f0fe;
+  color: #1a3d7c;
   font-weight: 700;
 }
 

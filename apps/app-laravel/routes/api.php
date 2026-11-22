@@ -66,10 +66,18 @@ Route::get('/oversight/mail', [OversightMailController::class, 'show'])->middlew
 Route::put('/oversight/mail', [OversightMailController::class, 'update'])->middleware('auth.session');
 Route::post('/oversight/mail/send', [OversightMailController::class, 'send'])->middleware('auth.session');
 Route::put('/oversight/{documentId}', [OversightController::class, 'update'])->middleware('auth.session');
-Route::get('/laws/{documentId}/comments', [\App\Http\Controllers\Api\LawCommentController::class, 'index']);
-Route::post('/laws/{documentId}/comments', [\App\Http\Controllers\Api\LawCommentController::class, 'store']);
-Route::post('/laws/{documentId}/comments/{commentId}/reply', [\App\Http\Controllers\Api\LawCommentController::class, 'reply']);
-Route::get('/laws/{documentId}/comments/{commentId}/files/{fileId}', [\App\Http\Controllers\Api\LawCommentController::class, 'file']);
+Route::get('/laws/{documentId}/comments', [\App\Http\Controllers\Api\LawCommentController::class, 'index'])->defaults('document_context', 'public');
+Route::post('/laws/{documentId}/comments', [\App\Http\Controllers\Api\LawCommentController::class, 'store'])->defaults('document_context', 'public');
+Route::post('/laws/{documentId}/comments/{commentId}/reply', [\App\Http\Controllers\Api\LawCommentController::class, 'reply'])->defaults('document_context', 'public');
+Route::get('/laws/{documentId}/comments/{commentId}/files/{fileId}', [\App\Http\Controllers\Api\LawCommentController::class, 'file'])->defaults('document_context', 'public');
+Route::middleware('auth.session')->prefix('admin/comments')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'index']);
+    Route::get('/{commentId}', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'show']);
+    Route::post('/{commentId}/reply', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'reply']);
+    Route::patch('/{commentId}/visibility', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'visibility']);
+    Route::post('/{commentId}/archive', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'archive']);
+    Route::get('/{commentId}/files/{fileId}', [\App\Http\Controllers\Api\AdminLawCommentController::class, 'file']);
+});
 Route::post('/laws/search', [LawSearchController::class, 'search'])->defaults('document_context', 'public');
 Route::get('/laws/facets', [LawSearchController::class, 'facets'])->defaults('document_context', 'public');
 Route::post('/laws/suggest', [LawSuggestController::class, 'suggest'])->defaults('document_context', 'public');

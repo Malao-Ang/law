@@ -87,14 +87,6 @@
             hide-details="auto"
             class="mb-3"
           />
-          <v-switch
-            v-model="isPublic"
-            color="primary"
-            hide-details
-            inset
-            label="เปิดเผยต่อสาธารณะ"
-            class="mb-2"
-          />
 
           <div class="text-subtitle-2 mb-2">ไฟล์แนบ (PDF, JPG, PNG, DOCX สูงสุด 5 ไฟล์ / ไฟล์ละ 10 MB)</div>
           <button type="button" class="composer-drop" @click="pickFiles">
@@ -129,13 +121,12 @@
           <div class="confirm-grid">
             <span>ประเภท</span><strong>{{ typeLabel }}</strong>
             <span>มาตราอ้างอิง</span><strong>{{ draft.sectionRef.trim() || '—' }}</strong>
-            <span>การเปิดเผย</span><strong>{{ isPublic ? 'เปิด' : 'เฉพาะฉัน' }}</strong>
             <span>ไฟล์แนบ</span><strong>{{ draft.files.length ? `${draft.files.length} ไฟล์` : 'ไม่มี' }}</strong>
           </div>
           <div class="text-subtitle-2 mt-4 mb-1">ความคิดเห็นของคุณ</div>
           <p class="confirm-body">{{ draft.body.trim() }}</p>
-          <v-alert type="warning" variant="tonal" density="compact" class="mt-4">
-            ความคิดเห็นที่เปิดเผยจะปรากฏต่อผู้ใช้คนอื่นทันที และเจ้าหน้าที่จะพิจารณาตอบกลับ หากไม่ผ่านเกณฑ์อาจถูกจำกัดการแสดงผล
+          <v-alert type="info" variant="tonal" density="compact" class="mt-4">
+            ความคิดเห็นจะส่งให้เจ้าหน้าที่พิจารณา การเผยแพร่ต่อผู้ใช้อื่นกำหนดโดยเจ้าหน้าที่
           </v-alert>
           <v-alert v-if="submitError" type="error" variant="tonal" density="compact" class="mt-3">{{ submitError }}</v-alert>
         </v-card-text>
@@ -174,7 +165,6 @@ const submitError = ref('');
 const username = ref('');
 const password = ref('');
 const fileInput = ref<HTMLInputElement | null>(null);
-const isPublic = ref(true);
 
 const draft = reactive({
   type: 'question' as LawCommentType,
@@ -193,7 +183,6 @@ function resetDraft(): void {
   draft.body = '';
   draft.sectionRef = '';
   draft.files = [];
-  isPublic.value = true;
   formError.value = '';
   submitError.value = '';
 }
@@ -283,7 +272,7 @@ async function submit(): Promise<void> {
       type: draft.type,
       body: draft.body.trim(),
       sectionRef: draft.sectionRef,
-      visibility: isPublic.value ? 'public' : 'private',
+      visibility: 'private',
       files: draft.files,
     });
     confirmOpen.value = false;
