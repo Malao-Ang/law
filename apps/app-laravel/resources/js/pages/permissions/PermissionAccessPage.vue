@@ -49,7 +49,7 @@
                 icon="mdi-lock-outline"
                 color="#d27c21"
                 :selected="scope === 'private'"
-                @select="scope = 'private'"
+                @select="selectPrivate"
               />
             </v-col>
           </v-row>
@@ -222,6 +222,14 @@ const availableGroups = computed(() => {
 
 const nextDisabled = computed(() => false);
 
+async function selectPrivate(): Promise<void> {
+  scope.value = 'private';
+  if (can.value.manage_permissions || !canSetScope.value || initialScope.value === 'private') return;
+  documentStore.setSaveError();
+  if (await documentStore.saveLawMeta({ access_scope: 'private' })) initialScope.value = 'private';
+  else scope.value = 'public';
+}
+
 function addGroup(groupId: string): void {
   if (!selectedGroupIds.value.includes(groupId)) {
     selectedGroupIds.value = [...selectedGroupIds.value, groupId];
@@ -283,10 +291,6 @@ async function saveAndPublish(): Promise<void> {
       permission_group_ids: scope.value === 'private' ? selectedGroupIds.value : [],
     });
     if (!saved) return;
-  } else if (canSetScope.value && scope.value !== initialScope.value) {
-    const saved = await documentStore.saveLawMeta({ access_scope: scope.value });
-    if (!saved) return;
-    initialScope.value = scope.value;
   }
 
   if (isOld.value) {

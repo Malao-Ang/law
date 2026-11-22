@@ -232,11 +232,11 @@ class DocumentAccess
             && $this->allows($request, 'publish', $document);
     }
 
-    /** Editors with publish rights may switch an open document to private; groups stay with permission managers. */
+    /** Editors with edit rights may switch an open document to private; groups stay with permission managers. */
     public function canSetScope(Request $request, array $document): bool
     {
         return $this->current->user($request) !== null && $this->context($request) !== 'public'
-            && $this->adminScope($request, $document) && $this->allows($request, 'publish', $document);
+            && $this->adminScope($request, $document) && $this->allows($request, 'edit', $document);
     }
 
     public function capabilities(Request $request, array $document): array
@@ -281,12 +281,18 @@ class DocumentAccess
             }
         }
         $actions = [];
+        $scopeToPrivate = $request->input('law_meta.access_scope') === 'private' && ($review['law_meta']['access_scope'] ?? 'public') === 'public'
+            && $this->canSetScope($request, $this->readDocument($documentId) ?? []);
         $publishFields = ['published_date', 'access_scope', 'permission_group_ids'];
         $publishing = $request->has('law_meta.published_date')
             && $request->input('law_meta.published_date') != ($review['law_meta']['published_date'] ?? null);
         foreach ((array) $request->input('law_meta', []) as $key => $value) {
             if (in_array($key, DocumentOwnership::FIELDS, true)) continue;
             if ($value != ($review['law_meta'][$key] ?? null)) {
+                if ($key === 'access_scope' && $scopeToPrivate) {
+                    $actions[] = 'edit';
+                    continue;
+                }
                 $actions[] = (in_array($key, $publishFields, true) || ($key === 'status' && $publishing)) ? 'publish' : 'edit';
             }
         }
