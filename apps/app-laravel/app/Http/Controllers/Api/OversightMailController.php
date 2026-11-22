@@ -23,10 +23,21 @@ class OversightMailController extends Controller
     {
         abort_if(app(\App\Services\Auth\CurrentUser::class)->user(request()) === null, 401, 'กรุณาเข้าสู่ระบบ');
         $items = $this->oversight->reminderCatalog(request());
+        $deadline = $this->oversight->mailTemplate(OversightService::CHANNEL_DEADLINE);
+        $proclamation = $this->oversight->mailTemplate(OversightService::CHANNEL_PROCLAMATION);
 
         return response()->json([
-            'template' => $this->oversight->mailTemplate(),
-            'defaults' => $this->oversight->defaultMailTemplate(),
+            'templates' => [
+                'deadline' => $deadline,
+                'proclamation' => $proclamation,
+            ],
+            /** @deprecated Prefer templates.deadline */
+            'template' => $deadline,
+            'defaults' => [
+                'deadline' => $this->oversight->defaultMailTemplate(OversightService::CHANNEL_DEADLINE),
+                'proclamation' => $this->oversight->defaultMailTemplate(OversightService::CHANNEL_PROCLAMATION),
+            ],
+            'channels' => $this->oversight->mailChannels(),
             'placeholders' => $this->placeholders(),
             'reminder_days' => $this->oversight->reminderDays(),
             'pending_count' => count(array_filter($items, static fn (array $item): bool => $item['due_now'])),
@@ -38,20 +49,28 @@ class OversightMailController extends Controller
     {
         $current = app(\App\Services\Auth\CurrentUser::class);
         abort_unless($current->user($request)['is_super_admin'] ?? false, 403);
-        $template = $this->oversight->saveMailTemplate($request->validated());
+        $templates = $this->oversight->saveMailTemplate($request->validated());
         $this->audit->record(
             'update',
             'oversight',
             'mail-template',
             'แก้ไขข้อความอีเมลแจ้งเตือน',
             [
-                'หัวข้อ: '.$template['subject'],
-                'แจ้งเตือนเมื่อเหลือ: '.implode(', ', $template['reminder_days']).' วัน',
+                'ใกล้ครบกำหนด: '.$templates['deadline']['subject'],
+                'ออกประกาศใหม่: '.$templates['proclamation']['subject'],
+                'แจ้งเตือนเมื่อเหลือ: '.implode(', ', $templates['reminder_days']).' วัน',
             ],
             'ข้อความอีเมลแจ้งเตือน',
         );
 
-        return response()->json(['template' => $template]);
+        return response()->json([
+            'templates' => [
+                'deadline' => $templates['deadline'],
+                'proclamation' => $templates['proclamation'],
+            ],
+            'template' => $templates['deadline'],
+            'reminder_days' => $templates['reminder_days'],
+        ]);
     }
 
     public function send(SendOversightMailRequest $request): JsonResponse
@@ -113,5 +132,4 @@ class OversightMailController extends Controller
             ['token' => '{link}', 'label' => 'ลิงก์เข้าระบบ', 'fields' => 'ข้อความ'],
         ];
     }
-
 }

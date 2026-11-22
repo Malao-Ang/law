@@ -225,22 +225,38 @@ class OversightTest extends TestCase
 
         $this->getJson('/api/oversight/mail')
             ->assertOk()
-            ->assertJsonPath('template.link_label', 'ระบบติดตามการกำกับดูแล')
+            ->assertJsonPath('templates.deadline.link_label', 'ระบบติดตามการกำกับดูแล')
+            ->assertJsonPath('templates.proclamation.link_label', 'ระบบติดตามการกำกับดูแล')
             ->assertJsonPath('pending_count', 1)
             ->assertJsonPath('items.0.due_now', true)
-            ->assertJsonPath('items.0.document_id', $id);
+            ->assertJsonPath('items.0.document_id', $id)
+            ->assertJsonPath('items.0.channel', 'deadline');
 
         $this->putJson('/api/oversight/mail', [
-            'subject' => '',
-            'body' => 'มีข้อความ',
-            'link_label' => 'เปิดระบบ',
+            'deadline' => [
+                'subject' => '',
+                'body' => 'มีข้อความ',
+                'link_label' => 'เปิดระบบ',
+            ],
+            'proclamation' => [
+                'subject' => 'ออกประกาศ {title}',
+                'body' => '{title} {deadlines} {link}',
+                'link_label' => 'เปิดระบบ',
+            ],
         ])->assertStatus(422);
 
         $this->putJson('/api/oversight/mail', [
-            'subject' => 'เตือนเอง {title}',
-            'body' => "<script>alert(1)</script>\n\n{title}\n\n{deadlines}\n\nดูที่ {link}",
-            'link_label' => 'เปิดระบบ',
-        ])->assertOk()->assertJsonPath('template.subject', 'เตือนเอง {title}');
+            'deadline' => [
+                'subject' => 'เตือนเอง {title}',
+                'body' => "<script>alert(1)</script>\n\n{title}\n\n{deadlines}\n\nดูที่ {link}",
+                'link_label' => 'เปิดระบบ',
+            ],
+            'proclamation' => [
+                'subject' => 'ออกประกาศ {title}',
+                'body' => '{title}\n{deadlines}\n{link}',
+                'link_label' => 'เปิดระบบ',
+            ],
+        ])->assertOk()->assertJsonPath('templates.deadline.subject', 'เตือนเอง {title}');
 
         $this->postJson('/api/oversight/mail/send')
             ->assertOk()
@@ -278,20 +294,35 @@ class OversightTest extends TestCase
         $this->track($oldId, 'อยู่ระหว่างการยกร่าง', $oldOffset);
 
         $this->putJson('/api/oversight/mail', [
-            'subject' => 'แจ้งเตือน {days}',
-            'body' => '{title} {deadlines}',
-            'link_label' => 'เปิดระบบ',
+            'deadline' => [
+                'subject' => 'แจ้งเตือน {days}',
+                'body' => '{title} {deadlines}',
+                'link_label' => 'เปิดระบบ',
+            ],
+            'proclamation' => [
+                'subject' => 'ออกประกาศ {days}',
+                'body' => '{title} {deadlines}',
+                'link_label' => 'เปิดระบบ',
+            ],
             'reminder_days' => [3, 10],
         ])->assertOk()
-            ->assertJsonPath('template.reminder_days', [10, 3]);
+            ->assertJsonPath('templates.deadline.reminder_days', [10, 3])
+            ->assertJsonPath('reminder_days', [10, 3]);
 
         $this->getJson('/api/oversight/summary')->assertJsonPath('reminder_days', [10, 3]);
         $this->getJson('/api/oversight/mail')->assertJsonPath('pending_count', 1);
 
         $this->putJson('/api/oversight/mail', [
-            'subject' => 'แจ้งเตือน {days}',
-            'body' => '{title} {deadlines}',
-            'link_label' => 'เปิดระบบ',
+            'deadline' => [
+                'subject' => 'แจ้งเตือน {days}',
+                'body' => '{title} {deadlines}',
+                'link_label' => 'เปิดระบบ',
+            ],
+            'proclamation' => [
+                'subject' => 'ออกประกาศ {days}',
+                'body' => '{title} {deadlines}',
+                'link_label' => 'เปิดระบบ',
+            ],
             'reminder_days' => [],
         ])->assertStatus(422);
 
@@ -328,7 +359,64 @@ class OversightTest extends TestCase
                 && count($mail->hits) === 1
                 && $mail->hits[0]['days_left'] === 14
                 && $mail->hits[0]['label'] === 'ออกประกาศฉบับใหม่ทั้งฉบับ: ประกาศที่ถูกเชื่อม'
+                && str_contains($mail->envelope()->subject, 'ต้องออกประกาศตามกฎหมาย')
+                && str_contains($mail->bodyHtml, 'ใกล้ถึงกำหนดต้องออกประกาศฉบับใหม่')
                 && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่ทั้งฉบับ: ประกาศที่ถูกเชื่อม');
+        });
+        Mail::assertSent(OversightReminderMail::class, 1);
+    }
+
+    public function test_deadline_and_proclamation_use_separate_templates(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $id = 'ov_split_'.uniqid();
+        $this->seedDocument($id, 'ฉบับแยกเทมเพลต');
+        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due);
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [[
+                'id' => 'r-split',
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_title' => 'กฎหมายต้นทาง',
+                'requires_new_proclamation' => true,
+                'proclamation_due_date' => $due,
+            ]],
+        ])->assertOk();
+
+        $this->putJson('/api/oversight/mail', [
+            'deadline' => [
+                'subject' => 'เทมเพลตกำหนด {title}',
+                'body' => "กำหนด\n{deadlines}",
+                'link_label' => 'ลิงก์กำหนด',
+            ],
+            'proclamation' => [
+                'subject' => 'เทมเพลตประกาศ {title}',
+                'body' => "ประกาศใหม่\n{deadlines}",
+                'link_label' => 'ลิงก์ประกาศ',
+            ],
+            'reminder_days' => [14],
+        ])->assertOk();
+
+        $this->getJson('/api/oversight/mail')
+            ->assertOk()
+            ->assertJsonPath('pending_count', 2);
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, 2);
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->envelope()->subject === 'เทมเพลตกำหนด ฉบับแยกเทมเพลต'
+                && str_contains($mail->bodyHtml, 'กำหนด')
+                && str_contains($mail->bodyHtml, 'กำหนดเวลาออกประกาศ')
+                && str_contains($mail->bodyHtml, 'ลิงก์กำหนด');
+        });
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->envelope()->subject === 'เทมเพลตประกาศ ฉบับแยกเทมเพลต'
+                && str_contains($mail->bodyHtml, 'ประกาศใหม่')
+                && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่ทั้งฉบับ: กฎหมายต้นทาง')
+                && str_contains($mail->bodyHtml, 'ลิงก์ประกาศ');
         });
     }
 

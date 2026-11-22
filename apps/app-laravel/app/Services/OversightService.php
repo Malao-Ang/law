@@ -90,25 +90,42 @@ final class OversightService
         return $this->publicItem($this->present($documentId, is_array($fresh) ? $fresh : []));
     }
 
+    public const CHANNEL_DEADLINE = 'deadline';
+
+    public const CHANNEL_PROCLAMATION = 'proclamation';
+
     /**
-     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
+     * @return array<int, array{key: string, label: string}>
      */
-    public function mailTemplate(): array
+    public function mailChannels(): array
     {
-        $defaults = $this->defaultMailTemplate();
-        $stored = $this->mailSettings();
+        return [
+            ['key' => self::CHANNEL_DEADLINE, 'label' => 'ใกล้ครบกำหนด'],
+            ['key' => self::CHANNEL_PROCLAMATION, 'label' => 'ออกประกาศใหม่'],
+        ];
+    }
+
+    /**
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>, channel: string}
+     */
+    public function mailTemplate(string $channel = self::CHANNEL_DEADLINE): array
+    {
+        $channel = $this->normalizeChannel($channel);
+        $defaults = $this->defaultMailTemplate($channel);
+        $block = $this->storedChannelBlock($this->mailSettings(), $channel);
 
         return [
-            'subject' => $this->storedMailText($stored['subject'] ?? null, $defaults['subject'], 180),
-            'body' => $this->storedMailText($stored['body'] ?? null, $defaults['body'], 4000),
-            'link_label' => $this->storedMailText($stored['link_label'] ?? null, $defaults['link_label'], 120),
+            'subject' => $this->storedMailText($block['subject'] ?? null, $defaults['subject'], 180),
+            'body' => $this->storedMailText($block['body'] ?? null, $defaults['body'], 4000),
+            'link_label' => $this->storedMailText($block['link_label'] ?? null, $defaults['link_label'], 120),
             'reminder_days' => $this->reminderDays(),
+            'channel' => $channel,
         ];
     }
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
+     * @return array{reminder_days: array<int, int>, deadline: array{subject: string, body: string, link_label: string, reminder_days: array<int, int>, channel: string}, proclamation: array{subject: string, body: string, link_label: string, reminder_days: array<int, int>, channel: string}}
      */
     public function saveMailTemplate(array $payload): array
     {
@@ -120,22 +137,42 @@ final class OversightService
             $days = $this->defaultReminderDays();
         }
 
+        $deadline = $this->resolveChannelSave($payload, self::CHANNEL_DEADLINE);
+        $proclamation = $this->resolveChannelSave($payload, self::CHANNEL_PROCLAMATION);
+
         $template = [
-            'subject' => $this->cleanMailLine($payload['subject'] ?? '', 180),
-            'body' => $this->cleanMailBody($payload['body'] ?? '', 4000),
-            'link_label' => $this->cleanMailLine($payload['link_label'] ?? '', 120),
             'reminder_days' => $days,
+            'deadline' => $deadline,
+            'proclamation' => $proclamation,
         ];
         $this->blob->write('settings', 'oversight-mail', $template);
 
-        return $template;
+        return [
+            'reminder_days' => $days,
+            'deadline' => $deadline + ['reminder_days' => $days, 'channel' => self::CHANNEL_DEADLINE],
+            'proclamation' => $proclamation + ['reminder_days' => $days, 'channel' => self::CHANNEL_PROCLAMATION],
+        ];
     }
 
     /**
-     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>}
+     * @return array{subject: string, body: string, link_label: string, reminder_days: array<int, int>, channel: string}
      */
-    public function defaultMailTemplate(): array
+    public function defaultMailTemplate(string $channel = self::CHANNEL_DEADLINE): array
     {
+        $channel = $this->normalizeChannel($channel);
+        if ($channel === self::CHANNEL_PROCLAMATION) {
+            return [
+                'subject' => $this->configMail('mail_proclamation_subject', 'แจ้งเตือนต้องออกประกาศตามกฎหมาย — เหลือ {days} วัน'),
+                'body' => $this->configMail(
+                    'mail_proclamation_body',
+                    "เรียนผู้รับผิดชอบ\n\nกฎหมาย {title} ใกล้ถึงกำหนดต้องออกประกาศฉบับใหม่\n\n{deadlines}\n\nกรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}",
+                ),
+                'link_label' => $this->configMail('mail_proclamation_link_label', 'ระบบติดตามการกำกับดูแล'),
+                'reminder_days' => $this->defaultReminderDays(),
+                'channel' => self::CHANNEL_PROCLAMATION,
+            ];
+        }
+
         return [
             'subject' => $this->configMail('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย — เหลือ {days} วัน'),
             'body' => $this->configMail(
@@ -144,13 +181,15 @@ final class OversightService
             ),
             'link_label' => $this->configMail('mail_link_label', 'ระบบติดตามการกำกับดูแล'),
             'reminder_days' => $this->defaultReminderDays(),
+            'channel' => self::CHANNEL_DEADLINE,
         ];
     }
 
     /**
      * Tracked laws that can receive a reminder, including ones that are not due today.
+     * One catalog row per document+channel (deadline vs proclamation).
      *
-     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, due_now: bool, already_sent: bool, hits: array<int, array<string, mixed>>}>
+     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, channel: string, due_now: bool, already_sent: bool, hits: array<int, array<string, mixed>>}>
      */
     public function reminderCatalog(?\Illuminate\Http\Request $request = null): array
     {
@@ -173,35 +212,46 @@ final class OversightService
             }
 
             $sent = is_array($record['reminders_sent'] ?? null) ? $record['reminders_sent'] : [];
-            $offsetHits = [];
-            $unsentOffset = [];
-            foreach ($allHits as $hit) {
-                if (! in_array($hit['days_left'], $offsets, true)) {
+            foreach ([self::CHANNEL_DEADLINE, self::CHANNEL_PROCLAMATION] as $channel) {
+                $channelHits = array_values(array_filter(
+                    $allHits,
+                    fn (array $hit): bool => $this->channelForKind((string) ($hit['kind'] ?? '')) === $channel,
+                ));
+                if ($channelHits === []) {
                     continue;
                 }
-                $offsetHits[] = $hit;
-                if (! isset($sent[$hit['sent_key']])) {
-                    $unsentOffset[] = $hit;
-                }
-            }
 
-            $dueNow = $unsentOffset !== [];
-            $items[] = [
-                'document_id' => $record['document_id'],
-                'title' => $record['title'],
-                'emails' => $emails,
-                'due_now' => $dueNow,
-                'already_sent' => $offsetHits !== [] && ! $dueNow,
-                'hits' => $dueNow ? $unsentOffset : ($offsetHits !== [] ? $offsetHits : $allHits),
-            ];
+                $offsetHits = [];
+                $unsentOffset = [];
+                foreach ($channelHits as $hit) {
+                    if (! in_array($hit['days_left'], $offsets, true)) {
+                        continue;
+                    }
+                    $offsetHits[] = $hit;
+                    if (! isset($sent[$hit['sent_key']])) {
+                        $unsentOffset[] = $hit;
+                    }
+                }
+
+                $dueNow = $unsentOffset !== [];
+                $items[] = [
+                    'document_id' => $record['document_id'],
+                    'title' => $record['title'],
+                    'emails' => $emails,
+                    'channel' => $channel,
+                    'due_now' => $dueNow,
+                    'already_sent' => $offsetHits !== [] && ! $dueNow,
+                    'hits' => $dueNow ? $unsentOffset : ($offsetHits !== [] ? $offsetHits : $channelHits),
+                ];
+            }
         }
 
         usort($items, static function (array $a, array $b): int {
             $daysA = (int) ($a['hits'][0]['days_left'] ?? 9999);
             $daysB = (int) ($b['hits'][0]['days_left'] ?? 9999);
 
-            return [$b['due_now'] ? 1 : 0, $daysA, $a['title']]
-                <=> [$a['due_now'] ? 1 : 0, $daysB, $b['title']];
+            return [$b['due_now'] ? 1 : 0, $daysA, $a['channel'], $a['title']]
+                <=> [$a['due_now'] ? 1 : 0, $daysB, $b['channel'], $b['title']];
         });
 
         return $items;
@@ -210,7 +260,7 @@ final class OversightService
     /**
      * Documents with a deadline landing on a reminder offset that has not been sent.
      *
-     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, hits: array<int, array<string, mixed>>}>
+     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, channel: string, hits: array<int, array<string, mixed>>}>
      */
     public function pendingReminders(): array
     {
@@ -223,6 +273,7 @@ final class OversightService
                 'document_id' => $item['document_id'],
                 'title' => $item['title'],
                 'emails' => $item['emails'],
+                'channel' => $item['channel'],
                 'hits' => $item['hits'],
             ];
         }
@@ -231,25 +282,29 @@ final class OversightService
     }
 
     /**
-     * @return array{document_id: string, title: string, emails: array<int, string>, hits: array<int, array<string, mixed>>}
+     * @return array<int, array{document_id: string, title: string, emails: array<int, string>, channel: string, hits: array<int, array<string, mixed>>}>
      */
-    public function manualBatch(string $documentId): array
+    public function manualBatches(string $documentId): array
     {
         if ($this->blob->read('review', $documentId) === null) {
             throw new RuntimeException('ไม่พบเอกสาร', 404);
         }
 
+        $batches = [];
         foreach ($this->reminderCatalog() as $item) {
             if ($item['document_id'] !== $documentId) {
                 continue;
             }
-
-            return [
+            $batches[] = [
                 'document_id' => $item['document_id'],
                 'title' => $item['title'],
                 'emails' => $item['emails'],
+                'channel' => $item['channel'],
                 'hits' => $item['hits'],
             ];
+        }
+        if ($batches !== []) {
+            return $batches;
         }
 
         foreach ($this->records() as $record) {
@@ -270,6 +325,16 @@ final class OversightService
         }
 
         throw new RuntimeException('ไม่พบเอกสาร', 404);
+    }
+
+    /**
+     * @deprecated Use manualBatches()
+     *
+     * @return array{document_id: string, title: string, emails: array<int, string>, channel: string, hits: array<int, array<string, mixed>>}
+     */
+    public function manualBatch(string $documentId): array
+    {
+        return $this->manualBatches($documentId)[0];
     }
 
     public function markSent(string $documentId, string $key): void
@@ -505,7 +570,7 @@ final class OversightService
 
     /**
      * @param  array<string, mixed>  $record
-     * @return array<int, array{label: string, date: string, display_date: string, days_left: int, sent_key: string}>
+     * @return array<int, array{kind: string, label: string, date: string, display_date: string, days_left: int, sent_key: string}>
      */
     private function deadlineHits(array $record): array
     {
@@ -516,6 +581,7 @@ final class OversightService
                 continue;
             }
             $hits[] = [
+                'kind' => (string) $deadline['kind'],
                 'label' => $deadline['label'],
                 'date' => $deadline['date'],
                 'display_date' => $this->formatThai($deadline['date']),
@@ -897,6 +963,79 @@ final class OversightService
         $stored = $this->blob->read('settings', 'oversight-mail');
 
         return is_array($stored) ? $stored : [];
+    }
+
+    private function normalizeChannel(string $channel): string
+    {
+        return $channel === self::CHANNEL_PROCLAMATION
+            ? self::CHANNEL_PROCLAMATION
+            : self::CHANNEL_DEADLINE;
+    }
+
+    private function channelForKind(string $kind): string
+    {
+        return $kind === 'proclamation' ? self::CHANNEL_PROCLAMATION : self::CHANNEL_DEADLINE;
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     * @return array{subject?: string, body?: string, link_label?: string}
+     */
+    private function storedChannelBlock(array $stored, string $channel): array
+    {
+        $channel = $this->normalizeChannel($channel);
+        $nested = $stored[$channel] ?? null;
+        if (is_array($nested)) {
+            return $nested;
+        }
+
+        // Legacy flat template applies only to the deadline channel.
+        if ($channel === self::CHANNEL_DEADLINE
+            && (isset($stored['subject']) || isset($stored['body']) || isset($stored['link_label']))) {
+            return [
+                'subject' => $stored['subject'] ?? null,
+                'body' => $stored['body'] ?? null,
+                'link_label' => $stored['link_label'] ?? null,
+            ];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{subject: string, body: string, link_label: string}
+     */
+    private function resolveChannelSave(array $payload, string $channel): array
+    {
+        $channel = $this->normalizeChannel($channel);
+        $incoming = $payload[$channel] ?? null;
+
+        // Legacy flat PUT updates the deadline template only.
+        if (! is_array($incoming) && $channel === self::CHANNEL_DEADLINE
+            && (array_key_exists('subject', $payload) || array_key_exists('body', $payload) || array_key_exists('link_label', $payload))) {
+            $incoming = [
+                'subject' => $payload['subject'] ?? '',
+                'body' => $payload['body'] ?? '',
+                'link_label' => $payload['link_label'] ?? '',
+            ];
+        }
+
+        if (is_array($incoming)) {
+            return [
+                'subject' => $this->cleanMailLine($incoming['subject'] ?? '', 180),
+                'body' => $this->cleanMailBody($incoming['body'] ?? '', 4000),
+                'link_label' => $this->cleanMailLine($incoming['link_label'] ?? '', 120),
+            ];
+        }
+
+        $current = $this->mailTemplate($channel);
+
+        return [
+            'subject' => $current['subject'],
+            'body' => $current['body'],
+            'link_label' => $current['link_label'],
+        ];
     }
 
     /** @return array<int, int> */

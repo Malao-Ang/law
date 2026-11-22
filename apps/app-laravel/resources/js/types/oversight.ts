@@ -51,14 +51,18 @@ export interface OversightSummary {
   items: OversightItem[];
 }
 
+export type OversightMailChannel = 'deadline' | 'proclamation';
+
 export interface OversightMailTemplate {
   subject: string;
   body: string;
   link_label: string;
   reminder_days: number[];
+  channel?: OversightMailChannel;
 }
 
 export interface OversightMailHit {
+  kind?: string;
   label: string;
   date: string;
   display_date: string;
@@ -70,6 +74,7 @@ export interface OversightMailItem {
   document_id: string;
   title: string;
   emails: string[];
+  channel: OversightMailChannel;
   due_now: boolean;
   already_sent: boolean;
   hits: OversightMailHit[];
@@ -81,13 +86,27 @@ export interface OversightMailPlaceholder {
   fields: string;
 }
 
+export interface OversightMailChannelInfo {
+  key: OversightMailChannel;
+  label: string;
+}
+
 export interface OversightMailSettings {
-  template: OversightMailTemplate;
-  defaults: OversightMailTemplate;
+  templates: Record<OversightMailChannel, OversightMailTemplate>;
+  /** @deprecated Prefer templates.deadline */
+  template?: OversightMailTemplate;
+  defaults: Record<OversightMailChannel, OversightMailTemplate>;
+  channels: OversightMailChannelInfo[];
   placeholders: OversightMailPlaceholder[];
   reminder_days: number[];
   pending_count: number;
   items: OversightMailItem[];
+}
+
+export interface OversightMailSavePayload {
+  deadline: Pick<OversightMailTemplate, 'subject' | 'body' | 'link_label'>;
+  proclamation: Pick<OversightMailTemplate, 'subject' | 'body' | 'link_label'>;
+  reminder_days: number[];
 }
 
 export interface OversightMailSendResult {
