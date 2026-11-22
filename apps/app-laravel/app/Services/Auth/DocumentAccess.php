@@ -227,6 +227,7 @@ class DocumentAccess
         if ($actor['is_super_admin'] ?? false) return true;
         $role = $this->current->role($actor, $request);
         if ($role === 'inner_admin') return true;
+        if ($role === 'editor') return $this->allows($request, 'edit', $document);
         $document = $this->documentMeta($document);
         return $role === 'outer_admin' && ($document['responsible']['username'] ?? null) === $actor['username']
             && $this->allows($request, 'publish', $document);
@@ -276,7 +277,8 @@ class DocumentAccess
         foreach ((array) $request->input('law_meta', []) as $key => $value) {
             if (in_array($key, DocumentOwnership::FIELDS, true)) continue;
             if ($value != ($review['law_meta'][$key] ?? null)) {
-                $actions[] = (in_array($key, $publishFields, true) || ($key === 'status' && $publishing)) ? 'publish' : 'edit';
+                $permissionField = in_array($key, ['access_scope', 'permission_group_ids'], true);
+                $actions[] = (! $permissionField && (in_array($key, $publishFields, true) || ($key === 'status' && $publishing))) ? 'publish' : 'edit';
             }
         }
         foreach ($request->except(['law_meta', '_token']) as $key => $value) {
@@ -284,7 +286,7 @@ class DocumentAccess
             if ($key !== 'reset_to_generated' || $value) $actions[] = 'edit';
         }
         $keys = array_diff(array_keys((array) $request->input('law_meta', [])), DocumentOwnership::FIELDS);
-        $fallback = $keys !== [] && array_diff($keys, $publishFields) === [] ? 'publish' : 'edit';
+        $fallback = $keys !== [] && array_diff($keys, $publishFields) === [] && array_diff($keys, ['access_scope', 'permission_group_ids']) !== [] ? 'publish' : 'edit';
         return array_values(array_unique($actions ?: [$fallback]));
     }
 }
