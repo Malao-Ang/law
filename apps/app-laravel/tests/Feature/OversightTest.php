@@ -69,7 +69,7 @@ class OversightTest extends TestCase
         $overdueRow = collect($res->json('items'))->firstWhere('document_id', $overdue);
         $this->assertTrue($overdueRow['overdue']);
         $this->assertSame('2026-10-01', $overdueRow['due_date']);
-        $this->assertSame('ต้องออกประกาศภายใน', $overdueRow['due_label']);
+        $this->assertStringContainsString('ออกประกาศฉบับใหม่', (string) $overdueRow['due_label']);
         $this->assertNotEmpty($overdueRow['due_dates']);
 
         $nextRow = collect($res->json('next_month'))->firstWhere('document_id', $next);
@@ -390,6 +390,118 @@ class OversightTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_deadline_uses_effective_date_while_status_is_draft(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $id = 'ov_effective_'.uniqid();
+        $this->seedDocument($id, 'ฉบับใกล้ครบวันที่มีผล');
+        $this->patchLawMeta($id, [
+            'status' => 'ร่าง',
+            'effective_date' => $due,
+        ]);
+        $this->track($id);
+
+        $summary = $this->getJson('/api/oversight/summary')->assertOk();
+        $row = collect($summary->json('items'))->firstWhere('document_id', $id);
+        $this->assertSame($due, $row['due_date']);
+        $this->assertTrue($row['is_draft']);
+        $this->assertSame($due, $row['effective_date']);
+        $this->assertStringContainsString('วันที่มีผลบังคับใช้', (string) $row['due_label']);
+
+        $this->getJson('/api/oversight/mail')
+            ->assertOk()
+            ->assertJsonPath('pending_count', 1)
+            ->assertJsonPath('items.0.channel', 'deadline');
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
+            return $mail->lawTitle === 'ฉบับใกล้ครบวันที่มีผล'
+                && $mail->hits[0]['days_left'] === 14
+                && $mail->hits[0]['label'] === 'วันที่มีผลบังคับใช้'
+                && str_contains($mail->envelope()->subject, 'กำหนดดำเนินการ')
+                && str_contains($mail->bodyHtml, 'ใกล้ถึงกำหนดดำเนินการ');
+        });
+        Mail::assertSent(OversightReminderMail::class, 1);
+    }
+
+    public function test_deadline_stops_when_status_is_no_longer_draft(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $id = 'ov_in_force_'.uniqid();
+        $this->seedDocument($id, 'ฉบับมีผลแล้ว');
+        $this->patchLawMeta($id, [
+            'status' => 'มีผลบังคับใช้',
+            'effective_date' => $due,
+        ]);
+        $this->track($id);
+
+        $row = collect($this->getJson('/api/oversight/summary')->assertOk()->json('items'))
+            ->firstWhere('document_id', $id);
+        $this->assertFalse($row['is_draft']);
+        $this->assertNull($row['due_date']);
+
+        $this->getJson('/api/oversight/mail')->assertOk()->assertJsonPath('pending_count', 0);
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertNothingSent();
+    }
+
+    public function test_deadline_and_proclamation_use_separate_templates(): void
+    {
+        Carbon::setTestNow('2026-10-23 02:00:00');
+        Mail::fake();
+
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
+        $id = 'ov_split_'.uniqid();
+        $this->seedDocument($id, 'ฉบับแยกเทมเพลต');
+        $this->track($id);
+        $this->setProclamation($id, $due, 'กฎหมายต้นทาง');
+        $this->patchLawMeta($id, [
+            'status' => 'ร่าง',
+            'effective_date' => $due,
+        ]);
+
+        $this->putJson('/api/oversight/mail', [
+            'deadline' => [
+                'subject' => 'เทมเพลตกำหนด {title}',
+                'body' => "กำหนด\n{deadlines}\n{link}",
+                'link_label' => 'ลิงก์กำหนด',
+            ],
+            'proclamation' => [
+                'subject' => 'เทมเพลตประกาศ {title}',
+                'body' => "ประกาศใหม่\n{deadlines}\n{link}",
+                'link_label' => 'ลิงก์ประกาศ',
+            ],
+            'reminder_days' => [14],
+        ])->assertOk();
+
+        $mail = $this->getJson('/api/oversight/mail')->assertOk();
+        $mail->assertJsonPath('pending_count', 2);
+        $channels = collect($mail->json('items'))->pluck('channel')->all();
+        $this->assertEqualsCanonicalizing(['deadline', 'proclamation'], $channels);
+
+        $this->artisan('oversight:send-reminders')->assertSuccessful();
+        Mail::assertSent(OversightReminderMail::class, 2);
+        $sent = collect(Mail::sent(OversightReminderMail::class));
+        $deadlineMail = $sent->first(
+            fn (OversightReminderMail $mail): bool => $mail->envelope()->subject === 'เทมเพลตกำหนด ฉบับแยกเทมเพลต',
+        );
+        $proclamationMail = $sent->first(
+            fn (OversightReminderMail $mail): bool => $mail->envelope()->subject === 'เทมเพลตประกาศ ฉบับแยกเทมเพลต',
+        );
+        $this->assertNotNull($deadlineMail, 'missing deadline mail; bodies='.$sent->map(fn ($m) => $m->envelope()->subject.'|'.$m->bodyHtml)->implode(' ;; '));
+        $this->assertNotNull($proclamationMail);
+        $this->assertStringContainsString('วันที่มีผลบังคับใช้', $deadlineMail->bodyHtml);
+        $this->assertStringContainsString('ลิงก์กำหนด', $deadlineMail->bodyHtml);
+        $this->assertStringContainsString('ออกประกาศฉบับใหม่ทั้งฉบับ: กฎหมายต้นทาง', $proclamationMail->bodyHtml);
+        $this->assertStringContainsString('ลิงก์ประกาศ', $proclamationMail->bodyHtml);
+    }
+
     public function test_proclamation_reminder_stops_when_the_new_law_is_in_force(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');
@@ -546,6 +658,17 @@ class OversightTest extends TestCase
             'law_meta' => ['title' => $title, 'law_type' => 'ประกาศ'],
             'pages' => [],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function patchLawMeta(string $id, array $meta): void
+    {
+        $store = app(ReviewStore::class);
+        $doc = $store->getReviewDocument($id);
+        $doc['law_meta'] = array_merge(is_array($doc['law_meta'] ?? null) ? $doc['law_meta'] : [], $meta);
+        $store->writeReviewDocument($id, $doc);
     }
 
     /**

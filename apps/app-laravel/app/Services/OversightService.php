@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\MasterData\EnforcementStatuses;
 use App\Services\Storage\MongoBlobStore;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -26,7 +27,10 @@ final class OversightService
         12 => 'ธันวาคม',
     ];
 
-    public function __construct(private readonly MongoBlobStore $blob) {}
+    public function __construct(
+        private readonly MongoBlobStore $blob,
+        private readonly EnforcementStatuses $enforcementStatuses,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -416,8 +420,18 @@ final class OversightService
         $publishDue = $tracked ? $this->dateOrNull($stored['publish_due_date'] ?? null) : null;
         $proclamationDeadlines = $this->proclamationDeadlines($documentId, $review);
         $dueDates = $this->summarizeDueDates($proclamationDeadlines);
+        $effectiveDate = $this->dateOrNull($meta['effective_date'] ?? null);
+        $isDraft = $this->enforcementStatuses->isDraft($meta['status'] ?? null);
+        if ($isDraft && $effectiveDate !== null) {
+            $dueDates[] = [
+                'date' => $effectiveDate,
+                'label' => 'วันที่มีผลบังคับใช้ (ยังเป็นร่าง)',
+                'display_date' => $this->formatThai($effectiveDate),
+            ];
+            usort($dueDates, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+        }
         $dueDate = $dueDates[0]['date'] ?? null;
-        $dueLabel = $dueDate === null ? null : 'ต้องออกประกาศภายใน';
+        $dueLabel = $dueDates[0]['label'] ?? null;
         $daysLeft = $dueDate === null ? null : $this->daysUntil($dueDate);
         [$nextStart, $nextEnd] = $this->nextMonthRange();
 
@@ -428,7 +442,7 @@ final class OversightService
                 if ($dueOn !== null && $dueOn->betweenIncluded($nextStart, $nextEnd)) {
                     $actions[] = [
                         'date' => $dueOn->toDateString(),
-                        'label' => (string) ($entry['label'] ?? $dueLabel ?? 'ต้องออกประกาศภายใน'),
+                        'label' => (string) ($entry['label'] ?? 'วันต้องทำภายใน'),
                     ];
                 }
             }
@@ -451,6 +465,8 @@ final class OversightService
             'status' => $status,
             'closed' => $closed,
             'publish_due_date' => $publishDue,
+            'effective_date' => $effectiveDate,
+            'is_draft' => $isDraft,
             'due_date' => $dueDate,
             'due_label' => $dueLabel,
             'due_dates' => $dueDates,
@@ -641,6 +657,19 @@ final class OversightService
     private function openDeadlines(array $record): array
     {
         $deadlines = [];
+
+        if (! empty($record['is_draft'])) {
+            $effectiveDate = $this->dateOrNull($record['effective_date'] ?? null);
+            if ($effectiveDate !== null) {
+                $deadlines[] = [
+                    'kind' => 'effective',
+                    'key' => 'effective',
+                    'label' => 'วันที่มีผลบังคับใช้',
+                    'date' => $effectiveDate,
+                ];
+            }
+        }
+
         foreach (is_array($record['proclamation_deadlines'] ?? null) ? $record['proclamation_deadlines'] : [] as $item) {
             if (! is_array($item)) {
                 continue;

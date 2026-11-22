@@ -25,6 +25,8 @@ export interface OversightItem {
   status: string | null;
   closed: boolean;
   publish_due_date: string | null;
+  effective_date: string | null;
+  is_draft: boolean;
   due_date: string | null;
   due_label: string | null;
   due_dates: OversightDueDate[];
