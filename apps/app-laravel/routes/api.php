@@ -139,7 +139,7 @@ Route::get('/documents/{documentId}/related/{targetDocumentId}/file', [DocumentF
 Route::get('/documents/{documentId}/images/{filename}', [ImageController::class, 'show'])->middleware('doc.read');
 Route::get('/documents/{documentId}/pages/{pageNo}/image', [ImageController::class, 'showPage'])->middleware('doc.read');
 
-// MinIO test endpoints (dev/debug only) — 404 in production.
+// MinIO test endpoints (dev/debug only)   404 in production.
 Route::middleware(NotInProduction::class)->prefix('test/minio')->group(function (): void {
     Route::get('/bucket', [MinioTestController::class, 'bucket']);
     Route::get('/', [MinioTestController::class, 'index']);

@@ -255,7 +255,7 @@ function usageRemovalWarning(form: UpsertMasterItemPayload, item: MasterItem | n
   const removedFileType = [...originalFileTypes].some((fileType) => !selectedFileTypes.has(fileType));
   if (!removedFamily && !removedFileType) return '';
 
-  return `มีเอกสาร ${usageCount.toLocaleString('th-TH')} ฉบับใช้โครงสร้างนี้อยู่ — เอกสารเดิมยังเก็บค่าไว้ แต่จะไม่แสดงเป็นตัวเลือกสำหรับประเภทที่นำออก`;
+  return `มีเอกสาร ${usageCount.toLocaleString('th-TH')} ฉบับใช้โครงสร้างนี้อยู่   เอกสารเดิมยังเก็บค่าไว้ แต่จะไม่แสดงเป็นตัวเลือกสำหรับประเภทที่นำออก`;
 }
 </script>
 

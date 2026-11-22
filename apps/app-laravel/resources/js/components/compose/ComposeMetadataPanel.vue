@@ -70,7 +70,7 @@
             <v-icon icon="mdi-check-circle-outline" color="success" />
             <div>
               <div class="text-caption text-medium-emphasis">อัปเดตล่าสุด</div>
-              <div class="text-body-2">{{ formatThaiDateTime(review.document_review.updated_at) || '—' }}</div>
+              <div class="text-body-2">{{ formatThaiDateTime(review.document_review.updated_at) || ' ' }}</div>
             </div>
           </div>
           <div class="d-flex align-start ga-3">

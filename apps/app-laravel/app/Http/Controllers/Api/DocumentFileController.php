@@ -53,7 +53,7 @@ class DocumentFileController extends Controller
                     );
                     $url = $links['file'][$isDownload ? 'download' : 'view'] ?? $links['file']['view'] ?? null;
                     if (is_string($url) && $url !== '') {
-                        // Proxy through Laravel — MinIO hostname (minio-cluster-dev) is not
+                        // Proxy through Laravel   MinIO hostname (minio-cluster-dev) is not
                         // publicly resolvable; browser cannot reach it directly from the internet.
                         $disposition = $isDownload ? HeaderUtils::DISPOSITION_ATTACHMENT : HeaderUtils::DISPOSITION_INLINE;
                         $filename = basename((string) ($status['source_file'] ?? $relative));

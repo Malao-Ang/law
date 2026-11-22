@@ -70,7 +70,7 @@ class BlockMutationTest extends TestCase
 
     public function test_merge_includes_content_of_blocks_without_reviewed_html(): void
     {
-        // b2 has approved_text but an EMPTY reviewed_html — its content must still
+        // b2 has approved_text but an EMPTY reviewed_html   its content must still
         // appear in the merged block's rendered HTML.
         $this->store->writeReviewDocument($this->docId, [
             'document_id' => $this->docId,

@@ -28,7 +28,7 @@ const legalStructures = createLegalStructureCatalog();
 // so the following blocks group under it without merging text.
 
 // A block that "displays as a divider": its text is only a run of dashes/underscores.
-const DIVIDER_RE = /^[-–—_─]{2,}\s*$/u;
+const DIVIDER_RE = /^[-– _─]{2,}\s*$/u;
 
 function isDivider(block: DocumentBlock): boolean {
   return DIVIDER_RE.test(blockText(block));
@@ -191,7 +191,7 @@ export function documentRelations(relations: LawRelation[] | undefined): LawRela
 
 /**
  * Derive law source ('internal' | 'external') from law_type via the lookups list.
- * ตาม docs/law-metadata-reference.md — derive จาก law_type; ใช้ stored source เป็น fallback
+ * ตาม docs/law-metadata-reference.md   derive จาก law_type; ใช้ stored source เป็น fallback
  * (สำหรับเอกสารเก่าที่เก็บค่าตรงๆ) เท่านั้น. internal เป็น default.
  */
 export function sourceOf(

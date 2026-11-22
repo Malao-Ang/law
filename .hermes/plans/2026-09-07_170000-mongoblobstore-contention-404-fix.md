@@ -32,7 +32,7 @@ Introduce a dedicated `ConcurrencyException` thrown by `withLock` when (and only
 
 ---
 
-## Task 1 — Dedicated exception for commit contention
+## Task 1   Dedicated exception for commit contention
 
 ### 1a. Create `ConcurrencyException`
 File: `apps/app-laravel/app/Services/Storage/ConcurrencyException.php` (new)
@@ -65,7 +65,7 @@ with:
 ```php
 use App\Services\Storage\ConcurrencyException;
 ```
-> `ConcurrencyException extends RuntimeException`, so any existing `catch (RuntimeException)` still catches it (backward-compatible) — but new catches can target the subclass first.
+> `ConcurrencyException extends RuntimeException`, so any existing `catch (RuntimeException)` still catches it (backward-compatible)   but new catches can target the subclass first.
 
 ### 1c. Verify
 ```bash
@@ -78,7 +78,7 @@ Commit: `feat(storage): add ConcurrencyException for withLock retry exhaustion`
 
 ---
 
-## Task 2 — Backoff + more retries in `withLock`
+## Task 2   Backoff + more retries in `withLock`
 
 ### 2a. Add bounded exponential backoff and raise attempts
 File: `apps/app-laravel/app/Services/Storage/MongoBlobStore.php`
@@ -120,7 +120,7 @@ Commit: `fix(storage): add jittered backoff and raise withLock retries to 6`
 
 ---
 
-## Task 3 — Map contention to 409, keep 404 for genuine not-found
+## Task 3   Map contention to 409, keep 404 for genuine not-found
 
 ### 3a. Catch `ConcurrencyException` first in `ReviewController::update`
 File: `apps/app-laravel/app/Http/Controllers/Api/ReviewController.php`
@@ -156,7 +156,7 @@ grep -n "catch (RuntimeException" apps/app-laravel/app/Http/Controllers/Api/Revi
 Expected hits include `update` (done in 3a), `updateDocumentReview` (line ~178), and likely `updateLayout`, `mergeBlocks`, `deleteBlock`, `splitBlock`, `createBlock`, `reorderBlocks`, `reprocess`. For EACH, insert the same `catch (ConcurrencyException) → 409` immediately before the existing `catch (RuntimeException) → 404`. Keep messages identical to 3a for DRY (consider a small private helper `private function concurrencyResponse(): JsonResponse` returning the 409 to avoid repetition).
 
 ### 3c. DRY helper (optional but preferred)
-File: same controller — add:
+File: same controller   add:
 ```php
     private function concurrencyResponse(): JsonResponse
     {
@@ -178,7 +178,7 @@ Commit: `fix(review): return 409 (not 404) on save contention`
 
 ---
 
-## Task 4 — Frontend: retry on 409 instead of surfacing an error
+## Task 4   Frontend: retry on 409 instead of surfacing an error
 
 ### 4a. Auto-retry block PATCH once on 409
 File: `apps/app-laravel/resources/js/stores/blockStore.ts` (the `patch` action calls the PATCH endpoint)
@@ -248,7 +248,7 @@ Run (RED before Task 1b lands, GREEN after):
 ```bash
 docker compose exec laravel-app php artisan test --filter=MongoBlobStoreConcurrencyTest
 ```
-Expected after Task 1+2: `OK (1 test)`. (Note: with backoff, the test sleeps ~6× up to ~200ms — acceptable, < 1.5s total.)
+Expected after Task 1+2: `OK (1 test)`. (Note: with backoff, the test sleeps ~6× up to ~200ms   acceptable, < 1.5s total.)
 
 ### T2. `ReviewController::update` returns 409 on contention, 404 on not-found
 File: `apps/app-laravel/tests/Feature/BlockUpdateConflictTest.php` (new)
@@ -268,8 +268,8 @@ Commit tests alongside the task they cover (T1 with Task 1/2, T2 with Task 3).
 
 ## Risks, tradeoffs, and open questions
 - **Backoff adds latency to genuinely contended saves** (up to ~200ms/attempt, ~6 attempts). Acceptable: only the contended path pays it; the happy path returns on attempt 0 with no sleep. If p99 save latency matters, lower `MAX_ATTEMPTS` or the cap.
-- **409 is the correct HTTP semantics** for optimistic-lock contention; the frontend retry (Task 4) hides it from users in the common case. If the client cannot be changed in this cycle, Tasks 1-3 alone still fix the *mislabeling* (409 instead of a scary 404) — Task 4 is the UX polish.
-- **Deeper root cause (open):** the editor may be firing N concurrent PATCHes for N blocks on first save. A more thorough fix is a single batch-save endpoint (one `withLock` transaction for all blocks) instead of N racing writes. That is a larger change — recommend as a follow-up if 409s persist after backoff. Not in scope here.
-- **`status` vs `review` share `_version`:** `setStatus` (e.g. `updateRagSkipped`) contends with block saves. Backoff mitigates it; a schema split (separate `_version` per sub-kind) would eliminate it but is a storage-format change — out of scope, note as follow-up.
-- **Mongo availability in CI/local:** T1 mocks the collection so it needs no live Mongo. T2 mocks the store. T3 (full suite) may need the normal test DB — run in the container where Mongo is available.
-- **Message wording** — user-facing message is Thai: `กำลังบันทึกอยู่ กรุณาลองใหม่อีกครั้ง` (confirmed).
+- **409 is the correct HTTP semantics** for optimistic-lock contention; the frontend retry (Task 4) hides it from users in the common case. If the client cannot be changed in this cycle, Tasks 1-3 alone still fix the *mislabeling* (409 instead of a scary 404)   Task 4 is the UX polish.
+- **Deeper root cause (open):** the editor may be firing N concurrent PATCHes for N blocks on first save. A more thorough fix is a single batch-save endpoint (one `withLock` transaction for all blocks) instead of N racing writes. That is a larger change   recommend as a follow-up if 409s persist after backoff. Not in scope here.
+- **`status` vs `review` share `_version`:** `setStatus` (e.g. `updateRagSkipped`) contends with block saves. Backoff mitigates it; a schema split (separate `_version` per sub-kind) would eliminate it but is a storage-format change   out of scope, note as follow-up.
+- **Mongo availability in CI/local:** T1 mocks the collection so it needs no live Mongo. T2 mocks the store. T3 (full suite) may need the normal test DB   run in the container where Mongo is available.
+- **Message wording**   user-facing message is Thai: `กำลังบันทึกอยู่ กรุณาลองใหม่อีกครั้ง` (confirmed).

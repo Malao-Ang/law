@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: ruler drawing widget — no Vuetify equivalent */
+/* ponytail: ruler drawing widget   no Vuetify equivalent */
 .review-ruler {
   position: relative;
   height: 20px;

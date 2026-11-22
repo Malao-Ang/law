@@ -17,8 +17,8 @@
             <td>{{ user.username }}</td>
             <td><div class="d-flex flex-wrap ga-1 py-2"><v-chip v-for="membership in user.memberships.slice(0, MAX_CHIPS)" :key="membership.unit_code" size="small" variant="tonal" color="primary">{{ membership.unit_name }} · {{ ROLE_LABELS[membership.role] }}</v-chip><v-chip v-if="user.memberships.length > MAX_CHIPS" size="small" variant="outlined" :title="user.memberships.slice(MAX_CHIPS).map(m => `${m.unit_name} · ${ROLE_LABELS[m.role]}`).join(', ')">+{{ user.memberships.length - MAX_CHIPS }} ...</v-chip><span v-if="!user.memberships.length">ผู้ใช้ทั่วไป</span></div></td>
             <td><v-chip size="small" :class="user.is_disabled ? 'master-status--inactive' : 'master-status--active'">{{ user.is_disabled ? 'ปิดใช้งาน' : 'ใช้งาน' }}</v-chip></td>
-            <td class="text-center"><v-icon v-if="user.is_super_admin" icon="mdi-shield-crown-outline" color="primary" aria-label="Super Admin จากการตั้งค่าระบบ" /><span v-else>—</span></td>
-            <td>{{ formatThaiDateTime(user.last_login_at) || '—' }}</td>
+            <td class="text-center"><v-icon v-if="user.is_super_admin" icon="mdi-shield-crown-outline" color="primary" aria-label="Super Admin จากการตั้งค่าระบบ" /><span v-else> </span></td>
+            <td>{{ formatThaiDateTime(user.last_login_at) || ' ' }}</td>
           </tr>
           <tr v-if="!loading && !items.length"><td colspan="6" class="text-center pa-6">ไม่พบผู้ใช้</td></tr>
         </tbody>
@@ -38,9 +38,9 @@
           <v-chip size="small" :class="detail.user.is_disabled ? 'master-status--inactive' : 'master-status--active'" class="mb-3 me-2">{{ detail.user.is_disabled ? 'ปิดใช้งาน' : 'ใช้งาน' }}</v-chip>
           <v-chip v-if="detail.user.is_super_admin" color="primary" variant="tonal" class="mb-3">ผู้ดูแลระบบสูงสุด (จากการตั้งค่าระบบ)</v-chip>
           <dl class="user-profile mb-5">
-            <dt>ชื่อผู้ใช้</dt><dd>{{ detail.user.username }}</dd><dt>อีเมล</dt><dd>{{ detail.user.email || '—' }}</dd>
-            <dt>คณะ</dt><dd>{{ detail.user.fac_name || '—' }}</dd><dt>ฝ่าย</dt><dd>{{ detail.user.dep_name || '—' }}</dd>
-            <dt>ตำแหน่ง</dt><dd>{{ detail.user.position || '—' }}</dd><dt>เข้าสู่ระบบล่าสุด</dt><dd>{{ formatThaiDateTime(detail.user.last_login_at) || '—' }}</dd>
+            <dt>ชื่อผู้ใช้</dt><dd>{{ detail.user.username }}</dd><dt>อีเมล</dt><dd>{{ detail.user.email || ' ' }}</dd>
+            <dt>คณะ</dt><dd>{{ detail.user.fac_name || ' ' }}</dd><dt>ฝ่าย</dt><dd>{{ detail.user.dep_name || ' ' }}</dd>
+            <dt>ตำแหน่ง</dt><dd>{{ detail.user.position || ' ' }}</dd><dt>เข้าสู่ระบบล่าสุด</dt><dd>{{ formatThaiDateTime(detail.user.last_login_at) || ' ' }}</dd>
           </dl>
           <h2 class="text-subtitle-1 font-weight-bold mb-3">หน่วยงานและสิทธิ์</h2>
           <p class="text-medium-emphasis mb-3">{{ auth.role === 'outer_admin' ? 'ดูข้อมูลได้อย่างเดียว' : 'สิทธิ์แก้ไข ลบ ส่งลงนาม และเผยแพร่จะมีผลเมื่อมีสิทธิ์อัปโหลด' }}</p>
@@ -50,7 +50,7 @@
               <td>{{ membership.unit_name || membership.unit_code }}</td>
               <td><v-select v-if="canEdit(membership)" v-model="membership.role" :items="assignableRoles" density="compact" hide-details :disabled="saving || detailLoading" :aria-label="`บทบาทใน ${membership.unit_name}`" @update:model-value="normalizeActions(membership)" /><span v-else>{{ ROLE_LABELS[membership.role] }}</span></td>
               <td v-for="action in actions" :key="action.value"><v-checkbox-btn v-model="membership.actions" :value="action.value" :aria-label="`${action.title} ${membership.unit_name}`" :disabled="saving || detailLoading || !canEdit(membership) || membership.role !== 'editor'" /></td>
-              <td><div class="d-flex ga-1"><v-btn v-if="canEdit(membership)" size="small" variant="tonal" :disabled="saving || detailLoading || !changed(membership)" @click="saveMembership(membership)">บันทึก</v-btn><v-btn v-if="auth.is_super_admin" size="small" color="error" variant="text" :disabled="saving || detailLoading" @click="removeMembership(membership)">ถอดออก</v-btn><span v-if="!canEdit(membership) && !auth.is_super_admin">—</span></div></td>
+              <td><div class="d-flex ga-1"><v-btn v-if="canEdit(membership)" size="small" variant="tonal" :disabled="saving || detailLoading || !changed(membership)" @click="saveMembership(membership)">บันทึก</v-btn><v-btn v-if="auth.is_super_admin" size="small" color="error" variant="text" :disabled="saving || detailLoading" @click="removeMembership(membership)">ถอดออก</v-btn><span v-if="!canEdit(membership) && !auth.is_super_admin"> </span></div></td>
             </tr><tr v-if="!memberships.length"><td colspan="8" class="text-center pa-4">ยังไม่มีสมาชิกหน่วยงาน</td></tr></tbody>
           </v-table>
           <v-card v-if="auth.is_super_admin" border class="pa-4 mt-4">

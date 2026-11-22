@@ -5,7 +5,7 @@ normalisation) and returns a float in [0.0, 1.0] together with a list of
 flag strings that describe which signals fired.
 
 Signals deliberately use measurable, deterministic properties of the extracted
-text — not heuristics that require a language model.  This makes them fast,
+text   not heuristics that require a language model.  This makes them fast,
 debuggable, and consistent across document types.
 """
 

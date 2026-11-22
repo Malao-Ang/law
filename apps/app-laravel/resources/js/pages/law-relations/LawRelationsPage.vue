@@ -28,7 +28,7 @@
         <v-alert type="info" variant="tonal" density="compact" class="mb-4">
           ขั้นตอนนี้ยังไม่บังคับ กรอกตอนนี้หรือส่งไป E-Sign ก่อนแล้วค่อยกลับมาก็ได้
           <span v-if="changeStatus">
-            — อิงสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย: <strong>{{ changeStatusCS.label(changeStatus) }}</strong>
+              อิงสถานะการเปลี่ยนแปลงจากข้อมูลกฎหมาย: <strong>{{ changeStatusCS.label(changeStatus) }}</strong>
           </span>
         </v-alert>
 

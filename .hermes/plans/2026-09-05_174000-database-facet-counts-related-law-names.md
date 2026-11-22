@@ -16,7 +16,7 @@ Fix `/database` filter counts so they reflect real visible/searchable documents,
 - `apps/app-laravel/resources/js/types/lawSearch.ts`
 - `apps/app-laravel/resources/js/pages/public/LawDatabasePage.vue`
 
-## Task Q4 — Fix stale `/database` filter counts
+## Task Q4   Fix stale `/database` filter counts
 
 ### Q4.1 Recompute facets from final visible results in mixed/elastic branch
 File: `apps/app-laravel/app/Http/Controllers/Api/LawSearchController.php`
@@ -67,7 +67,7 @@ Expected:
 - `total` equals currently visible public docs.
 - `facets.change_status[*].count` must not show stale 741/276/etc unless there are truly that many current docs.
 
-## Task Q5 — Show referenced law names, not “อื่น ๆ 1”
+## Task Q5   Show referenced law names, not “อื่น ๆ 1”
 
 ### Q5.1 Add `related_laws` to backend file-based search result
 File: `apps/app-laravel/app/Http/Controllers/Api/LawSearchController.php`

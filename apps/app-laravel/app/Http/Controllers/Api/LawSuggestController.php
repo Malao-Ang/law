@@ -26,7 +26,7 @@ class LawSuggestController extends Controller
     {
         $params = $request->validated();
 
-        // Published allowlist: ingested + has published_date + not draft — mirrors LawSearchController::fileBasedSearch
+        // Published allowlist: ingested + has published_date + not draft   mirrors LawSearchController::fileBasedSearch
         $publishedIds = [];
         foreach ($store->listLawMeta() as $metaRow) {
             if (

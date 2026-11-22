@@ -120,7 +120,7 @@
         <v-card-text>
           <div class="confirm-grid">
             <span>ประเภท</span><strong>{{ typeLabel }}</strong>
-            <span>มาตราอ้างอิง</span><strong>{{ draft.sectionRef.trim() || '—' }}</strong>
+            <span>มาตราอ้างอิง</span><strong>{{ draft.sectionRef.trim() || ' ' }}</strong>
             <span>ไฟล์แนบ</span><strong>{{ draft.files.length ? `${draft.files.length} ไฟล์` : 'ไม่มี' }}</strong>
           </div>
           <div class="text-subtitle-2 mt-4 mb-1">ความคิดเห็นของคุณ</div>

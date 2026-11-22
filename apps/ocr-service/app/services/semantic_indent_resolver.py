@@ -41,7 +41,7 @@ _QUOTE_OPENERS = (
     "(", "（",        # ( （
 )
 
-# Thai connectors that never start a new clause — always a continuation
+# Thai connectors that never start a new clause   always a continuation
 # of the previous parent under an active context.
 _THAI_CONNECTORS = (
     "ซึ่ง", "และ", "หรือ", "เพื่อ",
@@ -80,7 +80,7 @@ def _resolve_page(blocks: list[dict]) -> None:
         raw_text = block.get("raw_text", "").strip()
         alignment = layout.get("alignment")
 
-        # 1. Table — preserve table layout, reset context
+        # 1. Table   preserve table layout, reset context
         if btype == "table":
             current_parent_indent = 0
             next_is_by = False
@@ -88,7 +88,7 @@ def _resolve_page(blocks: list[dict]) -> None:
 
         # 2.5  Continuation override.  A non-marker block under an active parent
         # whose text opens with a quotation mark or a Thai connector word is
-        # semantically a child of the parent — never a standalone centred title —
+        # semantically a child of the parent   never a standalone centred title  
         # so we suppress the alignment reset and apply the continuation rule.
         if (
             not marker
@@ -100,7 +100,7 @@ def _resolve_page(blocks: list[dict]) -> None:
             layout["indent_reason"] = "continuation_override"
             continue
 
-        # 2. Centered / right-aligned — preserve geometric alignment, reset context
+        # 2. Centered / right-aligned   preserve geometric alignment, reset context
         if alignment in ("center", "right"):
             current_parent_indent = 0
             next_is_by = False
@@ -112,7 +112,7 @@ def _resolve_page(blocks: list[dict]) -> None:
             current_parent_indent = 0
             continue
 
-        # 4. โดย immediately after divider — first-line indent only
+        # 4. โดย immediately after divider   first-line indent only
         if next_is_by and raw_text.startswith("โดย"):
             layout["indent_level"] = 0
             layout["indent_first_line"] = 720  # 36 pt in twips
@@ -150,12 +150,12 @@ def _resolve_page(blocks: list[dict]) -> None:
             layout["indent_reason"] = "continuation"
             continue
 
-        # 9. Geometry fallback — cap at 4 to honour max semantic indent
+        # 9. Geometry fallback   cap at 4 to honour max semantic indent
         existing = layout.get("indent_level")
         if existing is not None:
             layout["indent_level"] = min(int(existing), 4)
 
-    # 10. Parent-child verification — repair orphans the per-block rules missed.
+    # 10. Parent-child verification   repair orphans the per-block rules missed.
     _verify_parent_child(blocks)
 
 
@@ -165,7 +165,7 @@ _VERIFY_REASONS = {"continuation", "continuation_override"}
 def _verify_parent_child(blocks: list[dict]) -> None:
     """Repair continuation blocks whose implied parent is missing or wrong.
 
-    Only continuation-typed blocks are verified — markers know their own
+    Only continuation-typed blocks are verified   markers know their own
     depth (e.g. ข้อ ๑.๒.๓ is level 3 on its own), and geometry-fallback
     blocks have no parent contract to enforce.
 
@@ -185,7 +185,7 @@ def _verify_parent_child(blocks: list[dict]) -> None:
         level = int(layout.get("indent_level", 0) or 0)
         if level < 2:
             continue
-        # At the cap (4), parent-child level diff is squashed by clamping —
+        # At the cap (4), parent-child level diff is squashed by clamping  
         # a parent already at 4 looks "equal" to its child, so we cannot
         # reliably detect orphans.  Leave saturated levels alone.
         if level >= 4:

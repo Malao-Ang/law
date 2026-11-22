@@ -12,7 +12,7 @@ class VersionChainFileInfoTest extends TestCase
     {
         $store = app(ReviewStore::class);
 
-        // v1 — has a real PDF file
+        // v1   has a real PDF file
         $v1 = $store->generateDocumentId();
         $stored = $store->storeUpload(
             UploadedFile::fake()->create('law_v1.pdf', 10, 'application/pdf'),
@@ -35,7 +35,7 @@ class VersionChainFileInfoTest extends TestCase
             'pages' => [['page_no' => 1, 'blocks' => []]],
         ]);
 
-        // v2 — child of v1, no file stored
+        // v2   child of v1, no file stored
         $v2 = $store->generateDocumentId();
         $store->setStatus($v2, ['status' => 'done', 'source_file' => 'law_v2.pdf']);
         $store->writeReviewDocument($v2, [

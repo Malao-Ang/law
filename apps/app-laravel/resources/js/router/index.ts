@@ -86,7 +86,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/law/relations/:documentId?', name: 'public-show-relations', component: PublicShowRelationsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId/comments', name: 'law-comments', component: LawCommentsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
-  // Dev-only MinIO test page — excluded from production builds.
+  // Dev-only MinIO test page   excluded from production builds.
   ...(import.meta.env.DEV
     ? [{ path: '/dev/minio', name: 'dev-minio', component: MinioTestPage, meta: { bareLayout: false } } as RouteRecordRaw]
     : []),

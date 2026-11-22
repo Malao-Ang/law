@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thai Legal OCR — เอกสารอ้างอิงสถาปัตยกรรม</title>
+<title>Thai Legal OCR   เอกสารอ้างอิงสถาปัตยกรรม</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Sarabun', 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; font-size: 14px; line-height: 1.6; }
@@ -225,7 +225,7 @@
 <body>
 <div class="page">
 
-  <h1>Thai Legal OCR — เอกสารอ้างอิงสถาปัตยกรรมระบบ</h1>
+  <h1>Thai Legal OCR   เอกสารอ้างอิงสถาปัตยกรรมระบบ</h1>
   <p class="subtitle">แผนที่ระบบทั้งหมด: บริการ, ประเภทข้อมูล, การประสานงาน PHP/Laravel, ไปป์ไลน์ OCR ของ Python, Vue stores และ request flows</p>
 
   <!-- ══════════════ OVERALL FLOW ══════════════ -->
@@ -323,7 +323,7 @@
   </div>
 
   <div class="note">
-    <strong>Shared volume:</strong> <code>poc_storage</code> เมาท์เป็น <code>/var/www/html/storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python). การแปลง path ผ่าน <code>DocumentPipelineClient::toSharedPath()</code> — ห้ามสร้าง path เองโดยตรง
+    <strong>Shared volume:</strong> <code>poc_storage</code> เมาท์เป็น <code>/var/www/html/storage/app/poc</code> (Laravel) และ <code>/data/poc</code> (Python). การแปลง path ผ่าน <code>DocumentPipelineClient::toSharedPath()</code>   ห้ามสร้าง path เองโดยตรง
   </div>
 
 
@@ -345,10 +345,10 @@
         <div class="fn-list">
           <div class="fn-item"><span class="fn-name">UploadController</span><span class="fn-desc">store() / show()</span></div>
           <div class="fn-item"><span class="fn-name">ReviewController</span><span class="fn-desc">show, preview, update, updateLayout, reprocess, mergeBlocks, deleteBlock, splitBlock, createBlock, reorderBlocks, reprocessPage, updateDocumentReview</span></div>
-          <div class="fn-item"><span class="fn-name">ExportController</span><span class="fn-desc">store() — ส่งออก RAG JSON; retryCorrection()</span></div>
-          <div class="fn-item"><span class="fn-name">PipelineCallbackController</span><span class="fn-desc">receive() — Python ส่งผลลัพธ์มาที่นี่</span></div>
+          <div class="fn-item"><span class="fn-name">ExportController</span><span class="fn-desc">store()   ส่งออก RAG JSON; retryCorrection()</span></div>
+          <div class="fn-item"><span class="fn-name">PipelineCallbackController</span><span class="fn-desc">receive()   Python ส่งผลลัพธ์มาที่นี่</span></div>
           <div class="fn-item"><span class="fn-name">ImageController</span><span class="fn-desc">show() รูปภาพบล็อก; showPage() thumbnail หน้า</span></div>
-          <div class="fn-item"><span class="fn-name">HealthController</span><span class="fn-desc">__invoke() — ตรวจสอบสถานะระบบ</span></div>
+          <div class="fn-item"><span class="fn-name">HealthController</span><span class="fn-desc">__invoke()   ตรวจสอบสถานะระบบ</span></div>
         </div>
       </div>
     </div>
@@ -361,7 +361,7 @@
           <div class="card-port">:8010 · FastAPI · thai-ocr-service</div>
         </div>
       </div>
-      <div class="card-desc">Docling + EasyOCR + LandingAI. รันในฐานะ root เพื่อจัดการสิทธิ์ volume. ยังไม่พร้อมทันที — EasyOCR ดาวน์โหลดโมเดล ~2 GB ครั้งแรก</div>
+      <div class="card-desc">Docling + EasyOCR + LandingAI. รันในฐานะ root เพื่อจัดการสิทธิ์ volume. ยังไม่พร้อมทันที   EasyOCR ดาวน์โหลดโมเดล ~2 GB ครั้งแรก</div>
       <div class="fn-section">
         <div class="fn-section-title">Endpoints (routes.py)</div>
         <div class="fn-list">
@@ -395,7 +395,7 @@
       <div class="fn-section">
         <div class="fn-section-title">Vite Dev Server</div>
         <div class="fn-list">
-          <div class="fn-item"><span class="fn-name">laravel-vite :5173</span><span class="fn-desc">Vue HMR. หยุดถ้าไม่มี node_modules — รัน npm install ก่อน</span></div>
+          <div class="fn-item"><span class="fn-name">laravel-vite :5173</span><span class="fn-desc">Vue HMR. หยุดถ้าไม่มี node_modules   รัน npm install ก่อน</span></div>
         </div>
       </div>
     </div>
@@ -403,7 +403,7 @@
 
 
   <!-- ══════════════ PHP SERVICES ══════════════ -->
-  <h2>PHP Laravel — ชั้น Services</h2>
+  <h2>PHP Laravel   ชั้น Services</h2>
   <div class="grid grid-2">
 
     <div class="card">
@@ -441,10 +441,10 @@
         </div>
       </div>
       <div class="fn-list">
-        <div class="fn-item"><span class="fn-name">extract(id, path, mode, engine)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/extract — เริ่มการสกัดแบบ async</span></div>
+        <div class="fn-item"><span class="fn-name">extract(id, path, mode, engine)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/extract   เริ่มการสกัดแบบ async</span></div>
         <div class="fn-item"><span class="fn-name">reprocessPage(id, pageNo, mode)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/reprocess-page</span></div>
         <div class="fn-item"><span class="fn-name">reprocessBlock(id, pageNo, blockId, mode)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/reprocess-block (sync)</span></div>
-        <div class="fn-item"><span class="fn-name">normalize(id, blocks, threshold)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/normalize — normalize + auto-correct CPU-only</span></div>
+        <div class="fn-item"><span class="fn-name">normalize(id, blocks, threshold)</span><span class="fn-verb">POST</span><span class="fn-desc">:8010/pipeline/normalize   normalize + auto-correct CPU-only</span></div>
         <div class="fn-item"><span class="fn-name">toSharedPath(relativePath)</span><span class="fn-verb">util</span><span class="fn-desc">แปลง path สัมพัทธ์ของ Laravel → Python /data/poc path สัมบูรณ์</span></div>
       </div>
       <div class="sep"></div>
@@ -606,7 +606,7 @@
 
 
   <!-- ══════════════ PYTHON SERVICES ══════════════ -->
-  <h2>Python OCR — ไฟล์ Service</h2>
+  <h2>Python OCR   ไฟล์ Service</h2>
   <div class="grid grid-4">
 
     <div class="card" style="grid-column: span 2;">
@@ -692,25 +692,25 @@
   <div class="layer-row">
     <div class="layer-box">
       <div class="layer-name">raw_text</div>
-      <div class="layer-key">ชั้น 0 — ผลลัพธ์ OCR/parse</div>
+      <div class="layer-key">ชั้น 0   ผลลัพธ์ OCR/parse</div>
       <div class="layer-desc">ข้อมูลดิบที่ได้จาก Docling / EasyOCR / LandingAI ไม่มีการแก้ไขหลังสกัด</div>
     </div>
     <div class="layer-arrow">→</div>
     <div class="layer-box">
       <div class="layer-name">normalized_text</div>
-      <div class="layer-key">ชั้น 1 — ผ่าน Thai normalizer</div>
+      <div class="layer-key">ชั้น 1   ผ่าน Thai normalizer</div>
       <div class="layer-desc">จัดลำดับสระถูกต้อง, ํา→ำ, ทำความสะอาด whitespace. กำหนดโดย <code>_normalize_block_text()</code> ใน block_builder</div>
     </div>
     <div class="layer-arrow">→</div>
     <div class="layer-box">
       <div class="layer-name">ai_suggested_text</div>
-      <div class="layer-key">ชั้น 2 — แก้ไขด้วย AI</div>
+      <div class="layer-key">ชั้น 2   แก้ไขด้วย AI</div>
       <div class="layer-desc">กำหนดเฉพาะเมื่อ <code>needs_review=True</code> และ confidence &lt; THAI_REVIEW_THRESHOLD. แหล่งที่มา: MockAICorrector (เสียบ provider จริงได้)</div>
     </div>
     <div class="layer-arrow">→</div>
     <div class="layer-box">
       <div class="layer-name">approved_text</div>
-      <div class="layer-key">ชั้น 3 — ผู้ตรวจสอบอนุมัติ</div>
+      <div class="layer-key">ชั้น 3   ผู้ตรวจสอบอนุมัติ</div>
       <div class="layer-desc">เขียนโดยผู้ตรวจสอบผ่าน PATCH /blocks/{id} ใช้สำหรับส่งออก รวมถึง <code>reviewed_html</code> (bold/italic/underline; ผ่าน DOMPurify)</div>
     </div>
   </div>
@@ -829,7 +829,7 @@
           <tr><td class="field-name">reviewed_html</td><td class="field-type">string?</td><td class="field-desc">HTML พร้อม bold/italic/underline; ผ่าน DOMPurify sanitize</td></tr>
           <tr><td class="field-name">needs_review</td><td class="field-type">boolean</td><td class="field-desc">True เมื่อ confidence &lt; THAI_REVIEW_THRESHOLD</td></tr>
           <tr><td class="field-name">meta.layout</td><td class="field-type">BlockLayout</td><td class="field-desc">indent_left, indent_first_line, indent_hanging, alignment, tabs[]</td></tr>
-          <tr><td class="field-name">meta.list_marker</td><td class="field-type">ListMarker?</td><td class="field-desc">{type, level, text} — มาตรา/ข้อ/วรรค/(ก)/๑.๑</td></tr>
+          <tr><td class="field-name">meta.list_marker</td><td class="field-type">ListMarker?</td><td class="field-desc">{type, level, text}   มาตรา/ข้อ/วรรค/(ก)/๑.๑</td></tr>
           <tr><td class="field-name">meta.image</td><td class="field-type">ImageMeta?</td><td class="field-desc">src_url, data_uri (≤200 KB), width, height</td></tr>
           <tr><td class="field-name">meta.spell_suggestions</td><td class="field-type">string[]?</td><td class="field-desc">คำแนะนำจาก Thai spellcheck</td></tr>
         </tbody>
@@ -888,7 +888,7 @@
 
 
   <!-- ══════════════ FRONTEND ROUTES ══════════════ -->
-  <h2>Vue Router — หน้าของ Frontend</h2>
+  <h2>Vue Router   หน้าของ Frontend</h2>
   <div class="type-card">
     <div class="type-card-header">
       <span>Vue 3 Routes</span>

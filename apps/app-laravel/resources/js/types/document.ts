@@ -242,7 +242,7 @@ export interface LawRelation {
   type: RelationType;
   target_document_id: string | null;
   target_title: string;
-  /** Human-readable section label (e.g. "มาตรา ๕") — kept for display and external refs */
+  /** Human-readable section label (e.g. "มาตรา ๕")   kept for display and external refs */
   target_section: string | null;
   /** Precise target block when selected from catalog picker */
   target_block_id: string | null;

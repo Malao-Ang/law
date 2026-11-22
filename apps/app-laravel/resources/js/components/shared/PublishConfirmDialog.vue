@@ -138,7 +138,7 @@ const checklist = computed<ChecklistItem[]>(() => {
       key: 'rag',
       label: 'จัดลำดับเนื้อหา',
       ok: ragOk,
-      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน — ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับเนื้อหา'),
+      status: ragOk ? 'พร้อมใช้งาน' : (currentStatus?.rag_skipped ? 'ข้ามขั้นตอน   ต้องกลับไปทำ' : 'ยังไม่ได้จัดลำดับเนื้อหา'),
       level: 'required',
     });
   }
@@ -162,7 +162,7 @@ const checklist = computed<ChecklistItem[]>(() => {
     level: 'optional',
   });
 
-  // 5. สถานะบังคับใช้ (required — ต้องไม่เป็น "ร่าง")
+  // 5. สถานะบังคับใช้ (required   ต้องไม่เป็น "ร่าง")
   const statusOk = !!currentMeta?.status && !isDraft(currentMeta.status);
   items.push({
     key: 'status',

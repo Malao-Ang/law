@@ -630,8 +630,8 @@ final class LawCommentService
             $index[$id] = [
                 'title' => trim((string) ($row['title'] ?? $id)),
                 'owner_unit_code' => $unitCode !== '' ? $unitCode : null,
-                'unit_name' => $unitName !== '' ? $unitName : ($agency !== '' ? $agency : '—'),
-                'agency' => $agency !== '' ? $agency : ($unitName !== '' ? $unitName : '—'),
+                'unit_name' => $unitName !== '' ? $unitName : ($agency !== '' ? $agency : ' '),
+                'agency' => $agency !== '' ? $agency : ($unitName !== '' ? $unitName : ' '),
             ];
         }
 
@@ -657,8 +657,8 @@ final class LawCommentService
                 $index[$id] = [
                     'title' => trim((string) ($meta['title'] ?? $id)),
                     'owner_unit_code' => $unitCode !== '' ? $unitCode : null,
-                    'unit_name' => $unitName !== '' ? $unitName : ($agency !== '' ? $agency : '—'),
-                    'agency' => $agency !== '' ? $agency : ($unitName !== '' ? $unitName : '—'),
+                    'unit_name' => $unitName !== '' ? $unitName : ($agency !== '' ? $agency : ' '),
+                    'agency' => $agency !== '' ? $agency : ($unitName !== '' ? $unitName : ' '),
                 ];
             }
         }
@@ -807,10 +807,10 @@ final class LawCommentService
         // Admin always sees the real author name.
         $base['author_name'] = (string) ($comment['author_name'] ?? 'ผู้ใช้');
         $doc = $docs[(string) ($comment['document_id'] ?? '')] ?? null;
-        $base['document_title'] = (string) ($doc['title'] ?? '—');
+        $base['document_title'] = (string) ($doc['title'] ?? ' ');
         $base['unit_code'] = $doc['owner_unit_code'] ?? null;
-        $base['unit_name'] = (string) ($doc['unit_name'] ?? '—');
-        $base['agency'] = (string) ($doc['agency'] ?? '—');
+        $base['unit_name'] = (string) ($doc['unit_name'] ?? ' ');
+        $base['agency'] = (string) ($doc['agency'] ?? ' ');
         $base['notify'] = ($comment['notify'] ?? true) !== false;
         $base['reveal_name'] = ($comment['reveal_name'] ?? true) !== false;
         $base['attachment_count'] = count($base['attachments']);

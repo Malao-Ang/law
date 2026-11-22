@@ -10,6 +10,12 @@ export interface OversightStep {
   completed_on: string | null;
 }
 
+export interface OversightDueDate {
+  date: string;
+  label: string;
+  display_date: string;
+}
+
 export interface OversightItem {
   document_id: string;
   title: string;
@@ -19,6 +25,9 @@ export interface OversightItem {
   status: string | null;
   closed: boolean;
   publish_due_date: string | null;
+  due_date: string | null;
+  due_label: string | null;
+  due_dates: OversightDueDate[];
   days_left: number | null;
   overdue: boolean;
   in_next_month: boolean;
@@ -118,9 +127,6 @@ export interface OversightMailSendResult {
 }
 
 export interface OversightUpdatePayload {
-  status: string;
-  publish_due_date: string | null;
-  steps: { key: string; due_date: string | null; completed_on: string | null }[];
   primary: OversightContact;
   backup: OversightContact;
 }

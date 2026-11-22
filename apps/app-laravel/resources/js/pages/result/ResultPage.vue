@@ -70,7 +70,7 @@
           <!-- Published -->
           <template v-if="isPublished">
             <v-alert type="success" variant="tonal" density="comfortable" class="mb-4" prepend-icon="mdi-check-decagram-outline">
-              เผยแพร่แล้ว — เอกสารนี้สามารถค้นหาได้บนหน้าสาธารณะ
+              เผยแพร่แล้ว   เอกสารนี้สามารถค้นหาได้บนหน้าสาธารณะ
             </v-alert>
             <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">{{ pdfExportError }}</v-alert>
             <v-alert v-if="docxExportError" type="error" variant="tonal" density="compact" class="mb-3">{{ docxExportError }}</v-alert>
@@ -111,7 +111,7 @@
           <!-- Exported, awaiting confirm -->
           <template v-else-if="esignExportedAt">
             <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
-              ส่งออกแล้วเมื่อ {{ formatThaiDate(esignExportedAt) }} — รอการยืนยันลงนาม
+              ส่งออกแล้วเมื่อ {{ formatThaiDate(esignExportedAt) }}   รอการยืนยันลงนาม
             </v-alert>
             <v-alert v-if="pdfExportError" type="error" variant="tonal" density="compact" class="mb-3">
               {{ pdfExportError }}
@@ -300,7 +300,7 @@ const docTitle = computed(() => meta.value?.title || review.value?.source_file |
 const esignExportedAt = computed(() => docStatus.value?.esign_exported_at ?? null);
 const canExportOriginalPdf = computed(() => /\.(docx?|doc)$/i.test(docStatus.value?.source_file ?? ''));
 // Published = the RAG export actually ran and was indexed (searchable on /law).
-// Reaching workflow step 6 only means the permissions step was completed — the
+// Reaching workflow step 6 only means the permissions step was completed   the
 // document is not searchable until it has been exported/ingested.
 const isPublished = computed(() => {
   const s = docStatus.value?.status;

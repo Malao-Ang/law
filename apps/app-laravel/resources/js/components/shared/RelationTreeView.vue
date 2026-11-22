@@ -25,7 +25,7 @@
               <span v-if="node.row.org"><v-icon icon="mdi-office-building-outline" size="12" /> {{ node.row.org }}</span>
             </div>
             <div class="text-caption mt-2" :class="statusClass(node.row.metaStatus || node.row.workflowStage)">
-              สถานะ: {{ node.row.metaStatus || node.row.workflowStage || '—' }}
+              สถานะ: {{ node.row.metaStatus || node.row.workflowStage || ' ' }}
             </div>
           </div>
         </div>

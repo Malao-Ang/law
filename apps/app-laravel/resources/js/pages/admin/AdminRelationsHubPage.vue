@@ -107,7 +107,7 @@
                 <v-icon start icon="mdi-history" size="10" />
                 {{ changeLogCountById[doc.id] }} เปลี่ยนแปลง
               </v-chip>
-              <span v-else class="text-caption text-medium-emphasis">—</span>
+              <span v-else class="text-caption text-medium-emphasis"> </span>
             </td>
             <td class="text-center text-caption">{{ tableValue(doc.editedAt) }}</td>
             <td @click.stop class="text-center">

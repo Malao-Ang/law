@@ -30,7 +30,7 @@ class FastExtractionPipelineTest extends TestCase
         mkdir($this->tmpRoot.'/ingested', 0700, true);
         mkdir($this->tmpRoot.'/pages', 0700, true);
 
-        // ponytail: MongoBlobStore is final — fake the Collection it wraps instead
+        // ponytail: MongoBlobStore is final   fake the Collection it wraps instead
         $store = [];
         $col = $this->createMock(Collection::class);
         $col->method('findOne')->willReturnCallback(function (array $filter) use (&$store): ?array {
@@ -55,7 +55,7 @@ class FastExtractionPipelineTest extends TestCase
             $store[(string) $doc['_id']] = $doc;
         });
         $col->method('countDocuments')->willReturn(0);
-        // ponytail: find() is not called by any test in this class — throw to surface accidental calls
+        // ponytail: find() is not called by any test in this class   throw to surface accidental calls
         $col->method('find')->willThrowException(new \RuntimeException('find() not expected in FastExtractionPipelineTest'));
 
         $blob = new MongoBlobStore($col);

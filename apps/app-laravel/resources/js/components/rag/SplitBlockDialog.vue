@@ -88,7 +88,7 @@ function toggle(index: number): void {
   boundaries.value = next;
 }
 
-// Which resulting block a line falls into — used only to colour the preview.
+// Which resulting block a line falls into   used only to colour the preview.
 function groupOf(lineIndex: number): number {
   let g = 0;
   for (const b of boundaries.value) if (b <= lineIndex) g++;

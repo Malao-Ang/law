@@ -56,6 +56,6 @@ class NormalizeDocumentJob implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        // normalization failure is non-fatal — document is already marked done
+        // normalization failure is non-fatal   document is already marked done
     }
 }

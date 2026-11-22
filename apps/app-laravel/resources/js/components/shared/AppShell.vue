@@ -153,7 +153,7 @@ const props = defineProps<{
   navGroups?: NavGroup[];
   fullHeight?: boolean;
   showBell?: boolean;
-  // legacy props kept for compat — no longer affect layout
+  // legacy props kept for compat   no longer affect layout
   hideTopBar?: boolean;
   showTopBar?: boolean;
 }>();

@@ -7,7 +7,7 @@ return [
     'reminder_days' => [30, 14, 7],
 
     /** Default reminder emails. Admins can replace these from the oversight mail page. */
-    'mail_subject' => 'แจ้งเตือนกำหนดดำเนินการกฎหมาย — เหลือ {days} วัน',
+    'mail_subject' => 'แจ้งเตือนกำหนดดำเนินการกฎหมาย   เหลือ {days} วัน',
     'mail_link_label' => 'ระบบติดตามการกำกับดูแล',
     'mail_body' => <<<'TEXT'
 เรียนผู้รับผิดชอบ
@@ -19,7 +19,7 @@ return [
 กรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}
 TEXT,
 
-    'mail_proclamation_subject' => 'แจ้งเตือนต้องออกประกาศตามกฎหมาย — เหลือ {days} วัน',
+    'mail_proclamation_subject' => 'แจ้งเตือนต้องออกประกาศตามกฎหมาย   เหลือ {days} วัน',
     'mail_proclamation_link_label' => 'ระบบติดตามการกำกับดูแล',
     'mail_proclamation_body' => <<<'TEXT'
 เรียนผู้รับผิดชอบ

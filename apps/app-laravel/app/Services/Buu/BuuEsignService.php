@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * e-Sign APIs via Kong (Develop).
  *
- * Documents must already exist on MinIO — pass doc_filename + doc_bucket only.
+ * Documents must already exist on MinIO   pass doc_filename + doc_bucket only.
  */
 class BuuEsignService
 {
@@ -39,7 +39,7 @@ class BuuEsignService
     /**
      * Submit a MinIO-stored document for electronic signing.
      *
-     * When $returnUrl is null, uses callbackUrl($documentId) — $documentId is then required.
+     * When $returnUrl is null, uses callbackUrl($documentId)   $documentId is then required.
      *
      * @param  list<array{psn_citizenid: string, docs_comment?: string}>  $signers
      * @param  list<array{attachment_name: string, attachment_filename: string, attachment_bucket: string}>  $attachments

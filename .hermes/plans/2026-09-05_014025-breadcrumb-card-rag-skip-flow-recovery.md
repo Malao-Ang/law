@@ -46,7 +46,7 @@ Do not encode `rag_skipped` in localStorage only. It must live in backend status
 
 ## Step-by-step tasks
 
-### Task 1 — Create baseline evidence before editing
+### Task 1   Create baseline evidence before editing
 
 Run:
 ```bash
@@ -62,7 +62,7 @@ Expected current baseline:
 
 Do not commit
 
-### Task 2 — Part A: fix breadcrumb ellipsis + tooltip CSS
+### Task 2   Part A: fix breadcrumb ellipsis + tooltip CSS
 
 File: `apps/app-laravel/resources/js/components/shared/AppShell.vue`
 
@@ -115,7 +115,7 @@ git add apps/app-laravel/resources/js/components/shared/AppShell.vue
 git commit -m "fix(shell): truncate breadcrumb label with ellipsis"
 ```
 
-### Task 3 — Part B: card equal height without arbitrary min-height
+### Task 3   Part B: card equal height without arbitrary min-height
 
 File discovered by search: `apps/app-laravel/resources/js/components/shared/LawRelationColumnPicker.vue`
 
@@ -155,7 +155,7 @@ git add apps/app-laravel/resources/js/components/shared/LawRelationColumnPicker.
 git commit -m "fix(relations): let picker cards stretch without arbitrary height"
 ```
 
-### Task 4 — RED backend test: status can persist `rag_skipped`
+### Task 4   RED backend test: status can persist `rag_skipped`
 
 Preferred file: create/extend `apps/app-laravel/tests/Unit/ReviewStoreTest.php` or a focused existing `ReviewStore` test file if present
 
@@ -202,7 +202,7 @@ git add apps/app-laravel/app/Services/ReviewStore.php apps/app-laravel/tests/Uni
 git commit -m "test(review): persist rag skipped status flag"
 ```
 
-### Task 5 — Add API endpoint to set/clear `rag_skipped`
+### Task 5   Add API endpoint to set/clear `rag_skipped`
 
 Files:
 - `apps/app-laravel/routes/api.php`
@@ -307,7 +307,7 @@ git add apps/app-laravel/routes/api.php apps/app-laravel/app/Http/Controllers/Ap
 git commit -m "feat(rag): add skipped status endpoint"
 ```
 
-### Task 6 — Add “ข้ามขั้นตอนนี้” button to RAG page
+### Task 6   Add “ข้ามขั้นตอนนี้” button to RAG page
 
 File: `apps/app-laravel/resources/js/components/rag/RagManageWorkspace.vue`
 
@@ -364,7 +364,7 @@ git add apps/app-laravel/resources/js/components/rag/RagManageWorkspace.vue
 git commit -m "feat(rag): allow skipping rag step with confirmation"
 ```
 
-### Task 7 — Clear `rag_skipped` after successful RAG save/export
+### Task 7   Clear `rag_skipped` after successful RAG save/export
 
 Files to inspect:
 - `apps/app-laravel/resources/js/components/rag/RagManageWorkspace.vue`
@@ -396,7 +396,7 @@ git add apps/app-laravel/resources/js/components/rag/RagManageWorkspace.vue apps
 git commit -m "fix(rag): clear skipped flag after completing rag"
 ```
 
-### Task 8 — Block publish on E-Sign and Edit Hub when `rag_skipped` is true
+### Task 8   Block publish on E-Sign and Edit Hub when `rag_skipped` is true
 
 Files:
 - `apps/app-laravel/resources/js/components/esign/ESignDocumentWorkspace.vue`
@@ -460,7 +460,7 @@ git add apps/app-laravel/resources/js/components/esign/ESignDocumentWorkspace.vu
 git commit -m "fix(publish): block publish when rag was skipped"
 ```
 
-### Task 9 — Final verification
+### Task 9   Final verification
 
 Run focused tests:
 ```bash

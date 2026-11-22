@@ -101,7 +101,7 @@
             </div>
             <div class="status-summary">
               <div class="status-summary__label">ผู้รับผิดชอบ</div>
-              <div class="status-summary__value">{{ meta.imported_by || '—' }}</div>
+              <div class="status-summary__value">{{ meta.imported_by || ' ' }}</div>
             </div>
             <div class="status-summary">
               <div class="status-summary__label">เวลาโดยประมาณ</div>
@@ -209,7 +209,7 @@
             </v-timeline-item>
           </v-timeline>
           <div v-else class="text-caption text-medium-emphasis text-center py-6">
-            ยังไม่มีกิจกรรม — ส่งเอกสารเข้าสู่ระบบ e-Sign เพื่อเริ่มติดตามสถานะ
+            ยังไม่มีกิจกรรม   ส่งเอกสารเข้าสู่ระบบ e-Sign เพื่อเริ่มติดตามสถานะ
           </div>
 
         </section>
@@ -612,7 +612,7 @@ const activeStepIndex = computed(() => {
   return 3;
 });
 
-const currentStepLabel = computed(() => flowSteps[activeStepIndex.value]?.label ?? '—');
+const currentStepLabel = computed(() => flowSteps[activeStepIndex.value]?.label ?? ' ');
 
 const etaLabel = computed(() => {
   if (stage.value === 'published' || stage.value === 'signed') return 'ดำเนินการเสร็จสิ้น';
@@ -894,7 +894,7 @@ function applyServerEsignStatus(status: DocumentStatus): void {
       signedAt: at,
       submittedAt: session.value.submittedAt ?? status.esign_submitted_at ?? at,
     }, {
-      title: 'ลงนามเสร็จสิ้น — พร้อมเผยแพร่',
+      title: 'ลงนามเสร็จสิ้น   พร้อมเผยแพร่',
       detail: signer ? `ผู้ลงนาม: ${signer}` : undefined,
       at,
     });
@@ -944,7 +944,7 @@ async function publish(): Promise<void> {
     if (otherRequiredFails.length > 0) {
       publishOpen.value = false;
       const firstFail = otherRequiredFails[0] ?? failedGate;
-      void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: `ไม่สามารถเผยแพร่ได้: ${firstFail?.label ?? 'ข้อมูลจำเป็นไม่ครบ'} — ${firstFail?.status ?? ''}` });
+      void Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: `ไม่สามารถเผยแพร่ได้: ${firstFail?.label ?? 'ข้อมูลจำเป็นไม่ครบ'}   ${firstFail?.status ?? ''}` });
       return;
     }
     // Only status gate fails → fall through to the ร่าง dialog below.

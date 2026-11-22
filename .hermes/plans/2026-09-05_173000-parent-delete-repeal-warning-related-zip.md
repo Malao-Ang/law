@@ -14,7 +14,7 @@ Implement three remaining e-Law requirements: prevent deleting an active parent 
 ## Architecture / proposed approach
 Add backend support in `ReviewStore` for child-law discovery so both delete guard and repeal warning use the same source of truth. Expose a small API endpoint for repeal warning and a ZIP endpoint for related-file download. Update frontend delete/save flows to show Thai messages and update public relations “ดาวน์โหลดทั้งหมด” to download exactly the selected law plus related tree as one ZIP.
 
-## Task Q1 — Prevent deleting parent law with active children
+## Task Q1   Prevent deleting parent law with active children
 
 ### Q1.1 Add active child discovery in `ReviewStore`
 File: `apps/app-laravel/app/Services/ReviewStore.php`
@@ -59,7 +59,7 @@ File: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
 Current catch already shows `err.message`. No UI change needed unless `jsonRequest` hides message. If needed, update `jsonRequest` error parsing in `api/client.ts` so backend `message` appears in thrown Error.
 
-## Task Q2 — Warn when repealing a parent with active child laws
+## Task Q2   Warn when repealing a parent with active child laws
 
 ### Q2.1 Add API endpoint for active children
 File: `apps/app-laravel/app/Http/Controllers/Api/ReviewController.php`
@@ -117,7 +117,7 @@ If either contains `ยกเลิก`, call `fetchActiveChildren(props.documen
 
 Import `fetchActiveChildren` and `Swal` if not already imported.
 
-## Task Q3 — ZIP download of selected law + related docs only
+## Task Q3   ZIP download of selected law + related docs only
 
 ### Q3.1 Add backend ZIP endpoint
 File: create `apps/app-laravel/app/Http/Controllers/Api/RelatedDocumentsZipController.php`
@@ -190,9 +190,9 @@ Important: This still downloads only selected law + related laws because backend
 
 ### PHP focused tests
 Add tests in an existing suitable test file or a new feature/unit test under `apps/app-laravel/tests`:
-1. `delete parent with active child returns 409` — create parent/child review/status fixtures, call DELETE `/api/documents/{parent}`, expect 409 and message contains `กฎหมายลูก`.
-2. `active children endpoint returns count and titles` — call GET `/api/documents/{parent}/active-children`, expect count 1 and child title.
-3. `related ZIP does not include unrelated database documents` — create selected, child, unrelated docs, call `/api/documents/{selected}/related-download.zip`, inspect zip entries if possible; assert selected/child present and unrelated absent.
+1. `delete parent with active child returns 409`   create parent/child review/status fixtures, call DELETE `/api/documents/{parent}`, expect 409 and message contains `กฎหมายลูก`.
+2. `active children endpoint returns count and titles`   call GET `/api/documents/{parent}/active-children`, expect count 1 and child title.
+3. `related ZIP does not include unrelated database documents`   create selected, child, unrelated docs, call `/api/documents/{selected}/related-download.zip`, inspect zip entries if possible; assert selected/child present and unrelated absent.
 
 Run focused tests:
 ```bash

@@ -469,7 +469,7 @@ function relationTypeLabel(type: RelationType): string {
 const promoteOnPublish = ref(false);
 async function togglePublished(next: boolean | null): Promise<void> {
   promoteOnPublish.value = false;
-  // ปิดเผยแพร่ — ไม่ต้องตรวจอะไร เปิด confirm dialog ตรงๆ
+  // ปิดเผยแพร่   ไม่ต้องตรวจอะไร เปิด confirm dialog ตรงๆ
   if (!next) {
     publishDialogNext.value = false;
     publishDialogOpen.value = true;
@@ -489,7 +489,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
   const failedGate = gates.find((g) => g.level === 'required' && !g.ok);
 
   if (hasRequiredFail) {
-    // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน (new docs only — isOldDoc skips this gate)
+    // Gate 1: e-Sign ต้องลงนามสำเร็จก่อน (new docs only   isOldDoc skips this gate)
     if (failedGate?.key === 'esign') {
       const esignSendFailed = docStatus?.esign_send_response?.status === 'fail';
       const isWaitingSign = !!docStatus?.esign_submitted_at && !esignSendFailed;
@@ -535,7 +535,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
       return;
     }
 
-    // Other required failures (status, metadata) — show generic block.
+    // Other required failures (status, metadata)   show generic block.
     // But if the only failure is status (ร่าง), fall through to the 3-option dialog below.
     const isOnlyStatusFail = failedGate?.key === 'status';
     if (!isOnlyStatusFail) {
@@ -551,7 +551,7 @@ async function togglePublished(next: boolean | null): Promise<void> {
     // isOnlyStatusFail → fall through to ร่าง dialog below.
   }
 
-  // All required gates pass — special handling for ร่าง status (post-gate)
+  // All required gates pass   special handling for ร่าง status (post-gate)
   if (!meta.value.status || isDraft(meta.value.status)) {
     const r = await Swal.fire({
       icon: 'question',

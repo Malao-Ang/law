@@ -230,7 +230,7 @@ onMounted(async () => {
       .filter((law) => canDisplayLawResult(law, auth.isAuthenticated))
       .map(mapSearchResultToDocumentVersion);
 
-    // Search API returns match_all in arbitrary order — sort newest-first once
+    // Search API returns match_all in arbitrary order   sort newest-first once
     // so every section (latest + each type) shows the most recent laws.
     // ponytail: only the first HOME_SEARCH_PAGE_SIZE docs are fetched; if the
     // catalog outgrows that, add a server-side date sort to the search query.

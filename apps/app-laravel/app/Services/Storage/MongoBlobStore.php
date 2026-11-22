@@ -152,7 +152,7 @@ final class MongoBlobStore
         return $out;
     }
 
-    /** Remove all documents — used in tests only. */
+    /** Remove all documents   used in tests only. */
     public function truncate(): void
     {
         $this->collection->deleteMany([]);

@@ -29,7 +29,7 @@
         <v-chip size="x-small" variant="tonal" color="admin-primary" class="ml-2">{{ fileTypeLabel }}</v-chip>
       </div>
 
-      <!-- scan mode selector — shown for all types; label changes per type -->
+      <!-- scan mode selector   shown for all types; label changes per type -->
       <div v-if="documentType !== 'old'" class="mt-3">
         <div class="text-caption text-medium-emphasis mb-1">{{ modeLabel }}</div>
         <v-select
@@ -114,7 +114,7 @@ const modeLabel = computed(() =>
 const modeOptions = computed(() =>
   isPdf.value
     ? [
-        { title: 'Gemini Vision — Google AI (แนะนำสำหรับ PDF scan)', value: 'gemini' },
+        { title: 'Gemini Vision   Google AI (แนะนำสำหรับ PDF scan)', value: 'gemini' },
         { title: 'LandingAI ADE', value: 'landingai' },
       ]
     : [
@@ -124,7 +124,7 @@ const modeOptions = computed(() =>
 
 const modeHint = computed(() => {
   if (isPdf.value && (scanMode.value === 'gemini' || scanMode.value === 'landingai')) {
-    return 'ใช้ cloud OCR ตามที่เลือก — ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
+    return 'ใช้ cloud OCR ตามที่เลือก   ถ้าอ่านเอกสารไม่สำเร็จจะแจ้งทันที';
   }
   return '';
 });

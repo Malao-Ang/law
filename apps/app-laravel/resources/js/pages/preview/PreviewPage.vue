@@ -29,7 +29,7 @@
         prepend-icon="mdi-arrow-left"
         :to="`/documents/${documentId}/review`"
       >กลับแก้ไข</v-btn>
-      <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง — ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
+      <span class="text-subtitle-1 font-weight-semibold ml-2">{{ sourceFile ? `ตัวอย่าง   ${sourceFile}` : 'ตัวอย่างเอกสาร' }}</span>
       <v-spacer />
       <v-btn
         variant="tonal"
@@ -118,7 +118,7 @@ onUnmounted(() => previewStore.reset());
 </script>
 
 <style scoped>
-/* document-render container — typography CSS, do not modify */
+/* document-render container   typography CSS, do not modify */
 .preview-paper {
   background: white;
   width: 210mm;

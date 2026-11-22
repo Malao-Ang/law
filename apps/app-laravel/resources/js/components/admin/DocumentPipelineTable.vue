@@ -255,7 +255,7 @@ const headers = [
 ];
 
 function effectiveStage(doc: DocumentListItem): StageKey {
-  // Old docs follow a fixed path — no localStorage overrides needed
+  // Old docs follow a fixed path   no localStorage overrides needed
   if (doc.document_type === 'old') {
     return deriveStageForDocument({
       status: doc.status,
@@ -373,8 +373,8 @@ async function confirmDelete(row: Row): Promise<void> {
 }
 
 function formatDate(iso?: string | null): string {
-  if (!iso) return '—';
-  return formatThaiDateNumeric(iso) || '—';
+  if (!iso) return ' ';
+  return formatThaiDateNumeric(iso) || ' ';
 }
 
 function hasActive(): boolean {

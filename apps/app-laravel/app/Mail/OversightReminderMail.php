@@ -26,7 +26,7 @@ class OversightReminderMail extends Mailable
         public string $linkLabel = '',
     ) {
         if ($this->subjectTemplate === '') {
-            $this->subjectTemplate = $this->configured('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย — เหลือ {days} วัน');
+            $this->subjectTemplate = $this->configured('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย   เหลือ {days} วัน');
         }
         if ($this->bodyTemplate === '') {
             $this->bodyTemplate = $this->configured(

@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
 
         def _warmup_and_log() -> None:
             warmup_ocr()
-            logger.info("OCR model ready — device: %s", pipeline.device)
+            logger.info("OCR model ready   device: %s", pipeline.device)
 
         def _warmup_spellchecker() -> None:
             try:

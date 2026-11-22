@@ -13,23 +13,23 @@ Extend the MinIO old-doc feature with: (1) dev/production mode switch so MinIO u
 - 5 new tests passing
 
 ### What's NOT done yet:
-- MinIO is always attempted — no dev/prod toggle
+- MinIO is always attempted   no dev/prod toggle
 - Only old-doc PDF path uploads to MinIO; new-doc (doc/docx/pdf) doesn't
 - Local files are never deleted after MinIO upload
 - `DocumentFileController` only serves PDFs (guard: `extension !== 'pdf'` → 404)
 - No backfill command for docs uploaded before this feature
 - Old-doc validation only accepts PDF (`mimes:pdf`); doc/docx are rejected
 
-### Key constraint — new docs need local files during extraction
+### Key constraint   new docs need local files during extraction
 `ExtractDocumentJob` reads the uploaded file from local disk (`ReviewStore::absolutePath(relativeFilePath)`). MinIO upload for new docs MUST happen AFTER extraction completes (in `ExtractDocumentJob::runFast` after status=done, or in `PipelineCallbackController` for standard path).
 
 ## Architecture / Proposed Approach
 
-Add env var `BUU_MINIO_ENABLED=true|false` (default `false`). When disabled, all MinIO calls are skipped — upload goes to local disk only, serve goes from local disk only. In production set `BUU_MINIO_ENABLED=true`.
+Add env var `BUU_MINIO_ENABLED=true|false` (default `false`). When disabled, all MinIO calls are skipped   upload goes to local disk only, serve goes from local disk only. In production set `BUU_MINIO_ENABLED=true`.
 
 For new docs, hook MinIO upload at the two completion points: (1) end of `ExtractDocumentJob::runFast()` after status=done, (2) `PipelineCallbackController::receive()` after writing review doc. Both are best-effort try/catch like the old-doc path.
 
-Expand `DocumentFileController` to serve any file type (pdf/doc/docx) — for doc/docx from MinIO, return redirect; from local, stream with appropriate Content-Type.
+Expand `DocumentFileController` to serve any file type (pdf/doc/docx)   for doc/docx from MinIO, return redirect; from local, stream with appropriate Content-Type.
 
 ## Step-by-step Tasks
 
@@ -56,7 +56,7 @@ BUU_MINIO_ENABLED=false
 
 ---
 
-### Task 2: Create `MinioUploadService` — centralized upload-if-enabled helper
+### Task 2: Create `MinioUploadService`   centralized upload-if-enabled helper
 
 **File**: `apps/app-laravel/app/Services/Buu/MinioUploadService.php`
 
@@ -75,7 +75,7 @@ class MinioUploadService
 
     /**
      * Upload file to MinIO if enabled. Returns stored filename or null.
-     * Never throws — all errors are caught and logged.
+     * Never throws   all errors are caught and logged.
      */
     public function uploadIfEnabled(
         string $absolutePath,
@@ -182,11 +182,11 @@ if ($minioFilename !== null) {
 }
 ```
 
-**Update existing tests**: `OldDocumentMinioUploadTest` — set `config(['buu.minio_enabled' => true])` in the minio-success test, `false` in the failure test should not call MinIO at all.
+**Update existing tests**: `OldDocumentMinioUploadTest`   set `config(['buu.minio_enabled' => true])` in the minio-success test, `false` in the failure test should not call MinIO at all.
 
 ---
 
-### Task 5: Hook MinIO upload for new docs — fast path
+### Task 5: Hook MinIO upload for new docs   fast path
 
 **File**: `apps/app-laravel/app/Jobs/ExtractDocumentJob.php`
 
@@ -209,7 +209,7 @@ if ($minioFilename !== null) {
 
 ---
 
-### Task 6: Hook MinIO upload for new docs — standard path (callback)
+### Task 6: Hook MinIO upload for new docs   standard path (callback)
 
 **File**: `apps/app-laravel/app/Http/Controllers/Api/PipelineCallbackController.php`
 
@@ -294,9 +294,9 @@ public function uploadAndCleanup(
 ```
 
 Then change callers to use `uploadAndCleanup()` instead of `uploadIfEnabled()` where appropriate:
-- `UploadController` (old-doc): use `uploadAndCleanup()` — old docs don't need local file after upload
-- `ExtractDocumentJob::runFast()`: use `uploadAndCleanup()` — extraction is done
-- `PipelineCallbackController`: use `uploadAndCleanup()` — extraction is done
+- `UploadController` (old-doc): use `uploadAndCleanup()`   old docs don't need local file after upload
+- `ExtractDocumentJob::runFast()`: use `uploadAndCleanup()`   extraction is done
+- `PipelineCallbackController`: use `uploadAndCleanup()`   extraction is done
 
 ---
 
@@ -388,7 +388,7 @@ class MigrateDocsToMinioCommand extends Command
 
 - Test 1 (minio success): add `config(['buu.minio_enabled' => true])` at top
 - Test 2 (minio fails): add `config(['buu.minio_enabled' => true])` at top
-- **New test 3**: `test_old_document_upload_skips_minio_when_disabled` — set `config(['buu.minio_enabled' => false])`, assert `minio_filename` is NOT in status
+- **New test 3**: `test_old_document_upload_skips_minio_when_disabled`   set `config(['buu.minio_enabled' => false])`, assert `minio_filename` is NOT in status
 
 **File**: `apps/app-laravel/tests/Feature/DocumentFileMinioTest.php`
 
@@ -434,7 +434,7 @@ Old docs can now be pdf, doc, or docx.
 
 ### Tradeoffs
 - **`uploadAndCleanup` deletes immediately**: No grace period. If something unexpected needs the file, it's gone. Mitigation: only delete when MinIO upload confirmed (returned filename is non-empty).
-- **No retry on MinIO upload**: Single attempt, then give up. Acceptable — the file stays local as fallback.
+- **No retry on MinIO upload**: Single attempt, then give up. Acceptable   the file stays local as fallback.
 
 ### Open Questions
 1. **MinIO folder structure**: Old docs → `/old-documents`, new docs → `/documents`, backfill → `/migrated`. Confirm this is OK or should they all go to one folder?

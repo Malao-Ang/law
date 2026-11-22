@@ -1,15 +1,15 @@
-# Plan — Admin upload & laws tables: e-Sign status column, clearer statuses, dd/mm/yyyy dates, matching filter
+# Plan   Admin upload & laws tables: e-Sign status column, clearer statuses, dd/mm/yyyy dates, matching filter
 
 > Project: `docling-thai-poc/apps/app-laravel` (Laravel 11 API + Vue 3 / Vuetify SPA).
 > Frontend "tests": `*.check.ts` run with `npx tsx` (no vitest). Verify with `npm run typecheck` + `npm run build`.
-> Base branch: `main` (create `feat/admin-esign-status-columns` off current main — the old esign branch is stale).
+> Base branch: `main` (create `feat/admin-esign-status-columns` off current main   the old esign branch is stale).
 
 ## Goal
 Make e-Sign progress visible and consistent in both admin tables: `admin/upload` (the `DocumentPipelineTable` queue) and `admin/laws` (`AdminLawListPage`) each gain a clear e-Sign status, законฃ status, publish status, a numeric `dd/mm/yyyy` (พ.ศ.) "แก้ไขล่าสุด" date, unchanged action buttons, and a matching e-Sign filter.
 
 ## Current context / findings
 - **`admin/upload`** renders `components/admin/DocumentPipelineTable.vue`. It already has columns: ลำดับ, เอกสาร, ประเภท (`lawType`), สถานะกฎหมาย (`lawStatus`), สถานะเผยแพร่ (`publishedDate`→เผยแพร่แล้ว/ยังไม่เผยแพร่), ขั้นตอน (`stage` via `PipelineStageChip`), อัปเดตล่าสุด (`updatedAt`), การดำเนินการ (actions). Filters: search + `filterType` + `filterStatus` (pipeline status).
-  - The **ขั้นตอน (stage)** column already shows `รอลงนาม` (stage `wait_esign`) and `เผยแพร่แล้ว` (stage `public`) — but there is **no dedicated e-Sign status** distinguishing ลงนามแล้ว / รอลงนาม / ยกเลิก / ถูกปฏิเสธ. Stage caps at `wait_esign` because `deriveStageFromWorkflow(6) → 'wait_esign'` and nothing advances it to `public` until `published_date`/status changes. So "ถ้าลงนามเรียบร้อยแล้วก็ควรแสดงสถานะ esign ได้อย่างถูกต้อง" = add an explicit e-Sign column driven by real esign fields.
+  - The **ขั้นตอน (stage)** column already shows `รอลงนาม` (stage `wait_esign`) and `เผยแพร่แล้ว` (stage `public`)   but there is **no dedicated e-Sign status** distinguishing ลงนามแล้ว / รอลงนาม / ยกเลิก / ถูกปฏิเสธ. Stage caps at `wait_esign` because `deriveStageFromWorkflow(6) → 'wait_esign'` and nothing advances it to `public` until `published_date`/status changes. So "ถ้าลงนามเรียบร้อยแล้วก็ควรแสดงสถานะ esign ได้อย่างถูกต้อง" = add an explicit e-Sign column driven by real esign fields.
   - Date shown via `formatThaiDate(doc.updated_at)` → "7 กันยายน 2569" (long Thai). User wants numeric `dd/mm/yyyy`.
 - **`admin/laws`** renders `pages/admin/AdminLawListPage.vue`. Columns: #, ชื่อกฎหมาย, ประเภท, สถานะ (`effectiveStatusLabel` = ร่าง or meta_status), แก้ไขล่าสุด (`formatThaiDate(doc.date)`), จัดการ (edit/eye/menu). Filters: search + `filterType` + `filterStatus` (workflowStage) + sort. Data source: `GET /api/reports/summary` → `ReportController::documents()`.
   - No publish/e-Sign columns; user wants ประเภทสถานะกฎหมาย + สถานะเผยแพร่ + สถานะ e-Sign shown clearly, old docs → `–` in e-Sign, numeric date, unchanged action buttons, + e-Sign filter.
@@ -23,7 +23,7 @@ Make e-Sign progress visible and consistent in both admin tables: `admin/upload`
   | `esign_submitted_at` set, code empty/other | รอลงนาม |
   | none of the above | ยังไม่ส่งลงนาม |
 - **Backend gap:** neither `ReviewStore::listDocuments()` (feeds pipeline table) nor `ReviewStore::listLawMeta()` (feeds ReportController) currently expose `esign_sign_status` / `esign_submitted_at`. Both must add these two fields. `ReportController::documents()` must pass them through.
-- **Date util:** `resources/js/utils/thaiDate.ts` has `formatThaiDate` (long) / `formatThaiDateShort` / `formatThaiDateTime` — none numeric. Add `formatThaiDateNumeric` (dd/mm/yyyy พ.ศ.).
+- **Date util:** `resources/js/utils/thaiDate.ts` has `formatThaiDate` (long) / `formatThaiDateShort` / `formatThaiDateTime`   none numeric. Add `formatThaiDateNumeric` (dd/mm/yyyy พ.ศ.).
 
 ### Decisions locked with the user
 1. Date = **dd/mm/yyyy พ.ศ.** (Buddhist year, +543), e.g. `07/09/2569`, on both tables' "แก้ไขล่าสุด".
@@ -40,7 +40,7 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
 
 ## Step-by-step tasks
 
-### Task 1 — Backend: expose esign fields in `listDocuments()`
+### Task 1   Backend: expose esign fields in `listDocuments()`
 **File:** `app/Services/ReviewStore.php`, inside `listDocuments()`'s `$documents[] = [ ... ]` array (currently ends ~line 188 with `workflow_updated_at`). Add two lines before the closing `];`:
 
 ```php
@@ -48,13 +48,13 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
                 'esign_sign_status' => isset($status['esign_sign_status']) ? (string) $status['esign_sign_status'] : null,
                 'esign_submitted_at' => $status['esign_submitted_at'] ?? null,
 ```
-(The first line already exists — match it and append the two new lines.)
+(The first line already exists   match it and append the two new lines.)
 
 **Verify:** `cd apps/app-laravel && ./vendor/bin/pint app/Services/ReviewStore.php --test` → PASS/no diff.
 
 ---
 
-### Task 2 — Backend: expose esign fields in `listLawMeta()`
+### Task 2   Backend: expose esign fields in `listLawMeta()`
 **File:** `app/Services/ReviewStore.php`, inside `listLawMeta()`'s `$rows[] = [ ... ]` (ends ~line 272 with `workflow_completed_step`). Append before the closing `];`:
 
 ```php
@@ -62,7 +62,7 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
                     'esign_sign_status' => isset($status['esign_sign_status']) ? (string) $status['esign_sign_status'] : null,
                     'esign_submitted_at' => $status['esign_submitted_at'] ?? null,
 ```
-(First line exists — match and append the two.)
+(First line exists   match and append the two.)
 
 > Note: `listLawMeta` is cached 180s via `Cache::remember('law-meta-list', ...)`. After deploy the column appears within 3 min or on cache flush; acceptable. Mention in verify to run `php artisan cache:clear` before manual check.
 
@@ -70,7 +70,7 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
 
 ---
 
-### Task 3 — Backend: pass esign fields through `ReportController::documents()`
+### Task 3   Backend: pass esign fields through `ReportController::documents()`
 **File:** `app/Http/Controllers/Api/ReportController.php`, in the `documents()` map (~line 179 ends with `workflow_completed_step`). Append:
 
 ```php
@@ -78,13 +78,13 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
             'esign_sign_status' => $r['esign_sign_status'] ?? null,
             'esign_submitted_at' => $r['esign_submitted_at'] ?? null,
 ```
-(First line exists — match and append the two.)
+(First line exists   match and append the two.)
 
-**Verify:** `docker compose exec -T laravel-app php artisan test --filter=ReportSummaryTest` → passes (no assertion on these new optional keys should break; if a strict-shape assertion fails, it is revealing an over-strict test — report it, do not weaken the feature).
+**Verify:** `docker compose exec -T laravel-app php artisan test --filter=ReportSummaryTest` → passes (no assertion on these new optional keys should break; if a strict-shape assertion fails, it is revealing an over-strict test   report it, do not weaken the feature).
 
 ---
 
-### Task 4 — Frontend types: add esign fields to the two list DTOs
+### Task 4   Frontend types: add esign fields to the two list DTOs
 **File:** `resources/js/types/document.ts`.
 
 4a. In `interface DocumentListItem` (ends ~line 264 with `source_file`), add:
@@ -107,10 +107,10 @@ Order: backend field exposure first (Tasks 1-3), shared util (Tasks 4-5), then e
 
 ---
 
-### Task 5 (TDD RED→GREEN) — Frontend: shared esign status label/color + numeric date
-5a. **RED check** — create `resources/js/utils/esignStatus.check.ts`:
+### Task 5 (TDD RED→GREEN)   Frontend: shared esign status label/color + numeric date
+5a. **RED check**   create `resources/js/utils/esignStatus.check.ts`:
 ```ts
-// dev-only assertion — no JS test runner in this app. Run:
+// dev-only assertion   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/utils/esignStatus.check.ts
 import { esignStatusLabel, esignStatusColor } from './esignStatus';
 
@@ -139,7 +139,7 @@ console.log('esignStatus.check.ts: all passed');
 ```
 Run it → **fails** (`esignStatusLabel` not exported yet).
 
-5b. **GREEN** — append to `resources/js/utils/esignStatus.ts`:
+5b. **GREEN**   append to `resources/js/utils/esignStatus.ts`:
 ```ts
 type EsignStatusInput = {
   document_type?: string | null;
@@ -171,7 +171,7 @@ export function esignStatusColor(row: EsignStatusInput | null | undefined): stri
 ```
 Run the check → `esignStatus.check.ts: all passed`.
 
-5c. **Numeric date** — append to `resources/js/utils/thaiDate.ts`:
+5c. **Numeric date**   append to `resources/js/utils/thaiDate.ts`:
 ```ts
 export function formatThaiDateNumeric(value: DateInput): string {
   const date = toDate(value);
@@ -188,10 +188,10 @@ export function formatThaiDateNumeric(value: DateInput): string {
 
 ---
 
-### Task 6 — `DocumentPipelineTable.vue`: add e-Sign column + data
+### Task 6   `DocumentPipelineTable.vue`: add e-Sign column + data
 **File:** `components/admin/DocumentPipelineTable.vue`.
 
-6a. Import helpers — update the imports block (~line 154):
+6a. Import helpers   update the imports block (~line 154):
 ```ts
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
 import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
@@ -201,8 +201,8 @@ import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
 6b. Change `formatDate` (~line 321) to numeric:
 ```ts
 function formatDate(iso?: string | null): string {
-  if (!iso) return '—';
-  return formatThaiDateNumeric(iso) || '—';
+  if (!iso) return ' ';
+  return formatThaiDateNumeric(iso) || ' ';
 }
 ```
 
@@ -242,7 +242,7 @@ function formatDate(iso?: string | null): string {
 
 ---
 
-### Task 7 — `DocumentPipelineTable.vue`: add e-Sign filter
+### Task 7   `DocumentPipelineTable.vue`: add e-Sign filter
 **File:** same. Keep existing search + type + status filters; add a 4th select.
 
 7a. Add reactive state near `filterStatus` (~line 183):
@@ -306,7 +306,7 @@ const filteredDocs = computed(() => {
 
 ---
 
-### Task 8 — `AdminLawListPage.vue`: add publish + e-Sign columns, numeric date
+### Task 8   `AdminLawListPage.vue`: add publish + e-Sign columns, numeric date
 **File:** `pages/admin/AdminLawListPage.vue`.
 
 8a. Update imports (~line 219):
@@ -314,7 +314,7 @@ const filteredDocs = computed(() => {
 import { formatThaiDateNumeric } from '../../utils/thaiDate';
 import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
 ```
-(Replace the `import { formatThaiDate } ...` line. If `formatThaiDate` is still referenced elsewhere in the file, keep both — grep first: `search_files "formatThaiDate\b" AdminLawListPage.vue`. Currently the only use is line 363.)
+(Replace the `import { formatThaiDate } ...` line. If `formatThaiDate` is still referenced elsewhere in the file, keep both   grep first: `search_files "formatThaiDate\b" AdminLawListPage.vue`. Currently the only use is line 363.)
 
 8b. Extend `interface LawRow` (~line 330) with:
 ```ts
@@ -358,13 +358,13 @@ import { esignStatusLabel, esignStatusColor } from '../../utils/esignStatus';
               </v-chip>
             </td>
 ```
-(The empty-colspan row at line 108 `colspan="6"` must become `colspan="8"` — two columns added.)
+(The empty-colspan row at line 108 `colspan="6"` must become `colspan="8"`   two columns added.)
 
 **Verify:** `npm run typecheck` passes.
 
 ---
 
-### Task 9 — `AdminLawListPage.vue`: add e-Sign filter
+### Task 9   `AdminLawListPage.vue`: add e-Sign filter
 **File:** same.
 
 9a. Add reactive state near `filterStatus` (~line 238):
@@ -400,14 +400,14 @@ function esignBucketOf(law: LawRow): string {
 >     })(),
 > ```
 
-9c. Add reset-to-page-1 on change — extend the `watch` (~line 259):
+9c. Add reset-to-page-1 on change   extend the `watch` (~line 259):
 ```ts
 watch([search, filterType, filterStatus, filterEsign, sortOrder], () => {
   page.value = 1;
 });
 ```
 
-9d. Extend `filteredLaws` (~line 400) — add after the `filterStatus` filter line:
+9d. Extend `filteredLaws` (~line 400)   add after the `filterStatus` filter line:
 ```ts
   if (filterEsign.value) result = result.filter((l) => l.esignBucket === filterEsign.value);
 ```
@@ -432,7 +432,7 @@ watch([search, filterType, filterStatus, filterEsign, sortOrder], () => {
 
 ---
 
-### Task 10 — Verify + smoke
+### Task 10   Verify + smoke
 ```bash
 cd apps/app-laravel
 npx tsx resources/js/utils/esignStatus.check.ts     # esignStatus.check.ts: all passed
@@ -442,8 +442,8 @@ docker compose exec -T laravel-app php artisan cache:clear   # flush law-meta-li
 docker compose exec -T laravel-app php artisan test --filter=ReportSummaryTest   # passes
 ```
 **Manual (dev):**
-1. `/admin/upload` — queue table shows a new **e-Sign** column: new doc waiting = "รอลงนาม" (admin-primary), signed = "ลงนามแล้ว" (green), old doc = "–". Date column is `dd/mm/yyyy` พ.ศ. e-Sign filter narrows rows.
-2. `/admin/laws` — table shows สถานะกฎหมาย + เผยแพร่ + e-Sign columns, old docs "–" in e-Sign, numeric date, edit/eye/menu actions unchanged, "สถานะ e-Sign" filter works.
+1. `/admin/upload`   queue table shows a new **e-Sign** column: new doc waiting = "รอลงนาม" (admin-primary), signed = "ลงนามแล้ว" (green), old doc = "–". Date column is `dd/mm/yyyy` พ.ศ. e-Sign filter narrows rows.
+2. `/admin/laws`   table shows สถานะกฎหมาย + เผยแพร่ + e-Sign columns, old docs "–" in e-Sign, numeric date, edit/eye/menu actions unchanged, "สถานะ e-Sign" filter works.
 
 Commit each logical group (backend / util / pipeline table / laws page) with descriptive messages. Do NOT push. No AI/co-author attribution.
 
@@ -457,8 +457,8 @@ Commit each logical group (backend / util / pipeline table / laws page) with des
 | Backend report | `php artisan test --filter=ReportSummaryTest` | passes |
 
 ## Risks, tradeoffs, open questions
-- **`listLawMeta` 180s cache:** admin/laws e-Sign column may lag up to 3 min after a sign event until cache expiry. Acceptable; `cache:clear` forces immediate. If unacceptable, a follow-up can drop the cache TTL — out of scope.
-- **Column width on narrow screens:** admin/laws goes 6→8 columns; on <1200px it may need horizontal scroll. `v-table` scrolls by default; if it looks cramped, wrap in `.v-table--fixed` or reduce padding — flag visually, do not block.
-- **e-Sign vs ขั้นตอน overlap (pipeline table):** the existing ขั้นตอน column already says "รอลงนาม" for `wait_esign`. The new e-Sign column is more precise (adds ลงนามแล้ว/ยกเลิก/ถูกปฏิเสธ). Keeping both is intentional per the request ("แสดงสถานะ esign ได้อย่างถูกต้อง"); they answer different questions (workflow position vs signature outcome). If the user later finds it redundant, the ขั้นตอน column can cap at `wait_esign` and defer signature detail to e-Sign — not now.
-- **`admin/laws` only lists info-completed docs** (`workflow_completed_step >= 4`). Docs still in early pipeline never appear here — correct, unchanged; e-Sign column is only meaningful for docs that reached the sign step anyway.
+- **`listLawMeta` 180s cache:** admin/laws e-Sign column may lag up to 3 min after a sign event until cache expiry. Acceptable; `cache:clear` forces immediate. If unacceptable, a follow-up can drop the cache TTL   out of scope.
+- **Column width on narrow screens:** admin/laws goes 6→8 columns; on <1200px it may need horizontal scroll. `v-table` scrolls by default; if it looks cramped, wrap in `.v-table--fixed` or reduce padding   flag visually, do not block.
+- **e-Sign vs ขั้นตอน overlap (pipeline table):** the existing ขั้นตอน column already says "รอลงนาม" for `wait_esign`. The new e-Sign column is more precise (adds ลงนามแล้ว/ยกเลิก/ถูกปฏิเสธ). Keeping both is intentional per the request ("แสดงสถานะ esign ได้อย่างถูกต้อง"); they answer different questions (workflow position vs signature outcome). If the user later finds it redundant, the ขั้นตอน column can cap at `wait_esign` and defer signature detail to e-Sign   not now.
+- **`admin/laws` only lists info-completed docs** (`workflow_completed_step >= 4`). Docs still in early pipeline never appear here   correct, unchanged; e-Sign column is only meaningful for docs that reached the sign step anyway.
 - **`old` doc with a stray `esign_*` field:** guard returns `–` first on `document_type === 'old'`, so no leakage. Confirmed in check test.

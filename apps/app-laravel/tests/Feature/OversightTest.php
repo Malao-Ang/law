@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Mail\OversightReminderMail;
+use App\Services\Auth\CurrentUser;
+use App\Services\Auth\MongoUserStore;
 use App\Services\ReviewStore;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
@@ -11,117 +13,112 @@ use Tests\TestCase;
 
 class OversightTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        app(MongoUserStore::class)->upsertFromLogin('ov_admin', ['name' => 'ผู้ทดสอบกำกับดูแล'], null, true);
+        $this->withHeaders(['Referer' => 'http://localhost:8500/admin', 'Accept' => 'application/json'])
+            ->withSession([
+                CurrentUser::SESSION_KEY => 'ov_admin',
+                CurrentUser::ACTING_MODE_KEY => 'super_admin',
+                CurrentUser::LOGIN_AT_KEY => time(),
+            ]);
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();
         parent::tearDown();
     }
 
-    public function test_summary_counts_overdue_compliance_and_next_month(): void
+    public function test_summary_shows_due_date_from_proclamation_relation(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');
 
         $overdue = 'ov_late_'.uniqid();
-        $onTime = 'ov_ok_'.uniqid();
-        $late = 'ov_miss_'.uniqid();
-        $nextPublish = 'ov_next_'.uniqid();
-        $nextStep = 'ov_step_'.uniqid();
-        $cancelled = 'ov_cancel_'.uniqid();
+        $next = 'ov_next_'.uniqid();
         $later = 'ov_later_'.uniqid();
         $plain = 'ov_plain_'.uniqid();
+        $cancelled = 'ov_cancel_'.uniqid();
 
         $this->seedDocument($overdue, 'เกินกำหนดออกประกาศ');
-        $this->seedDocument($onTime, 'ประกาศตรงเวลา');
-        $this->seedDocument($late, 'ประกาศช้า');
-        $this->seedDocument($nextPublish, 'ถึงรอบเดือนหน้า');
-        $this->seedDocument($nextStep, 'ขั้นตอนเดือนหน้า');
-        $this->seedDocument($cancelled, 'ยกเลิกแล้ว');
+        $this->seedDocument($next, 'ถึงรอบเดือนหน้า');
         $this->seedDocument($later, 'ยังไม่ถึงเดือนหน้า');
         $this->seedDocument($plain, 'ยังไม่ติดตาม');
+        $this->seedDocument($cancelled, 'ยกเลิกแล้ว');
 
-        $this->track($overdue, 'อยู่ระหว่างการยกร่าง', '2026-10-01');
-        $this->track($onTime, 'ประกาศแล้ว', '2026-10-15', [
-            'published' => ['completed_on' => '2026-10-01'],
-        ]);
-        $this->track($late, 'ประกาศแล้ว', '2026-10-01', [
-            'published' => ['completed_on' => '2026-10-20'],
-        ]);
-        $this->track($nextPublish, 'เสนอเพื่อพิจารณา', '2026-11-15');
-        $this->track($nextStep, 'อยู่ระหว่างการยกร่าง', '2026-12-01', [
-            'drafting' => ['due_date' => '2026-11-10'],
-        ]);
-        $this->track($cancelled, 'ยกเลิก', '2026-09-01');
-        $this->track($later, 'อนุมัติแล้ว/รอประกาศ', '2026-12-01');
+        $this->setProclamation($overdue, '2026-10-01');
+        $this->setProclamation($next, '2026-11-15');
+        $this->setProclamation($later, '2026-12-01');
+        $this->setProclamation($cancelled, '2026-09-01');
+        $this->track($overdue);
+        $this->track($next);
+        $this->track($later);
+        $this->seedLegacyStatus($cancelled, 'ยกเลิก');
 
         $res = $this->getJson('/api/oversight/summary');
         $res->assertOk();
-        $res->assertJsonPath('totals.tracked', 7);
+        $res->assertJsonPath('totals.tracked', 4);
         $res->assertJsonPath('totals.overdue_publication', 1);
-        $res->assertJsonPath('totals.on_time', 1);
-        $res->assertJsonPath('totals.late', 1);
         $res->assertJsonPath('next_month_label', 'พฤศจิกายน 2569');
-        $this->assertEquals(50, $res->json('totals.compliance_rate'));
 
         $nextIds = collect($res->json('next_month'))->pluck('document_id')->all();
-        $this->assertEqualsCanonicalizing([$nextPublish, $nextStep], $nextIds);
+        $this->assertEqualsCanonicalizing([$next], $nextIds);
 
-        $stepRow = collect($res->json('next_month'))->firstWhere('document_id', $nextStep);
-        $this->assertSame('อยู่ระหว่างการยกร่าง', $stepRow['next_action_label']);
-        $this->assertSame('2026-11-10', $stepRow['next_action_date']);
+        $overdueRow = collect($res->json('items'))->firstWhere('document_id', $overdue);
+        $this->assertTrue($overdueRow['overdue']);
+        $this->assertSame('2026-10-01', $overdueRow['due_date']);
+        $this->assertSame('ต้องออกประกาศภายใน', $overdueRow['due_label']);
+        $this->assertNotEmpty($overdueRow['due_dates']);
 
-        $byStatus = collect($res->json('by_status'))->keyBy('key');
-        $this->assertSame(2, $byStatus['drafting']['count']);
-        $this->assertSame(1, $byStatus['submitted']['count']);
-        $this->assertSame(1, $byStatus['approved']['count']);
-        $this->assertSame(2, $byStatus['published']['count']);
-        $this->assertSame(1, $byStatus['cancelled']['count']);
+        $nextRow = collect($res->json('next_month'))->firstWhere('document_id', $next);
+        $this->assertSame('2026-11-15', $nextRow['next_action_date']);
+        $this->assertStringContainsString('ออกประกาศฉบับใหม่', (string) $nextRow['next_action_label']);
+
+        $cancelledRow = collect($res->json('items'))->firstWhere('document_id', $cancelled);
+        $this->assertTrue($cancelledRow['closed']);
+        $this->assertFalse($cancelledRow['overdue']);
 
         $plainRow = collect($res->json('items'))->firstWhere('document_id', $plain);
         $this->assertFalse($plainRow['tracked']);
+        $this->assertNull($plainRow['due_date']);
         $this->assertFalse($plainRow['overdue']);
     }
 
-    public function test_update_stores_status_completion_and_both_contacts(): void
+    public function test_update_stores_contacts_without_status_or_steps(): void
     {
         $id = 'ov_edit_'.uniqid();
-        $this->seedDocument($id, 'ฉบับแก้ไขสถานะ');
+        $this->seedDocument($id, 'ฉบับแก้ไขผู้รับ');
+        $this->seedLegacyStatus($id, 'อยู่ระหว่างการยกร่าง', '2026-12-31', [
+            'drafting' => ['due_date' => '2026-11-01', 'completed_on' => '2026-10-28'],
+        ]);
 
         $res = $this->putJson("/api/oversight/{$id}", [
-            'status' => 'เสนอเพื่อพิจารณา',
-            'publish_due_date' => '2026-12-31',
-            'steps' => $this->steps([
-                'drafting' => ['due_date' => '2026-11-01', 'completed_on' => '2026-10-28'],
-            ]),
             'primary' => ['name' => 'สมชาย ใจดี', 'email' => 'Owner@Example.com'],
             'backup' => ['name' => 'สุดา แสงทอง', 'email' => 'backup@example.com'],
         ]);
 
         $res->assertOk();
-        $res->assertJsonPath('status', 'เสนอเพื่อพิจารณา');
-        $res->assertJsonPath('publish_due_date', '2026-12-31');
         $res->assertJsonPath('primary.email', 'owner@example.com');
         $res->assertJsonPath('backup.name', 'สุดา แสงทอง');
+        $res->assertJsonPath('status', 'อยู่ระหว่างการยกร่าง');
+        $res->assertJsonPath('publish_due_date', '2026-12-31');
         $res->assertJsonPath('steps.0.completed_on', '2026-10-28');
         $res->assertJsonPath('steps.0.due_date', '2026-11-01');
     }
 
-    public function test_update_rejects_unknown_status_and_missing_document(): void
+    public function test_update_rejects_invalid_email_and_missing_document(): void
     {
         $id = 'ov_bad_'.uniqid();
         $this->seedDocument($id);
 
         $this->putJson("/api/oversight/{$id}", [
-            'status' => 'ไม่มีสถานะนี้',
-            'publish_due_date' => null,
-            'steps' => $this->steps(),
             'primary' => ['name' => '', 'email' => 'not-an-email'],
             'backup' => ['name' => '', 'email' => null],
         ])->assertStatus(422);
 
         $this->putJson('/api/oversight/missing_'.uniqid(), [
-            'status' => 'อยู่ระหว่างการยกร่าง',
-            'publish_due_date' => null,
-            'steps' => $this->steps(),
             'primary' => ['name' => '', 'email' => null],
             'backup' => ['name' => '', 'email' => null],
         ])->assertNotFound();
@@ -136,18 +133,16 @@ class OversightTest extends TestCase
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays($days)->toDateString();
         $id = 'ov_mail_'.$days.'_'.uniqid();
         $this->seedDocument($id, 'ฉบับแจ้งเตือน');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due, [], [
-            'primary' => ['name' => 'สมชาย', 'email' => 'owner@example.com'],
-            'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
-        ]);
+        $this->track($id);
+        $this->setProclamation($id, $due);
 
         $this->artisan('oversight:send-reminders')->assertSuccessful();
         Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail) use ($days): bool {
             return $mail->hasTo('owner@example.com')
                 && $mail->hasTo('backup@example.com')
                 && $mail->hits[0]['days_left'] === $days
-                && str_contains($mail->envelope()->subject, 'เหลือ '.$days.' วัน')
-                && str_contains($mail->bodyHtml, 'ใกล้ถึงกำหนดดำเนินการ')
+                && str_contains($mail->envelope()->subject, 'ต้องออกประกาศตามกฎหมาย')
+                && str_contains($mail->bodyHtml, 'ใกล้ถึงกำหนดต้องออกประกาศฉบับใหม่')
                 && str_contains($mail->bodyHtml, 'ระบบติดตามการกำกับดูแล');
         });
 
@@ -155,7 +150,7 @@ class OversightTest extends TestCase
         Mail::assertSent(OversightReminderMail::class, 1);
     }
 
-    public function test_status_update_does_not_resend_the_same_reminder(): void
+    public function test_contact_update_does_not_resend_the_same_reminder(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');
         Mail::fake();
@@ -163,42 +158,45 @@ class OversightTest extends TestCase
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
         $id = 'ov_keep_'.uniqid();
         $this->seedDocument($id);
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due);
+        $this->track($id);
+        $this->setProclamation($id, $due);
 
         $this->artisan('oversight:send-reminders')->assertSuccessful();
-        $this->track($id, 'เสนอเพื่อพิจารณา', $due);
+        $this->track($id, [
+            'primary' => ['name' => 'สมชายใหม่', 'email' => 'owner@example.com'],
+            'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
+        ]);
         $this->artisan('oversight:send-reminders')->assertSuccessful();
 
         Mail::assertSent(OversightReminderMail::class, 1);
     }
 
-    public function test_reminder_uses_open_step_deadline_and_skips_closed_or_empty_contacts(): void
+    public function test_reminder_uses_proclamation_deadline_and_skips_closed_or_empty_contacts(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');
         Mail::fake();
-        $stepDue = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
+        $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
 
-        $stepId = 'ov_step_mail_'.uniqid();
-        $this->seedDocument($stepId, 'เตือนตามขั้นตอน');
-        $this->track($stepId, 'อยู่ระหว่างการยกร่าง', '2027-06-01', [
-            'drafting' => ['due_date' => $stepDue],
-        ], [
+        $openId = 'ov_open_mail_'.uniqid();
+        $this->seedDocument($openId, 'เตือนตามประกาศ');
+        $this->track($openId, [
             'primary' => ['name' => '', 'email' => null],
             'backup' => ['name' => 'ผู้ประสาน', 'email' => 'backup-only@example.com'],
         ]);
+        $this->setProclamation($openId, $due);
 
         $closedId = 'ov_closed_mail_'.uniqid();
         $this->seedDocument($closedId);
-        $this->track($closedId, 'ประกาศแล้ว', $stepDue, [
-            'published' => ['completed_on' => '2026-10-01'],
-        ]);
+        $this->seedLegacyStatus($closedId, 'ประกาศแล้ว', $due);
+        $this->setProclamation($closedId, $due);
 
         $silentId = 'ov_silent_'.uniqid();
         $this->seedDocument($silentId);
-        $this->track($silentId, 'อยู่ระหว่างการยกร่าง', $stepDue, [], [
+        $this->track($silentId, [
             'primary' => ['name' => '', 'email' => null],
             'backup' => ['name' => '', 'email' => null],
         ]);
+        $this->setProclamation($silentId, $due);
 
         $this->artisan('oversight:send-reminders --dry-run')->assertSuccessful();
         Mail::assertNothingSent();
@@ -206,7 +204,7 @@ class OversightTest extends TestCase
         $this->artisan('oversight:send-reminders')->assertSuccessful();
         Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
             return $mail->hasTo('backup-only@example.com')
-                && $mail->lawTitle === 'เตือนตามขั้นตอน'
+                && $mail->lawTitle === 'เตือนตามประกาศ'
                 && count($mail->hits) === 1
                 && $mail->hits[0]['days_left'] === 7;
         });
@@ -221,7 +219,8 @@ class OversightTest extends TestCase
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
         $id = 'ov_ui_mail_'.uniqid();
         $this->seedDocument($id, 'ฉบับจากหน้าแอดมิน');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due);
+        $this->track($id);
+        $this->setProclamation($id, $due);
 
         $this->getJson('/api/oversight/mail')
             ->assertOk()
@@ -230,7 +229,7 @@ class OversightTest extends TestCase
             ->assertJsonPath('pending_count', 1)
             ->assertJsonPath('items.0.due_now', true)
             ->assertJsonPath('items.0.document_id', $id)
-            ->assertJsonPath('items.0.channel', 'deadline');
+            ->assertJsonPath('items.0.channel', 'proclamation');
 
         $this->putJson('/api/oversight/mail', [
             'deadline' => [
@@ -252,11 +251,11 @@ class OversightTest extends TestCase
                 'link_label' => 'เปิดระบบ',
             ],
             'proclamation' => [
-                'subject' => 'ออกประกาศ {title}',
-                'body' => '{title}\n{deadlines}\n{link}',
+                'subject' => 'ออกประกาศเอง {title}',
+                'body' => "<script>alert(1)</script>\n\n{title}\n\n{deadlines}\n\nดูที่ {link}",
                 'link_label' => 'เปิดระบบ',
             ],
-        ])->assertOk()->assertJsonPath('templates.deadline.subject', 'เตือนเอง {title}');
+        ])->assertOk()->assertJsonPath('templates.proclamation.subject', 'ออกประกาศเอง {title}');
 
         $this->postJson('/api/oversight/mail/send')
             ->assertOk()
@@ -264,7 +263,7 @@ class OversightTest extends TestCase
 
         Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
             return $mail->hasTo('owner@example.com')
-                && $mail->envelope()->subject === 'เตือนเอง ฉบับจากหน้าแอดมิน'
+                && $mail->envelope()->subject === 'ออกประกาศเอง ฉบับจากหน้าแอดมิน'
                 && str_contains($mail->bodyHtml, '&lt;script&gt;alert(1)&lt;/script&gt;')
                 && ! str_contains($mail->bodyHtml, '<script>')
                 && str_contains($mail->bodyHtml, 'เปิดระบบ');
@@ -290,8 +289,10 @@ class OversightTest extends TestCase
         $oldId = 'ov_days_old_'.uniqid();
         $this->seedDocument($customId, 'ฉบับรอบใหม่');
         $this->seedDocument($oldId, 'ฉบับรอบเดิม');
-        $this->track($customId, 'อยู่ระหว่างการยกร่าง', $customDue);
-        $this->track($oldId, 'อยู่ระหว่างการยกร่าง', $oldOffset);
+        $this->track($customId);
+        $this->track($oldId);
+        $this->setProclamation($customId, $customDue);
+        $this->setProclamation($oldId, $oldOffset);
 
         $this->putJson('/api/oversight/mail', [
             'deadline' => [
@@ -341,7 +342,7 @@ class OversightTest extends TestCase
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
         $id = 'ov_proclaim_'.uniqid();
         $this->seedDocument($id, 'ฉบับที่ต้องออกประกาศใหม่');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->track($id);
         $this->putJson("/api/documents/{$id}/document-review", [
             'relations' => [[
                 'id' => 'r-new',
@@ -366,58 +367,27 @@ class OversightTest extends TestCase
         Mail::assertSent(OversightReminderMail::class, 1);
     }
 
-    public function test_deadline_and_proclamation_use_separate_templates(): void
+    public function test_publish_due_and_steps_no_longer_trigger_deadline_mail(): void
     {
         Carbon::setTestNow('2026-10-23 02:00:00');
         Mail::fake();
 
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(14)->toDateString();
-        $id = 'ov_split_'.uniqid();
-        $this->seedDocument($id, 'ฉบับแยกเทมเพลต');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', $due);
-        $this->putJson("/api/documents/{$id}/document-review", [
-            'relations' => [[
-                'id' => 'r-split',
-                'scope' => 'document',
-                'type' => 'amends',
-                'target_title' => 'กฎหมายต้นทาง',
-                'requires_new_proclamation' => true,
-                'proclamation_due_date' => $due,
-            ]],
-        ])->assertOk();
-
-        $this->putJson('/api/oversight/mail', [
-            'deadline' => [
-                'subject' => 'เทมเพลตกำหนด {title}',
-                'body' => "กำหนด\n{deadlines}",
-                'link_label' => 'ลิงก์กำหนด',
-            ],
-            'proclamation' => [
-                'subject' => 'เทมเพลตประกาศ {title}',
-                'body' => "ประกาศใหม่\n{deadlines}",
-                'link_label' => 'ลิงก์ประกาศ',
-            ],
-            'reminder_days' => [14],
-        ])->assertOk();
+        $id = 'ov_no_manual_'.uniqid();
+        $this->seedDocument($id, 'ฉบับไม่มีประกาศจากความสัมพันธ์');
+        $this->seedLegacyStatus($id, 'อยู่ระหว่างการยกร่าง', $due, [
+            'drafting' => ['due_date' => $due],
+        ], [
+            'primary' => ['name' => 'สมชาย', 'email' => 'owner@example.com'],
+            'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
+        ]);
 
         $this->getJson('/api/oversight/mail')
             ->assertOk()
-            ->assertJsonPath('pending_count', 2);
+            ->assertJsonPath('pending_count', 0);
 
         $this->artisan('oversight:send-reminders')->assertSuccessful();
-        Mail::assertSent(OversightReminderMail::class, 2);
-        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
-            return $mail->envelope()->subject === 'เทมเพลตกำหนด ฉบับแยกเทมเพลต'
-                && str_contains($mail->bodyHtml, 'กำหนด')
-                && str_contains($mail->bodyHtml, 'กำหนดเวลาออกประกาศ')
-                && str_contains($mail->bodyHtml, 'ลิงก์กำหนด');
-        });
-        Mail::assertSent(OversightReminderMail::class, function (OversightReminderMail $mail): bool {
-            return $mail->envelope()->subject === 'เทมเพลตประกาศ ฉบับแยกเทมเพลต'
-                && str_contains($mail->bodyHtml, 'ประกาศใหม่')
-                && str_contains($mail->bodyHtml, 'ออกประกาศฉบับใหม่ทั้งฉบับ: กฎหมายต้นทาง')
-                && str_contains($mail->bodyHtml, 'ลิงก์ประกาศ');
-        });
+        Mail::assertNothingSent();
     }
 
     public function test_proclamation_reminder_stops_when_the_new_law_is_in_force(): void
@@ -430,8 +400,8 @@ class OversightTest extends TestCase
         $partial = 'ov_part_'.uniqid();
         $this->seedDocument($whole, 'ต้องออกทั้งฉบับ');
         $this->seedDocument($partial, 'ต้องออกบางข้อ');
-        $this->track($whole, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
-        $this->track($partial, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->track($whole);
+        $this->track($partial);
 
         $this->putJson("/api/documents/{$whole}/document-review", [
             'relations' => [[
@@ -492,7 +462,7 @@ class OversightTest extends TestCase
         $due = Carbon::now('Asia/Bangkok')->startOfDay()->addDays(7)->toDateString();
         $id = 'ov_cover_'.uniqid();
         $this->seedDocument($id, 'รอครบทุกข้อ');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2027-06-01');
+        $this->track($id);
         $this->putJson("/api/documents/{$id}/document-review", [
             'relations' => [[
                 'id' => 'r-sections',
@@ -529,7 +499,8 @@ class OversightTest extends TestCase
 
         $id = 'ov_early_'.uniqid();
         $this->seedDocument($id, 'ฉบับส่งก่อนถึงรอบ');
-        $this->track($id, 'อยู่ระหว่างการยกร่าง', '2026-12-20');
+        $this->track($id);
+        $this->setProclamation($id, '2026-12-20');
 
         $this->postJson('/api/oversight/mail/send', ['document_id' => $id])
             ->assertOk()
@@ -543,7 +514,11 @@ class OversightTest extends TestCase
 
         $closed = 'ov_closed_send_'.uniqid();
         $this->seedDocument($closed);
-        $this->track($closed, 'ยกเลิก', '2026-12-20');
+        $this->seedLegacyStatus($closed, 'ยกเลิก', '2026-12-20', [], [
+            'primary' => ['name' => 'สมชาย', 'email' => 'owner@example.com'],
+            'backup' => ['name' => 'สุดา', 'email' => 'backup@example.com'],
+        ]);
+        $this->setProclamation($closed, '2026-12-20');
         $this->postJson('/api/oversight/mail/send', ['document_id' => $closed])->assertStatus(422);
         $this->postJson('/api/oversight/mail/send', ['document_id' => 'missing_'.uniqid()])->assertNotFound();
     }
@@ -574,40 +549,59 @@ class OversightTest extends TestCase
     }
 
     /**
-     * @param  array<string, array{due_date?: string|null, completed_on?: string|null}>  $stepDates
      * @param  array<string, array{name?: string, email?: string|null}>  $contacts
      */
-    private function track(
-        string $id,
-        string $status,
-        ?string $publishDue,
-        array $stepDates = [],
-        array $contacts = [],
-    ): void {
+    private function track(string $id, array $contacts = []): void
+    {
         $this->putJson("/api/oversight/{$id}", [
-            'status' => $status,
-            'publish_due_date' => $publishDue,
-            'steps' => $this->steps($stepDates),
             'primary' => $contacts['primary'] ?? ['name' => 'สมชาย', 'email' => 'owner@example.com'],
             'backup' => $contacts['backup'] ?? ['name' => 'สุดา', 'email' => 'backup@example.com'],
         ])->assertOk();
     }
 
-    /**
-     * @param  array<string, array{due_date?: string|null, completed_on?: string|null}>  $dates
-     * @return array<int, array{key: string, due_date: string|null, completed_on: string|null}>
-     */
-    private function steps(array $dates = []): array
+    private function setProclamation(string $id, string $due, string $targetTitle = 'ประกาศที่ถูกเชื่อม'): void
     {
+        $this->putJson("/api/documents/{$id}/document-review", [
+            'relations' => [[
+                'id' => 'r-'.$id,
+                'scope' => 'document',
+                'type' => 'amends',
+                'target_title' => $targetTitle,
+                'requires_new_proclamation' => true,
+                'proclamation_due_date' => $due,
+            ]],
+        ])->assertOk();
+    }
+
+    /**
+     * @param  array<string, array{due_date?: string|null, completed_on?: string|null}>  $stepDates
+     * @param  array<string, array{name?: string, email?: string|null}>  $contacts
+     */
+    private function seedLegacyStatus(
+        string $id,
+        string $status,
+        ?string $publishDue = null,
+        array $stepDates = [],
+        array $contacts = [],
+    ): void {
+        $store = app(ReviewStore::class);
+        $doc = $store->getReviewDocument($id);
         $steps = [];
         foreach (['drafting', 'submitted', 'approved', 'published', 'cancelled'] as $key) {
             $steps[] = [
                 'key' => $key,
-                'due_date' => $dates[$key]['due_date'] ?? null,
-                'completed_on' => $dates[$key]['completed_on'] ?? null,
+                'due_date' => $stepDates[$key]['due_date'] ?? null,
+                'completed_on' => $stepDates[$key]['completed_on'] ?? null,
             ];
         }
-
-        return $steps;
+        $doc['oversight'] = [
+            'status' => $status,
+            'publish_due_date' => $publishDue,
+            'steps' => $steps,
+            'primary' => $contacts['primary'] ?? ['name' => 'สมชาย', 'email' => 'owner@example.com'],
+            'backup' => $contacts['backup'] ?? ['name' => 'สุดา', 'email' => 'backup@example.com'],
+            'reminders_sent' => [],
+        ];
+        $store->writeReviewDocument($id, $doc);
     }
 }

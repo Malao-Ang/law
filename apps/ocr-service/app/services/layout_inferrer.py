@@ -1,6 +1,6 @@
 """Document-wide indent-level inference.
 
-The extractors emit per-block geometry — for PDFs that's ``bbox`` on every
+The extractors emit per-block geometry   for PDFs that's ``bbox`` on every
 block, for DOCX it's ``meta.layout.indent_left`` in twips.  Translating those
 raw measurements into a small, discrete set of "indent levels" (0..N) is what
 makes the review UI and the exported HTML clean: every block at the same
@@ -64,7 +64,7 @@ def infer_indent_levels(pages: list[dict]) -> None:
     step_pt = float(settings.indent_cluster_step)
     margin_pt = float(settings.page_margin_x)
 
-    # Pass 1 — collect.
+    # Pass 1   collect.
     block_xs: list[tuple[dict, float]] = []
     for page in pages:
         for block in page.get("blocks", []) or []:
@@ -76,14 +76,14 @@ def infer_indent_levels(pages: list[dict]) -> None:
     if not block_xs:
         return
 
-    # Pass 2 — cluster the union of all x-positions across the document.
+    # Pass 2   cluster the union of all x-positions across the document.
     clusters = cluster_x_positions(
         x_positions=[x for _, x in block_xs],
         step=step_pt,
         margin_x=margin_pt,
     )
 
-    # Pass 3 — annotate.
+    # Pass 3   annotate.
     for block, x in block_xs:
         level = detect_indent_level(x, clusters)
         layout = block.setdefault("meta", {}).setdefault("layout", {})

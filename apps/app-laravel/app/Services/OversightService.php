@@ -59,7 +59,7 @@ final class OversightService
             'statuses' => $this->statusOptions(),
             'totals' => [
                 'tracked' => count($tracked),
-                'overdue_publication' => count(array_filter($tracked, static fn (array $row): bool => $row['overdue'])),
+                'overdue_publication' => count(array_filter($records, static fn (array $row): bool => $row['overdue'])),
                 'on_time' => $onTime,
                 'late' => $late,
                 'compliance_rate' => $closedWithDeadline === 0 ? null : round($onTime / $closedWithDeadline * 100, 1),
@@ -162,7 +162,7 @@ final class OversightService
         $channel = $this->normalizeChannel($channel);
         if ($channel === self::CHANNEL_PROCLAMATION) {
             return [
-                'subject' => $this->configMail('mail_proclamation_subject', 'แจ้งเตือนต้องออกประกาศตามกฎหมาย — เหลือ {days} วัน'),
+                'subject' => $this->configMail('mail_proclamation_subject', 'แจ้งเตือนต้องออกประกาศตามกฎหมาย   เหลือ {days} วัน'),
                 'body' => $this->configMail(
                     'mail_proclamation_body',
                     "เรียนผู้รับผิดชอบ\n\nกฎหมาย {title} ใกล้ถึงกำหนดต้องออกประกาศฉบับใหม่\n\n{deadlines}\n\nกรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}",
@@ -174,7 +174,7 @@ final class OversightService
         }
 
         return [
-            'subject' => $this->configMail('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย — เหลือ {days} วัน'),
+            'subject' => $this->configMail('mail_subject', 'แจ้งเตือนกำหนดดำเนินการกฎหมาย   เหลือ {days} วัน'),
             'body' => $this->configMail(
                 'mail_body',
                 "เรียนผู้รับผิดชอบ\n\nกฎหมาย {title} ใกล้ถึงกำหนดดำเนินการ\n\n{deadlines}\n\nกรุณาเข้าตรวจสอบสถานะและวันแล้วเสร็จได้ที่ {link}",
@@ -414,19 +414,22 @@ final class OversightService
         }
 
         $publishDue = $tracked ? $this->dateOrNull($stored['publish_due_date'] ?? null) : null;
-        $daysLeft = $publishDue === null ? null : $this->daysUntil($publishDue);
+        $proclamationDeadlines = $this->proclamationDeadlines($documentId, $review);
+        $dueDates = $this->summarizeDueDates($proclamationDeadlines);
+        $dueDate = $dueDates[0]['date'] ?? null;
+        $dueLabel = $dueDate === null ? null : 'ต้องออกประกาศภายใน';
+        $daysLeft = $dueDate === null ? null : $this->daysUntil($dueDate);
         [$nextStart, $nextEnd] = $this->nextMonthRange();
 
         $actions = [];
-        if ($tracked && ! $closed) {
-            $publishOn = $this->parseDate($publishDue);
-            if ($publishOn !== null && $publishOn->betweenIncluded($nextStart, $nextEnd)) {
-                $actions[] = ['date' => $publishOn->toDateString(), 'label' => 'กำหนดเวลาออกประกาศ'];
-            }
-            foreach ($steps as $step) {
-                $stepDue = $this->parseDate($step['due_date']);
-                if ($step['completed_on'] === null && $stepDue !== null && $stepDue->betweenIncluded($nextStart, $nextEnd)) {
-                    $actions[] = ['date' => $stepDue->toDateString(), 'label' => $step['label']];
+        if (! $closed) {
+            foreach ($dueDates as $entry) {
+                $dueOn = $this->parseDate($entry['date'] ?? null);
+                if ($dueOn !== null && $dueOn->betweenIncluded($nextStart, $nextEnd)) {
+                    $actions[] = [
+                        'date' => $dueOn->toDateString(),
+                        'label' => (string) ($entry['label'] ?? $dueLabel ?? 'ต้องออกประกาศภายใน'),
+                    ];
                 }
             }
             usort($actions, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
@@ -448,8 +451,11 @@ final class OversightService
             'status' => $status,
             'closed' => $closed,
             'publish_due_date' => $publishDue,
+            'due_date' => $dueDate,
+            'due_label' => $dueLabel,
+            'due_dates' => $dueDates,
             'days_left' => $daysLeft,
-            'overdue' => $tracked && ! $closed && $daysLeft !== null && $daysLeft < 0,
+            'overdue' => ! $closed && $daysLeft !== null && $daysLeft < 0,
             'in_next_month' => $actions !== [],
             'next_action_date' => $actions[0]['date'] ?? null,
             'next_action_label' => $actions[0]['label'] ?? null,
@@ -457,7 +463,7 @@ final class OversightService
             'backup' => $this->contact($stored['backup'] ?? []),
             'steps' => $steps,
             'reminders_sent' => is_array($stored['reminders_sent'] ?? null) ? $stored['reminders_sent'] : [],
-            'proclamation_deadlines' => $this->proclamationDeadlines($documentId, $review),
+            'proclamation_deadlines' => $proclamationDeadlines,
         ];
     }
 
@@ -479,16 +485,16 @@ final class OversightService
      */
     private function storedFromPayload(array $payload, array $existing): array
     {
-        $byKey = [];
-        foreach ($payload['steps'] ?? [] as $step) {
-            if (is_array($step)) {
-                $byKey[(string) ($step['key'] ?? '')] = $step;
+        $storedSteps = [];
+        foreach (is_array($existing['steps'] ?? null) ? $existing['steps'] : [] as $step) {
+            if (is_array($step) && isset($step['key'])) {
+                $storedSteps[(string) $step['key']] = $step;
             }
         }
 
         $steps = [];
         foreach ($this->statusOptions() as $option) {
-            $incoming = $byKey[$option['key']] ?? [];
+            $incoming = $storedSteps[$option['key']] ?? [];
             $steps[] = [
                 'key' => $option['key'],
                 'due_date' => $this->dateOrNull($incoming['due_date'] ?? null),
@@ -496,14 +502,49 @@ final class OversightService
             ];
         }
 
+        $status = is_string($existing['status'] ?? null) ? (string) $existing['status'] : '';
+
         return [
-            'status' => (string) $payload['status'],
-            'publish_due_date' => $this->dateOrNull($payload['publish_due_date'] ?? null),
+            'status' => $status,
+            'publish_due_date' => $this->dateOrNull($existing['publish_due_date'] ?? null),
             'steps' => $steps,
             'primary' => $this->contact($payload['primary'] ?? []),
             'backup' => $this->contact($payload['backup'] ?? []),
             'reminders_sent' => is_array($existing['reminders_sent'] ?? null) ? $existing['reminders_sent'] : [],
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $proclamationDeadlines
+     * @return array<int, array{date: string, label: string, display_date: string}>
+     */
+    private function summarizeDueDates(array $proclamationDeadlines): array
+    {
+        $dueDates = [];
+        foreach ($proclamationDeadlines as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $date = $this->dateOrNull($item['date'] ?? null);
+            if ($date === null) {
+                continue;
+            }
+            $title = trim((string) ($item['title'] ?? ''));
+            $scope = (string) ($item['scope'] ?? 'whole');
+            $sections = is_array($item['sections'] ?? null) ? implode(', ', $item['sections']) : '';
+            $prefix = $scope === 'sections'
+                ? 'ออกประกาศฉบับใหม่บางข้อ'.($sections !== '' ? ' ('.$sections.')' : '')
+                : 'ออกประกาศฉบับใหม่ทั้งฉบับ';
+            $dueDates[] = [
+                'date' => $date,
+                'label' => $title !== '' ? $prefix.': '.$title : $prefix,
+                'display_date' => $this->formatThai($date),
+            ];
+        }
+
+        usort($dueDates, static fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+
+        return $dueDates;
     }
 
     /**
@@ -534,8 +575,8 @@ final class OversightService
     private function sortItems(array $items): array
     {
         usort($items, static function (array $a, array $b): int {
-            $dueA = $a['publish_due_date'] ?: '9999-99-99';
-            $dueB = $b['publish_due_date'] ?: '9999-99-99';
+            $dueA = $a['due_date'] ?: '9999-99-99';
+            $dueB = $b['due_date'] ?: '9999-99-99';
 
             return [$b['overdue'] ? 1 : 0, $dueA, $a['title']]
                 <=> [$a['overdue'] ? 1 : 0, $dueB, $b['title']];
@@ -600,27 +641,6 @@ final class OversightService
     private function openDeadlines(array $record): array
     {
         $deadlines = [];
-        if (is_string($record['publish_due_date']) && $record['publish_due_date'] !== '') {
-            $deadlines[] = [
-                'kind' => 'publish',
-                'key' => 'publish',
-                'label' => 'กำหนดเวลาออกประกาศ',
-                'date' => $record['publish_due_date'],
-            ];
-        }
-
-        foreach ($record['steps'] as $step) {
-            if (! is_string($step['due_date']) || $step['due_date'] === '' || $step['completed_on'] !== null) {
-                continue;
-            }
-            $deadlines[] = [
-                'kind' => 'step',
-                'key' => (string) $step['key'],
-                'label' => 'ขั้นตอน'.$step['label'],
-                'date' => $step['due_date'],
-            ];
-        }
-
         foreach (is_array($record['proclamation_deadlines'] ?? null) ? $record['proclamation_deadlines'] : [] as $item) {
             if (! is_array($item)) {
                 continue;

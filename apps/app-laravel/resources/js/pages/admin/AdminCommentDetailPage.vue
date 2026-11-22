@@ -48,7 +48,7 @@
                 <div><span class="info-label">ประเภทความคิดเห็น</span><strong>{{ comment.type_label }}</strong></div>
                 <div><span class="info-label">วันที่ส่ง</span><strong>{{ formatThaiDateTime(comment.created_at) }}</strong></div>
                 <div><span class="info-label">เอกสารที่เกี่ยวข้อง</span><strong>{{ comment.document_title }}</strong></div>
-                <div><span class="info-label">มาตราอ้างอิง</span><strong>{{ comment.section_ref || '—' }}</strong></div>
+                <div><span class="info-label">มาตราอ้างอิง</span><strong>{{ comment.section_ref || ' ' }}</strong></div>
                 <div><span class="info-label">หน่วยงานรับผิดชอบ</span><strong>{{ comment.unit_name || comment.agency }}</strong></div>
                 <div><span class="info-label">การแจ้งเตือน</span><strong>{{ comment.notify ? 'เปิด' : 'ปิด' }}</strong></div>
                 <div><span class="info-label">สถานะปัจจุบัน</span><strong>{{ comment.status_label }}</strong></div>
@@ -235,7 +235,7 @@
                 <div><span class="info-label">ผู้ส่ง</span><strong>{{ comment.author_name }}</strong></div>
                 <div><span class="info-label">ประเภท</span><strong>{{ comment.type_label }}</strong></div>
                 <div><span class="info-label">ส่งเมื่อ</span><strong>{{ formatThaiDateTime(comment.created_at) }}</strong></div>
-                <div><span class="info-label">มาตราอ้างอิง</span><strong>{{ comment.section_ref || '—' }}</strong></div>
+                <div><span class="info-label">มาตราอ้างอิง</span><strong>{{ comment.section_ref || ' ' }}</strong></div>
               </div>
               <div class="text-caption text-medium-emphasis mb-1">เอกสารอ้างอิง</div>
               <div class="font-weight-medium mb-3">{{ comment.document_title }}</div>
@@ -525,8 +525,8 @@ const replyForm = reactive({
 });
 
 const visibilityOptions = [
-  { title: 'Public — เผยแพร่ให้ผู้ใช้ที่เข้าสู่ระบบอ่านได้', value: 'public' },
-  { title: 'Private — เฉพาะเจ้าของความคิดเห็นและเจ้าหน้าที่', value: 'private' },
+  { title: 'Public   เผยแพร่ให้ผู้ใช้ที่เข้าสู่ระบบอ่านได้', value: 'public' },
+  { title: 'Private   เฉพาะเจ้าของความคิดเห็นและเจ้าหน้าที่', value: 'private' },
 ];
 
 const replyCount = computed(() => comment.value?.replies?.length ?? 0);

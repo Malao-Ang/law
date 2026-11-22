@@ -30,7 +30,7 @@ def flags_for(text: str) -> list[str]:
 
 @pytest.mark.parametrize("bad, expected", [
     ("สํานักงาน", "สำนักงาน"),
-    ("กํานด", "กำนด"),      # partial word — pattern fires on leading ก + ํ
+    ("กํานด", "กำนด"),      # partial word   pattern fires on leading ก + ํ
     ("ทํา", "ทำ"),
     ("จํานวน", "จำนวน"),
 ])
@@ -51,7 +51,7 @@ def test_zwsp_removed_between_thai_chars() -> None:
 
 def test_zwsp_at_genuine_word_boundary_allowed() -> None:
     # ZWSP between two full words should be treated as whitespace, not error
-    # After normalisation it may collapse to a space — the key requirement is
+    # After normalisation it may collapse to a space   the key requirement is
     # that the content words are intact.
     result = normalize_text("กข\u200bคง")
     assert "กข" in result["text"]
@@ -66,7 +66,7 @@ def test_zwsp_at_genuine_word_boundary_allowed() -> None:
     # ่ (mai ek) appearing before the consonant it belongs to
     ("่ก า", "ก่า"),
     # ้ (mai tho) before consonant
-    ("้น้า", "น้้า"),   # double — should not crash
+    ("้น้า", "น้้า"),   # double   should not crash
 ])
 def test_tone_mark_reordering(bad: str, expected: str) -> None:
     result = normalised(bad)
@@ -124,11 +124,11 @@ def test_nfc_normalisation_applied() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Unicode replacement character — must pass through unchanged
+# Unicode replacement character   must pass through unchanged
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_replacement_char_survives_normalisation() -> None:
-    # U+FFFD should not be stripped — it signals encoding corruption to the
+    # U+FFFD should not be stripped   it signals encoding corruption to the
     # confidence scorer, and removing it silently would hide the problem.
     text = "ข้อ\ufffdความ"
     result = normalised(text)
@@ -136,7 +136,7 @@ def test_replacement_char_survives_normalisation() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mixed Thai/ASCII — ASCII content must not be altered
+# Mixed Thai/ASCII   ASCII content must not be altered
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_ascii_content_unchanged() -> None:
@@ -147,7 +147,7 @@ def test_ascii_content_unchanged() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Known DOCX path — NFC applied before ThaiNormalizer
+# Known DOCX path   NFC applied before ThaiNormalizer
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_empty_string_returns_empty() -> None:
@@ -173,14 +173,14 @@ def test_newline_preserved_between_lines() -> None:
 
 
 def test_multiple_spaces_still_collapsed() -> None:
-    # Spaces must still collapse — only \t and \n are exempt.
+    # Spaces must still collapse   only \t and \n are exempt.
     assert normalised("foo     bar") == "foo bar"
     # NBSP and unicode spaces also collapse.
     assert normalised("foo  bar") == "foo bar"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pattern ordering regression — longer patterns must win over sub-patterns
+# Pattern ordering regression   longer patterns must win over sub-patterns
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_longer_pattern_wins() -> None:

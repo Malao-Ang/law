@@ -5,8 +5,7 @@
     subtitle="แยกข้อความใกล้ครบกำหนดกับต้องออกประกาศใหม่ หรือกดส่งเองได้โดยไม่ต้องรอรอบอัตโนมัติ"
   >
     <v-alert type="info" variant="tonal" class="mb-4" density="comfortable">
-      ระบบส่งอัตโนมัติทุกวันเวลา 08:00 น. เมื่อเหลือ {{ reminderLabel }} วัน
-      แต่ละจำนวนส่งครั้งเดียวต่อหนึ่งกำหนด โดยใช้เทมเพลตตามประเภทการแจ้งเตือน
+      ระบบส่งอัตโนมัติทุกวันเวลา 08:00 น. ตามรอบแจ้งเตือนที่กำหนดในข้อความอีเมล
     </v-alert>
 
     <v-alert v-if="loadError" type="error" variant="tonal" class="mb-4" density="compact">{{ loadError }}</v-alert>
@@ -142,14 +141,14 @@
           <div class="pa-4">
             <div class="text-subtitle-1 font-weight-bold">ตัวอย่างที่ผู้รับจะเห็น</div>
             <div class="text-caption text-medium-emphasis">
-              {{ channelLabel(activeChannel) }} —
+              {{ channelLabel(activeChannel) }}  
               {{ previewItem ? previewItem.title : 'ตัวอย่าง เมื่อยังไม่มีรายการที่ส่งได้' }}
             </div>
           </div>
           <v-divider />
           <v-card-text>
             <div class="text-caption text-medium-emphasis mb-1">หัวข้อ</div>
-            <div class="font-weight-bold mb-4">{{ preview.subject || '—' }}</div>
+            <div class="font-weight-bold mb-4">{{ preview.subject || ' ' }}</div>
             <div class="text-caption text-medium-emphasis mb-1">ข้อความ</div>
             <div class="mail-preview">{{ preview.body }}</div>
           </v-card-text>
@@ -190,7 +189,7 @@
         <tbody>
           <tr v-if="!loading && settings.items.length === 0">
             <td colspan="6" class="text-center text-medium-emphasis py-6">
-              ไม่มีรายการที่ส่งได้ ต้องติดตามกฎหมาย มีอีเมลผู้รับ และมีกำหนดที่ยังไม่บันทึกวันแล้วเสร็จ
+              ไม่มีรายการที่ส่งได้ ต้องมีอีเมลผู้รับ และมีวันต้องออกประกาศจากความสัมพันธ์
             </td>
           </tr>
           <tr
@@ -322,7 +321,7 @@ const channelTabs = computed(() => settings.value.channels.length
       { key: 'proclamation' as const, label: 'ออกประกาศใหม่' },
     ]);
 const activeForm = computed(() => forms[activeChannel.value]);
-const reminderLabel = computed(() => reminderDays.value.join(' / ') || '—');
+const reminderLabel = computed(() => reminderDays.value.join(' / ') || ' ');
 const dirty = computed(() => JSON.stringify(formSnapshot()) !== JSON.stringify({
   reminder_days: savedReminderDays.value,
   deadline: channelSnapshot('deadline', saved.value.deadline),
@@ -346,7 +345,7 @@ const confirmText = computed(() => {
   if (!target) {
     return `ส่งอีเมลตามข้อความนี้ให้รายการที่ถึงรอบวันนี้ ${settings.value.pending_count} ฉบับ (แยกตามประเภทเทมเพลต)`;
   }
-  return `ส่งถึง ${target.emails.join(', ')} สำหรับ «${target.title}» (${channelLabel(target.channel)}) — ระบบจะส่งทุกประเภทของกฎหมายฉบับนี้ที่มีกำหนดเปิดอยู่`;
+  return `ส่งถึง ${target.emails.join(', ')} สำหรับ «${target.title}» (${channelLabel(target.channel)})   ระบบจะส่งทุกประเภทของกฎหมายฉบับนี้ที่มีกำหนดเปิดอยู่`;
 });
 
 onMounted(() => {

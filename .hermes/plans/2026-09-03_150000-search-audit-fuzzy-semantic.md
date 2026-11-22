@@ -54,9 +54,9 @@ To:
 
 **File**: `app/Services/Search/LawSearchService.php`, lines 27-29
 
-Fuzzy retry only fires when `$raw['hits']['hits'] === []`. If ES returns some results but misses the best match (e.g. exact match on one doc, but the typo target is another doc), fuzzy never runs. This is a design limitation — ES `fuzziness: AUTO` should ideally be included in the initial query as a low-boost `should` clause alongside the exact match, not as a separate retry.
+Fuzzy retry only fires when `$raw['hits']['hits'] === []`. If ES returns some results but misses the best match (e.g. exact match on one doc, but the typo target is another doc), fuzzy never runs. This is a design limitation   ES `fuzziness: AUTO` should ideally be included in the initial query as a low-boost `should` clause alongside the exact match, not as a separate retry.
 
-**Impact**: Low — most searches either match or don't. But a query like "ประกาส" (typo for "ประกาศ") that accidentally matches another doc would miss the fuzzy correction for the intended target.
+**Impact**: Low   most searches either match or don't. But a query like "ประกาส" (typo for "ประกาศ") that accidentally matches another doc would miss the fuzzy correction for the intended target.
 
 **Fix**: Include fuzzy as a low-boost `should` in the initial exact query, rather than a separate retry. This is a larger refactor.
 
@@ -66,13 +66,13 @@ Fuzzy retry only fires when `$raw['hits']['hits'] === []`. If ES returns some re
 
 The file-based fuzzy threshold is 0.42 (Dice coefficient). For short Thai queries (3-5 chars), this can produce false positive matches because character bigrams in Thai are often shared between unrelated words due to common vowel/consonant combinations.
 
-**Impact**: Low — false positives in file-based fallback only.
+**Impact**: Low   false positives in file-based fallback only.
 
 ### Bug 4: No Thai word-boundary awareness in fuzzy (DESIGN GAP)
 
 ES `fuzziness: AUTO` operates on Lucene terms (after Thai analyzer tokenization), which is OK. But the file-based Dice similarity works on raw character ngrams without word segmentation. "ประกาส" (typo) and "ประกาศ" (correct) differ by one character and score high, which is correct. But "กฎหมาย" and "กฎะมาย" would also score high despite being phonetically very different in Thai.
 
-**Impact**: Low — file-based search is a fallback.
+**Impact**: Low   file-based search is a fallback.
 
 ## Step-by-step Tasks
 
@@ -139,7 +139,7 @@ This means fuzzy results appear in the initial query (with low score) instead of
 
 **File**: `apps/app-laravel/tests/Feature/LawSearchFuzzyTest.php`
 
-Add a test that seeds TWO laws — one matching exactly and one matching only via typo — and verifies both appear:
+Add a test that seeds TWO laws   one matching exactly and one matching only via typo   and verifies both appear:
 
 ```php
 public function test_fuzzy_results_appear_alongside_exact_matches(): void

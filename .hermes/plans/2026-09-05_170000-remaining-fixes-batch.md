@@ -1,4 +1,4 @@
-# Plan: แก้ไข /law/:id + database card + admin/upload + download filename — batch fix
+# Plan: แก้ไข /law/:id + database card + admin/upload + download filename   batch fix
 
 ## Goal
 แก้ 8 จุดค้างทั้งหมดใน 1 batch: keywords ใน database card, ชื่อไฟล์ download, admin/upload law status dash, /law/:id breadcrumb+header+parent law card+สารบัญเอกสารเก่า+เอกสารที่อ้างถึง tag
@@ -14,7 +14,7 @@
 
 ## Step-by-step tasks
 
-### Task 12 — Keywords ใน database search result card + highlight
+### Task 12   Keywords ใน database search result card + highlight
 
 **12a) Backend: add `keywords` to file-based search result**
 File: `apps/app-laravel/app/Http/Controllers/Api/LawSearchController.php`
@@ -73,7 +73,7 @@ function highlightKeyword(kw: string): string {
 }
 ```
 
-### Task 13 — ชื่อไฟล์ download ใน /law/relations
+### Task 13   ชื่อไฟล์ download ใน /law/relations
 
 File: `apps/app-laravel/resources/js/pages/public/PublicShowRelationsPage.vue`
 Search for download functions (`downloadRowPdf` or similar). Ensure the downloaded file uses the law title as filename, not the document ID. If the anchor.download uses `row.id`, change to:
@@ -81,22 +81,22 @@ Search for download functions (`downloadRowPdf` or similar). Ensure the download
 const safeName = (row.title || row.id).replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100) + '.pdf';
 ```
 
-### Task 15 — admin/upload law status `—` → chip
+### Task 15   admin/upload law status ` ` → chip
 
 File: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 Line 82 currently shows:
 ```vue
-<span v-else class="text-caption text-medium-emphasis">—</span>
+<span v-else class="text-caption text-medium-emphasis"> </span>
 ```
 Replace with:
 ```vue
 <v-chip v-else size="small" color="warning" variant="tonal">ร่าง</v-chip>
 ```
 
-### Task 19 — /law/:id เอกสารเก่าแสดง "ประกาศ" เปล่า
+### Task 19   /law/:id เอกสารเก่าแสดง "ประกาศ" เปล่า
 
 File: `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
-The header card (line ~112) shows `meta.title || documentStore.review.source_file`. For old docs with no title, use `source_file` (which is the PDF filename without extension). This is already correct — the issue is that `meta.title` is empty and `source_file` shows the raw filename.
+The header card (line ~112) shows `meta.title || documentStore.review.source_file`. For old docs with no title, use `source_file` (which is the PDF filename without extension). This is already correct   the issue is that `meta.title` is empty and `source_file` shows the raw filename.
 
 Change line ~112:
 ```vue
@@ -111,14 +111,14 @@ const cleanSourceFile = computed(() => {
 });
 ```
 
-### Task 20 — กฎหมายแม่เป็น card แยกเหนือข้อมูลกฎหมาย
+### Task 20   กฎหมายแม่เป็น card แยกเหนือข้อมูลกฎหมาย
 
 File: `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 The parent law card (line ~189) is already inside `<aside>` above `LawInfoPanel`. This is correct per Figma. But it currently uses `parentLawRelation` which only finds `issued_under` type. Also needs to show parent names from `parentNames` computed too.
 
-Ensure the parent law card appears FIRST in the aside, before `<section v-if="docRelations.length">` and before `<LawInfoPanel>`. It already does — verify visually.
+Ensure the parent law card appears FIRST in the aside, before `<section v-if="docRelations.length">` and before `<LawInfoPanel>`. It already does   verify visually.
 
-### Task 20b — /law/:id breadcrumb not showing
+### Task 20b   /law/:id breadcrumb not showing
 
 File: `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 The breadcrumb div (line 5-24) exists but is hidden behind the navbar. The `.lawx` wrapper needs `padding-top: 96px` like we did for `.psr`.
@@ -131,21 +131,21 @@ Search for `.lawx {` in the `<style>` section. If no padding-top, add:
 ```
 If `.lawx` style block doesn't exist, add it.
 
-### Task 21 — เอกสารเก่ามี TOC สารบัญ
+### Task 21   เอกสารเก่ามี TOC สารบัญ
 
 File: `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 Line ~79: `<template v-if="!usesOriginalPdfLayout">` hides TOC for old/PDF docs. But old docs should still show sidebar info panel. The TOC is section-based so it correctly hides for PDF-only docs (no sections to navigate).
 
-This is CORRECT behavior — old docs embed PDF, no section-based TOC possible. The sidebar info panel (aside) already shows for old docs. No change needed.
+This is CORRECT behavior   old docs embed PDF, no section-based TOC possible. The sidebar info panel (aside) already shows for old docs. No change needed.
 
-### Task 22 — "เอกสารที่อ้างถึง" → ใช้ชื่อกฎหมายเป็น tag
+### Task 22   "เอกสารที่อ้างถึง" → ใช้ชื่อกฎหมายเป็น tag
 
 File: `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 In the document relations section (line ~207-234), the `lawx-parentcard` shows `กฎหมายแม่ / เกี่ยวข้องทั้งฉบับ`. Each relation row shows `rel.target_title`. This already shows the law name.
 
 For the admin law list page (`AdminLawListPage.vue` line 115-118), the "กฎหมายที่อ้างถึง" chip shows count. This is correct.
 
-No change needed — already uses target_title.
+No change needed   already uses target_title.
 
 ## Verify
 ```bash

@@ -1,4 +1,4 @@
-# Plan: Preserve Word extraction layout — line height, 16pt font, first-logo sizing, image spacing
+# Plan: Preserve Word extraction layout   line height, 16pt font, first-logo sizing, image spacing
 
 ## Goal
 Improve Word/DOCX extraction and PDF export so imported legal Word documents preserve readable line spacing, default 16pt font, and logo/image sizing rules: first top logo is centered at 2.99 cm wide, image-to-text spacing is 1.5 line height, normal text line height is 1.0.
@@ -32,7 +32,7 @@ Use the DOCX XML as the source of truth first: parse image extents (`a:ext cx/cy
 
 ## Step-by-step tasks
 
-### Task 1 — Add tests for DOCX layout extraction metadata (RED)
+### Task 1   Add tests for DOCX layout extraction metadata (RED)
 
 File: create `apps/app-laravel/tests/Unit/FastDocxLayoutMetadataTest.php`
 
@@ -82,7 +82,7 @@ cd D:/workspace/outside/docling-thai-poc/apps/app-laravel
 php artisan test --filter=FastDocxLayoutMetadataTest
 ```
 
-### Task 2 — Normalize paragraph layout defaults minimally (GREEN)
+### Task 2   Normalize paragraph layout defaults minimally (GREEN)
 
 File: `apps/app-laravel/app/Services/Fast/Docx/ParagraphParser.php`
 
@@ -108,7 +108,7 @@ docker compose exec laravel-app php artisan test --filter=FastDocxLayoutMetadata
 ```
 Expected: paragraph spacing/font-size extraction tests pass; image/logo tests may still fail.
 
-### Task 3 — Extract DOCX image dimensions and paragraph alignment (RED/GREEN)
+### Task 3   Extract DOCX image dimensions and paragraph alignment (RED/GREEN)
 
 File: `apps/app-laravel/app/Services/Fast/Docx/ImageExtractor.php`
 
@@ -150,7 +150,7 @@ docker compose exec laravel-app php artisan test --filter=FastDocxLayoutMetadata
 ```
 Expected: raw dimension/alignment tests pass.
 
-### Task 4 — Mark only the first top image as logo and force 2.99 cm width
+### Task 4   Mark only the first top image as logo and force 2.99 cm width
 
 File: `apps/app-laravel/app/Services/Fast/FastDocxExtractor.php`
 
@@ -182,7 +182,7 @@ docker compose exec laravel-app php artisan test --filter=FastDocxLayoutMetadata
 ```
 Expected: all extraction metadata tests pass.
 
-### Task 5 — Apply image width + spacing consistently in HTML preview/export
+### Task 5   Apply image width + spacing consistently in HTML preview/export
 
 File: `apps/app-laravel/app/Services/DocumentHtmlService.php`
 
@@ -222,7 +222,7 @@ private function imageWidthPt(array $imgMeta, string $path): ?float
 
 Run focused export tests after adding them in Task 6.
 
-### Task 6 — Add PDF/DOCX export behavior tests
+### Task 6   Add PDF/DOCX export behavior tests
 
 File: create `apps/app-laravel/tests/Unit/DocumentExportImageLayoutTest.php`
 
@@ -239,7 +239,7 @@ docker compose exec laravel-app php artisan test --filter=DocumentExportImageLay
 ```
 Expected: pass after export changes.
 
-### Task 7 — Clamp broken Word line spacing to avoid overlapping text
+### Task 7   Clamp broken Word line spacing to avoid overlapping text
 
 File: `apps/app-laravel/app/Services/DocumentHtmlService.php`
 File: `apps/app-laravel/app/Services/DocumentExportService.php`
@@ -264,7 +264,7 @@ Add/extend tests:
 - `line_spacing=120` should render/export as `line-height:1.00`, not `0.50`.
 - `line_spacing=360` should render/export as `1.50`.
 
-### Task 8 — Preserve font size 16pt fallback and extracted sizes
+### Task 8   Preserve font size 16pt fallback and extracted sizes
 
 Files:
 - `apps/app-laravel/app/Services/Fast/Docx/ParagraphParser.php`

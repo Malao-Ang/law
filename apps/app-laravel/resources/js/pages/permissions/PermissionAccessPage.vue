@@ -305,7 +305,7 @@ async function saveAndPublish(): Promise<void> {
   try {
     await exportDocument(props.documentId);
   } catch (error) {
-    documentStore.setSaveError(error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ — ลองอีกครั้ง');
+    documentStore.setSaveError(error instanceof Error ? error.message : 'ส่งออกไม่สำเร็จ   ลองอีกครั้ง');
     return;
   }
 

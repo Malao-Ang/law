@@ -38,7 +38,7 @@
 
 ## Step-by-step tasks
 
-### Task 1 — RED: เพิ่ม backend feature test ว่า old external upload seed metadata source external
+### Task 1   RED: เพิ่ม backend feature test ว่า old external upload seed metadata source external
 
 ไฟล์ที่ต้องอ่านก่อนแก้:
 - `apps/app-laravel/tests/Feature/OldDocumentMinioUploadTest.php`
@@ -89,7 +89,7 @@ docker compose exec laravel-app php artisan test --filter=old_external_upload_pr
 ```
 
 Expected output:
-- ถ้าปัจจุบัน backend รับ source อยู่แล้ว test อาจ pass ทันที — ถ้า pass ทันที ให้ถือว่า backend behavior มีแล้ว และไม่ต้องแก้ backend
+- ถ้าปัจจุบัน backend รับ source อยู่แล้ว test อาจ pass ทันที   ถ้า pass ทันที ให้ถือว่า backend behavior มีแล้ว และไม่ต้องแก้ backend
 - ถ้า fail เพราะ MinIO mock/setup ให้ย้าย test ไป `tests/Unit/ReviewStoreHistoricalTest.php` และ test `createHistoricalStub(..., ['source' => 'external'])` แทน
 - ถ้า fail เพราะ source ไม่ถูกเขียนจริง ให้แก้ `UploadController.php`/`ReviewStore.php` แบบ minimal ให้ pass
 
@@ -101,7 +101,7 @@ git commit -m "test(upload): cover external source prefill for historical docume
 
 ถ้า test pass โดยไม่ต้องแก้ production code ให้ commit เฉพาะ test หรือรวมกับ frontend commit ถ้าทีมไม่ต้องการ test-only commit
 
-### Task 2 — เพิ่ม upload preset model ใน `AdminUploadPage.vue`
+### Task 2   เพิ่ม upload preset model ใน `AdminUploadPage.vue`
 
 ไฟล์: `apps/app-laravel/resources/js/pages/admin/AdminUploadPage.vue`
 
@@ -149,7 +149,7 @@ Expected output:
 > tsc --noEmit
 ```
 
-### Task 3 — แก้ UI card ให้มี “เอกสารนอก” ชัดเจนและส่ง preset external
+### Task 3   แก้ UI card ให้มี “เอกสารนอก” ชัดเจนและส่ง preset external
 
 ไฟล์: `apps/app-laravel/resources/js/pages/admin/AdminUploadPage.vue`
 
@@ -207,7 +207,7 @@ Expected output:
 > tsc --noEmit
 ```
 
-### Task 4 — ส่ง source ไป backend ตอน upload
+### Task 4   ส่ง source ไป backend ตอน upload
 
 ไฟล์: `apps/app-laravel/resources/js/pages/admin/AdminUploadPage.vue`
 
@@ -238,7 +238,7 @@ Expected output:
 > tsc --noEmit
 ```
 
-### Task 5 — ตรวจ LawInfoPage ว่าเปิดมาแล้ว source เป็น external และเลือก type ได้เฉพาะ external
+### Task 5   ตรวจ LawInfoPage ว่าเปิดมาแล้ว source เป็น external และเลือก type ได้เฉพาะ external
 
 ไฟล์: `apps/app-laravel/resources/js/pages/law-info/LawInfoPage.vue`
 
@@ -331,7 +331,7 @@ Build expected final line:
 8. กลับไป upload table แล้วตรวจ row:
    - แหล่งที่มา: `ภายนอก`
    - ประเภท: ถ้ายังไม่เลือก law_type ให้แสดง `รอกรอกข้อมูล` ตามแผน table display ก่อนหน้า
-   - ไม่มี `—`
+   - ไม่มี ` `
 
 ## Risks, tradeoffs, and open questions
 

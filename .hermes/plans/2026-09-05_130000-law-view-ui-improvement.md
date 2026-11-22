@@ -1,4 +1,4 @@
-# Plan: Improve /law/:id page UI — match Figma design
+# Plan: Improve /law/:id page UI   match Figma design
 
 ## Goal
 ปรับ `/law/:id` (LawDocumentView.vue + LawInfoPanel.vue) ให้แสดงรายละเอียดประเภทกฎหมาย, สถานะ, กฎหมายที่ถูกยกเลิก, และความสัมพันธ์ระดับข้อ/มาตราตาม screenshot
@@ -7,7 +7,7 @@
 1. `apps/app-laravel/resources/js/components/law/LawDocumentView.vue`
 2. `apps/app-laravel/resources/js/components/law/LawInfoPanel.vue`
 
-## Task 1: Head card — เพิ่ม พ.ศ. + issuer
+## Task 1: Head card   เพิ่ม พ.ศ. + issuer
 File: `LawDocumentView.vue` around line 110-118
 
 ปัจจุบัน head card มี: badge, title, meta (ประกาศ date, gazette, royal_command)
@@ -30,12 +30,12 @@ const buddhistYear = computed(() => {
 });
 ```
 
-## Task 2: Info panel — เพิ่มฟิลด์ที่ขาด
+## Task 2: Info panel   เพิ่มฟิลด์ที่ขาด
 File: `LawInfoPanel.vue`
 
 เพิ่ม rows (ถ้ามีค่า):
-- `change_status` (สถานะการเปลี่ยนแปลง) — ถ้าไม่ใช่ 'กฎหมายใหม่' หรือ ''
-- อ้างอิง — ถ้ามี `meta.gazette_reference` แสดงเป็น row label="อ้างอิง"
+- `change_status` (สถานะการเปลี่ยนแปลง)   ถ้าไม่ใช่ 'กฎหมายใหม่' หรือ ''
+- อ้างอิง   ถ้ามี `meta.gazette_reference` แสดงเป็น row label="อ้างอิง"
 
 Template ตรง `<v-card-text>` เพิ่ม:
 ```vue
@@ -49,7 +49,7 @@ Template ตรง `<v-card-text>` เพิ่ม:
 </div>
 ```
 
-## Task 3: กฎหมายแม่ card — ปรับ style เป็น warm card
+## Task 3: กฎหมายแม่ card   ปรับ style เป็น warm card
 File: `LawDocumentView.vue` around line 236-264
 
 ปัจจุบัน `.lawx-parentcard` มี relation groups อยู่แล้ว แต่ต้องปรับ:
@@ -82,7 +82,7 @@ CSS เพิ่ม:
 File: `LawDocumentView.vue` around line 178-232 (inside section v-for)
 
 ปัจจุบันมี `sectionRels` computed + template ที่แสดง inline relation card ใน section
-ตรวจว่ามันทำงานถูกต้อง — ถ้าไม่แสดง ให้ตรวจ `relationsForSection()` ว่า return ค่าถูกไหม
+ตรวจว่ามันทำงานถูกต้อง   ถ้าไม่แสดง ให้ตรวจ `relationsForSection()` ว่า return ค่าถูกไหม
 
 Template ควรเป็นแบบนี้ใน section card:
 ```vue
@@ -148,5 +148,5 @@ cd D:/workspace/outside/docling-thai-poc/apps/app-laravel && npm run typecheck
 
 ## Commit
 ```
-feat(law-view): improve public law page UI — head card year/issuer, info panel fields, relation cards styling
+feat(law-view): improve public law page UI   head card year/issuer, info panel fields, relation cards styling
 ```

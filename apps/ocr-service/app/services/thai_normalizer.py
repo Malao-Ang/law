@@ -14,14 +14,14 @@ class NormalizeResult(TypedDict):
 
 
 # ---------------------------------------------------------------------------
-# OCR fix table — sorted longest-first so longer patterns win over sub-patterns
+# OCR fix table   sorted longest-first so longer patterns win over sub-patterns
 # ---------------------------------------------------------------------------
 _THAI_OCR_FIXES_RAW: dict[str, str] = {
     "ํา": "ำ",
     "บญญตั ิ": "บัญญัติ",
     "ม าตรา": "มาตรา",
 
-    # ── sara am (ำ) — explicit common words ─────────────────────────────────
+    # ── sara am (ำ)   explicit common words ─────────────────────────────────
     # Longer compound patterns first
     "ส านักงาน": "สำนักงาน",
     "ส านักหอสมุด": "สำนักหอสมุด",
@@ -83,7 +83,7 @@ _THAI_OCR_FIXES_RAW: dict[str, str] = {
     "ชั่ว โมง": "ชั่วโมง",
     "รูป แบบ": "รูปแบบ",
     "รปแบบ": "รูปแบบ",
-    "ง าน": "งาน",          # งาน — งำน doesn't exist
+    "ง าน": "งาน",          # งาน   งำน doesn't exist
     "การ ": "การ ",          # avoid sara-aa→sara-am on การ
     "บรกิ าร": "บริการ",
 }
@@ -144,7 +144,7 @@ def normalize_thai_vowels(text: str) -> str:
     """Fix Thai vowel/tone-mark encoding errors from PDF span splitting.
 
     Fix A: Tone marks (่ ้ ๊ ๋) cannot precede a space before a Thai *consonant*
-           (ก-ฮ only — leading vowels เ แ โ ใ ไ are excluded because they
+           (ก-ฮ only   leading vowels เ แ โ ใ ไ are excluded because they
            start a new word and the preceding space is a legitimate boundary).
     Fix B: Same rule for ั and ็.
     Fix C: Nikhahit (ํ) + sara-aa (า) → sara-am (ำ).

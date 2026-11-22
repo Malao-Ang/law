@@ -2,7 +2,7 @@
   <AppShell
     :breadcrumbs="['เมนูหลัก', 'ติดตามกำกับดูแล']"
     title="ติดตามการกำกับดูแลและแจ้งเตือน"
-    subtitle="ปรับสถานะ วันแล้วเสร็จ และผู้รับอีเมลของกฎหมายลำดับรอง"
+    subtitle="ดูวันต้องทำภายในจากความสัมพันธ์ และกำหนดผู้รับอีเมลแจ้งเตือน"
   >
     <template #title-actions>
       <v-btn
@@ -16,9 +16,8 @@
       </v-btn>
     </template>
     <v-alert type="info" variant="tonal" class="mb-4" density="comfortable">
-      ระบบส่งอีเมลถึงผู้รับผิดชอบหลักและผู้ประสานงานสำรองเมื่อเหลือ
-      {{ reminderLabel }} วัน ก่อนกำหนดเวลาออกประกาศ ก่อนกำหนดแล้วเสร็จของขั้นตอนที่ยังไม่บันทึกวันแล้วเสร็จ
-      หรือก่อนกำหนดต้องออกประกาศฉบับใหม่
+      ระบบส่งอัตโนมัติเมื่อเหลือ {{ reminderLabel }} วันก่อนกำหนดต้องออกประกาศฉบับใหม่
+      หรือกด «ส่งอีเมล» ที่รายการเพื่อส่งทันทีโดยไม่ต้องรอรอบ
     </v-alert>
 
     <v-card border rounded="lg">
@@ -53,93 +52,126 @@
               <div class="text-caption text-medium-emphasis">{{ tableValue(item.law_type) }}</div>
             </td>
             <td class="text-center">
-              <v-chip size="small" :color="statusColor(item.status)" variant="tonal">
-                {{ tableValue(item.status || 'ยังไม่ติดตาม') }}
+              <v-chip v-if="item.status" size="small" :color="statusColor(item.status)" variant="tonal">
+                {{ item.status }}
               </v-chip>
+              <span v-else class="text-medium-emphasis"> </span>
             </td>
             <td class="text-center">
-              <div :class="item.overdue ? 'text-error font-weight-bold' : ''">{{ tableValue(formatThaiDate(item.publish_due_date)) }}</div>
+              <div :class="item.overdue ? 'text-error font-weight-bold' : ''">{{ tableValue(formatThaiDate(item.due_date)) }}</div>
               <div class="text-caption text-medium-emphasis">{{ daysLabel(item.days_left) }}</div>
             </td>
             <td :class="isEmptyTableValue(item.primary.name || item.primary.email || '-') ? 'text-center' : 'text-start'">{{ tableValue(item.primary.name || item.primary.email || '-') }}</td>
             <td :class="isEmptyTableValue(item.backup.name || item.backup.email || '-') ? 'text-center' : 'text-start'">{{ tableValue(item.backup.name || item.backup.email || '-') }}</td>
             <td class="text-center">
-              <v-btn size="small" variant="tonal" color="admin-primary" class="text-none" @click="openEditor(item)">
-                ปรับปรุง
-              </v-btn>
+              <div class="d-flex justify-center flex-wrap ga-2">
+                <v-btn
+                  size="small"
+                  variant="tonal"
+                  color="admin-primary"
+                  class="text-none"
+                  prepend-icon="mdi-send"
+                  :disabled="!canSendNow(item)"
+                  :loading="sendingId === item.document_id"
+                  @click="askSend(item)"
+                >
+                  ส่งอีเมล
+                </v-btn>
+                <v-btn size="small" variant="tonal" color="admin-primary" class="text-none" @click="openEditor(item)">
+                  ปรับปรุง
+                </v-btn>
+              </div>
             </td>
           </tr>
         </tbody>
       </v-table>
     </v-card>
 
-    <v-dialog v-model="dialog" max-width="920">
+    <v-dialog v-model="sendConfirmOpen" max-width="560">
       <v-card>
-        <v-card-title class="text-wrap">{{ form.title }}</v-card-title>
+        <v-card-title>ส่งอีเมลแจ้งเตือนทันที</v-card-title>
         <v-card-text>
-          <v-alert v-if="formError" type="error" variant="tonal" class="mb-4" density="compact">{{ formError }}</v-alert>
-          <v-row>
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="form.status"
-                :items="summary.statuses"
-                item-title="label"
-                item-value="label"
-                label="สถานะการดำเนินการ"
-                variant="outlined"
-                density="comfortable"
-              />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="form.publish_due_date"
-                type="date"
-                label="กำหนดเวลาออกประกาศ"
-                variant="outlined"
-                density="comfortable"
-              />
-            </v-col>
-          </v-row>
-
-          <div class="text-subtitle-2 font-weight-bold mb-2">วันแล้วเสร็จของแต่ละขั้นตอน</div>
-          <v-table density="compact" class="mb-4">
-            <thead>
-              <tr>
-                <th>ขั้นตอน</th>
-                <th>กำหนดแล้วเสร็จ</th>
-                <th>วันแล้วเสร็จ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="step in form.steps" :key="step.key">
-                <td :class="isEmptyTableValue(step.label) ? 'text-center' : 'text-start'">{{ tableValue(step.label) }}</td>
-                <td class="text-center">
-                  <v-text-field class="text-center" v-model="step.due_date" type="date" density="compact" variant="outlined" hide-details />
-                </td>
-                <td class="text-center">
-                  <v-text-field class="text-center" v-model="step.completed_on" type="date" density="compact" variant="outlined" hide-details />
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <v-row>
-            <v-col cols="12" md="6">
-              <div class="text-subtitle-2 font-weight-bold mb-2">ผู้รับผิดชอบหลัก</div>
-              <v-text-field v-model="form.primary.name" label="ชื่อ" variant="outlined" density="comfortable" />
-              <v-text-field v-model="form.primary.email" label="อีเมลรับแจ้งเตือน" type="email" variant="outlined" density="comfortable" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <div class="text-subtitle-2 font-weight-bold mb-2">ผู้ประสานงานสำรอง</div>
-              <v-text-field v-model="form.backup.name" label="ชื่อ" variant="outlined" density="comfortable" />
-              <v-text-field v-model="form.backup.email" label="อีเมลรับแจ้งเตือน" type="email" variant="outlined" density="comfortable" />
-            </v-col>
-          </v-row>
+          <p class="mb-0">
+            ส่งถึงผู้รับของ «{{ sendTarget?.title || '' }}» ตอนนี้ โดยไม่ต้องรอส่งอัตโนมัติ
+          </p>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" class="text-none" @click="dialog = false">ยกเลิก</v-btn>
-          <v-btn color="admin-primary" class="text-none" :loading="saving" @click="save">บันทึก</v-btn>
+          <v-btn variant="text" class="text-none" :disabled="sendingId !== null" @click="sendConfirmOpen = false">ยกเลิก</v-btn>
+          <v-btn color="admin-primary" class="text-none" :loading="sendingId !== null" @click="confirmSend">ส่งทันที</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="dialog" max-width="720" scrollable>
+      <v-card rounded="xl" class="oversight-dialog">
+        <div class="oversight-dialog__header">
+          <div class="min-width-0">
+            <h2 class="oversight-dialog__title">ปรับปรุงการกำกับดูแล</h2>
+            <p class="oversight-dialog__subtitle">{{ form.title }}</p>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" aria-label="ปิด" :disabled="saving" @click="dialog = false" />
+        </div>
+        <v-divider />
+
+        <v-card-text class="oversight-dialog__body">
+          <v-alert v-if="formError" type="error" variant="tonal" class="mb-1" density="compact">{{ formError }}</v-alert>
+
+          <section class="oversight-dialog__section">
+            <div class="oversight-dialog__section-title">
+              <v-icon icon="mdi-calendar-clock-outline" size="18" color="admin-primary" />
+              วันต้องทำภายใน
+            </div>
+            <v-card variant="outlined" class="oversight-dialog__dues">
+              <div v-if="form.due_dates.length === 0" class="text-medium-emphasis pa-4 text-center">
+                ยังไม่มีกำหนดจากความสัมพันธ์
+              </div>
+              <v-list v-else density="comfortable" class="py-1">
+                <v-list-item v-for="(entry, index) in form.due_dates" :key="`${entry.date}-${index}`">
+                  <v-list-item-title>{{ entry.label }}</v-list-item-title>
+                  <v-list-item-subtitle>{{ entry.display_date || formatThaiDate(entry.date) }}</v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
+            </v-card>
+          </section>
+
+          <section class="oversight-dialog__section">
+            <div class="oversight-dialog__section-title">
+              <v-icon icon="mdi-account-multiple-outline" size="18" color="admin-primary" />
+              ผู้รับอีเมลแจ้งเตือน
+            </div>
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-card variant="outlined" class="oversight-dialog__contact">
+                  <div class="oversight-dialog__contact-label">ผู้รับผิดชอบหลัก</div>
+                  <v-text-field v-model="form.primary.name" label="ชื่อ" variant="outlined" density="comfortable" hide-details="auto" class="mb-3" />
+                  <v-text-field v-model="form.primary.email" label="อีเมลรับแจ้งเตือน" type="email" variant="outlined" density="comfortable" hide-details="auto" />
+                </v-card>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-card variant="outlined" class="oversight-dialog__contact">
+                  <div class="oversight-dialog__contact-label">ผู้ประสานงานสำรอง</div>
+                  <v-text-field v-model="form.backup.name" label="ชื่อ" variant="outlined" density="comfortable" hide-details="auto" class="mb-3" />
+                  <v-text-field v-model="form.backup.email" label="อีเมลรับแจ้งเตือน" type="email" variant="outlined" density="comfortable" hide-details="auto" />
+                </v-card>
+              </v-col>
+            </v-row>
+          </section>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="oversight-dialog__footer">
+          <v-btn variant="outlined" class="text-none" :disabled="saving" @click="dialog = false">ยกเลิก</v-btn>
+          <v-btn
+            color="admin-primary"
+            variant="flat"
+            prepend-icon="mdi-content-save-outline"
+            class="text-none"
+            :loading="saving"
+            @click="save"
+          >
+            บันทึก
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -149,16 +181,10 @@
 <script setup lang="ts">
 import { tableValue, isEmptyTableValue } from '../../utils/tableValue';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { fetchOversightSummary, saveOversight } from '../../api/client';
+import { fetchOversightSummary, saveOversight, sendOversightMail } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
-import type { OversightItem, OversightSummary } from '../../types/oversight';
-
-interface FormStep {
-  key: string;
-  label: string;
-  due_date: string;
-  completed_on: string;
-}
+import { useSnackbarStore } from '../../stores/snackbarStore';
+import type { OversightDueDate, OversightItem, OversightSummary } from '../../types/oversight';
 
 const emptySummary = (): OversightSummary => ({
   as_of: '',
@@ -171,18 +197,20 @@ const emptySummary = (): OversightSummary => ({
   items: [],
 });
 
+const snackbar = useSnackbarStore();
 const summary = ref<OversightSummary>(emptySummary());
 const loading = ref(false);
 const dialog = ref(false);
 const saving = ref(false);
 const formError = ref('');
 const listFilter = ref<'all' | 'overdue' | 'next'>('all');
+const sendConfirmOpen = ref(false);
+const sendTarget = ref<OversightItem | null>(null);
+const sendingId = ref<string | null>(null);
 const form = reactive({
   document_id: '',
   title: '',
-  status: '',
-  publish_due_date: '',
-  steps: [] as FormStep[],
+  due_dates: [] as OversightDueDate[],
   primary: { name: '', email: '' },
   backup: { name: '', email: '' },
 });
@@ -211,17 +239,43 @@ function openEditor(item: OversightItem): void {
   formError.value = '';
   form.document_id = item.document_id;
   form.title = item.title;
-  form.status = item.status || summary.value.statuses[0]?.label || '';
-  form.publish_due_date = item.publish_due_date || '';
-  form.steps = item.steps.map((step) => ({
-    key: step.key,
-    label: step.label,
-    due_date: step.due_date || '',
-    completed_on: step.completed_on || '',
-  }));
+  form.due_dates = (item.due_dates || []).map((entry) => ({ ...entry }));
   form.primary = { name: item.primary.name, email: item.primary.email };
   form.backup = { name: item.backup.name, email: item.backup.email };
   dialog.value = true;
+}
+
+function canSendNow(item: OversightItem): boolean {
+  if (item.closed) return false;
+  if (!item.due_date) return false;
+  const emails = [item.primary.email, item.backup.email].map((value) => value.trim()).filter(Boolean);
+  return emails.length > 0;
+}
+
+function askSend(item: OversightItem): void {
+  if (!canSendNow(item)) return;
+  sendTarget.value = item;
+  sendConfirmOpen.value = true;
+}
+
+async function confirmSend(): Promise<void> {
+  const target = sendTarget.value;
+  if (!target) return;
+  sendingId.value = target.document_id;
+  try {
+    const result = await sendOversightMail(target.document_id);
+    sendConfirmOpen.value = false;
+    sendTarget.value = null;
+    if (result.sent > 0) {
+      snackbar.success(`ส่งอีเมลแล้ว ${result.sent.toLocaleString('th-TH')} ฉบับ`);
+    } else {
+      snackbar.info('ไม่มีกำหนดที่ส่งได้สำหรับกฎหมายนี้');
+    }
+  } catch (error) {
+    snackbar.error(error instanceof Error ? error.message : 'ส่งไม่สำเร็จ');
+  } finally {
+    sendingId.value = null;
+  }
 }
 
 async function save(): Promise<void> {
@@ -229,13 +283,6 @@ async function save(): Promise<void> {
   saving.value = true;
   try {
     await saveOversight(form.document_id, {
-      status: form.status,
-      publish_due_date: form.publish_due_date || null,
-      steps: form.steps.map((step) => ({
-        key: step.key,
-        due_date: step.due_date || null,
-        completed_on: step.completed_on || null,
-      })),
       primary: { name: form.primary.name.trim(), email: form.primary.email.trim() },
       backup: { name: form.backup.name.trim(), email: form.backup.email.trim() },
     });
@@ -249,7 +296,7 @@ async function save(): Promise<void> {
 }
 
 function formatThaiDate(value: string | null): string {
-  if (!value) return '—';
+  if (!value) return ' ';
   const [year, month, day] = value.split('-');
   if (!year || !month || !day) return value;
   return `${day}/${month}/${Number(year) + 543}`;
@@ -277,4 +324,88 @@ function statusColor(status: string | null): string {
 .oversight-filter :deep(.v-btn) { min-width: 104px; font-weight: 500; }
 .oversight-table :deep(tbody td) { padding-block: 12px; }
 .oversight-table :deep(tbody tr) { height: 68px; }
+
+.oversight-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90dvh;
+  overflow: hidden;
+}
+
+.oversight-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 14px;
+}
+
+.oversight-dialog__title {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.oversight-dialog__subtitle {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.oversight-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 24px 22px;
+}
+
+.oversight-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oversight-dialog__section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f2933;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.oversight-dialog__dues {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.oversight-dialog__contact {
+  border-radius: 12px;
+  padding: 14px 16px;
+  height: 100%;
+  background: #f8fafc;
+}
+
+.oversight-dialog__contact-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.oversight-dialog__footer {
+  justify-content: flex-end;
+  gap: 8px;
+  background: #f8fafc;
+  padding: 14px 24px;
+}
+
+.min-width-0 {
+  min-width: 0;
+}
 </style>
