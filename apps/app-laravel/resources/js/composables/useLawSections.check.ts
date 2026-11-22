@@ -1,4 +1,4 @@
-// ponytail: dev-only assertion — no JS test runner in this app. Run:
+// ponytail: dev-only assertion   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/composables/useLawSections.check.ts
 import { buildSections, suggestChunkType } from './useLawSections';
 import type { DocumentBlock, ReviewDocument } from '../types/document';

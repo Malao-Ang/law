@@ -41,7 +41,7 @@ export const vuetify = createVuetify({
           background: '#f6f1e8',
         },
       },
-      // Admin back-office (navy). Applied on /admin/* — see main.ts route guard.
+      // Admin back-office (navy). Applied on /admin/*   see main.ts route guard.
       admin: {
         colors: {
           ...sharedColors,

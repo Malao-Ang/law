@@ -104,7 +104,7 @@ class ReviewController extends Controller
     /**
      * Tag the response with a content ETag and force revalidation. The browser then
      * sends If-None-Match on reload / new tab; if the document is unchanged we return
-     * 304 with no body — no re-download, no client re-parse of a large JSON payload.
+     * 304 with no body   no re-download, no client re-parse of a large JSON payload.
      */
     private function withRevalidation(JsonResponse $response): JsonResponse
     {
@@ -128,7 +128,7 @@ class ReviewController extends Controller
 
         $documentReview = is_array($review['document_review'] ?? null) ? $review['document_review'] : [];
         // getReviewDocument() guarantees document_review is in sync, so generated_html
-        // (written by syncDocumentReview) is current — reuse it instead of rebuilding the
+        // (written by syncDocumentReview) is current   reuse it instead of rebuilding the
         // whole document's HTML a second time. Fall back to a build only if it's missing.
         $html = (string) ($documentReview['generated_html'] ?? '');
         if ($html === '') {
@@ -835,7 +835,7 @@ class ReviewController extends Controller
     private function relationChanges(array $relation, ?array $previous = null, string $documentTitle = ''): array
     {
         $lines = [
-            'เอกสาร: '.($documentTitle !== '' ? $documentTitle : '—'),
+            'เอกสาร: '.($documentTitle !== '' ? $documentTitle : ' '),
             'ประเภท: '.$this->relationTypeLabel((string) ($relation['type'] ?? 'related')),
             'เป้าหมาย: '.$this->relationTarget($relation),
             'ขอบเขต: '.(($relation['scope'] ?? 'document') === 'section' ? 'รายข้อ' : 'ทั้งฉบับ'),

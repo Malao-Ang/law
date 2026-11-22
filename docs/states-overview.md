@@ -1,10 +1,10 @@
 # สรุปสถานะทั้งหมดในระบบ (States Overview)
 
-ภาพรวมหน้าเดียวของ "สถานะ" ทุกชุดในระบบ — มีกี่แกน แต่ละแกนมีค่าอะไรบ้าง เก็บที่ไหน
+ภาพรวมหน้าเดียวของ "สถานะ" ทุกชุดในระบบ   มีกี่แกน แต่ละแกนมีค่าอะไรบ้าง เก็บที่ไหน
 และเกี่ยวข้องกันยังไง. รายละเอียดค่าเต็ม ๆ ดูเอกสารที่ลิงก์ไว้ท้ายแต่ละหัวข้อ.
 
 > ⚠️ กฎเหล็ก: มี **หลายแกนสถานะที่เป็นอิสระต่อกัน** อย่า derive แกนหนึ่งจากอีกแกน
-> (มีข้อยกเว้นเดียวคือตอน publish — ดูหัวข้อ 5).
+> (มีข้อยกเว้นเดียวคือตอน publish   ดูหัวข้อ 5).
 
 ---
 
@@ -22,12 +22,12 @@
 | 8 | **ขั้นตอน workflow** (`workflow_completed_step`) | ทำ flow นำเข้าถึงขั้นที่เท่าไร | `DocumentStatus.workflow_*` |
 
 **สำคัญ:** แกน 1–4 อยู่บน `LawMeta` (ความจริงเชิงกฎหมาย). แกน 5–8 อยู่บน `DocumentStatus`
-(สถานะการทำงาน/pipeline) — **คนละ object กัน** โดยเฉพาะ `LawMeta.status` (กฎหมาย) ≠
+(สถานะการทำงาน/pipeline)   **คนละ object กัน** โดยเฉพาะ `LawMeta.status` (กฎหมาย) ≠
 `DocumentStatus.status` (pipeline).
 
 ---
 
-## 1. สถานะบังคับใช้ — `LawMeta.status`
+## 1. สถานะบังคับใช้   `LawMeta.status`
 
 สถานะทางกฎหมายที่แสดงบนหน้าเว็บ. ค่าที่เก็บใน `LawMeta.status` เป็น code จาก master data `enforcement_status`
 ไม่ใช่ข้อความ label ภาษาไทยโดยตรง.
@@ -42,9 +42,9 @@
 
 ---
 
-## 2. การเผยแพร่ — `LawMeta.published_date`
+## 2. การเผยแพร่   `LawMeta.published_date`
 
-ไม่มี boolean แยก — ดูจากว่ามีวันที่หรือไม่.
+ไม่มี boolean แยก   ดูจากว่ามีวันที่หรือไม่.
 
 | ค่า | สถานะ |
 |---|---|
@@ -53,7 +53,7 @@
 
 ---
 
-## 3. การเข้าถึง — `LawMeta.access_scope` (สาธารณะ / ส่วนตัว)
+## 3. การเข้าถึง   `LawMeta.access_scope` (สาธารณะ / ส่วนตัว)
 
 | ค่า | ความหมาย |
 |---|---|
@@ -66,7 +66,7 @@
 
 ---
 
-## 4. การเปลี่ยนแปลง — `LawMeta.change_status` (+ `change_details`)
+## 4. การเปลี่ยนแปลง   `LawMeta.change_status` (+ `change_details`)
 
 `change_status` เป็น string หลัก, `change_details: string[]` เป็นตัวเลือกย่อย.
 
@@ -79,7 +79,7 @@
 
 ---
 
-## 5. สถานะ e-Sign — `DocumentStatus.esign_*`
+## 5. สถานะ e-Sign   `DocumentStatus.esign_*`
 
 state machine ของการลงนามอิเล็กทรอนิกส์ (`deriveEsignStage`). รหัสจริงจาก BUU e-Sign
 เก็บใน `esign_sign_status` (Y/N/C); stage ที่ UI ใช้ derive มาจากรหัส + timestamp + `published_date`.
@@ -100,11 +100,11 @@ state machine ของการลงนามอิเล็กทรอนิ
 
 **Publish gate:** เผยแพร่ได้ต่อเมื่อ `esign_sign_status = 'Y'` เท่านั้น (ยืนยันใน
 `ReviewController` + `usePublishGates`). ตอน publish สำเร็จจะ set `status = 'STA01'`
-**พร้อม** `published_date = now` — **นี่คือที่เดียว** ที่ 2 แกนขยับพร้อมกัน.
+**พร้อม** `published_date = now`   **นี่คือที่เดียว** ที่ 2 แกนขยับพร้อมกัน.
 
 ---
 
-## 6. สถานะ pipeline — `DocumentStatus.status`
+## 6. สถานะ pipeline   `DocumentStatus.status`
 
 สถานะการประมวลผล OCR/extraction (ไม่ใช่สถานะทางกฎหมาย).
 
@@ -121,14 +121,14 @@ state machine ของการลงนามอิเล็กทรอนิ
 
 ---
 
-## 7. สถานะแก้คำ — `DocumentStatus.correction_status`
+## 7. สถานะแก้คำ   `DocumentStatus.correction_status`
 
-`not_required` / `pending` / `in_progress` / `done` / `failed` — สถานะ spellcheck/แก้คำ
+`not_required` / `pending` / `in_progress` / `done` / `failed`   สถานะ spellcheck/แก้คำ
 (ทำงานหลัง extract บน fast path, non-fatal).
 
 ---
 
-## 8. ขั้นตอน workflow นำเข้าเอกสาร — `workflow_completed_step`
+## 8. ขั้นตอน workflow นำเข้าเอกสาร   `workflow_completed_step`
 
 6 ขั้น (เอกสาร `old` ใช้ flow สั้นกว่า, เลขในวงเล็บ).
 
@@ -140,8 +140,8 @@ state machine ของการลงนามอิเล็กทรอนิ
 | 4 (old 2) | ข้อมูล (metadata) | `/documents/:id/law-info` |
 | 5 (old 3) | ความสัมพันธ์เอกสาร | `/documents/:id/relations` |
 | 6 (old 4) | กำหนดสิทธิ์ (`access_scope`) | `/documents/:id/permissions` |
-| — | ลงนาม e-Sign | `/documents/:id/esign` |
-| — | เผยแพร่ | (หลัง e-Sign) |
+|   | ลงนาม e-Sign | `/documents/:id/esign` |
+|   | เผยแพร่ | (หลัง e-Sign) |
 
 ---
 
@@ -158,7 +158,7 @@ state machine ของการลงนามอิเล็กทรอนิ
 เผยแพร่        →  status = "STA01" + published_date = now  → e-Sign: published
 ```
 
-แต่ละบรรทัดขยับคนละแกน — เช่นเอกสารหนึ่งอาจ `status = "STA03"`, `access_scope = "private"`,
+แต่ละบรรทัดขยับคนละแกน   เช่นเอกสารหนึ่งอาจ `status = "STA03"`, `access_scope = "private"`,
 e-Sign `waiting`, pipeline `done` พร้อมกันได้ (แกนอิสระต่อกัน).
 
 ---

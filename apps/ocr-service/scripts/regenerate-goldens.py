@@ -29,8 +29,8 @@ FIXTURE_MAP: dict[str, str] = {
     "prakat_1.pdf.golden.json": "ประกาศ (1).pdf",
     "prakat_3.docx.golden.json": "ประกาศ (3).docx",
     "prakat_scan.pdf.golden.json": "ประกาศ (1).pdf",   # rasterised version
-    "multi_level_list.docx.golden.json": None,          # synthetic — must be created manually
-    "table_with_merges.docx.golden.json": None,         # synthetic — must be created manually
+    "multi_level_list.docx.golden.json": None,          # synthetic   must be created manually
+    "table_with_merges.docx.golden.json": None,         # synthetic   must be created manually
 }
 
 # Repo root is five levels up from this script (scripts/ → ocr-service/ → apps/ → repo)
@@ -102,7 +102,7 @@ def regenerate(fixture_names: list[str]) -> None:
     for name in fixture_names:
         source_name = FIXTURE_MAP.get(name)
         if source_name is None:
-            print(f"  SKIP  {name}  (synthetic fixture — create manually)")
+            print(f"  SKIP  {name}  (synthetic fixture   create manually)")
             results.append((name, "skipped"))
             continue
 

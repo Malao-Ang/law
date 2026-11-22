@@ -5,12 +5,12 @@ legal/government vocabulary so that specialist terms are never flagged as
 misspellings.
 
 Design rules:
-* **Advisory only** — suggestions are written to ``meta.spell_suggestions``;
+* **Advisory only**   suggestions are written to ``meta.spell_suggestions``;
   they are never auto-applied.  Legal text must round-trip verbatim.
-* **Gated by confidence** — only called for blocks that already need review
+* **Gated by confidence**   only called for blocks that already need review
   (low OCR confidence or existing flags).  Do not slow down high-confidence
   blocks.
-* **Legal terms preserved** — terms in ``legal_terms.txt`` are added to the
+* **Legal terms preserved**   terms in ``legal_terms.txt`` are added to the
   checker's dictionary and will never appear as suggestions.
 """
 
@@ -70,7 +70,7 @@ class ThaiSpellChecker:
         """Return a list of spell-suggestion dicts for ``text``.
 
         Each dict has ``token``, ``suggestion``, ``confidence``, and ``offset``
-        — matching the ``meta.spell_suggestions`` schema.
+          matching the ``meta.spell_suggestions`` schema.
 
         Returns ``[]`` when spellcheck is unavailable or the text is clean.
         """
@@ -125,7 +125,7 @@ class ThaiSpellChecker:
         return results
 
 
-# Module-level singleton — shared across requests.
+# Module-level singleton   shared across requests.
 _checker_instance: ThaiSpellChecker | None = None
 
 

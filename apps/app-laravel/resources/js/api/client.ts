@@ -21,7 +21,7 @@
 } from '../types/document';
 import type { LawSearchFacets, LawSearchParams, LawSearchResponse, LawSuggestParams, LawSuggestResponse } from '../types/lawSearch';
 import type { PermissionDirectoryResponse, PermissionGroup, UpsertPermissionGroupPayload } from '../types/permission';
-import type { OversightSummary, OversightUpdatePayload, OversightItem, OversightMailSettings, OversightMailTemplate, OversightMailSendResult } from '../types/oversight';
+import type { OversightSummary, OversightUpdatePayload, OversightItem, OversightMailSettings, OversightMailSavePayload, OversightMailSendResult } from '../types/oversight';
 import type { VersionChain } from '../types/versionChain';
 import type { AuditLogResponse } from '../types/auditLog';
 
@@ -844,8 +844,14 @@ export function fetchOversightMail(): Promise<OversightMailSettings> {
   return jsonRequest<OversightMailSettings>('/api/oversight/mail');
 }
 
-export function saveOversightMail(payload: OversightMailTemplate): Promise<{ template: OversightMailTemplate }> {
-  return jsonRequest<{ template: OversightMailTemplate }>('/api/oversight/mail', {
+export function saveOversightMail(payload: OversightMailSavePayload): Promise<{
+  templates: OversightMailSettings['templates'];
+  reminder_days: number[];
+}> {
+  return jsonRequest<{
+    templates: OversightMailSettings['templates'];
+    reminder_days: number[];
+  }>('/api/oversight/mail', {
     method: 'PUT',
     body: JSON.stringify(payload),
   });

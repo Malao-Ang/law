@@ -1,4 +1,4 @@
-# Plan: Boolean Search — Add Symbol Operators `&` `|` `~`
+# Plan: Boolean Search   Add Symbol Operators `&` `|` `~`
 
 ## Goal
 
@@ -17,9 +17,9 @@
 
 **จุดบกพร่องที่พบ (3 จุด):**
 
-1. **`&` ไม่ถูก recognize เป็น AND** — ถูก tokenize เป็น search term ธรรมดา ทำให้ค้นหาคำว่า `&` แทนที่จะเป็น operator
-2. **`|` ไม่ถูก recognize เป็น OR** — เช่นเดียวกัน ถูกใช้เป็น search term
-3. **`~` standalone (มี space ก่อน term) ไม่ถูก recognize เป็น NOT** — เช่น `ภาษี ~ ค่าเดินทาง` → `~` ถูกเพิ่มเป็น search term (length == 1 ไม่ผ่าน check `mb_strlen($token) > 1` ที่ L186) แทนที่จะ negate term ถัดไป
+1. **`&` ไม่ถูก recognize เป็น AND**   ถูก tokenize เป็น search term ธรรมดา ทำให้ค้นหาคำว่า `&` แทนที่จะเป็น operator
+2. **`|` ไม่ถูก recognize เป็น OR**   เช่นเดียวกัน ถูกใช้เป็น search term
+3. **`~` standalone (มี space ก่อน term) ไม่ถูก recognize เป็น NOT**   เช่น `ภาษี ~ ค่าเดินทาง` → `~` ถูกเพิ่มเป็น search term (length == 1 ไม่ผ่าน check `mb_strlen($token) > 1` ที่ L186) แทนที่จะ negate term ถัดไป
 
 **ส่วนที่ทำงานถูกต้องแล้ว:**
 - `ภาษี AND ค่าเดินทาง` ✓
@@ -123,7 +123,7 @@ Expected: 3 of 5 tests fail (`test_ampersand_is_and_operator`, `test_pipe_is_or_
 
 **ไฟล์:** `apps/app-laravel/app/Services/Search/LawSearchQuery.php`
 
-**แก้ไข 1** — เพิ่ม `&` เข้า AND check (L168):
+**แก้ไข 1**   เพิ่ม `&` เข้า AND check (L168):
 ```php
 // BEFORE:
 if (! $quoted && in_array($upper, ['AND', 'และ'], true)) {
@@ -132,7 +132,7 @@ if (! $quoted && in_array($upper, ['AND', 'และ'], true)) {
 if (! $quoted && in_array($upper, ['AND', 'และ', '&'], true)) {
 ```
 
-**แก้ไข 2** — เพิ่ม `|` เข้า OR check (L173):
+**แก้ไข 2**   เพิ่ม `|` เข้า OR check (L173):
 ```php
 // BEFORE:
 if (! $quoted && in_array($upper, ['OR', 'หรือ'], true)) {
@@ -141,7 +141,7 @@ if (! $quoted && in_array($upper, ['OR', 'หรือ'], true)) {
 if (! $quoted && in_array($upper, ['OR', 'หรือ', '|'], true)) {
 ```
 
-**แก้ไข 3** — เพิ่ม `~` เข้า NOT check (L178):
+**แก้ไข 3**   เพิ่ม `~` เข้า NOT check (L178):
 ```php
 // BEFORE:
 if (! $quoted && in_array($upper, ['NOT', 'ไม่'], true)) {
@@ -156,7 +156,7 @@ docker compose exec laravel-app php artisan test --filter=LawSearchQueryTest
 ```
 Expected: 5 tests pass.
 
-### Task 3: Regression — run existing tests
+### Task 3: Regression   run existing tests
 
 ```bash
 docker compose exec laravel-app php artisan test --filter=LawSearchServiceTest
@@ -176,6 +176,6 @@ git commit -m "feat(search): support & | ~ as boolean operator aliases"
 ## Risks & Tradeoffs
 
 - **`&` / `|` ในชื่อเอกสาร:** หากมีเอกสารที่มี `&` หรือ `|` ในชื่อ (เช่น "AT&T") การค้นหาจะถือเป็น operator แทนที่จะเป็นส่วนหนึ่งของชื่อ → ใช้ `"AT&T"` (quoted) เพื่อ escape ได้ ซึ่งเป็น pattern เดียวกับ AND/OR/NOT อยู่แล้ว ในบริบทกฎหมายไทยไม่น่ามีกรณีนี้
-- **Elasticsearch path:** symbol operators ถูก convert เป็น expanded DSL เหมือน AND/OR/NOT — ใช้ code path เดียวกันทุกประการ (`buildExpandedMust`) ไม่ต้องแก้ ES query builder
-- **File-based path:** `matchesText()` → `groupMatchesText()` ใช้ `orGroups()` + negation logic ที่มีอยู่ — ไม่ต้องแก้
+- **Elasticsearch path:** symbol operators ถูก convert เป็น expanded DSL เหมือน AND/OR/NOT   ใช้ code path เดียวกันทุกประการ (`buildExpandedMust`) ไม่ต้องแก้ ES query builder
+- **File-based path:** `matchesText()` → `groupMatchesText()` ใช้ `orGroups()` + negation logic ที่มีอยู่   ไม่ต้องแก้
 - **No breaking change:** ผู้ใช้ที่ไม่ใช้ symbol operators ไม่ได้รับผลกระทบ

@@ -2,7 +2,7 @@ import { createLawTypeCatalog } from '../composables/useLawType';
 
 // map law_type → DocBadge law-type badge + สี border หัวเอกสาร.
 // ค่าสีตรงกับ DocBadge.vue (Figma design system).
-// ponytail: 4 hex นี้ mirror DocBadge STYLES โดยตรง — ถ้า DocBadge เปลี่ยนสี ให้แก้ที่นี่ด้วย.
+// ponytail: 4 hex นี้ mirror DocBadge STYLES โดยตรง   ถ้า DocBadge เปลี่ยนสี ให้แก้ที่นี่ด้วย.
 
 export type LawBadgeType = 'กฎหมายภายนอก' | 'ระเบียบ' | 'ข้อบังคับ' | 'ประกาศ';
 

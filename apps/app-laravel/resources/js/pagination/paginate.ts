@@ -1,6 +1,6 @@
 // Pure pagination geometry for the review editor. Given the measured top-level
 // blocks of the ProseMirror flow (spacers reset to 0, break nodes collapsed to
-// 0), decide where A4 page boundaries fall — at manual page breaks AND wherever
+// 0), decide where A4 page boundaries fall   at manual page breaks AND wherever
 // a block would overflow the usable page height (auto-pagination). Never splits
 // a block: a block that would cross the boundary is pushed whole to the next
 // sheet.

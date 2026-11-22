@@ -40,7 +40,7 @@ def _overlap_ratio(
     cell_bbox: tuple[float, float, float, float],
     word_bbox: tuple[float, float, float, float],
 ) -> float:
-    """Return intersection area / word area — how much of the word is inside the cell."""
+    """Return intersection area / word area   how much of the word is inside the cell."""
     cx0 = max(cell_bbox[0], word_bbox[0])
     cy0 = max(cell_bbox[1], word_bbox[1])
     cx1 = min(cell_bbox[2], word_bbox[2])

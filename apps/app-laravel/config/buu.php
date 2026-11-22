@@ -44,7 +44,7 @@ return [
     'esign_callback_base_url' => rtrim((string) env('BUU_ESIGN_CALLBACK_BASE_URL', env('APP_URL', 'http://localhost')), '/'),
 
     /**
-     * Exact doc_returnurl (sandbox). When set, this is sent as-is — no path is appended.
+     * Exact doc_returnurl (sandbox). When set, this is sent as-is   no path is appended.
      */
     'esign_return_url' => rtrim((string) env('BUU_ESIGN_RETURN_URL', ''), '/'),
 

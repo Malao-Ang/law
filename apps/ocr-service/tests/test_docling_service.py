@@ -59,7 +59,7 @@ def test_word_attr_present_attribute_returned() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# _parse_numbering_xml — optional elements missing
+# _parse_numbering_xml   optional elements missing
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_parse_numbering_xml_no_file_returns_empty() -> None:

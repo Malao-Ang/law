@@ -176,7 +176,7 @@
                 <span class="mdi lawx-section-relcard__icon" :class="relationIcon(rel)" />
                 <span class="lawx-section-relcard__main">
                   <span class="lawx-section-relcard__title">{{ rel.target_title }}</span>
-                  <span v-if="rel.note" class="lawx-section-relcard__note">— {{ rel.note }}</span>
+                  <span v-if="rel.note" class="lawx-section-relcard__note">  {{ rel.note }}</span>
                 </span>
                 <span v-if="rel.target_section" class="lawx-section-relcard__sec">{{ rel.target_section }}</span>
               </a>
@@ -200,7 +200,7 @@
               </a>
               <div v-if="parentLawRelation.target_section" class="text-caption text-medium-emphasis mt-1">
                 {{ parentLawRelation.target_section }}
-                <span v-if="parentLawRelation.note"> — {{ parentLawRelation.note }}</span>
+                <span v-if="parentLawRelation.note">   {{ parentLawRelation.note }}</span>
               </div>
             </div>
           </div>
@@ -228,7 +228,7 @@
               <span class="mdi lawx-relrow__icon" :class="relationIcon(rel)" />
               <span class="lawx-relrow__main">
                 <span class="lawx-relrow__title">{{ rel.target_title }}</span>
-                <span v-if="rel.note" class="lawx-relrow__note">— {{ rel.note }}</span>
+                <span v-if="rel.note" class="lawx-relrow__note">  {{ rel.note }}</span>
               </span>
               <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
             </a>
@@ -293,7 +293,7 @@ const canRead = computed(() => documentStore.documentId === props.documentId && 
 const exportingPdf = ref(false);
 const pdfExportError = ref('');
 
-// Fetch in the watcher (immediate) — same-route param changes (/law/A -> /law/B) reuse this
+// Fetch in the watcher (immediate)   same-route param changes (/law/A -> /law/B) reuse this
 // component, so onMounted never re-fires; the watcher keeps content + versions in sync.
 watch(() => props.documentId, (id) => {
   if (documentStore.documentId !== id || !documentStore.review) {
@@ -482,7 +482,7 @@ async function downloadPdf(): Promise<void> {
           return;
         }
       } catch {
-        // non-fatal — fall through to regular export
+        // non-fatal   fall through to regular export
       }
       window.open(`/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`, '_blank', 'noopener');
       return;
@@ -519,7 +519,7 @@ async function printPage(): Promise<void> {
   } catch {
     // non-fatal
   }
-  // No signed PDF yet — open the review export PDF.
+  // No signed PDF yet   open the review export PDF.
   const url = `/api/public/documents/${encodeURIComponent(props.documentId)}/export-pdf/preview`;
   window.open(url, '_blank', 'noopener');
 }
@@ -638,7 +638,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
 .lawx-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
-/* ponytail: lawx-grid 3-column responsive layout + sticky topbar/toc/info — no Vuetify equivalent */
+/* ponytail: lawx-grid 3-column responsive layout + sticky topbar/toc/info   no Vuetify equivalent */
 .lawx-grid {
   max-width: 1360px;
   margin: 0 auto;

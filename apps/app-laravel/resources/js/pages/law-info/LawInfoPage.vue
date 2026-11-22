@@ -764,7 +764,7 @@ watch(() => form.value.change_status, () => {
 });
 
 watch(() => form.value.source, () => {
-  // Only clear law_type if it no longer fits the chosen source — keeps a stored
+  // Only clear law_type if it no longer fits the chosen source   keeps a stored
   // value intact when the review load sets source+law_type together.
   if (!isOld.value) return;
   if (!hasText(form.value.source)) {

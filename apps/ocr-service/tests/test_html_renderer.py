@@ -1,4 +1,4 @@
-"""Tests for html_renderer — the single canonical table renderer."""
+"""Tests for html_renderer   the single canonical table renderer."""
 from app.services.html_renderer import build_table_html
 
 

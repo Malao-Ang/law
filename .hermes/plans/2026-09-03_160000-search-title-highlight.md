@@ -8,17 +8,17 @@ Ensure the search results page shows highlighted title text (matching query term
 
 ### How title highlighting works today
 
-1. **During typing** (autocomplete dropdown) — `ELawHeroSearch.vue` line 58-66: client-side `highlightTitle()` wraps query matches in `<mark>` tags using regex on the raw title string. This works correctly.
+1. **During typing** (autocomplete dropdown)   `ELawHeroSearch.vue` line 58-66: client-side `highlightTitle()` wraps query matches in `<mark>` tags using regex on the raw title string. This works correctly.
 
-2. **After search submit** (results list) — `LawDatabasePage.vue` line 365:
+2. **After search submit** (results list)   `LawDatabasePage.vue` line 365:
    ```html
    v-html="law.title_highlighted ? sanitizeHighlight(law.title_highlighted) : (law.title || 'ไม่ระบุชื่อกฎหมาย')"
    ```
    The frontend checks `title_highlighted` from the API response. If absent/null, it falls back to plain `title` with no highlighting.
 
-3. **Backend — file-based path** — `LawSearchController.php` line 170: Returns `title_highlighted` via `highlightTitle()` method that wraps query matches in `<mark>` tags. **This path works correctly.**
+3. **Backend   file-based path**   `LawSearchController.php` line 170: Returns `title_highlighted` via `highlightTitle()` method that wraps query matches in `<mark>` tags. **This path works correctly.**
 
-4. **Backend — ES path** — `LawSearchService::parse()` lines 374-391: Returns `title` but **NEVER** returns `title_highlighted`. ES IS configured to highlight the `title` field (line 304 of `buildBodyFromMust`), but the parse method only puts title highlight fragments into `snippets`, never into a dedicated `title_highlighted` field.
+4. **Backend   ES path**   `LawSearchService::parse()` lines 374-391: Returns `title` but **NEVER** returns `title_highlighted`. ES IS configured to highlight the `title` field (line 304 of `buildBodyFromMust`), but the parse method only puts title highlight fragments into `snippets`, never into a dedicated `title_highlighted` field.
 
 ### The bug
 
@@ -28,11 +28,11 @@ When Elasticsearch is active and returns results (the production/primary path), 
 
 | File | Role | Bug? |
 |------|------|------|
-| `app/Services/Search/LawSearchService.php` | ES query builder + parser | YES — `parse()` doesn't extract title highlight |
-| `app/Http/Controllers/Api/LawSearchController.php` | Controller; overlays ES + file-based | Partial — ES overlay doesn't add `title_highlighted` |
-| `resources/js/pages/public/LawDatabasePage.vue` | Search results rendering | OK — correctly uses `title_highlighted` |
-| `resources/js/components/shared/ELawHeroSearch.vue` | Autocomplete dropdown | OK — client-side highlighting |
-| `resources/js/types/lawSearch.ts` | Type definition | OK — `title_highlighted` already in interface |
+| `app/Services/Search/LawSearchService.php` | ES query builder + parser | YES   `parse()` doesn't extract title highlight |
+| `app/Http/Controllers/Api/LawSearchController.php` | Controller; overlays ES + file-based | Partial   ES overlay doesn't add `title_highlighted` |
+| `resources/js/pages/public/LawDatabasePage.vue` | Search results rendering | OK   correctly uses `title_highlighted` |
+| `resources/js/components/shared/ELawHeroSearch.vue` | Autocomplete dropdown | OK   client-side highlighting |
+| `resources/js/types/lawSearch.ts` | Type definition | OK   `title_highlighted` already in interface |
 
 ## Step-by-step Tasks
 
@@ -134,7 +134,7 @@ public function test_parse_extracts_title_highlighted_from_es_highlight(): void
 }
 ```
 
-Alternatively, add to `LawSearchTest::test_search_endpoint_returns_results_and_facets` — ensure the mocked ES response includes `title_highlighted` and the endpoint passes it through.
+Alternatively, add to `LawSearchTest::test_search_endpoint_returns_results_and_facets`   ensure the mocked ES response includes `title_highlighted` and the endpoint passes it through.
 
 ---
 

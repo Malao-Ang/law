@@ -291,7 +291,7 @@ const dueHint = computed(() => {
 
 const dialogTitle = computed(() => {
   const label = relationTypeLabel(form.value.type);
-  return form.value.type === 'related' ? 'เพิ่มความสัมพันธ์' : `เพิ่มความสัมพันธ์ — ${label}`;
+  return form.value.type === 'related' ? 'เพิ่มความสัมพันธ์' : `เพิ่มความสัมพันธ์   ${label}`;
 });
 
 const canSave = computed(() => {

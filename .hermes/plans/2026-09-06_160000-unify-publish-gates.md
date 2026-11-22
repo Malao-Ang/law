@@ -1,22 +1,22 @@
-# Plan: Unify publish validation gates — EditHub + ESignStatus + PublishConfirmDialog
+# Plan: Unify publish validation gates   EditHub + ESignStatus + PublishConfirmDialog
 
 ## Goal
 Consolidate all publish validation logic into one shared composable so EditHub, ESignStatusWorkspace, and PublishConfirmDialog use the same gates and conditions.
 
-## Current state — 3 places validate differently
+## Current state   3 places validate differently
 
 ### 1. EditHubWorkspace.vue `togglePublished()` (line 458-540)
 Sequential SweetAlert gates **before** opening dialog:
 - Gate 1: e-Sign → `esign_confirmed_at` + `esign_sign_status !== 'rejected'` + `esign_send_response.status !== 'fail'`
-- Gate 2: RAG → `(exported|ingested|step≥3)` AND `!rag_skipped` — **blocks if rag_skipped=true**
+- Gate 2: RAG → `(exported|ingested|step≥3)` AND `!rag_skipped`   **blocks if rag_skipped=true**
 - Gate 3: Access scope → `meta.access_scope` exists
 - Gate 4: Status ≠ ร่าง (3-button: auto-change / go edit / cancel)
 - Old docs skip gates 1-2
 
 ### 2. PublishConfirmDialog.vue checklist (line 113-184)
 Checklist shown in dialog **after** gates pass:
-- e-Sign: checks only `esign_confirmed_at` — **missing send_response.status check**
-- RAG: `(exported|ingested|step≥3) && !rag_skipped` — same logic ✅
+- e-Sign: checks only `esign_confirmed_at`   **missing send_response.status check**
+- RAG: `(exported|ingested|step≥3) && !rag_skipped`   same logic ✅
 - Access scope ✅
 - Relations (optional) ✅
 - Status ≠ ร่าง ✅
@@ -24,7 +24,7 @@ Checklist shown in dialog **after** gates pass:
 - `hasRequiredFail` disables confirm button
 
 ### 3. ESignStatusWorkspace.vue `publish()` (line 669-683)
-**NO validation at all** — directly saves `มีผลบังคับใช้` + publishes:
+**NO validation at all**   directly saves `มีผลบังคับใช้` + publishes:
 - No RAG check ❌
 - No access_scope check ❌
 - No status check ❌
@@ -37,7 +37,7 @@ Checklist shown in dialog **after** gates pass:
 |-------|-------|
 | **RAG skipped = can still publish** | EditHub Gate 2 blocks correctly, but ESignStatus has no check at all |
 | **e-Sign send_response.status=fail still shows "ลงนามสำเร็จ"** | PublishConfirmDialog line 127 only checks `esign_confirmed_at`, not `send_response` |
-| **ESign page publish has zero validation** | `PublishLawDialog` is cosmetic only — no gates, no checklist |
+| **ESign page publish has zero validation** | `PublishLawDialog` is cosmetic only   no gates, no checklist |
 | **Duplicate logic** | Same conditions coded 3 times with slight differences |
 
 ## Proposed solution
@@ -104,36 +104,36 @@ export function evaluatePublishGates(
 
 #### ESignStatusWorkspace.vue
 - Replace `PublishLawDialog` with `PublishConfirmDialog` (same component as EditHub)
-- Or: add gate check before `publish()` — call `evaluatePublishGates()`, if `hasRequiredFail`, show SweetAlert blocking publish
+- Or: add gate check before `publish()`   call `evaluatePublishGates()`, if `hasRequiredFail`, show SweetAlert blocking publish
 - Remove `PublishLawDialog.vue` if no longer used
 
 ### Delete if unused
-- `apps/app-laravel/resources/js/components/esign/PublishLawDialog.vue` — replaced by shared `PublishConfirmDialog`
+- `apps/app-laravel/resources/js/components/esign/PublishLawDialog.vue`   replaced by shared `PublishConfirmDialog`
 
 ## Step-by-step tasks
 
-### Task 1 — Create `usePublishGates.ts`
+### Task 1   Create `usePublishGates.ts`
 File: `apps/app-laravel/resources/js/composables/usePublishGates.ts`
 - Export `evaluatePublishGates()` function
 - Export types `PublishGate`, `PublishGateResult`
 - Import `LawMeta`, `DocumentStatus`, `LawRelation` from types
 
-### Task 2 — Update `PublishConfirmDialog.vue`
+### Task 2   Update `PublishConfirmDialog.vue`
 - Import `evaluatePublishGates`
 - Replace inline checklist with composable call
 - Pass `esign_send_response` in status check (currently missing)
 
-### Task 3 — Update `EditHubWorkspace.vue`
+### Task 3   Update `EditHubWorkspace.vue`
 - Import `evaluatePublishGates`
 - Replace inline gate checks (lines 466-540) with composable
 - Keep ร่าง special 3-button dialog as post-gate logic
 
-### Task 4 — Update `ESignStatusWorkspace.vue`
+### Task 4   Update `ESignStatusWorkspace.vue`
 - Replace `PublishLawDialog` with `PublishConfirmDialog`
 - Add gate check before publish
 - Remove import of `PublishLawDialog`
 
-### Task 5 — Delete `PublishLawDialog.vue` if unused
+### Task 5   Delete `PublishLawDialog.vue` if unused
 Search for remaining references; delete if none.
 
 ## Verification

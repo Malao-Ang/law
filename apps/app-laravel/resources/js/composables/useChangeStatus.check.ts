@@ -1,4 +1,4 @@
-// Dev-only assertion file — no JS test runner in this app. Run:
+// Dev-only assertion file   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/composables/useChangeStatus.check.ts
 import { createChangeStatusCatalog, type ChangeStatusCatalogInput } from './useChangeStatus';
 

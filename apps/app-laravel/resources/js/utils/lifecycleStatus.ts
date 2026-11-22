@@ -1,6 +1,6 @@
 // apps/app-laravel/resources/js/utils/lifecycleStatus.ts
 // Folds the publish + e-sign + pipeline-stage axes into a single readable
-// "ความคืบหน้า" chip. Pure function — display-only, reads existing fields.
+// "ความคืบหน้า" chip. Pure function   display-only, reads existing fields.
 import { STAGE_MAP, type StageKey } from '../data/documentPipeline';
 import type { DocumentListItem } from '../types/document';
 
@@ -19,7 +19,7 @@ export interface LifecycleStatus {
 }
 
 // Collapse the 11-stage StageKey into 4 readable draft phases.
-// Exhaustive switch (no default) — TS errors here if a StageKey is ever added.
+// Exhaustive switch (no default)   TS errors here if a StageKey is ever added.
 function draftPhaseLabel(stage: StageKey, isOld: boolean): string {
   switch (stage) {
     case 'queue':
@@ -68,14 +68,14 @@ export function lifecycleStatus(doc: DocumentListItem, stage: StageKey): Lifecyc
   // 5-6. e-sign positive / in-flight
   if (!isOld) {
     if (esign === 'Y') {
-      return { key: 'signed', bucket: 'signed', label: 'ลงนามสำเร็จ — รอเผยแพร่', color: 'admin-primary', icon: 'mdi-check-decagram-outline' };
+      return { key: 'signed', bucket: 'signed', label: 'ลงนามสำเร็จ   รอเผยแพร่', color: 'admin-primary', icon: 'mdi-check-decagram-outline' };
     }
     if (doc.esign_submitted_at) {
       return { key: 'waiting', bucket: 'waiting', label: 'รอลงนาม', color: 'info', icon: 'mdi-draw-pen' };
     }
   }
 
-  // 7. draft — show the coarse phase it is currently in
+  // 7. draft   show the coarse phase it is currently in
   return {
     key: 'draft',
     bucket: 'draft',

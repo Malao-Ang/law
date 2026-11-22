@@ -1,4 +1,4 @@
-// dev-only assertion — no JS test runner in this app. Run:
+// dev-only assertion   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/utils/esignStatus.check.ts
 import { esignStatusLabel, esignStatusColor } from './esignStatus';
 

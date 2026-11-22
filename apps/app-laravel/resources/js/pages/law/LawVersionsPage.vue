@@ -130,7 +130,7 @@
                       <div v-if="rel.target_section" class="text-caption text-medium-emphasis">
                         {{ rel.target_section }}
                       </div>
-                      <div v-if="rel.note" class="text-caption text-medium-emphasis">— {{ rel.note }}</div>
+                      <div v-if="rel.note" class="text-caption text-medium-emphasis">  {{ rel.note }}</div>
                     </div>
                     <div class="d-flex ga-1 flex-shrink-0">
                       <v-btn

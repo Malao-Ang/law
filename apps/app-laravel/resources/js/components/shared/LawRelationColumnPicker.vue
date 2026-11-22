@@ -102,7 +102,7 @@
                 :aria-selected="selectedSection === null && sectionTouched"
                 @click="selectWholeDocument"
               >
-                <span class="law-rel-col__label">— ทั้งฉบับ —</span>
+                <span class="law-rel-col__label">  ทั้งฉบับ  </span>
               </button>
               <button
                 v-for="section in filteredCol3"

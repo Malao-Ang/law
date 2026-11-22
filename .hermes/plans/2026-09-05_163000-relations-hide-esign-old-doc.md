@@ -5,16 +5,16 @@
 
 ## Current context / assumptions
 - File: `apps/app-laravel/resources/js/pages/law-relations/LawRelationsPage.vue`
-- `WorkflowFooterBar` รับ `extra-label` prop — ถ้าเป็น string จะแสดงปุ่ม, ถ้าเป็น `undefined` จะซ่อน
+- `WorkflowFooterBar` รับ `extra-label` prop   ถ้าเป็น string จะแสดงปุ่ม, ถ้าเป็น `undefined` จะซ่อน
 - `isOld` computed มีอยู่แล้ว (line 234): `computed(() => documentStore.review?.law_meta?.document_type === 'old')`
 - ปัจจุบัน template (line 11-16) ส่ง `extra-label="ส่งไป E-Sign"` โดยไม่เช็ค `isOld`
 
 ## Architecture / proposed approach
-เปลี่ยน `extra-label`, `extra-icon`, `extra-loading`, `extra-disabled` ให้เป็น conditional — ส่งค่าจริงเฉพาะเอกสารใหม่, ส่ง `undefined` สำหรับเอกสารเก่า ทำให้ `WorkflowFooterBar` ซ่อนปุ่มอัตโนมัติ
+เปลี่ยน `extra-label`, `extra-icon`, `extra-loading`, `extra-disabled` ให้เป็น conditional   ส่งค่าจริงเฉพาะเอกสารใหม่, ส่ง `undefined` สำหรับเอกสารเก่า ทำให้ `WorkflowFooterBar` ซ่อนปุ่มอัตโนมัติ
 
 ## Step-by-step tasks
 
-### Task 1 — Conditionally hide extra button for old docs
+### Task 1   Conditionally hide extra button for old docs
 File: `apps/app-laravel/resources/js/pages/law-relations/LawRelationsPage.vue`
 
 Replace lines 11-16 (inside `<WorkflowFooterBar>` attributes):
@@ -56,4 +56,4 @@ git add apps/app-laravel/resources/js/pages/law-relations/LawRelationsPage.vue &
 - Typecheck ผ่าน
 
 ## Risks, tradeoffs, and open questions
-- ไม่มี — แก้แค่ 1 ไฟล์, 1 จุด, ใช้ `isOld` ที่มีอยู่แล้ว
+- ไม่มี   แก้แค่ 1 ไฟล์, 1 จุด, ใช้ `isOld` ที่มีอยู่แล้ว

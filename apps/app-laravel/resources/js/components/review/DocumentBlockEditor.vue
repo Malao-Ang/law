@@ -83,7 +83,7 @@
               />
             </ResizableDragBlock>
             <div v-else class="block-editor__image-missing text-caption text-medium-emphasis">
-              [Image — no URL: {{ block.meta.image?.src_path ?? 'unknown' }}]
+              [Image   no URL: {{ block.meta.image?.src_path ?? 'unknown' }}]
             </div>
             <figcaption v-if="block.meta.image?.caption" class="text-caption text-medium-emphasis">
               {{ block.meta.image.caption }}
@@ -112,7 +112,7 @@
           </div>
         </template>
 
-        <!-- Text block — TipTap inline editor when selected, plain text otherwise -->
+        <!-- Text block   TipTap inline editor when selected, plain text otherwise -->
         <template v-else>
           <!-- Inline TipTap editor when this block is actively editing -->
           <div
@@ -587,7 +587,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* ponytail: document canvas & TipTap inline editor — keep all */
+/* ponytail: document canvas & TipTap inline editor   keep all */
 .block-editor__page {
   margin-bottom: 1.5rem;
 }

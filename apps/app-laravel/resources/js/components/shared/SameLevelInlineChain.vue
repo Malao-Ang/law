@@ -78,7 +78,7 @@ const items = computed(() => {
       versionLabel: sameLevelVersionLabel(chain, row.id),
       statusLabel: row.metaStatus
         ? statusLabel(row.metaStatus)
-        : (kind === 'revoked' ? statusLabel(repealedCode.value) : kind === 'active' ? statusLabel(inForceCode.value) : '—'),
+        : (kind === 'revoked' ? statusLabel(repealedCode.value) : kind === 'active' ? statusLabel(inForceCode.value) : ' '),
     };
   });
 });

@@ -26,7 +26,7 @@ abstract class TestCase extends BaseTestCase
             app(AuditLogStore::class)->truncate();
             app(LawCommentStore::class)->truncate();
         } catch (\Exception) {
-            // MongoDB not reachable — tests that need it will fail naturally
+            // MongoDB not reachable   tests that need it will fail naturally
         }
     }
 }

@@ -13,7 +13,7 @@ Guarantee every uploaded document's source file lands in MinIO on both extractio
   Both upload source-only to folder `/{documentId}`, set `minio_source_filename`, and are non-fatal via `MinioUploadService::uploadIfEnabled`.
 - **PDF → MinIO at e-Sign**: `EsignSubmitService::submit` (`app/Services/EsignSubmitService.php:60-113`) exports the reviewed doc to PDF, calls `buuEsign->uploadPdf(...)`, stores `esign_doc_filename` + `esign_bucket`. `send()` then calls SendDocumentSign referencing that MinIO object. This is the "PDF for e-Sign" path and stays.
 - **Serving**: `DocumentFileController::show` (`app/Http/Controllers/Api/DocumentFileController.php:52-86`) is **local-first, MinIO-fallback** today.
-- `MinioUploadService` (`app/Services/Buu/MinioUploadService.php`) wraps `BuuMinioService::putFile`; `uploadIfEnabled` returns null when `config('buu.minio_enabled')` is false (local dev) — so nothing breaks when MinIO is off.
+- `MinioUploadService` (`app/Services/Buu/MinioUploadService.php`) wraps `BuuMinioService::putFile`; `uploadIfEnabled` returns null when `config('buu.minio_enabled')` is false (local dev)   so nothing breaks when MinIO is off.
 
 ### Decisions (from user, confirmed)
 1. **DOCX upload**: store the **original `.docx` only** on MinIO at upload time. The PDF is generated later at e-Sign (existing `EsignSubmitService::submit` flow). Do NOT convert-and-upload a PDF at upload time.
@@ -24,14 +24,14 @@ Guarantee every uploaded document's source file lands in MinIO on both extractio
 
 ### Constraints
 - `USER.md`: never `git push` without permission; no AI/co-author markers in code or commit messages.
-- MinIO is OFF in local dev (`BUU_MINIO_ENABLED=false`) — every change must degrade gracefully to local when MinIO is disabled.
+- MinIO is OFF in local dev (`BUU_MINIO_ENABLED=false`)   every change must degrade gracefully to local when MinIO is disabled.
 
 ## Architecture / proposed approach
 Extract the two duplicated `uploadSourceToMinio()` bodies into one reusable method on `MinioUploadService` so both extraction paths call a single implementation (DRY). Invert `DocumentFileController::show` to attempt the MinIO public-link redirect first and fall back to streaming the local file only when MinIO is disabled or errors. Keep everything non-fatal so local-dev (MinIO off) still serves from disk.
 
 ---
 
-## Task 1 — DRY: one source-upload method on MinioUploadService
+## Task 1   DRY: one source-upload method on MinioUploadService
 
 ### 1a. Add `uploadSource()` to `MinioUploadService`
 File: `apps/app-laravel/app/Services/Buu/MinioUploadService.php`
@@ -117,7 +117,7 @@ Commit: `refactor(minio): centralise source upload into MinioUploadService::uplo
 
 ---
 
-## Task 2 — Serve files MinIO-first
+## Task 2   Serve files MinIO-first
 
 ### 2a. Invert `DocumentFileController::show` to MinIO-first
 File: `apps/app-laravel/app/Http/Controllers/Api/DocumentFileController.php`
@@ -164,7 +164,7 @@ Replace the body **from line 52 to line 86** (the "1. Try local first" block thr
 
         abort(404, 'File not found.');
 ```
-Note: the MinIO branch now uses `minio_source_filename` (the actual uploaded key) rather than falling back to `$relative` as a key — using the local relative path as a MinIO key was a latent bug. When `minio_source_filename` is empty (never uploaded), it skips straight to local.
+Note: the MinIO branch now uses `minio_source_filename` (the actual uploaded key) rather than falling back to `$relative` as a key   using the local relative path as a MinIO key was a latent bug. When `minio_source_filename` is empty (never uploaded), it skips straight to local.
 
 ### 2b. Verify
 ```bash
@@ -172,19 +172,19 @@ docker compose exec laravel-app php -l app/Http/Controllers/Api/DocumentFileCont
 ```
 Expected: `No syntax errors detected`.
 
-Manual (MinIO off — local dev): `GET /api/documents/{id}/file` still streams the local file (200). 
-Manual (MinIO on — server): same endpoint returns a 302 redirect to a MinIO presigned URL; `curl -I` shows `Location:` a MinIO URL. If MinIO errors, it falls back to 200 local stream.
+Manual (MinIO off   local dev): `GET /api/documents/{id}/file` still streams the local file (200). 
+Manual (MinIO on   server): same endpoint returns a 302 redirect to a MinIO presigned URL; `curl -I` shows `Location:` a MinIO URL. If MinIO errors, it falls back to 200 local stream.
 
 Commit: `feat(files): serve documents MinIO-first with local fallback`
 
 ---
 
-## Task 3 — Make source upload observable + retriable (optional hardening)
+## Task 3   Make source upload observable + retriable (optional hardening)
 
 > YAGNI check: only do this if uploads are silently failing in prod. It adds a status flag + a manual retry endpoint. If not needed now, skip and keep Task 1+2.
 
 ### 3a. Record upload outcome in status
-File: `apps/app-laravel/app/Services/Buu/MinioUploadService.php` — in `uploadSource()`, when `$minioFilename === null` and MinIO is enabled, also set a diagnostic flag:
+File: `apps/app-laravel/app/Services/Buu/MinioUploadService.php`   in `uploadSource()`, when `$minioFilename === null` and MinIO is enabled, also set a diagnostic flag:
 ```php
         if ($minioFilename === null) {
             $reviewStore->setStatus($documentId, ['minio_source_upload_failed' => true]);
@@ -253,8 +253,8 @@ Commit each task once its verify passes.
 
 ## Risks, tradeoffs, and open questions
 - **MinIO-first adds a network round-trip per file view.** `getPublicLinks` calls Kong on every request. Mitigation: the presigned URL is a redirect (browser fetches MinIO directly, not through Laravel), and the existing `Cache-Control` only applies to the local branch. If Kong latency becomes an issue, cache presigned URLs briefly (follow-up, not now).
-- **`minio_source_filename` may be empty for docs uploaded before this change / when MinIO was off during their upload.** Those fall through to local serving — correct behaviour. No backfill included; a one-off backfill command could re-upload old sources if desired (open question — not requested).
+- **`minio_source_filename` may be empty for docs uploaded before this change / when MinIO was off during their upload.** Those fall through to local serving   correct behaviour. No backfill included; a one-off backfill command could re-upload old sources if desired (open question   not requested).
 - **Task 3 is optional** (YAGNI). Include only if prod shows silent upload failures.
-- **PDF-at-e-Sign unchanged.** Per decision #1, DOCX/new docs still generate the PDF only at e-Sign time via `EsignSubmitService::submit`. If later you want the PDF in MinIO immediately at upload (so it's downloadable before signing), that's a separate task: convert via `LibreOfficeConverter` (docx→pdf) or `DocumentExportService::toPdf`, then `MinioUploadService::uploadIfEnabled` with a `pdf` folder — explicitly out of scope here.
-- **`minio-only` mode** is left as a `TODO` in `DocumentFileController` (decision #3) — not implemented until MinIO is proven stable in production.
+- **PDF-at-e-Sign unchanged.** Per decision #1, DOCX/new docs still generate the PDF only at e-Sign time via `EsignSubmitService::submit`. If later you want the PDF in MinIO immediately at upload (so it's downloadable before signing), that's a separate task: convert via `LibreOfficeConverter` (docx→pdf) or `DocumentExportService::toPdf`, then `MinioUploadService::uploadIfEnabled` with a `pdf` folder   explicitly out of scope here.
+- **`minio-only` mode** is left as a `TODO` in `DocumentFileController` (decision #3)   not implemented until MinIO is proven stable in production.
 - **Local dev safety:** every branch checks `config('buu.minio_enabled')`; with it false, behaviour is identical to today (local streaming). Verify by running Task 2's manual check with MinIO off.

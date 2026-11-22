@@ -2,11 +2,10 @@
   <AppShell
     :breadcrumbs="['เมนูหลัก', 'ติดตามกำกับดูแล', 'ข้อความแจ้งเตือน']"
     title="ข้อความและการส่งอีเมลแจ้งเตือน"
-    subtitle="แก้ข้อความที่ผู้รับผิดชอบจะได้รับ หรือกดส่งเองได้โดยไม่ต้องรอรอบอัตโนมัติ"
+    subtitle="แยกข้อความใกล้ครบกำหนดกับต้องออกประกาศใหม่ หรือกดส่งเองได้โดยไม่ต้องรอรอบอัตโนมัติ"
   >
     <v-alert type="info" variant="tonal" class="mb-4" density="comfortable">
-      ระบบส่งอัตโนมัติทุกวันเวลา 08:00 น. เมื่อเหลือ {{ reminderLabel }} วัน
-      แต่ละจำนวนส่งครั้งเดียวต่อหนึ่งกำหนด โดยใช้ข้อความที่บันทึกในหน้านี้
+      ระบบส่งอัตโนมัติทุกวันเวลา 08:00 น. ตามรอบแจ้งเตือนที่กำหนดในข้อความอีเมล
     </v-alert>
 
     <v-alert v-if="loadError" type="error" variant="tonal" class="mb-4" density="compact">{{ loadError }}</v-alert>
@@ -24,10 +23,10 @@
           <v-divider />
           <v-card-text>
             <v-alert v-if="formError" type="error" variant="tonal" class="mb-4" density="compact">{{ formError }}</v-alert>
-            <div class="text-subtitle-2 font-weight-bold mb-2">แจ้งเตือนเมื่อเหลือกี่วัน</div>
+            <div class="text-subtitle-2 font-weight-bold mb-2">แจ้งเตือนเมื่อเหลือกี่วัน (ใช้ร่วมกันทั้งสองประเภท)</div>
             <div class="d-flex flex-wrap ga-2 mb-3">
               <v-chip
-                v-for="day in form.reminder_days"
+                v-for="day in reminderDays"
                 :key="day"
                 closable
                 color="admin-primary"
@@ -36,7 +35,7 @@
               >
                 {{ day === 0 ? 'วันครบกำหนด' : `${day} วัน` }}
               </v-chip>
-              <span v-if="form.reminder_days.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่ระบุรอบแจ้งเตือน</span>
+              <span v-if="reminderDays.length === 0" class="text-body-2 text-medium-emphasis">ยังไม่ระบุรอบแจ้งเตือน</span>
             </div>
             <div class="d-flex align-center ga-2 mb-6">
               <v-text-field
@@ -53,9 +52,30 @@
               />
               <v-btn variant="tonal" color="admin-primary" class="text-none" @click="addDay">เพิ่มรอบ</v-btn>
             </div>
+
+            <div class="text-subtitle-2 font-weight-bold mb-2">ประเภทข้อความ</div>
+            <v-btn-toggle
+              v-model="activeChannel"
+              mandatory
+              density="comfortable"
+              divided
+              variant="outlined"
+              color="admin-primary"
+              class="mb-6"
+            >
+              <v-btn
+                v-for="channel in channelTabs"
+                :key="channel.key"
+                :value="channel.key"
+                class="text-none px-4"
+              >
+                {{ channel.label }}
+              </v-btn>
+            </v-btn-toggle>
+
             <v-text-field
               ref="subjectField"
-              v-model="form.subject"
+              v-model="activeForm.subject"
               label="หัวข้อ"
               variant="outlined"
               density="comfortable"
@@ -78,7 +98,7 @@
             </div>
             <v-textarea
               ref="bodyField"
-              v-model="form.body"
+              v-model="activeForm.body"
               label="ข้อความ"
               variant="outlined"
               rows="12"
@@ -100,7 +120,7 @@
               </v-chip>
             </div>
             <v-text-field
-              v-model="form.link_label"
+              v-model="activeForm.link_label"
               label="ข้อความลิงก์เข้าระบบ"
               variant="outlined"
               density="comfortable"
@@ -121,13 +141,14 @@
           <div class="pa-4">
             <div class="text-subtitle-1 font-weight-bold">ตัวอย่างที่ผู้รับจะเห็น</div>
             <div class="text-caption text-medium-emphasis">
+              {{ channelLabel(activeChannel) }}  
               {{ previewItem ? previewItem.title : 'ตัวอย่าง เมื่อยังไม่มีรายการที่ส่งได้' }}
             </div>
           </div>
           <v-divider />
           <v-card-text>
             <div class="text-caption text-medium-emphasis mb-1">หัวข้อ</div>
-            <div class="font-weight-bold mb-4">{{ preview.subject || '—' }}</div>
+            <div class="font-weight-bold mb-4">{{ preview.subject || ' ' }}</div>
             <div class="text-caption text-medium-emphasis mb-1">ข้อความ</div>
             <div class="mail-preview">{{ preview.body }}</div>
           </v-card-text>
@@ -158,6 +179,7 @@
         <thead>
           <tr>
             <th class="text-center">กฎหมาย</th>
+            <th class="text-center">ประเภท</th>
             <th class="text-center">ผู้รับ</th>
             <th class="text-center">กำหนดที่จะแจ้ง</th>
             <th class="text-center">สถานะ</th>
@@ -166,18 +188,23 @@
         </thead>
         <tbody>
           <tr v-if="!loading && settings.items.length === 0">
-            <td colspan="5" class="text-center text-medium-emphasis py-6">
-              ไม่มีรายการที่ส่งได้ ต้องติดตามกฎหมาย มีอีเมลผู้รับ และมีกำหนดที่ยังไม่บันทึกวันแล้วเสร็จ
+            <td colspan="6" class="text-center text-medium-emphasis py-6">
+              ไม่มีรายการที่ส่งได้ ต้องมีอีเมลผู้รับ และมีวันที่มีผลบังคับใช้ (สถานะยังเป็นร่าง) หรือวันต้องออกประกาศจากความสัมพันธ์
             </td>
           </tr>
           <tr
             v-for="item in settings.items"
-            :key="item.document_id"
+            :key="`${item.document_id}:${item.channel}`"
             class="cursor-pointer"
-            :class="{ 'bg-grey-lighten-4': previewItem?.document_id === item.document_id }"
-            @click="selectedId = item.document_id"
+            :class="{ 'bg-grey-lighten-4': previewItemKey === itemKey(item) }"
+            @click="selectItem(item)"
           >
             <td class="font-weight-medium" :class="isEmptyTableValue(item.title) ? 'text-center' : 'text-start'">{{ tableValue(item.title) }}</td>
+            <td class="text-center">
+              <v-chip size="small" variant="tonal" :color="item.channel === 'proclamation' ? 'secondary' : 'admin-primary'">
+                {{ channelLabel(item.channel) }}
+              </v-chip>
+            </td>
             <td :class="isEmptyTableValue(item.emails.join(', ')) ? 'text-center' : 'text-start'">{{ tableValue(item.emails.join(', ')) }}</td>
             <td class="text-center">
               <div v-for="hit in item.hits" :key="`${hit.date}-${hit.label}`">
@@ -226,80 +253,153 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { fetchOversightMail, saveOversightMail, sendOversightMail } from '../../api/client';
 import AppShell from '../../components/shared/AppShell.vue';
 import { useSnackbarStore } from '../../stores/snackbarStore';
-import type { OversightMailItem, OversightMailSettings, OversightMailTemplate } from '../../types/oversight';
+import type {
+  OversightMailChannel,
+  OversightMailItem,
+  OversightMailSettings,
+  OversightMailTemplate,
+} from '../../types/oversight';
 
 const subjectTokens = ['{title}', '{days}'];
 const snackbar = useSnackbarStore();
 
-const emptyTemplate = (): OversightMailTemplate => ({
+const emptyTemplate = (channel: OversightMailChannel): OversightMailTemplate => ({
   subject: '',
   body: '',
   link_label: '',
   reminder_days: [30, 14, 7],
+  channel,
 });
+
 const settings = ref<OversightMailSettings>({
-  template: emptyTemplate(),
-  defaults: emptyTemplate(),
+  templates: {
+    deadline: emptyTemplate('deadline'),
+    proclamation: emptyTemplate('proclamation'),
+  },
+  defaults: {
+    deadline: emptyTemplate('deadline'),
+    proclamation: emptyTemplate('proclamation'),
+  },
+  channels: [
+    { key: 'deadline', label: 'ใกล้ครบกำหนด' },
+    { key: 'proclamation', label: 'ออกประกาศใหม่' },
+  ],
   placeholders: [],
   reminder_days: [30, 14, 7],
   pending_count: 0,
   items: [],
 });
-const saved = ref<OversightMailTemplate>(emptyTemplate());
-const form = reactive<OversightMailTemplate>(emptyTemplate());
+
+const forms = reactive<Record<OversightMailChannel, OversightMailTemplate>>({
+  deadline: emptyTemplate('deadline'),
+  proclamation: emptyTemplate('proclamation'),
+});
+const saved = ref<Record<OversightMailChannel, OversightMailTemplate>>({
+  deadline: emptyTemplate('deadline'),
+  proclamation: emptyTemplate('proclamation'),
+});
+const reminderDays = ref<number[]>([30, 14, 7]);
+const savedReminderDays = ref<number[]>([30, 14, 7]);
+const activeChannel = ref<OversightMailChannel>('deadline');
 const loading = ref(false);
 const saving = ref(false);
 const sending = ref(false);
 const sendAllBusy = ref(false);
 const loadError = ref('');
 const formError = ref('');
-const selectedId = ref('');
+const selectedKey = ref('');
 const confirmOpen = ref(false);
 const confirmTarget = ref<OversightMailItem | null>(null);
 const subjectField = ref<{ $el?: HTMLElement } | null>(null);
 const bodyField = ref<{ $el?: HTMLElement } | null>(null);
 const dayDraft = ref('');
 
-const reminderLabel = computed(() => form.reminder_days.join(' / ') || '—');
-const dirty = computed(() => JSON.stringify(formSnapshot()) !== JSON.stringify(saved.value));
-const missingContext = computed(() => !form.body.includes('{title}') && !form.body.includes('{deadlines}'));
+const channelTabs = computed(() => settings.value.channels.length
+  ? settings.value.channels
+  : [
+      { key: 'deadline' as const, label: 'ใกล้ครบกำหนด' },
+      { key: 'proclamation' as const, label: 'ออกประกาศใหม่' },
+    ]);
+const activeForm = computed(() => forms[activeChannel.value]);
+const reminderLabel = computed(() => reminderDays.value.join(' / ') || ' ');
+const dirty = computed(() => JSON.stringify(formSnapshot()) !== JSON.stringify({
+  reminder_days: savedReminderDays.value,
+  deadline: channelSnapshot('deadline', saved.value.deadline),
+  proclamation: channelSnapshot('proclamation', saved.value.proclamation),
+}));
+const missingContext = computed(() => !activeForm.value.body.includes('{title}') && !activeForm.value.body.includes('{deadlines}'));
+const channelItems = computed(() => settings.value.items.filter((item) => item.channel === activeChannel.value));
 const previewItem = computed(() => {
-  const selected = settings.value.items.find((item) => item.document_id === selectedId.value);
+  const selected = settings.value.items.find((item) => itemKey(item) === selectedKey.value);
   if (selected) return selected;
-  return settings.value.items.find((item) => item.due_now) ?? settings.value.items[0] ?? null;
+  return channelItems.value.find((item) => item.due_now)
+    ?? channelItems.value[0]
+    ?? settings.value.items.find((item) => item.due_now)
+    ?? settings.value.items[0]
+    ?? null;
 });
+const previewItemKey = computed(() => (previewItem.value ? itemKey(previewItem.value) : ''));
 const preview = computed(() => renderPreview(previewItem.value));
 const confirmText = computed(() => {
   const target = confirmTarget.value;
   if (!target) {
-    return `ส่งอีเมลตามข้อความนี้ให้กฎหมายที่ถึงรอบวันนี้ ${settings.value.pending_count} ฉบับ`;
+    return `ส่งอีเมลตามข้อความนี้ให้รายการที่ถึงรอบวันนี้ ${settings.value.pending_count} ฉบับ (แยกตามประเภทเทมเพลต)`;
   }
-  return `ส่งถึง ${target.emails.join(', ')} สำหรับ «${target.title}»`;
+  return `ส่งถึง ${target.emails.join(', ')} สำหรับ «${target.title}» (${channelLabel(target.channel)})   ระบบจะส่งทุกประเภทของกฎหมายฉบับนี้ที่มีกำหนดเปิดอยู่`;
 });
 
 onMounted(() => {
   void load();
 });
 
+function itemKey(item: OversightMailItem): string {
+  return `${item.document_id}:${item.channel}`;
+}
+
+function channelLabel(channel: OversightMailChannel): string {
+  return channelTabs.value.find((item) => item.key === channel)?.label
+    ?? (channel === 'proclamation' ? 'ออกประกาศใหม่' : 'ใกล้ครบกำหนด');
+}
+
 function normalizeDays(days: number[]): number[] {
   return [...new Set(days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 365))].sort((a, b) => b - a);
 }
 
-function formSnapshot(): OversightMailTemplate {
+function channelSnapshot(channel: OversightMailChannel, source: OversightMailTemplate) {
   return {
-    subject: form.subject,
-    body: form.body,
-    link_label: form.link_label,
-    reminder_days: normalizeDays(form.reminder_days),
+    subject: source.subject,
+    body: source.body,
+    link_label: source.link_label,
   };
 }
 
-function applyTemplate(template: OversightMailTemplate): void {
-  form.subject = template.subject;
-  form.body = template.body;
-  form.link_label = template.link_label;
-  form.reminder_days = normalizeDays(template.reminder_days ?? [30, 14, 7]);
-  saved.value = formSnapshot();
+function formSnapshot() {
+  return {
+    reminder_days: normalizeDays(reminderDays.value),
+    deadline: channelSnapshot('deadline', forms.deadline),
+    proclamation: channelSnapshot('proclamation', forms.proclamation),
+  };
+}
+
+function applyTemplates(payload: OversightMailSettings): void {
+  const days = normalizeDays(payload.reminder_days ?? payload.templates.deadline.reminder_days ?? [30, 14, 7]);
+  reminderDays.value = days;
+  savedReminderDays.value = [...days];
+  (['deadline', 'proclamation'] as OversightMailChannel[]).forEach((channel) => {
+    const template = payload.templates[channel] ?? emptyTemplate(channel);
+    forms[channel].subject = template.subject;
+    forms[channel].body = template.body;
+    forms[channel].link_label = template.link_label;
+    forms[channel].reminder_days = days;
+    forms[channel].channel = channel;
+    saved.value[channel] = {
+      subject: template.subject,
+      body: template.body,
+      link_label: template.link_label,
+      reminder_days: days,
+      channel,
+    };
+  });
 }
 
 async function load(): Promise<void> {
@@ -307,9 +407,12 @@ async function load(): Promise<void> {
   loadError.value = '';
   try {
     settings.value = await fetchOversightMail();
-    applyTemplate(settings.value.template);
-    if (!selectedId.value && settings.value.items[0]) {
-      selectedId.value = (settings.value.items.find((item) => item.due_now) ?? settings.value.items[0]).document_id;
+    applyTemplates(settings.value);
+    if (!selectedKey.value && settings.value.items[0]) {
+      const preferred = settings.value.items.find((item) => item.due_now && item.channel === activeChannel.value)
+        ?? settings.value.items.find((item) => item.due_now)
+        ?? settings.value.items[0];
+      selectItem(preferred);
     }
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ';
@@ -318,8 +421,13 @@ async function load(): Promise<void> {
   }
 }
 
+function selectItem(item: OversightMailItem): void {
+  selectedKey.value = itemKey(item);
+  activeChannel.value = item.channel;
+}
+
 function validateDays(): boolean {
-  if (normalizeDays(form.reminder_days).length === 0) {
+  if (normalizeDays(reminderDays.value).length === 0) {
     formError.value = 'ต้องมีอย่างน้อย 1 รอบแจ้งเตือน';
     return false;
   }
@@ -344,10 +452,12 @@ async function save(): Promise<boolean> {
 }
 
 function restoreDefaults(): void {
-  form.subject = settings.value.defaults.subject;
-  form.body = settings.value.defaults.body;
-  form.link_label = settings.value.defaults.link_label;
-  form.reminder_days = normalizeDays(settings.value.defaults.reminder_days ?? [30, 14, 7]);
+  const channel = activeChannel.value;
+  const defaults = settings.value.defaults[channel] ?? emptyTemplate(channel);
+  forms[channel].subject = defaults.subject;
+  forms[channel].body = defaults.body;
+  forms[channel].link_label = defaults.link_label;
+  reminderDays.value = normalizeDays(settings.value.defaults.deadline.reminder_days ?? [30, 14, 7]);
   formError.value = '';
 }
 
@@ -362,21 +472,21 @@ function addDay(): void {
     formError.value = 'จำนวนวันต้องเป็นจำนวนเต็ม 0 ถึง 365';
     return;
   }
-  if (form.reminder_days.includes(day)) {
+  if (reminderDays.value.includes(day)) {
     formError.value = 'มีจำนวนวันนี้อยู่แล้ว';
     return;
   }
-  if (form.reminder_days.length >= 8) {
+  if (reminderDays.value.length >= 8) {
     formError.value = 'เพิ่มรอบแจ้งเตือนได้ไม่เกิน 8 รอบ';
     return;
   }
-  form.reminder_days = normalizeDays([...form.reminder_days, day]);
+  reminderDays.value = normalizeDays([...reminderDays.value, day]);
   dayDraft.value = '';
   formError.value = '';
 }
 
 function removeDay(day: number): void {
-  form.reminder_days = form.reminder_days.filter((item) => item !== day);
+  reminderDays.value = reminderDays.value.filter((item) => item !== day);
 }
 
 function askSend(item: OversightMailItem | null): void {
@@ -392,7 +502,12 @@ async function confirmSend(): Promise<void> {
     if (dirty.value) {
       if (!validateDays()) return;
       const stored = await saveOversightMail(formSnapshot());
-      applyTemplate(stored.template);
+      settings.value.templates = stored.templates;
+      applyTemplates({
+        ...settings.value,
+        templates: stored.templates,
+        reminder_days: stored.reminder_days,
+      });
     }
     const result = await sendOversightMail(confirmTarget.value?.document_id);
     confirmOpen.value = false;
@@ -417,11 +532,11 @@ async function confirmSend(): Promise<void> {
 
 function insertToken(field: 'subject' | 'body', token: string): void {
   const target = field === 'subject' ? subjectField.value : bodyField.value;
-  const current = form[field];
+  const current = activeForm.value[field];
   const el = target?.$el?.querySelector('textarea, input') as HTMLTextAreaElement | HTMLInputElement | null;
   const start = el?.selectionStart ?? current.length;
   const end = el?.selectionEnd ?? start;
-  form[field] = current.slice(0, start) + token + current.slice(end);
+  activeForm.value[field] = current.slice(0, start) + token + current.slice(end);
   void nextTick(() => {
     el?.focus();
     const pos = start + token.length;
@@ -433,11 +548,17 @@ function renderPreview(item: OversightMailItem | null): { subject: string; body:
   const title = item?.title ?? 'ตัวอย่างกฎหมาย';
   const hits = item?.hits?.length
     ? item.hits
-    : [{ label: 'กำหนดเวลาออกประกาศ', display_date: '06/11/2569', days_left: 14, date: '' }];
+    : [{
+        label: activeChannel.value === 'proclamation' ? 'ออกประกาศฉบับใหม่ทั้งฉบับ' : 'กำหนดเวลาออกประกาศ',
+        display_date: '06/11/2569',
+        days_left: 14,
+        date: '',
+      }];
   const days = [...new Set(hits.map((hit) => hit.days_left))].sort((a, b) => a - b).join('/');
   const deadlines = hits
     .map((hit) => `• ${hit.label} วันที่ ${hit.display_date} (${daysPhrase(hit.days_left)})`)
     .join('\n');
+  const form = activeForm.value;
   const replace = (text: string) => text
     .replaceAll('{title}', title)
     .replaceAll('{days}', days)

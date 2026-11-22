@@ -125,7 +125,7 @@ class DocxParser:
         # Infer first-line indent from a leading TAB when w:firstLine is absent.
         # Thai legal DOCX files routinely use a literal tab at the start of body
         # paragraphs instead of setting w:ind/@firstLine.
-        # Skip for numbered list items — their text already starts with
+        # Skip for numbered list items   their text already starts with
         # `prefix + "\t"` as a structural marker separator, not a body indent.
         layout = layout.copy()
         if numbering_info is None and layout.get("indent_first_line") is None and text.startswith("\t"):

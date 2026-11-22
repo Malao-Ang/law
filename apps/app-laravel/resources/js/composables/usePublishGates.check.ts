@@ -1,4 +1,4 @@
-// dev-only assertion — no JS test runner in this app. Run:
+// dev-only assertion   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/composables/usePublishGates.check.ts
 import { evaluatePublishGates } from './usePublishGates';
 import type { DocumentStatus, LawMeta } from '../types/document';

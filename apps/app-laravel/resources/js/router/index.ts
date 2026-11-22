@@ -11,6 +11,8 @@ const AdminUploadPage = () => import('../pages/admin/AdminUploadPage.vue');
 const AdminReportPage = () => import('../pages/admin/AdminReportPage.vue');
 const AdminOversightPage = () => import('../pages/admin/AdminOversightPage.vue');
 const AdminOversightMailPage = () => import('../pages/admin/AdminOversightMailPage.vue');
+const AdminCommentsPage = () => import('../pages/admin/AdminCommentsPage.vue');
+const AdminCommentDetailPage = () => import('../pages/admin/AdminCommentDetailPage.vue');
 const AdminAuditLogPage = () => import('../pages/admin/AdminAuditLogPage.vue');
 const AdminOcrQueuePage = () => import('../pages/admin/AdminOcrQueuePage.vue');
 const AdminRelationsHubPage = () => import('../pages/admin/AdminRelationsHubPage.vue');
@@ -55,6 +57,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/admin/reports', name: 'admin-reports', component: AdminReportPage, meta: { bareLayout: true } },
   { path: '/admin/oversight', name: 'admin-oversight', component: AdminOversightPage, meta: { bareLayout: true } },
   { path: '/admin/oversight-mail', name: 'admin-oversight-mail', component: AdminOversightMailPage, meta: { bareLayout: true } },
+  { path: '/admin/comments', name: 'admin-comments', component: AdminCommentsPage, meta: { bareLayout: true } },
+  { path: '/admin/comments/:commentId', name: 'admin-comment-detail', component: AdminCommentDetailPage, props: true, meta: { bareLayout: true } },
   { path: '/admin/audit-logs', name: 'admin-audit-logs', component: AdminAuditLogPage, meta: { bareLayout: true } },
   { path: '/admin/upload', name: 'admin-upload', component: AdminUploadPage, meta: { bareLayout: true } },
   { path: '/admin/ocr-queue', name: 'admin-ocr-queue', component: AdminOcrQueuePage, meta: { bareLayout: true } },
@@ -82,7 +86,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/law/relations/:documentId?', name: 'public-show-relations', component: PublicShowRelationsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId/comments', name: 'law-comments', component: LawCommentsPage, props: true, meta: { bareLayout: true } },
   { path: '/law/:documentId', name: 'law', component: LawPage, props: true, meta: { bareLayout: true } },
-  // Dev-only MinIO test page — excluded from production builds.
+  // Dev-only MinIO test page   excluded from production builds.
   ...(import.meta.env.DEV
     ? [{ path: '/dev/minio', name: 'dev-minio', component: MinioTestPage, meta: { bareLayout: false } } as RouteRecordRaw]
     : []),

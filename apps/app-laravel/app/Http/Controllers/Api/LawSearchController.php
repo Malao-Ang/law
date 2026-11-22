@@ -742,7 +742,7 @@ class LawSearchController extends Controller
                 $chunks = is_array($export['chunks'] ?? null) ? $export['chunks'] : [];
             }
             // An ingested doc can lack an export file (e.g. published via a path
-            // that didn't persist one) — read searchable text straight from the
+            // that didn't persist one)   read searchable text straight from the
             // review blocks so content search works regardless.
             if ($chunks === [] && $documentId !== '') {
                 $chunks = $this->chunksFromReview($documentId, $store);

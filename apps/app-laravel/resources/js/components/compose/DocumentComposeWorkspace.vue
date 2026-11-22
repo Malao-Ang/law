@@ -436,7 +436,7 @@ async function handleCreateAfterSelected(): Promise<void> {
 }
 
 function onAllBlocksSaved(): void {
-  // Stay in edit mode — user can keep editing without a reload
+  // Stay in edit mode   user can keep editing without a reload
 }
 
 function handleFooterSave(): void {

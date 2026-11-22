@@ -117,7 +117,7 @@ const rowIcon = computed(() =>
 );
 
 const statusLabel = computed(() =>
-  props.node.row.metaStatus || props.node.row.workflowStage || '—',
+  props.node.row.metaStatus || props.node.row.workflowStage || ' ',
 );
 
 const statusChipColor = computed(() =>

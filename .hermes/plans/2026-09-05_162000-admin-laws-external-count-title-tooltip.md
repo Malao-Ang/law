@@ -1,4 +1,4 @@
-# Plan: admin/laws + admin/upload — นับกฎหมายภายนอกให้ถูก และชื่อยาวตัด ... พร้อม tooltip
+# Plan: admin/laws + admin/upload   นับกฎหมายภายนอกให้ถูก และชื่อยาวตัด ... พร้อม tooltip
 
 ## Goal
 แก้หน้า `admin/laws` ให้ stat card "กฎหมายภายนอก" นับจาก `law_meta.source === 'external'`/เอกสารเก่าภายนอก ไม่ใช่นับจาก `law_type` และทำให้ชื่อกฎหมายในตาราง `admin/laws` + `admin/upload` ยาวเกิน 1 บรรทัดตัด `...` พร้อม tooltip.
@@ -11,14 +11,14 @@
 - Report API: `apps/app-laravel/app/Http/Controllers/Api/ReportController.php`
 - Current report documents do not expose `source`, so the frontend cannot count external-law documents correctly.
 - Current `AdminLawListPage.vue` counts stat card `กฎหมายภายนอก` from `by_type` where `law_type === 'กฎหมายภายนอก'`, but real external docs may have law_type like `พระราชบัญญัติ`, `ระเบียบ`, etc. and `source === 'external'`.
-- User requirement: no dash `—` in admin/upload tag columns; keep meaningful chips.
+- User requirement: no dash ` ` in admin/upload tag columns; keep meaningful chips.
 
 ## Architecture / proposed approach
 Expose `source` from the report summary API, type it on the frontend, then count the "กฎหมายภายนอก" card from document source instead of law type. Add a reusable Vuetify tooltip wrapping a single-line truncated title in both admin tables, with scoped CSS using `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`.
 
 ## Step-by-step tasks
 
-### Task 1 — Add `source` to report API documents
+### Task 1   Add `source` to report API documents
 File: `apps/app-laravel/app/Http/Controllers/Api/ReportController.php`
 
 In `documents()` add a `source` field next to `published_date`:
@@ -38,7 +38,7 @@ cd D:/workspace/outside/docling-thai-poc/apps/app-laravel && npm run typecheck
 
 Expected output includes no TypeScript errors after Task 2.
 
-### Task 2 — Type `source` in `ReportDocument`
+### Task 2   Type `source` in `ReportDocument`
 File: `apps/app-laravel/resources/js/types/document.ts`
 
 Add optional `source` field to `ReportDocument`:
@@ -49,7 +49,7 @@ Add optional `source` field to `ReportDocument`:
 
 Place it near `published_date?: string;`.
 
-### Task 3 — Count external laws from `source`, not `law_type`
+### Task 3   Count external laws from `source`, not `law_type`
 File: `apps/app-laravel/resources/js/pages/admin/AdminLawListPage.vue`
 
 Update the `statCards` computed block so `กฎหมายภายนอก` uses `summary.value.documents.filter((d) => d.source === 'external')`.
@@ -68,7 +68,7 @@ Replace the count/recent logic inside `FEATURED_TYPES.map` with this exact shape
 
 Do not change `FEATURED_TYPES`.
 
-### Task 4 — Truncate law title in `admin/laws` table with tooltip
+### Task 4   Truncate law title in `admin/laws` table with tooltip
 File: `apps/app-laravel/resources/js/pages/admin/AdminLawListPage.vue`
 
 Replace current title span:
@@ -100,7 +100,7 @@ Add scoped CSS at bottom:
 }
 ```
 
-### Task 5 — Truncate upload table title with tooltip
+### Task 5   Truncate upload table title with tooltip
 File: `apps/app-laravel/resources/js/components/admin/DocumentPipelineTable.vue`
 
 Replace current title template:
@@ -136,7 +136,7 @@ Add scoped CSS near existing table CSS:
 }
 ```
 
-### Task 6 — Verify and commit
+### Task 6   Verify and commit
 Run:
 
 ```bash

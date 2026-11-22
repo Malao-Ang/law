@@ -25,6 +25,7 @@ final class AuditLogStore
         'block' => 'บล็อกเนื้อหา',
         'permission_group' => 'กลุ่มสิทธิ์',
         'oversight' => 'กำกับดูแล',
+        'comment' => 'ความคิดเห็น',
         'relation' => 'ความสัมพันธ์',
         'master_data' => 'ข้อมูลหลัก', 'unit' => 'หน่วยงาน', 'membership' => 'สมาชิกหน่วยงาน',
         'audit_log' => 'ประวัติการใช้งาน', 'user' => 'ผู้ใช้', 'auth' => 'การเข้าสู่ระบบ',

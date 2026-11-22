@@ -11,7 +11,7 @@ from app.services.block_builder import render_text_with_layout
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P1 — combining-mark-only spans must survive the whitespace guard
+# P1   combining-mark-only spans must survive the whitespace guard
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_combining_mark_only_span_not_lost() -> None:
@@ -32,7 +32,7 @@ def test_combining_mark_not_space_separated() -> None:
 
 def test_tone_mark_span_attaches_directly() -> None:
     """Tone mark in its own span must be attached directly to the preceding span."""
-    # ["ดว", "้", "ย"] — tone mark should attach without space
+    # ["ดว", "้", "ย"]   tone mark should attach without space
     result = _join_thai_spans(["ดว", "้", "ย"])
     assert " ้" not in result, "unwanted space before ้"
     assert "้ " not in result, "unwanted space after ้"
@@ -40,7 +40,7 @@ def test_tone_mark_span_attaches_directly() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P2 — line breaks must be preserved across lines in a block
+# P2   line breaks must be preserved across lines in a block
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_two_lines_joined_with_newline() -> None:
@@ -76,7 +76,7 @@ def test_newline_rendered_as_br_in_html() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P3 — PDF paragraph blocks must carry meta.layout
+# P3   PDF paragraph blocks must carry meta.layout
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_pdf_block_layout_keys_complete() -> None:
@@ -96,7 +96,7 @@ def test_pdf_block_layout_keys_complete() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P4 — indent inference from line x-positions
+# P4   indent inference from line x-positions
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _FakeRect:
@@ -193,7 +193,7 @@ def test_layout_all_required_keys_present() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# P5 — table cell extraction via span-level path
+# P5   table cell extraction via span-level path
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_extract_pdf_cell_text_fallback_when_no_rect() -> None:

@@ -314,7 +314,7 @@
                 class="mb-1"
                 icon="mdi-magnify-scan"
               >
-                ไม่พบผลลัพธ์ที่ตรงกับ "{{ query }}" — แสดงผลใกล้เคียงที่พบแทน
+                ไม่พบผลลัพธ์ที่ตรงกับ "{{ query }}"   แสดงผลใกล้เคียงที่พบแทน
               </v-alert>
               <div
                 v-for="law in sortedResults"

@@ -1,4 +1,4 @@
-// ponytail: dev-only assertion — no JS test runner in this app. Run:
+// ponytail: dev-only assertion   no JS test runner in this app. Run:
 //   cd apps/app-laravel && npx tsx resources/js/composables/useShowRelations.check.ts
 import {
   buildRelationTree,

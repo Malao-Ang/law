@@ -196,7 +196,7 @@
           </div>
           <div>
             <div class="rel-root__meta-label">หน่วยงาน</div>
-            <div class="rel-root__meta-value">{{ selectedRow.org || '—' }}</div>
+            <div class="rel-root__meta-value">{{ selectedRow.org || ' ' }}</div>
           </div>
         </div>
       </v-card>

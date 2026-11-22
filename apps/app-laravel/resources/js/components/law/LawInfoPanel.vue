@@ -112,7 +112,7 @@
               >
                 <span class="lawx-relrow__main">
                   <span class="lawx-relrow__title">{{ rel.target_title || rel.target_document_id || 'ไม่ระบุชื่อกฎหมาย' }}</span>
-                  <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">— {{ rel.change_detail || rel.note }}</span>
+                  <span v-if="rel.change_detail || rel.note" class="lawx-relrow__note">  {{ rel.change_detail || rel.note }}</span>
                 </span>
                 <span v-if="rel.target_section" class="lawx-relrow__sec">{{ rel.target_section }}</span>
               </a>

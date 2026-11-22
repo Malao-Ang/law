@@ -17,7 +17,7 @@ class DocumentExportService
     // Must match the editor's primary face (DocumentEditorShell .ProseMirror).
     // Only "TH Sarabun New" is actually installed in the LibreOffice container;
     // "TH Sarabun PSK" is not, so declaring it first makes fontconfig substitute
-    // Google "Sarabun" — a different font with different metrics than the review.
+    // Google "Sarabun"   a different font with different metrics than the review.
     private const EXPORT_FONT = 'TH Sarabun New';
 
     private const DEFAULT_LINE_HEIGHT = 1.0;
@@ -179,7 +179,7 @@ class DocumentExportService
             $html = $draftElementHtml !== '' ? $draftElementHtml : $this->blockHtmlOrFallback($block);
             $runs = $this->parseHtmlRuns($html);
             if ($runs === []) {
-                // An emptied block is still a visible blank line in the editor —
+                // An emptied block is still a visible blank line in the editor  
                 // emit an empty paragraph so the PDF keeps the same vertical rhythm.
                 $emptyRun = $section->addTextRun($this->paragraphStyleForBlock($block, $lineHeight));
                 $emptyRun->addText(' ', ['name' => self::EXPORT_FONT, 'size' => 16]);
@@ -876,7 +876,7 @@ class DocumentExportService
     private function blankParagraphStyle(): array
     {
         // PhpWord's Paragraph style key for line spacing is `lineHeight` (a
-        // multiplier), NOT `line`/`lineRule` — those are silently ignored, which
+        // multiplier), NOT `line`/`lineRule`   those are silently ignored, which
         // left blank paragraphs with no line box so LibreOffice collapsed them.
         return [
             'spaceAfter' => 0,

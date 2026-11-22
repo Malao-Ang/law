@@ -358,7 +358,7 @@ function initials(name: string): string {
 }
 
 function onSignerConfirmed(signer: ESignSigner): void {
-  // One primary signer per role type — replace if same role already selected
+  // One primary signer per role type   replace if same role already selected
   signers.value = [
     ...signers.value.filter((entry) => entry.roleType !== signer.roleType),
     signer,

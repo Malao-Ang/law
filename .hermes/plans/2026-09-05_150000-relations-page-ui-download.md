@@ -4,8 +4,8 @@
 ปรับ UI หน้า `/law/relations/:documentId` ให้ดูง่ายขึ้น + เพิ่ม feature download PDF (เดี่ยว + ทั้งหมด)
 
 ## Files to modify
-1. `apps/app-laravel/resources/js/pages/public/PublicShowRelationsPage.vue` — main page
-2. `apps/app-laravel/resources/js/api/client.ts` — download helper (existing)
+1. `apps/app-laravel/resources/js/pages/public/PublicShowRelationsPage.vue`   main page
+2. `apps/app-laravel/resources/js/api/client.ts`   download helper (existing)
 
 ## Task 1: ปรับ ROOT card ให้ดูง่ายขึ้น
 File: `PublicShowRelationsPage.vue` around line 171-210
@@ -54,7 +54,7 @@ File: `PublicShowRelationsPage.vue` around line 171-210
     </div>
     <div>
       <div class="rel-root__meta-label"><v-icon icon="mdi-office-building-outline" size="14" /> หน่วยงาน</div>
-      <div class="rel-root__meta-value">{{ selectedRow.org || '—' }}</div>
+      <div class="rel-root__meta-value">{{ selectedRow.org || ' ' }}</div>
     </div>
     <div v-if="rootMeta?.law_group">
       <div class="rel-root__meta-label"><v-icon icon="mdi-folder-outline" size="14" /> กลุ่มกฎหมาย</div>
@@ -163,7 +163,7 @@ feat(relations): improve public relations page UI + add PDF download (single & a
 ```
 
 ## Notes
-- `documentFileDownloadUrl()` returns `/api/documents/:id/file?download=1` — works for both old (original PDF) and new (e-Sign exported PDF) documents
+- `documentFileDownloadUrl()` returns `/api/documents/:id/file?download=1`   works for both old (original PDF) and new (e-Sign exported PDF) documents
 - Backend `DocumentFileController` already handles returning the right file (MinIO or local)
 - Download all: stagger 500ms between downloads to avoid browser blocking multiple downloads
 - File name: sanitize title to safe filename, limit 100 chars

@@ -6,7 +6,7 @@ export interface Sheet { top: number; height: number }
 /**
  * Paginate the review editor's ProseMirror flow onto stacked A4 sheets.
  * Splits at manual page breaks AND wherever a top-level block would overflow
- * the usable page height (auto-pagination) — the overflowing block is pushed
+ * the usable page height (auto-pagination)   the overflowing block is pushed
  * whole to the next sheet, never split.
  *
  * Measures every top-level block with offsetTop/offsetHeight (pre-transform, so

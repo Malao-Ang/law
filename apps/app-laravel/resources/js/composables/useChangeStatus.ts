@@ -25,7 +25,7 @@ export interface ChangeDetailOption {
   icon: string | null;
 }
 
-// ─── Seeds (4 CHG + 4 CHD — authoritative fallback) ──────────────────────────
+// ─── Seeds (4 CHG + 4 CHD   authoritative fallback) ──────────────────────────
 
 const SEED_TYPES: ChangeStatusOption[] = [
   { title: 'กฎหมายใหม่',       value: 'CHG01', code: 'CHG01', source: 'both',     has_details: false, role: 'new' },

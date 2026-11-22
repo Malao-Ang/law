@@ -8,16 +8,16 @@
 
 | หน้า | Route | ผู้ใช้ | Layout | คำอธิบาย |
 |------|-------|--------|--------|----------|
-| `AdminShowRelationsPage.vue` | `/admin/show-relations/:documentId?` | Admin | `AppShell` (admin sidebar, breadcrumbs, bell icon) | เลือกกฎหมาย → ดู hierarchy/tree ของกฎหมายลำดับรอง — **data + logic สมบูรณ์แล้ว** |
-| `LawRelationsPage.vue` | `/documents/:documentId/relations` | Admin (workflow step 5/6) | `AppShell` + `WorkflowFooterBar` | ขั้นตอนนำเข้า: เพิ่ม/ลบ relation, เลือก parent — **editor ไม่ใช่ view** |
-| `LawVersionsPage.vue` | `/law/:documentId/versions` | Public user | `ELawNavbar` + `ELawFooter` (public law layout) | ดู version timeline + relation list (read-only) — **มีแล้วแต่เป็น per-document** |
+| `AdminShowRelationsPage.vue` | `/admin/show-relations/:documentId?` | Admin | `AppShell` (admin sidebar, breadcrumbs, bell icon) | เลือกกฎหมาย → ดู hierarchy/tree ของกฎหมายลำดับรอง   **data + logic สมบูรณ์แล้ว** |
+| `LawRelationsPage.vue` | `/documents/:documentId/relations` | Admin (workflow step 5/6) | `AppShell` + `WorkflowFooterBar` | ขั้นตอนนำเข้า: เพิ่ม/ลบ relation, เลือก parent   **editor ไม่ใช่ view** |
+| `LawVersionsPage.vue` | `/law/:documentId/versions` | Public user | `ELawNavbar` + `ELawFooter` (public law layout) | ดู version timeline + relation list (read-only)   **มีแล้วแต่เป็น per-document** |
 | `LawPage.vue` | `/law/:documentId` | Public user | `ELawNavbar` + `ELawFooter` | อ่านเอกสารกฎหมาย, sidebar มีปุ่ม "ดูเวอร์ชันและความสัมพันธ์" → link ไป `/law/:id/versions` |
 
 ### สรุป
 
-- **ฝั่ง admin** มี show-relations (hierarchy view) สมบูรณ์แล้ว — `AdminShowRelationsPage.vue` + composable `useShowRelations.ts`
+- **ฝั่ง admin** มี show-relations (hierarchy view) สมบูรณ์แล้ว   `AdminShowRelationsPage.vue` + composable `useShowRelations.ts`
 - **ฝั่ง user/public** มี per-document versions + relations (`LawVersionsPage.vue`) แต่ **ไม่มีหน้า browse + hierarchy** เหมือน admin
-- Business logic สำหรับ build tree, filter, stat, search อยู่ใน `composables/useShowRelations.ts` — reusable ได้เลย
+- Business logic สำหรับ build tree, filter, stat, search อยู่ใน `composables/useShowRelations.ts`   reusable ได้เลย
 - ต้องสร้างหน้า public ใหม่ที่ wrap logic เดียวกัน แต่ใช้ **public layout** (`ELawNavbar` / `ELawFooter`) แทน `AppShell`
 
 ## Architecture / Proposed Approach
@@ -83,7 +83,7 @@ const PublicShowRelationsPage = () => import('../pages/public/PublicShowRelation
 
 **3c.** `apps/app-laravel/resources/js/pages/public/LawDatabasePage.vue`
 
-(Optional) เพิ่มลิ้ง "ดูความสัมพันธ์" ในรายการผลค้นหา — ถ้า document มี relations
+(Optional) เพิ่มลิ้ง "ดูความสัมพันธ์" ในรายการผลค้นหา   ถ้า document มี relations
 
 ### Task 4: Style adjustments
 
@@ -96,9 +96,9 @@ const PublicShowRelationsPage = () => import('../pages/public/PublicShowRelation
 ### Task 5: ตรวจสอบว่า composable/component reuse ได้จริง
 
 Files ที่ reuse:
-- `composables/useShowRelations.ts` — ใช้ได้ตรงๆ (ไม่มี admin dependency)
-- `components/admin/RelationTreeView.vue` — ย้ายไป `shared/` หรือ import จาก admin ก็ได้ (ไม่มี admin-specific logic)
-- `components/admin/HierarchyList.vue` — เช่นเดียวกัน
+- `composables/useShowRelations.ts`   ใช้ได้ตรงๆ (ไม่มี admin dependency)
+- `components/admin/RelationTreeView.vue`   ย้ายไป `shared/` หรือ import จาก admin ก็ได้ (ไม่มี admin-specific logic)
+- `components/admin/HierarchyList.vue`   เช่นเดียวกัน
 
 **แนะนำ:** ย้าย `RelationTreeView.vue` และ `HierarchyList.vue` จาก `components/admin/` → `components/shared/` เพื่อให้ทั้ง admin และ public import ได้ แล้ว update import path ใน `AdminShowRelationsPage.vue`
 
@@ -119,9 +119,9 @@ cd apps/app-laravel && npm run typecheck
 | Item | Notes |
 |------|-------|
 | **Route ordering** | `/law/relations/:documentId?` ต้องอยู่ก่อน `/law/:documentId` ไม่งั้น "relations" จะถูก match เป็น documentId |
-| **Component location** | ย้าย RelationTreeView/HierarchyList ไป shared/ จะเปลี่ยน import path ใน AdminShowRelationsPage — safe แต่ต้อง update |
-| **Data source** | `useShowRelations.ts` เรียก `fetchReportSummary()` ที่ return `documents[]` — public user เข้าถึง API นี้ได้หรือไม่? ตรวจสอบ ReportController ว่าไม่มี auth guard |
-| **Performance** | หน้า admin load ทุก document เข้า memory สำหรับ tree build — ถ้า document เยอะอาจต้อง lazy load ใน public (scope นอก plan นี้) |
+| **Component location** | ย้าย RelationTreeView/HierarchyList ไป shared/ จะเปลี่ยน import path ใน AdminShowRelationsPage   safe แต่ต้อง update |
+| **Data source** | `useShowRelations.ts` เรียก `fetchReportSummary()` ที่ return `documents[]`   public user เข้าถึง API นี้ได้หรือไม่? ตรวจสอบ ReportController ว่าไม่มี auth guard |
+| **Performance** | หน้า admin load ทุก document เข้า memory สำหรับ tree build   ถ้า document เยอะอาจต้อง lazy load ใน public (scope นอก plan นี้) |
 
 ## Open Question
 

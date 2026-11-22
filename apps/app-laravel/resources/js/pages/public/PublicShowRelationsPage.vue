@@ -220,7 +220,7 @@
           </div>
           <div>
             <div class="rel-root__meta-label"><v-icon icon="mdi-office-building-outline" size="14" /> หน่วยงาน</div>
-            <div class="rel-root__meta-value">{{ selectedRow.org || '—' }}</div>
+            <div class="rel-root__meta-value">{{ selectedRow.org || ' ' }}</div>
           </div>
           <div v-if="rootMeta?.law_group">
             <div class="rel-root__meta-label"><v-icon icon="mdi-folder-outline" size="14" /> กลุ่มกฎหมาย</div>

@@ -1,4 +1,4 @@
-# Thai legal/government document vocabulary — not to be flagged by the spellchecker.
+# Thai legal/government document vocabulary   not to be flagged by the spellchecker.
 # One term per line; lines starting with # are comments.
 พระราชบัญญัติ
 ราชกิจจานุเบกษา
